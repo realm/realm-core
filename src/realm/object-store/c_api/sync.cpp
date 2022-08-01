@@ -379,6 +379,9 @@ RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t* conf
     config->stop_policy = SyncSessionStopPolicy(policy);
 }
 
+const char* realm_sync_error_original_file_path_key = SyncError::c_original_file_path_key;
+const char* realm_sync_error_recovery_file_path_key = SyncError::c_recovery_file_path_key;
+
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, realm_sync_error_handler_func_t handler,
                                                  realm_userdata_t userdata,
                                                  realm_free_userdata_func_t userdata_free) noexcept
@@ -393,8 +396,6 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
-        c_error.c_original_file_path_key = error.c_original_file_path_key;
-        c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         c_user_info.reserve(error.user_info.size());
@@ -404,6 +405,15 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
 
         c_error.user_info_map = c_user_info.data();
         c_error.user_info_length = c_user_info.size();
+
+        std::vector<realm_sync_error_compensating_write_info_t> c_compensating_writes;
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            c_compensating_writes.push_back({compensating_write.reason.c_str(),
+                                             compensating_write.object_name.c_str(),
+                                             to_capi(compensating_write.primary_key)});
+        }
+        c_error.compensating_writes = c_compensating_writes.data();
+        c_error.compensating_writes_length = c_compensating_writes.size();
 
         realm_sync_session_t c_session(session);
         handler(userdata.get(), &c_session, std::move(c_error));

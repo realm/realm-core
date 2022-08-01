@@ -3369,6 +3369,12 @@ typedef struct realm_sync_error_user_info {
     const char* value;
 } realm_sync_error_user_info_t;
 
+typedef struct realm_sync_error_compensating_write_info {
+    const char* reason;
+    const char* object_name;
+    realm_value_t primary_key;
+} realm_sync_error_compensating_write_info_t;
+
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
 // Pointers to this struct and its pointer members are only valid inside the scope
@@ -3376,15 +3382,20 @@ typedef struct realm_sync_error_user_info {
 typedef struct realm_sync_error {
     realm_sync_error_code_t error_code;
     const char* detailed_message;
-    const char* c_original_file_path_key;
-    const char* c_recovery_file_path_key;
     bool is_fatal;
     bool is_unrecognized_by_client;
     bool is_client_reset_requested;
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
+
+    realm_sync_error_compensating_write_info_t* compensating_writes;
+    size_t compensating_writes_length;
 } realm_sync_error_t;
+
+
+static const char* realm_sync_error_original_file_path_key;
+static const char* realm_sync_error_recovery_file_path_key;
 
 /**
  * Callback function invoked by the sync session once it has uploaded or download
