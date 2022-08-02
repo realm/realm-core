@@ -64,7 +64,7 @@ ObjLink Obj::get_link() const
     return ObjLink(m_table->get_key(), m_key);
 }
 
-const TableClusterTree* Obj::get_tree_top() const
+const ClusterTree* Obj::get_tree_top() const
 {
     if (m_key.is_unresolved()) {
         return m_table.unchecked_ptr()->m_tombstones.get();
@@ -1167,7 +1167,7 @@ bool Obj::ensure_writeable()
 {
     Allocator& alloc = get_alloc();
     if (alloc.is_read_only(m_mem.get_ref())) {
-        m_mem = const_cast<TableClusterTree*>(get_tree_top())->ensure_writeable(m_key);
+        m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
         m_storage_version = alloc.get_storage_version();
         return true;
     }
@@ -1178,7 +1178,7 @@ REALM_FORCEINLINE void Obj::sync(Node& arr)
 {
     auto ref = arr.get_ref();
     if (arr.has_missing_parent_update()) {
-        const_cast<TableClusterTree*>(get_tree_top())->update_ref_in_parent(m_key, ref);
+        const_cast<ClusterTree*>(get_tree_top())->update_ref_in_parent(m_key, ref);
     }
     if (m_mem.get_ref() != ref) {
         m_mem = arr.get_mem();

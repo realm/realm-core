@@ -193,7 +193,7 @@ void Cluster::create()
         }
         return false;
     };
-    m_tree_top.for_each_and_every_column(column_initialize);
+    m_tree_top.m_owner->for_each_and_every_column(column_initialize);
 
     // By specifying the minimum size, we ensure that the array has a capacity
     // to hold m_size 64 bit refs.
@@ -435,7 +435,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         }
         return false;
     };
-    m_tree_top.for_each_and_every_column(insert_in_column);
+    m_tree_top.m_owner->for_each_and_every_column(insert_in_column);
 }
 
 template <class T>
@@ -524,7 +524,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         }
         return false;
     };
-    m_tree_top.for_each_and_every_column(move_from_column);
+    m_tree_top.m_owner->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
         new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
@@ -943,7 +943,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         }
         return false;
     };
-    m_tree_top.for_each_and_every_column(erase_in_column);
+    m_tree_top.m_owner->for_each_and_every_column(erase_in_column);
 
     // Any remaining backlink columns to erase from?
     for (auto k : backlink_column_keys)
@@ -1293,7 +1293,7 @@ void Cluster::verify() const
         return false;
     };
 
-    m_tree_top.for_each_and_every_column(verify_column);
+    m_tree_top.m_owner->for_each_and_every_column(verify_column);
 #endif
 }
 
@@ -1314,7 +1314,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        m_tree_top.for_each_and_every_column([&](ColKey col) {
+        m_tree_top.m_owner->for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
                 ref_type ref = Array::get_as_ref(j);

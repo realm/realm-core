@@ -871,32 +871,18 @@ void Dictionary::migrate()
     class DictionaryClusterTree : public ClusterTree {
     public:
         DictionaryClusterTree(ArrayParent* owner, Allocator& alloc, size_t ndx)
-            : ClusterTree(alloc)
+            : ClusterTree(nullptr, alloc, ndx)
             , m_owner(owner)
-            , m_ndx_in_cluster(ndx)
         {
         }
 
-        ~DictionaryClusterTree() override{};
-        void update_indexes(ObjKey, const FieldValues&) final {}
-        void cleanup_key(ObjKey) final {}
-        void set_spec(ArrayPayload&, ColKey::Idx) const final {}
-        bool is_string_enum_type(ColKey::Idx) const final
-        {
-            return false;
-        }
-        const Table* get_owning_table() const noexcept final
-        {
-            return nullptr;
-        }
         std::unique_ptr<ClusterNode> get_root_from_parent() final
         {
-            return create_root_from_parent(m_owner, m_ndx_in_cluster);
+            return create_root_from_parent(m_owner, m_top_position_for_cluster_tree);
         }
 
     private:
         ArrayParent* m_owner;
-        size_t m_ndx_in_cluster;
     };
 
     if (auto dict_ref = m_obj._get<int64_t>(get_col_key().get_index())) {

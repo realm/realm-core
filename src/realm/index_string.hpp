@@ -24,7 +24,7 @@
 #include <array>
 
 #include <realm/array.hpp>
-#include <realm/table_cluster_tree.hpp>
+#include <realm/cluster_tree.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
@@ -115,7 +115,7 @@ static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
     {
@@ -124,14 +124,14 @@ public:
     {
         return m_cluster_tree->size();
     }
-    TableClusterTree::Iterator begin() const
+    ClusterTree::Iterator begin() const
     {
-        return TableClusterTree::Iterator(*m_cluster_tree, 0);
+        return ClusterTree::Iterator(*m_cluster_tree, 0);
     }
 
-    TableClusterTree::Iterator end() const
+    ClusterTree::Iterator end() const
     {
-        return TableClusterTree::Iterator(*m_cluster_tree, size());
+        return ClusterTree::Iterator(*m_cluster_tree, size());
     }
 
 
@@ -144,7 +144,7 @@ public:
     Mixed get_value(ObjKey key) const;
 
 private:
-    const TableClusterTree* m_cluster_tree;
+    const ClusterTree* m_cluster_tree;
     ColKey m_column_key;
 };
 
@@ -308,7 +308,7 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
+    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
         : m_column(cluster_tree, column_key)
     {
     }
