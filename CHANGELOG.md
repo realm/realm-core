@@ -2,13 +2,34 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 12.4.0 Release notes
+
+### Enhancements
 * Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * Expose MongoDB client interface in the C API. ([PR #5638](https://github.com/realm/realm-core/pull/5638)).
 * Add support in the C API for constructing a new `realm_app_t` object via `realm_app_create`. ([PR #5570](https://github.com/realm/realm-core/issues/5570))
 * Reduce use of memory mappings and virtual address space ([PR #5645](https://github.com/realm/realm-core/pull/5645)). Also fixes some errors (see below)
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix exception when decoding interned strings in realm-apply-to-state tool. ([PR #5628](https://github.com/realm/realm-core/pull/5628))
 * Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * Throw `runtime_error` if subscription set is requested and flexible sync is not enabled. ([PR #5637](https://github.com/realm/realm-core/pull/5637))
