@@ -403,9 +403,9 @@ TEST_CASE("Schema") {
                  {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", {{"value", PropertyType::Int}}},
             };
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::Sync),
-                "Asymmetric table with property 'object.link' of type 'object' cannot have an object type.");
+            REQUIRE_THROWS_CONTAINING(schema.validate(SchemaValidationMode::Sync),
+                                      "Asymmetric table with property 'object.link' of type 'object' cannot have a "
+                                      "non-embedded object type.");
         }
 
         SECTION("allow embedded objects with asymmetric sync") {
