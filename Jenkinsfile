@@ -48,18 +48,18 @@ jobWrapper {
             targetSHA1 = 'NONE'
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
-            } 
+            }
 
             isCoreCronJob = isCronJob()
             requireNightlyBuild = false
             if(isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
-        }   
+        }
 
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
-        println "Target branch: ${targetBranch}"        
+        println "Target branch: ${targetBranch}"
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
@@ -85,7 +85,7 @@ jobWrapper {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
-        
+
         if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
@@ -234,7 +234,7 @@ jobWrapper {
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
-                            dir(${publishingStash}) {
+                            dir(publishingStash) {
                                 unstash name: publishingStash
                                 def path = publishingStash.replaceAll('___', '/')
                                 def files = findFiles(glob: '**')
@@ -244,7 +244,7 @@ jobWrapper {
                                         s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
                                     }
                                 }
-                            } 
+                            }
                         }
                     }
                 }
