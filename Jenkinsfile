@@ -48,18 +48,18 @@ jobWrapper {
             targetSHA1 = 'NONE'
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
-            } 
+            }
 
             isCoreCronJob = isCronJob()
             requireNightlyBuild = false
             if(isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
-        }   
+        }
 
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
-        println "Target branch: ${targetBranch}"        
+        println "Target branch: ${targetBranch}"
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
@@ -85,7 +85,7 @@ jobWrapper {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
-        
+
         if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
@@ -234,7 +234,7 @@ jobWrapper {
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
-                            dir(${publishingStash}) {
+                            dir(publishingStash) {
                                 unstash name: publishingStash
                                 def path = publishingStash.replaceAll('___', '/')
                                 def files = findFiles(glob: '**')
@@ -244,7 +244,7 @@ jobWrapper {
                                         s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
                                     }
                                 }
-                            } 
+                            }
                         }
                     }
                 }
@@ -551,9 +551,9 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                                 adb connect emulator
                                 timeout 30m adb wait-for-device
                                 adb push test/realm-tests /data/local/tmp
-                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp/resources \\;
+                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp/resources \\;
+                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp/resources \\;
                                 adb shell 'cd /data/local/tmp; ${environment.join(' ')} ./realm-tests || echo __ADB_FAIL__' | tee adb.log
                                 ! grep __ADB_FAIL__ adb.log
                             """
