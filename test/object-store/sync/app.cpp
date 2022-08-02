@@ -3207,8 +3207,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         auto user1 = log_in(app);
         auto user2 = log_in(app, AppCredentials::anonymous(false));
         CHECK(user1 != user2);
-
-        App::clear_cached_apps();
     }
 }
 
