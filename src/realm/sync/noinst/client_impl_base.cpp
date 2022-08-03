@@ -2032,10 +2032,6 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     if (m_state != Active)
         return;
 
-    if (REALM_UNLIKELY(m_stopped_for_testing)) {
-        logger.debug("Stopped for testing. Won't process download message");
-        return;
-    }
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2090,6 +2086,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     receive_download_message_hook(progress, query_version, batch_state);
+
+    if (REALM_UNLIKELY(m_stopped_for_testing)) {
+        logger.debug("Stopped for testing. Won't process download message");
+        return;
+    }
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();

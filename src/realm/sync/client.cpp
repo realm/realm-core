@@ -683,7 +683,7 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
     return m_wrapper.m_client_reset_config;
 }
 
-struct ChangesetProtocolErrorComparor {
+struct ChangesetProtocolErrorComparator {
     bool operator()(const ProtocolErrorInfo& error_info, const Transformer::RemoteChangeset& changeset) const noexcept
     {
         return *error_info.pending_until_server_version < changeset.remote_version;
@@ -733,7 +733,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     if (!pending_errors.empty()) {
         std::vector<ProtocolErrorInfo> observed_pending_errors;
         std::set_intersection(pending_errors.begin(), pending_errors.end(), changesets.begin(), changesets.end(),
-                              std::back_inserter(observed_pending_errors), ChangesetProtocolErrorComparor{});
+                              std::back_inserter(observed_pending_errors), ChangesetProtocolErrorComparator{});
 
         for (const auto& error_info : observed_pending_errors) {
             SessionErrorInfo sess_err_info(error_info,

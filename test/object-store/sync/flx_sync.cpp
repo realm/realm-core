@@ -773,18 +773,20 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
-    auto test_obj_id = ObjectId::gen();
+    auto test_obj_id_1 = ObjectId::gen();
+    auto test_obj_id_2 = ObjectId::gen();
 
     create_user_and_log_in(harness.app());
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.cache = false;
 
     {
-        auto [error_received_promise, error_received_future] = util::make_promise_future<void>();
-        auto shared_error_received_promise = std::make_shared<util::Promise<void>>(std::move(error_received_promise));
+        auto error_received_pf = util::make_promise_future<void>();
+        auto [download_received_promise, download_received_future] = util::make_promise_future<void>();
+
         config.sync_config->on_error_message_received_hook =
-            [promise = std::move(shared_error_received_promise)](std::weak_ptr<SyncSession> weak_session,
-                                                                 const sync::ProtocolErrorInfo& info) mutable {
+            [promise = std::make_shared<util::Promise<void>>(std::move(error_received_pf.promise))](
+                std::weak_ptr<SyncSession> weak_session, const sync::ProtocolErrorInfo& info) mutable {
                 auto session = weak_session.lock();
                 if (!session) {
                     return true;
@@ -799,11 +801,29 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
                 return false;
             };
 
+
+        config.sync_config->on_download_message_received_hook =
+            [promise = std::make_shared<util::Promise<void>>(std::move(download_received_promise)),
+             &error_received_pf](std::weak_ptr<SyncSession> weak_session, const sync::SyncProgress&, int64_t,
+                                 sync::DownloadBatchState) mutable {
+                auto session = weak_session.lock();
+                if (!session) {
+                    return;
+                }
+                if (!error_received_pf.future.is_ready() || !promise) {
+                    return;
+                }
+
+                promise->emplace_value();
+                promise.reset();
+                session->close();
+            };
+
         auto realm = Realm::get_shared_realm(config);
         auto table = realm->read_group().get_table("class_TopLevel");
         auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
         std::move(new_query).commit();
 
         wait_for_upload(*realm);
@@ -813,12 +833,21 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         realm->begin_transaction();
         Object::create(c, realm, "TopLevel",
                        util::Any(AnyDict{
-                           {"_id", test_obj_id},
-                           {"queryable_str_field", std::string{"bizz"}},
+                           {"_id", test_obj_id_1},
+                           {"queryable_str_field", std::string{"foo"}},
                        }));
         realm->commit_transaction();
 
-        error_received_future.get();
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {"_id", test_obj_id_2},
+                           {"queryable_str_field", std::string{"baz"}},
+                       }));
+        realm->commit_transaction();
+
+        error_received_pf.future.get();
+        download_received_future.get();
         realm->sync_session()->shutdown_and_wait();
         config.sync_config->on_error_message_received_hook = {};
     }
@@ -840,40 +869,55 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         CHECK(sync_error.compensating_writes.size() == 1);
         auto write_info = sync_error.compensating_writes[0];
         CHECK(write_info.primary_key.is_type(type_ObjectId));
-        CHECK(write_info.primary_key.get_object_id() == test_obj_id);
+        CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
         CHECK(write_info.object_name == "TopLevel");
         CHECK_THAT(write_info.reason,
                    Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
     }
 
-    std::atomic<bool> error_message_received = false;
+    std::atomic<int> error_messages_received = 0;
     config.sync_config->on_error_message_received_hook =
-        [&error_message_received](std::weak_ptr<SyncSession>, const sync::ProtocolErrorInfo&) mutable {
-            error_message_received.store(true);
+        [&error_messages_received](std::weak_ptr<SyncSession>, const sync::ProtocolErrorInfo&) mutable {
+            error_messages_received.fetch_add(1);
             return true;
         };
+    config.sync_config->on_download_message_received_hook = {};
 
-    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-    auto shared_error_promise = std::make_shared<util::Promise<SyncError>>(std::move(error_promise));
+    std::mutex errors_mutex;
+    std::vector<SyncError> errors;
 
-    config.sync_config->error_handler = [promise = std::move(shared_error_promise)](std::shared_ptr<SyncSession>,
-                                                                                    SyncError error) {
-        promise->emplace_value(std::move(error));
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+        std::lock_guard<std::mutex> lk(errors_mutex);
+        errors.push_back(std::move(error));
     };
 
     auto realm = Realm::get_shared_realm(config);
     wait_for_upload(*realm);
     wait_for_download(*realm);
 
-    auto sync_error = error_future.get();
-    REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
-    auto write_info = sync_error.compensating_writes_info[0];
-    CHECK(write_info.primary_key.is_type(type_ObjectId));
-    CHECK(write_info.primary_key.get_object_id() == test_obj_id);
-    CHECK(write_info.object_name == "TopLevel");
-    CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
-    REQUIRE_FALSE(error_message_received.load());
+    {
+        REQUIRE(error_messages_received.load() == 1);
+        std::lock_guard<std::mutex> lk(errors_mutex);
 
+        REQUIRE(errors.size() == 2);
+        auto& sync_error = errors.front();
+
+        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        auto& write_info = sync_error.compensating_writes_info[0];
+        CHECK(write_info.primary_key.is_type(type_ObjectId));
+        CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
+        CHECK(write_info.object_name == "TopLevel");
+        CHECK_THAT(write_info.reason,
+                   Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
+
+        sync_error = errors.back();
+        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        write_info = sync_error.compensating_writes_info[0];
+        REQUIRE(write_info.primary_key.is_type(type_ObjectId));
+        REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
+        REQUIRE(write_info.object_name == "TopLevel");
+        REQUIRE(write_info.reason == util::format("write to '%1' in table \"TopLevel\" not allowed", test_obj_id_2));
+    }
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
 
@@ -895,8 +939,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     role.read = true;
     role.write =
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-    FLXSyncTestHarness::ServerSchema server_schema{
-        g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
+    FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
     auto make_error_handler = [] {
