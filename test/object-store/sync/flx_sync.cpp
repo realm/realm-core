@@ -82,7 +82,6 @@ const Schema g_simple_embedded_obj_schema{
     {"TopLevel",
      {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
       {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-      {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
       {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
     {"TopLevel_embedded_obj",
      ObjectSchema::ObjectType::Embedded,
@@ -802,9 +801,9 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
         auto realm = Realm::get_shared_realm(config);
         auto table = realm->read_group().get_table("class_TopLevel");
-        auto queryable_int_field = table->get_column_key("queryable_int_field");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(Query(table).equal(queryable_int_field, 100));
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
         std::move(new_query).commit();
 
         wait_for_upload(*realm);
@@ -815,8 +814,7 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         Object::create(c, realm, "TopLevel",
                        util::Any(AnyDict{
                            {"_id", test_obj_id},
-                           {"queryable_str_field", std::string{"foo"}},
-                           {"queryable_int_field", int64_t(75)},
+                           {"queryable_str_field", std::string{"bizz"}},
                        }));
         realm->commit_transaction();
 
@@ -898,7 +896,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     role.write =
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
     FLXSyncTestHarness::ServerSchema server_schema{
-        g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
+        g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
     auto make_error_handler = [] {
@@ -930,6 +928,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK(write_info.object_name == "TopLevel");
         CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring(error_msg_fragment));
     };
+
     SECTION("compensating write because of permission violation") {
         harness.do_with_new_user([&](auto user) {
             SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
