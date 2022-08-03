@@ -384,7 +384,7 @@ public:
         else if (left.m_from_list && right.m_from_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             // Eg: `{1, 2, 3} * {4, 5} > age`
-            throw std::runtime_error("Operations involving two lists are not supported");
+            throw std::logic_error("Operations involving two lists are not supported");
         }
         else if (!left.m_from_list && right.m_from_list) {
             // Right values come from link. Left must come from single row.
@@ -534,11 +534,15 @@ public:
         size_t right_size = right.m_from_list ? right.size() : 1;
         // remove duplicates to reduce comparison time in nested loops
         if (left_size > 2 && right_size > 2) {
+            // If we assume that there generally are less matches than mismatches then it makes
+            // sense to optimize for failing fast.
             if constexpr (realm::is_any_v<TCond, Greater, GreaterEqual>) {
+                // We fail faster if we compare smallest on left side with biggest on right side
                 std::sort(left.begin(), left.end());
                 std::sort(right.begin(), right.end(), std::greater<QueryValue>());
             }
             else if constexpr (realm::is_any_v<TCond, Less, LessEqual>) {
+                // We fail faster if we compare biggest on left side with smallest on right side
                 std::sort(left.begin(), left.end(), std::greater<QueryValue>());
                 std::sort(right.begin(), right.end());
             }
