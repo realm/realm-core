@@ -11,6 +11,12 @@ realm_callback_token_schema::~realm_callback_token_schema()
     realm::c_api::CBindingContext::get(*m_realm).schema_changed_callbacks().remove(m_token);
 }
 
+realm_refresh_callback_token::~realm_refresh_callback_token()
+{
+    realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
+}
+
+
 namespace realm::c_api {
 
 
@@ -173,6 +179,18 @@ RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t* realm,
         realm, CBindingContext::get(*realm).realm_changed_callbacks().add(std::move(func)));
 }
 
+RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t* realm,
+                                                                         realm_on_realm_refresh_func_t callback,
+                                                                         realm_userdata_t userdata,
+                                                                         realm_free_userdata_func_t userdata_free)
+{
+    util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
+        callback(userdata.get());
+    };
+    return new realm_refresh_callback_token(
+        realm, CBindingContext::get(*realm).realm_pending_refresh_callbacks().add(std::move(func)));
+}
+
 RLM_API bool realm_refresh(realm_t* realm)
 {
     return wrap_err([&]() {
@@ -226,6 +244,17 @@ CBindingContext& CBindingContext::get(SharedRealm realm)
     CBindingContext* ctx = dynamic_cast<CBindingContext*>(realm->m_binding_context.get());
     REALM_ASSERT(ctx != nullptr);
     return *ctx;
+}
+
+void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool)
+{
+    if (auto ptr = realm.lock()) {
+        auto version_id = ptr->read_transaction_version();
+        if (m_realm_pending_refresh_callbacks.invoke_if(version_id.version)) {
+            m_realm_pending_refresh_callbacks.remove(version_id.version);
+        }
+    }
+    m_realm_changed_callbacks.invoke();
 }
 
 } // namespace realm::c_api

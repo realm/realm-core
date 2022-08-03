@@ -142,7 +142,9 @@ using SharedUserdata = std::shared_ptr<void>;
 template <typename... Args>
 class CallbackRegistry {
 public:
-    uint64_t add(util::UniqueFunction<void(Args...)>&& callback)
+    using Callback_T = util::UniqueFunction<void(Args...)>;
+
+    uint64_t add(Callback_T&& callback)
     {
         uint64_t token = m_next_token++;
         m_callbacks.emplace_hint(m_callbacks.end(), token, std::move(callback));
@@ -159,6 +161,16 @@ public:
         for (auto& callback : m_callbacks) {
             callback.second(args...);
         }
+    }
+
+    bool invoke_if(uint64_t token, Args... args)
+    {
+        auto it = m_callbacks.lower_bound(token);
+        if (it != m_callbacks.end()) {
+            it->second(args...);
+            return true;
+        }
+        return false;
     }
 
 private:
