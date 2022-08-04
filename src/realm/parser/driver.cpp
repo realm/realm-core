@@ -35,18 +35,21 @@ const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
     return "";
 }
 
-const char* expression_cmp_type_to_str(ExpressionComparisonType type)
+const char* expression_cmp_type_to_str(util::Optional<ExpressionComparisonType> type)
 {
-    switch (type) {
-        case ExpressionComparisonType::Any:
-            return "ANY";
-        case ExpressionComparisonType::All:
-            return "ALL";
-        case ExpressionComparisonType::None:
-            return "NONE";
+    if (type) {
+        switch (*type) {
+            case ExpressionComparisonType::Any:
+                return "ANY";
+            case ExpressionComparisonType::All:
+                return "ALL";
+            case ExpressionComparisonType::None:
+                return "NONE";
+        }
     }
     return "";
 }
+
 
 static std::map<int, std::string> opstr = {
     {CompareNode::EQUAL, "="},
@@ -156,82 +159,103 @@ class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
         : Arguments(args.size())
+        , m_args([](const std::vector<Mixed>& list) -> std::vector<std::vector<Mixed>> {
+            std::vector<std::vector<Mixed>> ret;
+            for (const Mixed& m : list) {
+                ret.push_back({m});
+            }
+            return ret;
+        }(args))
+    {
+    }
+    MixedArguments(const std::vector<std::vector<Mixed>>& args)
+        : Arguments(args.size())
         , m_args(args)
     {
     }
     bool bool_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<bool>();
+        return m_args.at(n)[0].get<bool>();
     }
     long long long_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<int64_t>();
+        return m_args.at(n)[0].get<int64_t>();
     }
     float float_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<float>();
+        return m_args.at(n)[0].get<float>();
     }
     double double_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<double>();
+        return m_args.at(n)[0].get<double>();
     }
     StringData string_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<StringData>();
+        return m_args.at(n)[0].get<StringData>();
     }
     BinaryData binary_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<BinaryData>();
+        return m_args.at(n)[0].get<BinaryData>();
     }
     Timestamp timestamp_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<Timestamp>();
+        return m_args.at(n)[0].get<Timestamp>();
     }
     ObjectId objectid_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjectId>();
+        return m_args.at(n)[0].get<ObjectId>();
     }
     UUID uuid_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<UUID>();
+        return m_args.at(n)[0].get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<Decimal128>();
+        return m_args.at(n)[0].get<Decimal128>();
     }
     ObjKey object_index_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjKey>();
+        return m_args.at(n)[0].get<ObjKey>();
     }
     ObjLink objlink_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjLink>();
+        return m_args.at(n)[0].get<ObjLink>();
+    }
+    std::vector<Mixed> list_for_argument(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n);
     }
     bool is_argument_null(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).is_null();
+        return m_args.at(n).size() == 0 || m_args.at(n)[0].is_null();
+    }
+    bool is_argument_list(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n).size() > 1;
     }
     DataType type_for_argument(size_t n)
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get_type();
+        return m_args.at(n)[0].get_type();
     }
 
 private:
-    const std::vector<Mixed>& m_args;
+    const std::vector<std::vector<Mixed>> m_args;
 };
 
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
@@ -304,10 +328,11 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
 
-    auto left_is_constant = m_left->is_constant();
-    auto right_is_constant = m_right->is_constant();
+    const bool left_is_constant = m_left->is_constant();
+    const bool right_is_constant = m_right->is_constant();
+    const bool produces_multiple_values = m_left->is_list() || m_right->is_list();
 
-    if (left_is_constant && right_is_constant) {
+    if (left_is_constant && right_is_constant && !produces_multiple_values) {
         right = m_right->visit(drv, type);
         left = m_left->visit(drv, type);
         auto v_left = left->get_mixed();
@@ -417,7 +442,8 @@ Query EqualityNode::visit(ParserDriver* drv)
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
-            throw InvalidQueryArgError("The keypath following 'IN' must contain a list");
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list. Found '" +
+                                       r->description(drv->m_serializer_state) + "'");
         }
     }
 
@@ -464,8 +490,8 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
         else if (left_type == type_Link) {
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
-                link_column->get_comparison_type() == ExpressionComparisonType::Any) {
+            if (link_column && link_column->link_map().get_nb_hops() == 1 && link_column->get_comparison_type() &&
+                *link_column->get_comparison_type() == ExpressionComparisonType::Any) {
                 // We can use equal/not_equal and get a LinksToNode based query
                 if (op == CompareNode::EQUAL) {
                     return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
@@ -507,7 +533,8 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
-        if (dynamic_cast<PropNode*>(prop->prop)->comp_type != ExpressionComparisonType::All) {
+        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
+        if (!cmp_type || *cmp_type != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
@@ -1007,9 +1034,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::BASE64: {
             const size_t encoded_size = text.size() - 5;
             size_t buffer_size = util::base64_decoded_size(encoded_size);
-            drv->m_args.buffer_space.push_back({});
-            auto& decode_buffer = drv->m_args.buffer_space.back();
-            decode_buffer.resize(buffer_size);
+            std::string decode_buffer(buffer_size, char(0));
             StringData window(text.c_str() + 4, encoded_size);
             util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
             if (!decoded_size) {
@@ -1017,15 +1042,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
             decode_buffer.resize(*decoded_size); // truncate
-
+            drv->m_args.buffer_space.push_back(OwnedData{decode_buffer.data(), decode_buffer.size()});
+            const char* data = drv->m_args.buffer_space.back().data();
             if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<ConstantStringValue>(StringData(data, decode_buffer.size()));
             }
             if (hint == type_Binary) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
             }
             if (hint == type_Mixed) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
             }
             break;
         }
@@ -1107,9 +1133,28 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             break;
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
+            if (m_comp_type && !drv->m_args.is_argument_list(arg_no)) {
+                throw InvalidQueryError(util::format(
+                    "ANY/ALL/NONE are only allowed on arguments which contain a list but '%1' is not a list.",
+                    explain_value_message));
+            }
             if (drv->m_args.is_argument_null(arg_no)) {
                 explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = std::make_unique<Value<null>>(realm::null());
+            }
+            else if (drv->m_args.is_argument_list(arg_no)) {
+                std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
+                std::unique_ptr<Value<Mixed>> values = std::make_unique<Value<Mixed>>();
+                constexpr bool is_list = true;
+                values->init(is_list, mixed_list.size());
+                size_t ndx = 0;
+                for (auto& val : mixed_list) {
+                    values->set(ndx++, val);
+                }
+                if (m_comp_type) {
+                    values->set_comparison_type(*m_comp_type);
+                }
+                ret = std::move(values);
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
@@ -1208,7 +1253,64 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
-LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
+std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
+{
+    if (hint == type_TypeOfValue) {
+        try {
+            std::unique_ptr<Value<TypeOfValue>> ret = std::make_unique<Value<TypeOfValue>>();
+            constexpr bool is_list = true;
+            ret->init(is_list, elements.size());
+            ret->set_comparison_type(m_comp_type);
+            size_t ndx = 0;
+            for (auto constant : elements) {
+                std::unique_ptr<Subexpr> evaluated = constant->visit(drv, hint);
+                if (auto converted = dynamic_cast<Value<TypeOfValue>*>(evaluated.get())) {
+                    ret->set(ndx++, converted->get(0));
+                }
+                else {
+                    throw InvalidQueryError(util::format("Invalid constant inside constant list: %1",
+                                                         evaluated->description(drv->m_serializer_state)));
+                }
+            }
+            return ret;
+        }
+        catch (const std::runtime_error& e) {
+            throw InvalidQueryArgError(e.what());
+        }
+    }
+
+    std::unique_ptr<Value<Mixed>> ret = std::make_unique<Value<Mixed>>();
+    constexpr bool is_list = true;
+    ret->init(is_list, elements.size());
+    ret->set_comparison_type(m_comp_type);
+    size_t ndx = 0;
+    for (auto constant : elements) {
+        auto evaulated_constant = constant->visit(drv, hint);
+        if (auto value = dynamic_cast<const ValueBase*>(evaulated_constant.get())) {
+            REALM_ASSERT_EX(value->size() == 1, value->size());
+            Mixed mixed = value->get(0);
+            if (mixed.is_type(type_String)) {
+                StringData str = mixed.get_string();
+                drv->m_args.buffer_space.push_back(OwnedData{str.data(), str.size()});
+                ret->set(ndx++, StringData(drv->m_args.buffer_space.back().data(), str.size()));
+            }
+            else if (mixed.is_type(type_Binary)) {
+                BinaryData bin = mixed.get_binary();
+                drv->m_args.buffer_space.push_back(OwnedData{bin.data(), bin.size()});
+                ret->set(ndx++, BinaryData(drv->m_args.buffer_space.back().data(), bin.size()));
+            }
+            else {
+                ret->set(ndx++, value->get(0));
+            }
+        }
+        else {
+            throw InvalidQueryError("Invalid constant inside constant list");
+        }
+    }
+    return ret;
+}
+
+LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (std::string path_elem : path_elems) {
@@ -1229,7 +1331,7 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
             try {
                 link_chain.link(path_elem);
             }
-            // I case of exception, we have to throw InvalidQueryError
+            // In case of exception, we have to throw InvalidQueryError
             catch (const std::runtime_error& e) {
                 auto str = e.what();
                 StringData table_name = drv->get_printable_name(link_chain.get_current_table()->get_name());
@@ -1304,10 +1406,6 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
         throw InvalidQueryError(
             util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
                          left->description(state), right->description(state)));
-    }
-    if (left->has_multiple_values() && right->has_multiple_values()) {
-        throw InvalidQueryError(util::format("Comparison between two lists is not supported ('%1' and '%2')",
-                                             left->description(state), right->description(state)));
     }
     if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
         throw InvalidQueryError(util::format("Comparison between two constants is not supported ('%1' and '%2')",
@@ -1464,6 +1562,12 @@ std::string check_escapes(const char* str)
 
 } // namespace query_parser
 
+Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, {});
+}
+
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
 {
     MixedArguments args(arguments);
@@ -1471,6 +1575,13 @@ Query Table::query(const std::string& query_string, const std::vector<Mixed>& ar
 }
 
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                   const query_parser::KeyPathMapping& mapping) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, mapping);
+}
+
+Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
                    const query_parser::KeyPathMapping& mapping) const
 {
     MixedArguments args(arguments);
@@ -1565,7 +1676,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
         }
     }
     else {
-        if (m_comparison_type != ExpressionComparisonType::Any && list_count == 0) {
+        if (m_comparison_type && list_count == 0) {
             throw InvalidQueryError(util::format("The keypath following '%1' must contain a list",
                                                  expression_cmp_type_to_str(m_comparison_type)));
         }

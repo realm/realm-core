@@ -202,6 +202,11 @@ typedef struct realm_key_path_array {
     size_t nb_elements;
     realm_key_path_t* paths;
 } realm_key_path_array_t;
+typedef struct realm_query_arg {
+    size_t nb_args;
+    bool is_list;
+    realm_value_t* arg;
+} realm_query_arg_t;
 
 typedef struct realm_version_id {
     uint64_t version;
@@ -2198,7 +2203,7 @@ RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const re
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t target_table, const char* query_string,
-                                         size_t num_args, const realm_value_t* args);
+                                         size_t num_args, const realm_query_arg_t* args);
 
 
 /**
@@ -2225,7 +2230,7 @@ RLM_API const char* realm_query_get_description(realm_query_t*);
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_append_query(const realm_query_t*, const char* query_string, size_t num_args,
-                                                const realm_value_t* args);
+                                                const realm_query_arg_t* args);
 
 /**
  * Parse a query string and bind it to a list.
@@ -2242,7 +2247,7 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t*, const char
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, const char* query_string,
-                                                  size_t num_args, const realm_value_t* args);
+                                                  size_t num_args, const realm_query_arg_t* args);
 
 /**
  * Parse a query string and bind it to another query result.
@@ -2260,7 +2265,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results, const char* query_string,
-                                                     size_t num_args, const realm_value_t* args);
+                                                     size_t num_args, const realm_query_arg_t* args);
 
 /**
  * Count the number of objects found by this query.
