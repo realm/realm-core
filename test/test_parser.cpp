@@ -4022,7 +4022,7 @@ TEST(Parser_ListVsList)
 
     // None of {1, 2, 3} matches all of integers
     verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
-    verify_query(test_context, table, "ALL integers == ANY {1, 2, 3}", 1);
+    verify_query(test_context, table, "ALL integers == ANY {2, 1, 3}", 1);
     verify_query(test_context, table, "{7, 3, 8, 0} < integers", 1);
 
     TableView tv;

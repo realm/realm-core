@@ -270,6 +270,7 @@ public:
     void init(bool from_link_list, size_t nb_values)
     {
         m_from_list = from_link_list;
+        m_sorted = false;
         resize(nb_values);
     }
 
@@ -345,6 +346,13 @@ public:
     {
         return m_first + m_size;
     }
+    void sort()
+    {
+        if (!m_sorted) {
+            std::sort(begin(), end());
+            m_sorted = true;
+        }
+    }
     template <class TOperator>
     REALM_FORCEINLINE void fun_const(const ValueType& const_value, const ValueBase& right)
     {
@@ -408,84 +416,6 @@ public:
         }
     }
 
-    // Optimization for the left hand side being constant
-    template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(const ValueType& left, ValueBase& right,
-                                                  ExpressionComparisonType comparison)
-    {
-        TCond c;
-        const size_t sz = right.size();
-        if (!right.m_from_list) {
-            // ALL/NONE not supported for non list types
-            REALM_ASSERT_DEBUG(comparison == ExpressionComparisonType::Any);
-            for (size_t m = 0; m < sz; m++) {
-                if (c(left, right[m]))
-                    return m;
-            }
-        }
-        else {
-            for (size_t m = 0; m < sz; m++) {
-                bool match = c(left, right[m]);
-                if (match) {
-                    if (comparison == ExpressionComparisonType::Any) {
-                        return 0;
-                    }
-                    if (comparison == ExpressionComparisonType::None) {
-                        return not_found; // one matched
-                    }
-                }
-                else {
-                    if (comparison == ExpressionComparisonType::All) {
-                        return not_found;
-                    }
-                }
-            }
-            if (comparison == ExpressionComparisonType::None || comparison == ExpressionComparisonType::All) {
-                return 0; // either none or all
-            }
-        }
-        return not_found;
-    }
-
-    // Optimization for the right hand side being constant
-    template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(ValueBase& left, const ValueType& right,
-                                                  ExpressionComparisonType comparison)
-    {
-        TCond c;
-        const size_t sz = left.size();
-        if (!left.m_from_list) {
-            REALM_ASSERT_DEBUG(comparison ==
-                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
-            for (size_t m = 0; m < sz; m++) {
-                if (c(left[m], right))
-                    return m;
-            }
-        }
-        else {
-            for (size_t m = 0; m < sz; m++) {
-                bool match = c(left[m], right);
-                if (match) {
-                    if (comparison == ExpressionComparisonType::Any) {
-                        return 0;
-                    }
-                    if (comparison == ExpressionComparisonType::None) {
-                        return not_found; // one matched
-                    }
-                }
-                else {
-                    if (comparison == ExpressionComparisonType::All) {
-                        return not_found;
-                    }
-                }
-            }
-            if (comparison == ExpressionComparisonType::None || comparison == ExpressionComparisonType::All) {
-                return 0; // either none or all
-            }
-        }
-        return not_found;
-    }
-
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
     REALM_FORCEINLINE static size_t compare(ValueBase& left, ValueBase& right,
@@ -534,8 +464,8 @@ public:
         size_t right_size = right.m_from_list ? right.size() : 1;
 
         if (left_size > 2 && right_size > 2) {
-            std::sort(left.begin(), left.end());
-            std::sort(right.begin(), right.end());
+            left.sort();
+            right.sort();
 
             if constexpr (std::is_same_v<TCond, Equal>) {
                 if (compare_left != ExpressionComparisonType::None && compare_right == Compare::Any) {
@@ -685,6 +615,7 @@ private:
     QueryValue m_cache[prealloc];
     QueryValue* m_first = &m_cache[0];
     size_t m_size = 1;
+    bool m_sorted = false;
 
     void resize(size_t size)
     {
@@ -772,6 +703,11 @@ public:
     virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual bool has_constant_evaluation() const
+    {
+        return false;
+    }
+
+    virtual bool has_single_value() const
     {
         return false;
     }
@@ -1321,9 +1257,14 @@ public:
         return m_from_list;
     }
 
+    bool has_single_value() const override
+    {
+        return size() == 1;
+    }
+
     bool has_constant_evaluation() const override
     {
-        return !m_from_list;
+        return true;
     }
 
     util::Optional<ExpressionComparisonType> get_comparison_type() const final
@@ -3910,8 +3851,8 @@ public:
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
-        m_left_is_const = m_left->has_constant_evaluation();
-        m_right_is_const = m_right->has_constant_evaluation();
+        m_left_is_const = m_left->has_single_value();
+        m_right_is_const = m_right->has_single_value();
         if (m_left_is_const) {
             m_const_value = m_left->get_mixed();
         }
@@ -4041,15 +3982,13 @@ public:
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
-        m_left_is_const = m_left->has_constant_evaluation();
-        m_right_is_const = m_right->has_constant_evaluation();
-        if (m_left_is_const) {
-            m_const_value = m_left->get_mixed();
+        if (m_left->has_constant_evaluation()) {
+            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
         }
-        if (m_right_is_const) {
-            REALM_ASSERT(!m_left_is_const);
-            m_const_value = m_right->get_mixed();
+        if (m_right->has_constant_evaluation()) {
+            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
         }
+        REALM_ASSERT(!(m_left_const_values && m_right_const_values));
     }
 
     // See comment in base class
@@ -4073,15 +4012,24 @@ public:
     double init() override
     {
         double dT = 50.0;
-        if (m_left_is_const || m_right_is_const) {
+        if ((m_left->has_single_value()) || (m_right->has_single_value())) {
             dT = 10.0;
             if constexpr (std::is_same_v<TCond, Equal>) {
                 // If the property not being constant has a search index we can speed things up by
                 // finding all matches up front.
-                Subexpr* column = m_left_is_const ? m_right.get() : m_left.get();
+                Mixed const_value;
+                Subexpr* column;
+                if (m_left->has_single_value()) {
+                    const_value = m_left->get_mixed();
+                    column = m_right.get();
+                }
+                else {
+                    const_value = m_right->get_mixed();
+                    column = m_left.get();
+                }
 
                 if (column->has_search_index() && *column->get_comparison_type() == ExpressionComparisonType::Any) {
-                    if (m_const_value.is_null()) {
+                    if (const_value.is_null()) {
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,
                         // so we must compute the slow matching even if there is an index.
@@ -4093,12 +4041,12 @@ public:
                         }
                     }
                     else {
-                        if (column->get_type() != m_const_value.get_type()) {
+                        if (column->get_type() != const_value.get_type()) {
                             // If the type we are looking for is not the same type as the target
                             // column, we cannot use the index
                             return dT;
                         }
-                        m_matches = column->find_all(m_const_value);
+                        m_matches = column->find_all(const_value);
                     }
                     // Sort
                     std::sort(m_matches.begin(), m_matches.end());
@@ -4177,47 +4125,25 @@ public:
         }
 
         size_t match;
-        ValueBase left;
-        ValueBase right;
+        ValueBase left_buf;
+        ValueBase right_buf;
         const util::Optional<ExpressionComparisonType> left_cmp_type = m_left->get_comparison_type();
         const util::Optional<ExpressionComparisonType> right_cmp_type = m_right->get_comparison_type();
-        if (m_left_is_const) {
-            const ExpressionComparisonType right_evaluated_cmp_type =
-                right_cmp_type.value_or(ExpressionComparisonType::Any);
-            for (; start < end;) {
-                m_right->evaluate(start, right);
-                match = ValueBase::compare_const<TCond>(m_const_value, right, right_evaluated_cmp_type);
-                if (match != not_found && match + start < end)
-                    return start + match;
 
-                size_t rows = right.m_from_list ? 1 : right.size();
-                start += rows;
-            }
-        }
-        else if (m_right_is_const) {
-            const ExpressionComparisonType left_evaluated_cmp_type =
-                left_cmp_type.value_or(ExpressionComparisonType::Any);
-            for (; start < end;) {
-                m_left->evaluate(start, left);
-                match = ValueBase::compare_const<TCond>(left, m_const_value, left_evaluated_cmp_type);
-                if (match != not_found && match + start < end)
-                    return start + match;
+        ValueBase* left = m_left_const_values ? m_left_const_values : &left_buf;
+        ValueBase* right = m_right_const_values ? m_right_const_values : &right_buf;
 
-                size_t rows = left.m_from_list ? 1 : left.size();
-                start += rows;
-            }
-        }
-        else {
-            for (; start < end;) {
-                m_left->evaluate(start, left);
-                m_right->evaluate(start, right);
-                match = ValueBase::template compare<TCond>(left, right, left_cmp_type, right_cmp_type);
-                if (match != not_found && match + start < end)
-                    return start + match;
+        for (; start < end;) {
+            if (!m_left_const_values)
+                m_left->evaluate(start, left_buf);
+            if (!m_right_const_values)
+                m_right->evaluate(start, right_buf);
+            match = ValueBase::template compare<TCond>(*left, *right, left_cmp_type, right_cmp_type);
+            if (match != not_found && match + start < end)
+                return start + match;
 
-                size_t rows = (left.m_from_list || right.m_from_list) ? 1 : minimum(right.size(), left.size());
-                start += rows;
-            }
+            size_t rows = (left->m_from_list || right->m_from_list) ? 1 : minimum(right->size(), left->size());
+            start += rows;
         }
 
         return not_found; // no match
@@ -4247,23 +4173,20 @@ private:
     Compare(const Compare& other)
         : m_left(other.m_left->clone())
         , m_right(other.m_right->clone())
-        , m_left_is_const(other.m_left_is_const)
-        , m_right_is_const(other.m_right_is_const)
     {
-        if (m_left_is_const) {
-            m_const_value = m_left->get_mixed();
+        if (m_left->has_constant_evaluation()) {
+            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
         }
-        if (m_right_is_const) {
-            m_const_value = m_right->get_mixed();
+        if (m_right->has_constant_evaluation()) {
+            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
         }
     }
 
     std::unique_ptr<Subexpr> m_left;
     std::unique_ptr<Subexpr> m_right;
     const Cluster* m_cluster;
-    bool m_left_is_const;
-    bool m_right_is_const;
-    QueryValue m_const_value;
+    ValueBase* m_left_const_values = nullptr;
+    ValueBase* m_right_const_values = nullptr;
     bool m_has_matches = false;
     std::vector<ObjKey> m_matches;
     mutable size_t m_index_get = 0;
