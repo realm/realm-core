@@ -532,26 +532,54 @@ public:
 
         size_t left_size = left.m_from_list ? left.size() : 1;
         size_t right_size = right.m_from_list ? right.size() : 1;
-        // remove duplicates to reduce comparison time in nested loops
+
         if (left_size > 2 && right_size > 2) {
-            // If we assume that there generally are less matches than mismatches then it makes
-            // sense to optimize for failing fast.
-            if constexpr (realm::is_any_v<TCond, Greater, GreaterEqual>) {
-                // We fail faster if we compare smallest on left side with biggest on right side
-                std::sort(left.begin(), left.end());
-                std::sort(right.begin(), right.end(), std::greater<QueryValue>());
+            std::sort(left.begin(), left.end());
+            std::sort(right.begin(), right.end());
+
+            if constexpr (std::is_same_v<TCond, Equal>) {
+                if (compare_left != ExpressionComparisonType::None && compare_right == Compare::Any) {
+                    // Optimization with O(n) complexity
+                    const bool any = compare_left == ExpressionComparisonType::Any;
+                    size_t left_idx = 0;
+                    size_t right_idx = 0;
+                    while (right_idx < right_size) {
+                        if (c(left[left_idx], right[right_idx])) {
+                            left_idx++;
+                            right_idx++;
+                            if (any || left_idx == left_size) {
+                                return 0;
+                            }
+                        }
+                        else {
+                            if (left[left_idx] < right[right_idx]) {
+                                if (any && left_idx < left_size) {
+                                    left_idx++;
+                                }
+                                else {
+                                    return not_found;
+                                }
+                            }
+                            else {
+                                right_idx++;
+                            }
+                        }
+                    }
+                    return not_found;
+                }
             }
-            else if constexpr (realm::is_any_v<TCond, Less, LessEqual>) {
-                // We fail faster if we compare biggest on left side with smallest on right side
-                std::sort(left.begin(), left.end(), std::greater<QueryValue>());
-                std::sort(right.begin(), right.end());
+            else if constexpr (realm::is_any_v<TCond, Greater, GreaterEqual, Less, LessEqual>) {
+                // Only consider first and last
+                left[1] = left[left_size - 1];
+                left_size = 2;
+                right[1] = right[right_size - 1];
+                right_size = 2;
             }
             else {
-                std::sort(left.begin(), left.end());
-                std::sort(right.begin(), right.end());
+                // remove duplicates to reduce comparison time in nested loops
+                left_size = std::unique(left.begin(), left.end()) - left.begin();
+                right_size = std::unique(right.begin(), right.end()) - right.begin();
             }
-            left_size = std::unique(left.begin(), left.end()) - left.begin();
-            right_size = std::unique(right.begin(), right.end()) - right.begin();
         }
 
         if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
