@@ -1,7 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Allow multiple anonymous sessions. ([PR #5693](https://github.com/realm/realm-core/pull/5693)).
+* Introducing query parser support for constant list expressions such as `fruit IN {'apple', 'orange'}`. This also includes general query support for list vs list matching such as `NONE fruits IN {'apple', 'orange'}`. ([Issue #4266](https://github.com/realm/realm-core/issues/4266))
 
 ### Fixed
 * Fix error message when validating outgoing links from asymmetric objects to non-embedded objects. ([PR #5702](https://github.com/realm/realm-core/pull/5702))
