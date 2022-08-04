@@ -401,7 +401,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type == type_Link && right_type == type_TypedLink && right->has_constant_evaluation()) {
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_single_value()) {
         if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
             if (right->get_mixed().is_null()) {
                 right_type = ColumnTypeTraits<realm::null>::id;
@@ -448,7 +448,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (right->has_constant_evaluation() && (left_type == right_type || left_type == type_Mixed)) {
+    if (right->has_single_value() && (left_type == right_type || left_type == type_Mixed)) {
         Mixed val = right->get_mixed();
         if (prop && !prop->links_exist()) {
             auto col_key = prop->column_key();
@@ -557,8 +557,8 @@ Query RelationalNode::visit(ParserDriver* drv)
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
-    const bool right_type_is_null = right->has_constant_evaluation() && right->get_mixed().is_null();
-    const bool left_type_is_null = left->has_constant_evaluation() && left->get_mixed().is_null();
+    const bool right_type_is_null = right->has_single_value() && right->get_mixed().is_null();
+    const bool left_type_is_null = left->has_single_value() && left->get_mixed().is_null();
     REALM_ASSERT(!(left_type_is_null && right_type_is_null));
 
     if (left_type == type_Link || left_type == type_TypeOfValue) {
@@ -574,7 +574,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+    if (prop && !prop->links_exist() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         switch (left->get_type()) {
@@ -633,7 +633,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
 
     verify_only_string_types(right_type, opstr[op]);
 
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+    if (prop && !prop->links_exist() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {
@@ -1412,7 +1412,7 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
                                              left->description(state), right->description(state)));
     }
     if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
-        if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {
+        if (link_column->has_multiple_values() && right->has_single_value() && right->get_mixed().is_null()) {
             throw InvalidQueryError(
                 util::format("Cannot compare linklist ('%1') with NULL", left->description(state)));
         }
