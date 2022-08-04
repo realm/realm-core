@@ -1056,6 +1056,20 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
+    SECTION("realm notify when pending refresh") {
+        bool realm_pending_refresh = false;
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_pending_refresh, [](void*) {}));
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+        CHECK(realm_pending_refresh);
+    }
+
     SECTION("schema is set after opening") {
         const realm_class_info_t baz = {
             "baz",

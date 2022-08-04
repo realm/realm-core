@@ -1,0 +1,17 @@
+diff a/src/realm/object-store/c_api/sync.cpp b/src/realm/object-store/c_api/sync.cpp	(rejected hunks)
+@@ -962,12 +962,12 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
+     SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
+ }
+ 
+-RLM_API bool realm_sync_shutdown_and_delete_realm(const realm_sync_session_t* session,
+-                                                  const char* realm_path, bool* did_delete)
++RLM_API bool realm_sync_shutdown_and_delete_realm(const realm_sync_session_t* session, const char* realm_path,
++                                                  bool* did_delete)
+ {
+     REALM_ASSERT(session);
+     REALM_ASSERT(realm_path);
+-    return wrap_err([&](){
++    return wrap_err([&]() {
+         (*session)->shutdown_and_wait();
+         return realm_delete_files(realm_path, did_delete);
+     });

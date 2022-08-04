@@ -1,0 +1,165 @@
+diff --git a/src/realm/set.hpp b/src/realm/set.hpp
+index 18d97812e..9b4dcf485 100644
+--- a/src/realm/set.hpp
++++ b/src/realm/set.hpp
+@@ -95,7 +95,7 @@ public:
+ 
+     template <class Func>
+     void find_all(const T& value, Func&& func) const;
+-    
++
+     bool is_subset_of(const CollectionBase&) const;
+     bool is_strict_subset_of(const CollectionBase& rhs) const;
+     bool is_superset_of(const CollectionBase& rhs) const;
+@@ -115,9 +115,9 @@ public:
+     size_t find(T value) const;
+ 
+     /// Erase an element from the set, returning true if the set contained the element.
+-    template<bool AllNull = true>
++    template <bool AllNull = true>
+     std::pair<size_t, bool> erase(T value);
+-    
++
+     // Overriding members of CollectionBase:
+     size_t size() const final;
+     bool is_null(size_t ndx) const final;
+@@ -272,7 +272,7 @@ private:
+     static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
+ 
+     T get_internal(std::size_t) const;
+-    
++
+     std::pair<size_t, bool> erase_all_nulls(T value);
+ };
+ 
+@@ -641,13 +641,12 @@ template <class Func>
+ void Set<T>::find_all(const T& value, Func&& func) const
+ {
+     auto it = find_impl(value);
+-    
+-    if(it == end())
+-    {
++
++    if (it == end()) {
+         func(not_found);
+         return;
+     }
+-        
++
+     while (it != end() && SetElementEquals<T>{}(*it, value)) {
+         func(it.index());
+         it += 1;
+@@ -702,11 +701,11 @@ template <class T>
+ template <bool AllNull>
+ std::pair<size_t, bool> Set<T>::erase(T value)
+ {
+-    if constexpr(std::is_same_v<Mixed, T> && AllNull) {
+-        if(value.is_null())
++    if constexpr (std::is_same_v<Mixed, T> && AllNull) {
++        if (value.is_null())
+             return erase_null();
+     }
+-    
++
+     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
+     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
+         return {npos, false};
+@@ -746,7 +745,7 @@ template <class T>
+ std::pair<size_t, bool> Set<T>::erase_null()
+ {
+     const auto& res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
+-    if(res.second)
++    if (res.second)
+         return erase_null();
+     return res;
+ }
+diff --git a/test/test_mixed_null_assertions.cpp b/test/test_mixed_null_assertions.cpp
+index b0ab62bcd..33a9091ac 100644
+--- a/test/test_mixed_null_assertions.cpp
++++ b/test/test_mixed_null_assertions.cpp
+@@ -100,17 +100,17 @@ TEST(Mixed_List_unresolved_as_null)
+         // find all mixed nulls or unresolved link should work the same way
+         int cnt = 0;
+         list.find_all(realm::null(), [this, &cnt](size_t pos) {
+-            if(cnt == 0)
++            if (cnt == 0)
+                 CHECK(pos == 0);
+-            else if(cnt == 1)
++            else if (cnt == 1)
+                 CHECK(pos == 2);
+             cnt += 1;
+         });
+         cnt = 0;
+         list.find_all(obj1, [this, &cnt](size_t pos) {
+-            if(cnt == 0)
++            if (cnt == 0)
+                 CHECK(pos == 0);
+-            else if(cnt == 1)
++            else if (cnt == 1)
+                 CHECK(pos == 2);
+             cnt += 1;
+         });
+@@ -181,7 +181,7 @@ TEST(Mixed_Set_unresolved_as_null)
+     CHECK(success1);
+ 
+     {
+-        //null treated as invalalid link
++        // null treated as invalalid link
+         CHECK(set.size() == 2);
+         auto [it, success] = set.insert(Mixed{});
+         CHECK(!success);
+@@ -218,9 +218,9 @@ TEST(Mixed_Set_unresolved_as_null)
+         CHECK(indices[0] == 0);
+         CHECK(indices[1] == 1);
+     }
+-    
++
+     {
+-        //trigger interface exception, we ended up with multiple nulls
++        // trigger interface exception, we ended up with multiple nulls
+         Group g;
+         auto t = g.add_table("foo");
+         t->add_column_set(type_Mixed, "mixeds");
+@@ -239,21 +239,21 @@ TEST(Mixed_Set_unresolved_as_null)
+         CHECK(set.is_null(0));
+         CHECK(!set.is_null(1));
+         obj2.invalidate();
+-        //this is the only violation we allow right now, we have ended up with 2 nulls
++        // this is the only violation we allow right now, we have ended up with 2 nulls
+         CHECK(set.is_null(0));
+         CHECK(set.is_null(1));
+         auto obj3 = t->create_object();
+         set.insert(obj3);
+         CHECK(set.size() == 3);
+         int cnt = 0;
+-        //we can now do find_all for nulls
++        // we can now do find_all for nulls
+         set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
+             CHECK(index == 0 || index == 1);
+             CHECK(set.is_null(index));
+             cnt += 1;
+         });
+         CHECK(cnt == 2);
+-        //erase null will erase all the nulls
++        // erase null will erase all the nulls
+         set.erase_null();
+         CHECK(set.size() == 1);
+         auto obj4 = t->create_object();
+@@ -261,7 +261,7 @@ TEST(Mixed_Set_unresolved_as_null)
+         set.insert(obj4);
+         set.insert(obj5);
+         CHECK(set.size() == 3);
+-        //erase all the nulls by default
++        // erase all the nulls by default
+         obj4.invalidate();
+         obj5.invalidate();
+         set.erase(Mixed{});
+@@ -272,7 +272,7 @@ TEST(Mixed_Set_unresolved_as_null)
+         set.insert(obj7);
+         CHECK(set.size() == 3);
+         obj6.invalidate();
+-        //remove only the first null
++        // remove only the first null
+         set.erase<false>(Mixed{});
+         CHECK(set.size() == 2);
+     }
