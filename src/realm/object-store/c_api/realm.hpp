@@ -27,6 +27,13 @@ class CBindingContext : public BindingContext {
 public:
     static CBindingContext& get(SharedRealm realm);
 
+    CBindingContext() = default;
+    CBindingContext(SharedRealm realm)
+        : BindingContext()
+    {
+        this->realm = realm;
+    }
+
     CallbackRegistry<>& realm_changed_callbacks()
     {
         return m_realm_changed_callbacks;

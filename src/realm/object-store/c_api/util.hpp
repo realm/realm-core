@@ -163,14 +163,13 @@ public:
         }
     }
 
-    bool invoke_if(uint64_t token, Args... args)
+    void invoke_if(uint64_t expected, Args... args)
     {
-        auto it = m_callbacks.lower_bound(token);
-        if (it != m_callbacks.end()) {
-            it->second(args...);
-            return true;
+        for (const auto& [current, callback] : m_callbacks) {
+            if (current <= expected) {
+                callback(args...);
+            }
         }
-        return false;
     }
 
 private:

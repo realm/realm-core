@@ -238,7 +238,7 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
 CBindingContext& CBindingContext::get(SharedRealm realm)
 {
     if (!realm->m_binding_context) {
-        realm->m_binding_context.reset(new CBindingContext());
+        realm->m_binding_context.reset(new CBindingContext(realm));
     }
 
     CBindingContext* ctx = dynamic_cast<CBindingContext*>(realm->m_binding_context.get());
@@ -250,9 +250,7 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
 {
     if (auto ptr = realm.lock()) {
         auto version_id = ptr->read_transaction_version();
-        if (m_realm_pending_refresh_callbacks.invoke_if(version_id.version)) {
-            m_realm_pending_refresh_callbacks.remove(version_id.version);
-        }
+        m_realm_pending_refresh_callbacks.invoke_if(version_id.version);
     }
     m_realm_changed_callbacks.invoke();
 }
