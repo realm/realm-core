@@ -115,7 +115,7 @@ public:
 
 private:
     Status m_status;
-    util::Optional<T> m_value;
+    util::Optional<T> m_value{};
 };
 
 template <typename T, typename... Args>
