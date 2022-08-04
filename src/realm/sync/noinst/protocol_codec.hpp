@@ -273,8 +273,7 @@ public:
                     info.message = json["message"];
                     info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
-                    info.server_requests_action =
-                        util::make_optional<sync::ProtocolErrorInfo::Action>(string_to_action(json["action"]));
+                    info.server_requests_action = string_to_action(json["action"]); // Throws
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
                         info.resumption_delay_interval.emplace();
@@ -470,6 +469,8 @@ private:
             {"ApplicationBug", action::ApplicationBug},
             {"Warning", action::Warning},
             {"Transient", action::Transient},
+            {"LogOut", action::LogOut},
+            {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
         };
@@ -477,7 +478,7 @@ private:
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
             return action_it->second;
         }
-        REALM_UNREACHABLE();
+        throw ProtocolCodecException(util::format("unexpected Action '%1' received from the server", action_string));
     }
 
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();

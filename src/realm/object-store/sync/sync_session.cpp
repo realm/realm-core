@@ -180,6 +180,7 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
         auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
+        user_facing_error.server_requests_action = realm::sync::ProtocolErrorInfo::Action::LogOut;
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
@@ -323,10 +324,10 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     });
 }
 
-void SyncSession::download_fresh_realm(util::Optional<sync::ProtocolErrorInfo::Action> server_requests_action)
+void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
 {
     // first check that recovery will not be prevented
-    if (server_requests_action && *server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
+    if (server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
         auto mode = config(&SyncConfig::client_resync_mode);
         if (mode == ClientResyncMode::Recover) {
             handle_fresh_realm_downloaded(
@@ -425,9 +426,8 @@ void SyncSession::download_fresh_realm(util::Optional<sync::ProtocolErrorInfo::A
     sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(
-    DBRef db, util::Optional<std::string> error_message,
-    util::Optional<sync::ProtocolErrorInfo::Action> server_requests_action)
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+                                                sync::ProtocolErrorInfo::Action server_requests_action)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
@@ -466,7 +466,7 @@ void SyncSession::handle_fresh_realm_downloaded(
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        m_server_requests_action = server_requests_action.value_or(sync::ProtocolErrorInfo::Action::ClientReset);
+        m_server_requests_action = server_requests_action;
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
@@ -500,45 +500,30 @@ void SyncSession::handle_error(SyncError error)
         delete_file = ShouldBackup::yes;
     }
     else if (error_code.category() == realm::sync::protocol_error_category()) {
-        SimplifiedProtocolError simplified =
-            get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
-        if (error.server_requests_action) {
-            // we have specific instructions from the server concerning client resets
-            switch (*error.server_requests_action) {
-                case sync::ProtocolErrorInfo::Action::ClientReset:
-                    [[fallthrough]];
-                case sync::ProtocolErrorInfo::Action::ClientResetNoRecovery:
-                    simplified = SimplifiedProtocolError::ClientResetRequested;
-                    break;
-                default:
-                    if (simplified == SimplifiedProtocolError::ClientResetRequested) {
-                        // Server says not to do a client reset, but the client wants
-                        // to do one; make a fatal (non-reset) error instead.
-                        simplified = SimplifiedProtocolError::UnexpectedInternalIssue;
-                    }
-            }
-        }
-        switch (simplified) {
-            case SimplifiedProtocolError::ConnectionIssue:
+        switch (error.server_requests_action) {
+            case sync::ProtocolErrorInfo::Action::NoAction:
+                REALM_UNREACHABLE(); // This is not sent by the MongoDB server
+            case sync::ProtocolErrorInfo::Action::ApplicationBug:
+                [[fallthrough]];
+            case sync::ProtocolErrorInfo::Action::ProtocolViolation:
+                next_state = NextStateAfterError::inactive;
+                break;
+            case sync::ProtocolErrorInfo::Action::Warning:
+                break; // not fatal, but should be bubbled up to the user below.
+            case sync::ProtocolErrorInfo::Action::Transient:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case SimplifiedProtocolError::UnexpectedInternalIssue:
-                break; // fatal: bubble these up to the user below
-            case SimplifiedProtocolError::SessionIssue:
-                // The SDK doesn't need to be aware of these because they are strictly informational, and do not
-                // represent actual errors.
-                return;
-            case SimplifiedProtocolError::CompensatingWrite:
-                break; // not fatal, but should be bubbled up to the user below.
-            case SimplifiedProtocolError::BadAuthentication:
+            case sync::ProtocolErrorInfo::Action::LogOut:
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
                 break;
-            case SimplifiedProtocolError::PermissionDenied:
+            case sync::ProtocolErrorInfo::Action::DeleteRealm:
                 next_state = NextStateAfterError::inactive;
                 delete_file = ShouldBackup::no;
                 break;
-            case SimplifiedProtocolError::ClientResetRequested:
+            case sync::ProtocolErrorInfo::Action::ClientReset:
+                [[fallthrough]];
+            case sync::ProtocolErrorInfo::Action::ClientResetNoRecovery:
                 switch (config(&SyncConfig::client_resync_mode)) {
                     case ClientResyncMode::Manual:
                         next_state = NextStateAfterError::inactive;
@@ -765,11 +750,11 @@ void SyncSession::create_sync_session()
     }
     session_config.custom_http_headers = sync_config.custom_http_headers;
 
-    if (m_server_requests_action) {
-        const bool allowed_to_recover = *m_server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset;
+    if (m_server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
+        const bool allowed_to_recover = m_server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset;
         session_config.client_reset_config =
             make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
-        m_server_requests_action = util::none;
+        m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
     m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
@@ -831,20 +816,8 @@ void SyncSession::create_sync_session()
             if (error) {
                 SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal(),
                                      error->log_url, std::move(error->compensating_writes)};
-                // If `action` is sent by the server, it takes precedence over `shouldClientReset` and
-                // `isRecoveryModeDisabled`.
+                // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
                 sync_error.server_requests_action = error->server_requests_action;
-                if (!sync_error.server_requests_action && error->should_client_reset) {
-                    if (*error->should_client_reset) {
-                        sync_error.server_requests_action =
-                            error->client_reset_recovery_is_disabled
-                                ? sync::ProtocolErrorInfo::Action::ClientResetNoRecovery
-                                : sync::ProtocolErrorInfo::Action::ClientReset;
-                    }
-                    else {
-                        sync_error.server_requests_action = sync::ProtocolErrorInfo::Action::Transient;
-                    }
-                }
                 self->handle_error(std::move(sync_error));
             }
         });

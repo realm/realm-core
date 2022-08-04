@@ -741,6 +741,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
             realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
                                        "A fake client reset error", true);
+            synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, synthetic);
 
             session->revive_if_needed();

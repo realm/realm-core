@@ -206,7 +206,17 @@ struct ResumptionDelayInfo {
 };
 
 struct ProtocolErrorInfo {
-    enum class Action { ProtocolViolation, ApplicationBug, Warning, Transient, ClientReset, ClientResetNoRecovery };
+    enum class Action {
+        NoAction,
+        ProtocolViolation,
+        ApplicationBug,
+        Warning,
+        Transient,
+        LogOut,
+        DeleteRealm,
+        ClientReset,
+        ClientResetNoRecovery
+    };
 
     ProtocolErrorInfo() = default;
     ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
@@ -215,7 +225,7 @@ struct ProtocolErrorInfo {
         , try_again(do_try_again)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
-        , server_requests_action(util::none)
+        , server_requests_action(Action::NoAction)
     {
     }
     int raw_error_code = 0;
@@ -226,7 +236,7 @@ struct ProtocolErrorInfo {
     util::Optional<std::string> log_url;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     util::Optional<ResumptionDelayInfo> resumption_delay_interval;
-    util::Optional<Action> server_requests_action;
+    Action server_requests_action;
 
     bool is_fatal() const
     {
@@ -378,6 +388,8 @@ constexpr bool session_level_error_requires_suspend(ProtocolError error)
 inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action action)
 {
     switch (action) {
+        case ProtocolErrorInfo::Action::NoAction:
+            return o << "NoAction";
         case ProtocolErrorInfo::Action::ProtocolViolation:
             return o << "ProtocolViolation";
         case ProtocolErrorInfo::Action::ApplicationBug:
@@ -386,6 +398,10 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "Warning";
         case ProtocolErrorInfo::Action::Transient:
             return o << "Transient";
+        case ProtocolErrorInfo::Action::LogOut:
+            return o << "LogOut";
+        case ProtocolErrorInfo::Action::DeleteRealm:
+            return o << "DeleteRealm";
         case ProtocolErrorInfo::Action::ClientReset:
             return o << "ClientReset";
         case ProtocolErrorInfo::Action::ClientResetNoRecovery:

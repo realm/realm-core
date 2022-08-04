@@ -1189,8 +1189,9 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
-                info.raw_error_code, info.try_again, session_ident); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4, error_action=%5)",
+                info.message, info.raw_error_code, info.try_again, session_ident,
+                info.server_requests_action); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {

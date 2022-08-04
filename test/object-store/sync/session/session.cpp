@@ -491,7 +491,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         SECTION("transitions to Inactive if a fatal error occurs") {
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
+            SyncError err{code, "Not a real error message", true};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             CHECK(sessions_are_inactive(*session));
             // The session shouldn't report fatal errors when in the dying state.
             CHECK(!error_handler_invoked);
@@ -501,7 +503,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             // Fire a simulated *non-fatal* error.
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+            SyncError err{code, "Not a real error message", false};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);
         }
