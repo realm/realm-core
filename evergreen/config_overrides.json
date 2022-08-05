@@ -9,5 +9,8 @@
       "unownedEventSubscriptionPollingPeriodSeconds": 2,
       "staleOwnedJobPollingPeriodSec": 2
     }
+  },
+  "sync": {
+    "brokerRegistryCacheTTL": "0s"
   }
 }
