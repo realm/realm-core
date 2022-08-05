@@ -99,12 +99,14 @@ public:
     const T& get_value() const
     {
         REALM_ASSERT_DEBUG(is_ok());
+        REALM_ASSERT_RELEASE(m_value);
         return *m_value;
     }
 
     T& get_value()
     {
         REALM_ASSERT_DEBUG(is_ok());
+        REALM_ASSERT_RELEASE(m_value);
         return *m_value;
     }
 
