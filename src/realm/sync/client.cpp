@@ -760,7 +760,13 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
         return true;
     }
-    process_pending_flx_bootstrap();
+
+    try {
+        process_pending_flx_bootstrap();
+    }
+    catch (const IntegrationException& e) {
+        on_integration_failure(e, batch_state);
+    }
 
     return true;
 }
@@ -780,44 +786,44 @@ void SessionImpl::process_pending_flx_bootstrap()
     VersionInfo new_version;
     DownloadCursor download_cursor;
     int64_t query_version = -1;
-    try {
-        while (bootstrap_store->has_pending()) {
-            auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
-            if (!pending_batch.progress) {
-                logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-                bootstrap_store->clear();
-                return;
-            }
-
-            auto batch_state =
-                pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
-            uint64_t downloadable_bytes = 0;
-            query_version = pending_batch.query_version;
-
-            if (batch_state == DownloadBatchState::LastInBatch) {
-                update_progress(*pending_batch.progress);
-            }
-
-            history.integrate_server_changesets(
-                *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-                pending_batch.changesets.size(), new_version, batch_state, logger,
-                [&](const TransactionRef& tr) {
-                    bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
-                },
-                get_transact_reporter());
-            download_cursor = pending_batch.progress->download;
-
-            logger.info(
-                "Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                "%3. %4 changesets remaining in bootstrap",
-                pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                pending_batch.remaining);
+    while (bootstrap_store->has_pending()) {
+        auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
+        if (!pending_batch.progress) {
+            logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            bootstrap_store->clear();
+            return;
         }
-        on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
+
+        auto batch_state =
+            pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
+        uint64_t downloadable_bytes = 0;
+        query_version = pending_batch.query_version;
+        bool simulate_integration_error =
+            (m_wrapper.m_simulate_integration_error && !pending_batch.changesets.empty());
+        if (simulate_integration_error) {
+            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
+        }
+
+
+        if (batch_state == DownloadBatchState::LastInBatch) {
+            update_progress(*pending_batch.progress);
+        }
+
+        history.integrate_server_changesets(
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
+            pending_batch.changesets.size(), new_version, batch_state, logger,
+            [&](const TransactionRef& tr) {
+                bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
+            },
+            get_transact_reporter());
+        download_cursor = pending_batch.progress->download;
+
+        logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
+                    "%3. %4 changesets remaining in bootstrap",
+                    pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
+                    pending_batch.remaining);
     }
-    catch (const IntegrationException& e) {
-        on_integration_failure(e, DownloadBatchState::LastInBatch);
-    }
+    on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
 
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();
@@ -1253,8 +1259,9 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         m_actualized = true;
     }
     catch (...) {
-        if (was_created)
+        if (was_created) {
             m_client.remove_connection(conn);
+        }
         throw;
     }
 
@@ -1390,10 +1397,7 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 {
     m_suspended = true;
     if (m_connection_state_change_listener) {
-        ClientImpl::Connection& conn = m_sess->get_connection();
-        if (conn.get_state() != ConnectionState::disconnected) {
-            m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
-        }
+        m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
     }
 }
 

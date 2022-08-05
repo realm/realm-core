@@ -1169,6 +1169,7 @@ inline void ClientImpl::Connection::voluntary_disconnect()
 }
 
 inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info)
+
 {
     REALM_ASSERT(m_reconnect_info.m_reason && !was_voluntary(*m_reconnect_info.m_reason));
     disconnect(info); // Throws
