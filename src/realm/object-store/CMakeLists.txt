@@ -13,6 +13,7 @@ set(SOURCES
     object_store.cpp
     results.cpp
     schema.cpp
+    sectioned_results.cpp
     set.cpp
     shared_realm.cpp
     thread_safe_reference.cpp
@@ -54,6 +55,7 @@ set(HEADERS
     property.hpp
     results.hpp
     schema.hpp
+    sectioned_results.hpp
     set.hpp
     shared_realm.hpp
     thread_safe_reference.hpp

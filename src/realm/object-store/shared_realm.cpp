@@ -194,12 +194,22 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
-    return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
+    // If there is a subscription store, then return the latest set
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
+        return flx_sub_store->get_latest();
+    }
+    // Otherwise, throw runtime_error
+    throw std::runtime_error("Flexible sync is not enabled");
 }
 
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
-    return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
+    // If there is a subscription store, then return the active set
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
+        return flx_sub_store->get_active();
+    }
+    // Otherwise, throw runtime_error
+    throw std::runtime_error("Flexible sync is not enabled");
 }
 #endif
 
@@ -962,6 +972,9 @@ void Realm::commit_transaction()
     }
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
+    if (auto audit = audit_context()) {
+        audit->prepare_for_write(prev_version);
+    }
 
     m_coordinator->commit_write(*this, /* commit_to_disk */ true);
     cache_new_schema();

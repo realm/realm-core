@@ -14,7 +14,6 @@ endif()
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
-include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
@@ -23,8 +22,11 @@ include(CheckCXXSourceRuns)
 
 include(CodeCoverage)
 
-# Get accurate git-describe version
-git_describe(REALM_VERSION)
+if(NOT DEFINED REALM_VERSION)
+    # Get accurate git-describe version
+    include(GetGitRevisionDescription)
+    git_describe(REALM_VERSION)
+endif()
 set(PROJECT_VERSION ${DEP_VERSION})
 
 # Project-wide build flags
@@ -198,7 +200,6 @@ endif()
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
-option(REALM_BUILD_DOGLESS "Build server with support for emitting statsd" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
@@ -310,26 +311,7 @@ set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
-# Include additional CMakeLists
 add_subdirectory(src)
-add_subdirectory(external/catch)
-
-# This disables a c++17 feature that Apple doesn't support yet and Catch2 uses
-# The following define could be removed if we drop support for MacOS 10.12
-target_compile_definitions(Catch2 PRIVATE
-    CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
-    PRIVATE _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
-)
-
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
-endif()
-
-if (REALM_BUILD_DOGLESS)
-    set(REALM_HAVE_DOGLESS ON)
-    add_subdirectory(src/dogless)
-endif()
 
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
@@ -338,6 +320,19 @@ install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 if(REALM_CORE_SUBMODULE_BUILD)
     return()
 endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
+endif()
+
+add_subdirectory(external/catch EXCLUDE_FROM_ALL)
+
+# Cmake does not let us easily set the deployment target per-target, but Catch2
+# can use modern features because we only run tests on recent OS versions.
+target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 
 # Enable CTest and include unit tests
 enable_testing()

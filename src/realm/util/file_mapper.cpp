@@ -240,10 +240,10 @@ static void ensure_reclaimer_thread_runs()
 struct ReclaimerThreadStopper {
     ~ReclaimerThreadStopper()
     {
-            if (reclaimer_thread) {
-                reclaimer_shutdown = true;
-                reclaimer_thread->join();
-            }
+        if (reclaimer_thread) {
+            reclaimer_shutdown = true;
+            reclaimer_thread->join();
+        }
     }
 } reclaimer_thread_stopper;
 #else // REALM_PLATFORM_APPLE
@@ -262,7 +262,9 @@ static void ensure_reclaimer_thread_runs()
         }
         reclaimer_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, reclaimer_queue);
         dispatch_source_set_timer(reclaimer_timer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_SEC);
-        dispatch_source_set_event_handler(reclaimer_timer, ^{ reclaim_pages(); });
+        dispatch_source_set_event_handler(reclaimer_timer, ^{
+            reclaim_pages();
+        });
         dispatch_resume(reclaimer_timer);
     }
 }
@@ -273,7 +275,8 @@ struct ReclaimerThreadStopper {
         if (reclaimer_timer) {
             dispatch_source_cancel(reclaimer_timer);
             // Block until any currently-running timer tasks are done
-            dispatch_sync(reclaimer_queue, ^{});
+            dispatch_sync(reclaimer_queue, ^{
+                          });
             dispatch_release(reclaimer_timer);
             dispatch_release(reclaimer_queue);
         }
@@ -294,21 +297,13 @@ size_t get_num_decrypted_pages()
     return num_decrypted_pages.load();
 }
 
-decrypted_memory_stats_t get_decrypted_memory_stats()
-{
-    decrypted_memory_stats_t retval;
-    retval.memory_size = num_decrypted_pages.load() * page_size();
-    retval.reclaimer_target = reclaimer_target.load() * page_size();
-    retval.reclaimer_workload = reclaimer_workload.load() * page_size();
-    return retval;
-}
-
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
     ensure_reclaimer_thread_runs();
-    auto j = std::find_if(info.readers.begin(), info.readers.end(),
-                          [=](auto& reader) { return reader.reader_ID == reader_id; });
+    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto& reader) {
+        return reader.reader_ID == reader_id;
+    });
     if (j == info.readers.end()) {
         ReaderInfo i = {reader_id, info.current_version};
         info.readers.push_back(i);
@@ -502,6 +497,7 @@ SharedFileInfo* get_file_info_for_file(File& file)
         return it->info.get();
 }
 
+
 namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
                                   const char* encryption_key)
@@ -644,6 +640,28 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
     }
 }
 
+
+EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
+                                      const char* encryption_key)
+{
+    return add_mapping(addr, 0, fd, offset, access, encryption_key);
+}
+
+void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
+                              size_t new_size)
+{
+    LockGuard lock(mapping_mutex);
+    auto m = find_mapping_for_addr(addr, old_size);
+    REALM_ASSERT(m);
+    m->size = new_size;
+    mapping->extend_to(offset, new_size);
+}
+
+void remove_encrypted_mapping(void* addr, size_t size)
+{
+    remove_mapping(addr, size);
+}
+
 void* mmap_reserve(FileDesc fd, size_t reservation_size, File::AccessMode access, size_t offset_in_file,
                    const char* enc_key, EncryptedFileMapping*& mapping)
 {
@@ -691,7 +709,7 @@ void* mmap_anon(size_t size)
 
     ULARGE_INTEGER s;
     s.QuadPart = size;
-    
+
     hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
     if (hMapFile == NULL) {
         throw std::system_error(GetLastError(), std::system_category(), "CreateFileMapping() failed");
@@ -721,6 +739,7 @@ void* mmap_anon(size_t size)
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key)
 {
+    _impl::SimulatedFailure::trigger_mmap(size);
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
@@ -974,5 +993,5 @@ void msync(FileDesc fd, void* addr, size_t size)
     }
 #endif
 }
-}
-}
+} // namespace util
+} // namespace realm

@@ -47,7 +47,6 @@
 #include "util/demangle.hpp"
 #include "util/semaphore.hpp"
 #include "util/thread_wrapper.hpp"
-#include "util/mock_metrics.hpp"
 #include "util/compare_groups.hpp"
 
 using namespace realm;
@@ -123,7 +122,6 @@ ClientHistory& get_history(DBRef db)
 {
     return get_replication(db).get_history();
 }
-
 
 TEST(Sync_BadVirtualPath)
 {
@@ -1804,7 +1802,7 @@ TEST(Sync_HTTP404NotFound)
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
 
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
+    util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
     util::network::Endpoint endpoint = server.listen_endpoint();
@@ -1910,7 +1908,7 @@ TEST(Sync_HTTP_ContentLength)
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
 
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
+    util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
     util::network::Endpoint endpoint = server.listen_endpoint();
@@ -1939,474 +1937,6 @@ TEST(Sync_HTTP_ContentLength)
 
     server.stop();
     server_thread.join();
-}
-
-
-// The Sync_HttpApiOk sends a HTTP request to a running sync server with url
-// prefix /api/ and checks the various api endpoints.
-TEST(Sync_HttpApi)
-{
-    TEST_DIR(server_dir);
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    std::string server_address = "localhost";
-
-    Server::Config server_config;
-    server_config.logger = &server_logger;
-    server_config.listen_address = server_address;
-    server_config.listen_port = "";
-    server_config.tcp_no_delay = true;
-
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
-    Server server(server_dir, std::move(public_key), server_config);
-    server.start();
-
-    ThreadWrapper server_thread;
-    server_thread.start([&] {
-        server.run();
-    });
-
-    const util::network::Endpoint& endpoint = server.listen_endpoint();
-
-    // url = /api/ok
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/ok";
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Ok);
-        CHECK(!response.body);
-    }
-
-    // url = /api/x
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/x";
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Forbidden);
-        CHECK_EQUAL(response.body, "no access token");
-    }
-
-    // url = /api/x with admin access token
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/x";
-        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::NotFound);
-    }
-
-    // url = /api/info with admin access token
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/info";
-        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Ok);
-        CHECK(response.body);
-        const char* prefix = "Realm sync server\n\n";
-        size_t prefix_len = strlen(prefix);
-        CHECK(response.body->length() >= prefix_len && response.body->substr(0, prefix_len) == prefix);
-    }
-
-    // url = /api/info with non-admin access token
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/info";
-        request.headers["Authorization"] = _impl::make_authorization_header(g_user_0_token);
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Forbidden);
-        CHECK_EQUAL(response.body, "must be admin");
-    }
-
-    server.stop();
-    server_thread.join();
-}
-
-
-// This test checks that a custom authorization header name
-// can be set in the sync server config.
-TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
-{
-    TEST_DIR(server_dir);
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    std::string server_address = "localhost";
-
-    Server::Config server_config;
-    server_config.logger = &server_logger;
-    server_config.listen_address = server_address;
-    server_config.listen_port = "";
-    server_config.tcp_no_delay = true;
-    server_config.authorization_header_name = "X-Alternative-Name";
-
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
-    Server server(server_dir, std::move(public_key), server_config);
-    server.start();
-
-    ThreadWrapper server_thread;
-    server_thread.start([&] {
-        server.run();
-    });
-
-    const util::network::Endpoint& endpoint = server.listen_endpoint();
-
-    // Correct authorization header.
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/info";
-        request.headers["X-Alternative-Name"] = _impl::make_authorization_header(g_signed_test_user_token);
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Ok);
-        CHECK(response.body);
-        const char* prefix = "Realm sync server\n\n";
-        size_t prefix_len = strlen(prefix);
-        CHECK(response.body->length() >= prefix_len && response.body->substr(0, prefix_len) == prefix);
-    }
-
-    // Incorrect authorization header.
-    {
-        util::HTTPRequest request;
-        request.method = util::HTTPMethod::Get;
-        request.path = "/api/info";
-        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
-        HTTPRequestClient client(logger, endpoint, request);
-        client.fetch_response();
-        const util::HTTPResponse& response = client.get_response();
-        CHECK_EQUAL(response.status, util::HTTPStatus::Forbidden);
-        CHECK_EQUAL(response.body, "no access token");
-    }
-
-    server.stop();
-    server_thread.join();
-}
-
-
-#if 0
-// FIXME: This test does not pass always - CHECK_LESS(size_after_1, size_before_1) fails sometimes.
-//        Is this test still relevant?
-// This test creates a sync server and a sync client. The sync client uploads
-// data to two Realms.
-//
-// The sizes of the Realms are found.  A HTTP request for "/api/compact" is
-// sent to the server. It is checked that the Realms are smaller.
-//
-// Another client is made that downloads the data through full sync and it is
-// verified that it ends up with the same data as the uploading client.
-//
-// This cycle is repeated: Create more data, compact, check sizes, verify
-// correctness.
-TEST(Sync_HttpApiCompact)
-{
-    TEST_DIR(server_dir);
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
-
-    ClientServerFixture fixture(server_dir, test_context);
-    fixture.start();
-
-    Session session_1 = fixture.make_bound_session(db_1, "/db_1");
-    std::unique_ptr<Replication> history_1 = make_client_replication();
-    auto db_1 = DB::create(*history_1, path_1);
-
-    Session session_2 = fixture.make_bound_session(db_2, "/db_2");
-    std::unique_ptr<Replication> history_2 = make_client_replication();
-    auto db_2 = DB::create(*history_2, path_2);
-
-    auto create_schema = [](Session& sess, DBRef db) {
-        WriteTransaction wt(db);
-        TableRef table = wt.get_group().add_table_with_primary_key("class_items", type_String, "a");
-        table->add_column(type_Int, "i");
-        version_type new_version = wt.commit();
-        sess.nonsync_transact_notify(new_version);
-    };
-    create_schema(session_1, db_1);
-    create_schema(session_2, db_2);
-
-    auto insert_objects = [](WriteTransaction& wt, size_t counter, int number_of_objects) {
-        TableRef table = wt.get_table("class_items");
-
-        for (int i = 0; i < number_of_objects; ++i) {
-            std::string pk_str = std::to_string(counter) + "_" + std::to_string(i);
-            StringData pk{pk_str};
-            Obj obj = table->create_object_with_primary_key(pk);
-            obj.set(table->get_column_key("i"), i);
-        }
-    };
-
-    size_t counter = 0;
-
-    for (size_t i = 0; i < 1; ++i) {
-        WriteTransaction wt{db_1};
-        insert_objects(wt, counter, 400);
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
-        ++counter;
-    }
-
-    for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt{db_2};
-        insert_objects(wt, counter, 300);
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
-        ++counter;
-    }
-
-    session_1.wait_for_upload_complete_or_client_stopped();
-    session_2.wait_for_upload_complete_or_client_stopped();
-
-    std::string server_realm_file_1 = fixture.map_virtual_to_real_path("/db_1");
-    std::string server_realm_file_2 = fixture.map_virtual_to_real_path("/db_2");
-    CHECK(util::File::exists(server_realm_file_1));
-    CHECK(util::File::exists(server_realm_file_2));
-
-    size_t size_before_1 = util::File{server_realm_file_1}.get_size();
-    size_t size_before_2 = util::File{server_realm_file_2}.get_size();
-
-    // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
-
-    size_t size_after_1 = util::File{server_realm_file_1}.get_size();
-    size_t size_after_2 = util::File{server_realm_file_2}.get_size();
-
-    CHECK_LESS(size_after_1, size_before_1);
-    CHECK_LESS(size_after_2, size_before_2);
-
-    auto check_groups = [&](DBRef db_external, const std::string& server_path) {
-        TEST_CLIENT_DB(db);
-        Session session = fixture.make_bound_session(db, server_path);
-        session.wait_for_download_complete_or_client_stopped();
-
-        auto db = DB::create(make_client_replication(), path);
-        ReadTransaction rt_1(db);
-        ReadTransaction rt_2(db_external);
-        CHECK(compare_groups(rt_1, rt_2));
-        session.detach();
-        fixture.wait_for_session_terminations_or_client_stopped();
-    };
-
-    check_groups(db_1, "/db_1");
-    check_groups(db_2, "/db_2");
-
-    // First cycle is complete. Repeat. The amount of data is slightly
-    // changes.
-
-    for (size_t i = 0; i < 2; ++i) {
-        WriteTransaction wt{db_1};
-        insert_objects(wt, counter, 700);
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
-        ++counter;
-    }
-
-    for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt{db_2};
-        insert_objects(wt, counter, 300);
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
-        ++counter;
-    }
-
-    session_1.wait_for_upload_complete_or_client_stopped();
-    session_2.wait_for_upload_complete_or_client_stopped();
-
-    size_before_1 = util::File{server_realm_file_1}.get_size();
-    size_before_2 = util::File{server_realm_file_2}.get_size();
-
-    // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
-
-    size_after_1 = util::File{server_realm_file_1}.get_size();
-    size_after_2 = util::File{server_realm_file_2}.get_size();
-
-    CHECK_LESS(size_after_1, size_before_1);
-    CHECK_LESS(size_after_2, size_before_2);
-
-    check_groups(db_1, "/db_1");
-    check_groups(db_2, "/db_2");
-}
-
-#endif // _WIN32
-
-
-// Sync_RealmDeletion creates a client realm, uploads a changeset,
-// exercises the Realm deletion HTTP request, and verifies that
-// the Realm (including .lock and .management) is gone and that
-// the session has been disabled.
-// The test also verifies that the Realm isn't deleted if the
-// request lacks proper Authorization.
-void test_realm_deletion(unit_test::TestContext& test_context, bool disable_state_realms)
-{
-    REALM_ASSERT(disable_state_realms);
-
-    TEST_DIR(server_dir);
-    TEST_CLIENT_DB(db);
-
-    {
-        WriteTransaction wt{db};
-        wt.add_table("class_table-1");
-        wt.commit();
-    }
-
-    ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, std::move(config));
-
-    std::string server_path = "/test";
-    std::string server_realm_file = fixture.map_virtual_to_real_path(server_path);
-    std::string server_realm_file_lock = server_realm_file + ".lock";
-    std::string server_realm_file_management = server_realm_file + ".management";
-
-    bool session_is_disabled = false;
-
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::server_file_deleted, ec);
-        session_is_disabled = true;
-        fixture.stop();
-    };
-
-    fixture.set_client_side_error_handler(error_handler);
-    Session session = fixture.make_bound_session(db, server_path);
-    fixture.start();
-    session.wait_for_upload_complete_or_client_stopped();
-
-    CHECK(util::File::exists(server_realm_file));
-    CHECK(util::File::exists(server_realm_file_lock));
-    CHECK(util::File::exists(server_realm_file_management));
-
-    // Send a HTTP request to delete the Realm without Authorization
-    CHECK_EQUAL(util::HTTPStatus::Forbidden, fixture.send_http_delete_request(server_path, ""));
-
-    // The server realm is still there
-    CHECK(util::File::exists(server_realm_file));
-    CHECK(util::File::exists(server_realm_file_lock));
-    CHECK(util::File::exists(server_realm_file_management));
-
-    // Send a HTTP request to delete the Realm without Authorization
-    CHECK_EQUAL(util::HTTPStatus::Forbidden, fixture.send_http_delete_request(server_path, ""));
-
-    // The server realm is still there
-    CHECK(util::File::exists(server_realm_file));
-    CHECK(util::File::exists(server_realm_file_lock));
-    CHECK(util::File::exists(server_realm_file_management));
-
-    // Send a HTTP request to delete the Realm with Authorization
-    // for another Realm.
-    CHECK_EQUAL(util::HTTPStatus::Forbidden,
-                fixture.send_http_delete_request(server_path, g_signed_test_user_token_for_path));
-
-    // The server realm is still there
-    CHECK(util::File::exists(server_realm_file));
-    CHECK(util::File::exists(server_realm_file_lock));
-    CHECK(util::File::exists(server_realm_file_management));
-
-    // Send a HTTP request to delete the Realm with admin Authorization
-    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(server_path));
-
-    // The realm is deleted
-    CHECK(!util::File::exists(server_realm_file));
-    CHECK(!util::File::exists(server_realm_file_lock));
-    CHECK(!util::File::exists(server_realm_file_management));
-
-    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_table-2");
-    });
-
-    session.wait_for_upload_complete_or_client_stopped();
-
-    CHECK(session_is_disabled);
-    CHECK(!util::File::exists(server_realm_file));
-    CHECK(!util::File::exists(server_realm_file_lock));
-    CHECK(!util::File::exists(server_realm_file_management));
-}
-
-
-TEST(Sync_RealmDeletionWhenStateRealmsDisabled)
-{
-    test_realm_deletion(test_context, true);
-}
-
-
-// Sync_RealmDeletionEmptyDir creates a client realm, uploads a changeset,
-// exercises the Realm deletion HTTP request, and verifies that
-// the Realm (including .lock and .management) and all directories
-// made empty by removing the realm are removed as well.
-TEST(Sync_RealmDeletionEmptyDir)
-{
-    TEST_DIR(server_dir);
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
-
-    ClientServerFixture fixture(server_dir, test_context);
-    fixture.start();
-
-    std::string server_path = "/u/project/task/test";
-    std::string server_realm_file = fixture.map_virtual_to_real_path(server_path);
-    std::string server_realm_file_lock = server_realm_file + ".lock";
-    std::string server_realm_file_management = server_realm_file + ".management";
-    std::string server_task_dir = util::parent_dir(server_realm_file);
-    std::string server_project_dir = util::parent_dir(server_task_dir);
-    std::string server_u_dir = util::parent_dir(server_project_dir);
-
-    // Create the Realm at path = /u/project/task/test. This Realm will be deleted later.
-    {
-        {
-            WriteTransaction wt{db_1};
-            wt.add_table("class_table-1");
-            wt.commit();
-        }
-
-        Session session = fixture.make_bound_session(db_1, server_path);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    // Create another Realm at path = /u/test. This Realm will not be deleted.
-    {
-        {
-            WriteTransaction wt{db_2};
-            wt.add_table("class_table-1");
-            wt.commit();
-        }
-
-        Session session = fixture.make_bound_session(db_2, "/u/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    CHECK(util::File::exists(server_u_dir));
-    CHECK(util::File::exists(server_project_dir));
-    CHECK(util::File::exists(server_task_dir));
-    CHECK(util::File::exists(server_realm_file));
-    CHECK(util::File::exists(server_realm_file_lock));
-    CHECK(util::File::exists(server_realm_file_management));
-
-    // Send a HTTP request to delete the Realm with admin Authorization
-    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(server_path));
-
-    // server_u_dir should still exist.
-    CHECK(util::File::exists(server_u_dir));
-
-    // Check that the realm and the empty parent directories are deleted
-    CHECK(!util::File::exists(server_project_dir));
-    CHECK(!util::File::exists(server_task_dir));
-    CHECK(!util::File::exists(server_realm_file));
-    CHECK(!util::File::exists(server_realm_file_lock));
-    CHECK(!util::File::exists(server_realm_file_management));
 }
 
 
@@ -3289,19 +2819,19 @@ TEST(Sync_SSL_Certificate_1)
 {
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = true;
-    session_config.ssl_trust_certificate_path = ca_dir + "/root-ca/crt.pem";
+    session_config.ssl_trust_certificate_path = ca_dir + "crt.pem";
 
     Session session = fixture.make_session(db, std::move(session_config));
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
@@ -3319,19 +2849,19 @@ TEST(Sync_SSL_Certificate_2)
     bool did_fail = false;
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = true;
-    session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
+    session_config.ssl_trust_certificate_path = ca_dir + "dns-chain.crt.pem";
 
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
         CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
@@ -3357,19 +2887,19 @@ TEST(Sync_SSL_Certificate_3)
 {
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = false;
-    session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
+    session_config.ssl_trust_certificate_path = ca_dir + "dns-chain.crt.pem";
 
     Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
@@ -3384,19 +2914,19 @@ TEST(Sync_SSL_Certificate_DER)
 {
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = true;
-    session_config.ssl_trust_certificate_path = ca_dir + "/certs/localhost-chain.crt.cer";
+    session_config.ssl_trust_certificate_path = ca_dir + "localhost-chain.crt.cer";
 
     Session session = fixture.make_session(db, std::move(session_config));
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
@@ -3416,7 +2946,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
 {
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     Session::port_type server_port_ssl;
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port, const char*,
@@ -3428,8 +2958,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, config};
 
@@ -3456,7 +2986,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     bool did_fail = false;
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     Session::port_type server_port_ssl;
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
@@ -3478,8 +3008,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, config};
 
@@ -3511,7 +3041,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
 {
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
     Session::port_type server_port_ssl = 0;
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
@@ -3537,8 +3067,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
 
     ClientServerFixture::Config config;
     config.enable_server_ssl = true;
-    config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
-    config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
+    config.server_ssl_certificate_path = ca_dir + "localhost-chain.crt.pem";
+    config.server_ssl_certificate_key_path = ca_dir + "localhost-server.key.pem";
 
     ClientServerFixture fixture{server_dir, test_context, config};
 
@@ -3984,7 +3514,7 @@ TEST(Sync_UploadDownloadProgress_3)
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
 
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
+    util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
     auto server_port = server.listen_endpoint().port();
@@ -4293,7 +3823,7 @@ TEST(Sync_UploadDownloadProgress_6)
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
 
-    util::Optional<PKey> public_key = PKey::load_public(g_test_server_key_path);
+    util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
 
@@ -5269,43 +4799,6 @@ TEST(Sync_ReadOnlyClientSideHistoryTrim)
     CHECK_LESS(util::File{db_1_path}.get_size(), 0x400000);
 }
 
-#if 0 // FIXME: enable when history and file format upgrade is implemented
-TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
-{
-    TEST_DIR(server_dir);
-    TEST_CLIENT_DB(db);
-
-    std::string virtual_path = "/test";
-    std::string origin_server_path =
-        util::File::resolve("admin_realm_issue_1794.realm", "resources");
-    std::string target_server_path;
-    {
-        ClientServerFixture fixture{server_dir, test_context};
-        target_server_path = fixture.map_virtual_to_real_path(virtual_path);
-        fixture.start();
-    }
-    util::File::copy(origin_server_path, target_server_path);
-
-    // Synchronize a client with the migrated server file
-    {
-        ClientServerFixture fixture{server_dir, test_context};
-        fixture.start();
-        Session session = fixture.make_bound_session(client_path, virtual_path);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    {
-        // Verify the migrated server file
-        TestServerHistoryContext context;
-        _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{context, compaction_control};
-        SharedGroup db{history, target_server_path};
-        ReadTransaction rt{db};
-        rt.get_group().verify();
-    }
-}
-#endif
-
 // This test creates two objects in a target table and a link list
 // in a source table. The first target object is inserted in the link list,
 // and later the link is set to the second target object.
@@ -5786,15 +5279,6 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
 
 namespace issue2104 {
 
-class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
-public:
-    void on_integration_session_begin() override {}
-
-    void on_changeset_integrated(std::size_t) override {}
-
-    void on_changesets_merged(long) override {}
-};
-
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     ServerHistoryContext()
@@ -5817,16 +5301,10 @@ public:
         return m_transform_buffer;
     }
 
-    IntegrationReporter& get_integration_reporter() override
-    {
-        return m_integration_reporter;
-    }
-
 private:
     std::mt19937_64 m_random;
     std::unique_ptr<sync::Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
-    IntegrationReporter m_integration_reporter;
 };
 
 } // namespace issue2104
@@ -6034,38 +5512,6 @@ TEST_IF(Sync_Issue2104, false)
 }
 
 
-TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
-{
-    TEST_DIR(server_dir);
-    ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, std::move(config));
-    fixture.start();
-
-    for (int i = 0; i < 64; ++i) {
-        std::string virt_path = "/test";
-        {
-            TEST_CLIENT_DB(db);
-            Session session = fixture.make_bound_session(db, virt_path);
-            session.wait_for_download_complete_or_client_stopped();
-            session.detach();
-            fixture.wait_for_session_terminations_or_client_stopped();
-        }
-        auto run_delete = [&] {
-            CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(virt_path));
-        };
-        auto run_compact = [&] {
-            CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
-        };
-        ThreadWrapper delete_thread;
-        ThreadWrapper compact_thread;
-        delete_thread.start(run_delete);
-        compact_thread.start(run_compact);
-        delete_thread.join();
-        compact_thread.join();
-    }
-}
-
-
 TEST(Sync_RunServerWithoutPublicKey)
 {
     TEST_CLIENT_DB(db);
@@ -6120,43 +5566,6 @@ TEST(Sync_ServerSideEncryption)
     CHECK(group.has_table("class_Test"));
 }
 
-
-TEST(Sync_ServerSideEncryptionPlusCompact)
-{
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
-
-    {
-        WriteTransaction wt(db_1);
-        wt.add_table("class_Test");
-        wt.commit();
-    }
-
-    TEST_DIR(server_dir);
-    ClientServerFixture::Config config;
-    bool always_encrypt = true;
-    config.server_encryption_key = crypt_key_2(always_encrypt);
-    ClientServerFixture fixture(server_dir, test_context, std::move(config));
-    fixture.start();
-
-    {
-        Session session = fixture.make_bound_session(db_1, "/test");
-        session.wait_for_upload_complete_or_client_stopped();
-    }
-
-    // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
-
-    {
-        Session session = fixture.make_bound_session(db_2, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    {
-        auto rt = db_2->start_read();
-        CHECK(rt->has_table("class_Test"));
-    }
-}
 
 // This test calls row_for_object_id() for various object ids and tests that
 // the right value is returned including that no assertions are hit.
@@ -6295,58 +5704,6 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     }
 }
 
-
-TEST(Sync_ClientFileBlacklisting)
-{
-    TEST_CLIENT_DB(db);
-    TEST_DIR(server_dir);
-
-    // Get a client file identifier allocated for the client-side file
-    {
-        ClientServerFixture fixture(server_dir, test_context);
-        fixture.start();
-        Session session = fixture.make_bound_session(db, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    file_ident_type client_file_ident;
-    {
-        version_type client_version;
-        SaltedFileIdent client_file_ident_2;
-        SyncProgress progress;
-        get_history(db).get_status(client_version, client_file_ident_2, progress);
-        client_file_ident = client_file_ident_2.ident;
-    }
-
-    // Check that blacklisting works
-    MockMetrics metrics;
-    bool did_fail = false;
-    {
-        ClientServerFixture::Config config;
-        config.server_metrics = &metrics;
-        config.client_file_blacklists["/test"].push_back(client_file_ident);
-        ClientServerFixture fixture(server_dir, test_context, std::move(config));
-        fixture.start();
-        using ConnectionState = ConnectionState;
-        using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-            if (state != ConnectionState::disconnected)
-                return;
-            REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            CHECK_EQUAL(sync::ProtocolError::client_file_blacklisted, ec);
-            CHECK(is_fatal);
-            did_fail = true;
-            fixture.stop();
-        };
-        Session session = fixture.make_session(db);
-        session.set_connection_state_change_listener(listener);
-        fixture.bind_session(session, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-    CHECK_EQUAL(1.0, metrics.sum_equal("blacklisted"));
-}
 
 // This test could trigger the assertion that the row_for_object_id cache is
 // valid before the cache was properly invalidated in the case of a short
@@ -6535,7 +5892,7 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
         auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
         auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
         if constexpr (is_optional) {
-            auto obj_3 = table_2->create_object_with_primary_key(default_or_null);
+            table_2->create_object_with_primary_key(default_or_null);
         }
 
         auto list = obj_1.template get_list<TEST_TYPE>("oids");
@@ -7134,7 +6491,7 @@ TEST(Sync_BundledRealmFile)
 
     write_transaction_notifying_session(db, session, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
-        auto foo = foos->create_object_with_primary_key(123);
+        foos->create_object_with_primary_key(123);
     });
 
     // We cannot write out file if changes are not synced to server
@@ -7213,7 +6570,7 @@ TEST(Sync_UpgradeToClientHistory)
         auto col_link = baas->add_column(*foos, "link");
 
         auto foo = foos->create_object_with_primary_key("123").set(col_str, "Goodbye");
-        auto baa = baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
+        baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
 
         tr->commit();
     }
@@ -7232,7 +6589,7 @@ TEST(Sync_UpgradeToClientHistory)
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
         auto foos = tr.get_group().get_table("class_Foo");
-        auto foo = foos->create_object_with_primary_key("456");
+        foos->create_object_with_primary_key("456");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();

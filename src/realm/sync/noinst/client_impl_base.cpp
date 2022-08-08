@@ -1942,7 +1942,11 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         // clean up m_client_reset_operation at this point as sync should be able to continue from
         // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
-        if (!client_reset_operation->finalize(client_file_ident)) {
+        util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
+            this->non_sync_flx_completion(version);
+        };
+        if (!client_reset_operation->finalize(client_file_ident, get_flx_subscription_store(),
+                                              std::move(on_flx_subscription_complete))) {
             return false;
         }
         realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
@@ -1966,6 +1970,10 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
+        // In recovery mode, there may be new changesets to upload and nothing left to download.
+        // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
+        // For both, we want to allow uploads again without needing external changes to download first.
+        m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);

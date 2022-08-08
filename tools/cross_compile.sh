@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -56,9 +56,14 @@ if [ -z "${OS}" ] || [ -z "${BUILD_TYPE}" ]; then
 fi
 
 # Check for android-related obligatory fields
-if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
-    echo "ERROR: option -a is needed for android builds";
-    usage
+if [[ "${OS}" == "android" ]]; then
+    if [[ -z "${ARCH}" ]]; then
+        echo "ERROR: option -a is needed for android builds";
+        usage
+    elif [[ -z "${ANDROID_NDK}" ]]; then
+        echo "ERROR: set ANDROID_NDK to the top level path for the Android NDK";
+        usage
+    fi
 fi
 
 if [ "${OS}" == "android" ]; then
@@ -69,6 +74,7 @@ if [ "${OS}" == "android" ]; then
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
+          -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \

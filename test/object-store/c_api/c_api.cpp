@@ -20,6 +20,11 @@
 #include <external/json/json.hpp>
 #endif
 
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
+#endif
+
 using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
@@ -241,14 +246,8 @@ CPtr<T> clone_cptr(const T* ptr)
     } while (false);
 
 TEST_CASE("C API (C)", "[c_api]") {
-    const char* file_name = "c_api_test_c.realm";
-
-    // FIXME: Use a better test file guard.
-    if (realm::util::File::exists(file_name)) {
-        CHECK(realm::util::File::try_remove(file_name));
-    }
-
-    CHECK(realm_c_api_tests(file_name) == 0);
+    TestFile file;
+    CHECK(realm_c_api_tests(file.path.c_str()) == 0);
 }
 
 TEST_CASE("C API (non-database)", "[c_api]") {
@@ -1752,9 +1751,13 @@ TEST_CASE("C API", "[c_api]") {
         }
 
         SECTION("query") {
-            auto arg = rlm_str_val("Hello, World!");
-            auto q =
-                cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0 SORT(int ASCENDING)", 1, &arg));
+            realm_value_t arg_data[1] = {rlm_str_val("Hello, World!")};
+            size_t num_args = 2;
+            realm_query_arg_t args[2] = {realm_query_arg_t{1, false, &arg_data[0]},
+                                         realm_query_arg_t{1, false, &int_val2}};
+            realm_query_arg_t* arg_list = &args[0];
+            auto q = cptr_checked(
+                realm_query_parse(realm, class_foo.key, "string == $0 SORT(int ASCENDING)", 1, arg_list));
 
             SECTION("realm_query_description()") {
                 const char* descr = realm_query_get_description(q.get());
@@ -1774,20 +1777,23 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(count == count2);
                 }
                 SECTION("realm_query_append_query") {
-                    auto q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(1)", 1, &arg));
+                    auto q2 =
+                        cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(1)", num_args, arg_list));
                     size_t count;
                     CHECK(checked(realm_query_count(q2.get(), &count)));
                     CHECK(count == 1);
-                    q2 = cptr_checked(realm_query_append_query(q.get(), "FALSEPREDICATE", 1, &arg));
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "FALSEPREDICATE", num_args, arg_list));
                     CHECK(checked(realm_query_count(q2.get(), &count)));
                     CHECK(count == 0);
-                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(0)", 1, &arg));
+                    q2 =
+                        cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(0)", num_args, arg_list));
                     CHECK(checked(realm_query_count(q2.get(), &count)));
                     CHECK(count == 0);
-                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(10)", 1, &arg));
+                    q2 = cptr_checked(
+                        realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(10)", num_args, arg_list));
                     CHECK(checked(realm_query_count(q2.get(), &count)));
                     CHECK(count == 1);
-                    q2 = cptr_checked(realm_query_append_query(q.get(), "int == $0", 1, &int_val2));
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "int == $1", num_args, arg_list));
                     CHECK(checked(realm_query_count(q2.get(), &count)));
                     CHECK(count == 0);
                 }
@@ -1795,7 +1801,7 @@ TEST_CASE("C API", "[c_api]") {
 
             SECTION("realm_query_parse() errors") {
                 // Invalid class key
-                CHECK(!realm_query_parse(realm, 123123123, "string == $0", 1, &arg));
+                CHECK(!realm_query_parse(realm, 123123123, "string == $0", num_args, arg_list));
                 CHECK_ERR(RLM_ERR_NO_SUCH_TABLE);
 
                 // Invalid syntax
@@ -1809,7 +1815,6 @@ TEST_CASE("C API", "[c_api]") {
 
             SECTION("interpolate all types") {
                 realm_value_t int_arg = rlm_int_val(123);
-
                 realm_value_t bool_arg = rlm_bool_val(true);
                 realm_value_t string_arg = rlm_str_val("foobar");
                 static const uint8_t binary_data[3] = {1, 2, 3};
@@ -1821,21 +1826,42 @@ TEST_CASE("C API", "[c_api]") {
                 realm_value_t object_id_arg = rlm_object_id_val("abc123abc123");
                 realm_value_t uuid_arg = rlm_uuid_val("01234567-9abc-4def-9012-3456789abcde");
                 realm_value_t link_arg = rlm_link_val(class_bar.key, realm_object_get_key(obj2.get()));
+                realm_value_t list_arg[3] = {rlm_int_val(456), rlm_str_val("lol"), rlm_double_val(3.14)};
 
-                auto q_int = cptr_checked(realm_query_parse(realm, class_foo.key, "int == $0", 1, &int_arg));
-                auto q_bool = cptr_checked(realm_query_parse(realm, class_foo.key, "bool == $0", 1, &bool_arg));
-                auto q_string = cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", 1, &string_arg));
-                auto q_binary = cptr_checked(realm_query_parse(realm, class_foo.key, "binary == $0", 1, &binary_arg));
+                static const size_t num_args = 13;
+                realm_query_arg_t args[num_args] = {
+                    realm_query_arg_t{1, false, &int_arg},       realm_query_arg_t{1, false, &bool_arg},
+                    realm_query_arg_t{1, false, &string_arg},    realm_query_arg_t{1, false, &binary_arg},
+                    realm_query_arg_t{1, false, &timestamp_arg}, realm_query_arg_t{1, false, &float_arg},
+                    realm_query_arg_t{1, false, &double_arg},    realm_query_arg_t{1, false, &decimal_arg},
+                    realm_query_arg_t{1, false, &object_id_arg}, realm_query_arg_t{1, false, &uuid_arg},
+                    realm_query_arg_t{1, false, &link_arg},      realm_query_arg_t{3, true, &list_arg[0]},
+                    realm_query_arg_t{0, true, nullptr}};
+                realm_query_arg_t* arg_list = &args[0];
+
+                auto q_int = cptr_checked(realm_query_parse(realm, class_foo.key, "int == $0", num_args, arg_list));
+                auto q_bool = cptr_checked(realm_query_parse(realm, class_foo.key, "bool == $1", num_args, arg_list));
+                auto q_string =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string == $2", num_args, arg_list));
+                auto q_binary =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "binary == $3", num_args, arg_list));
                 auto q_timestamp =
-                    cptr_checked(realm_query_parse(realm, class_foo.key, "timestamp == $0", 1, &timestamp_arg));
-                auto q_float = cptr_checked(realm_query_parse(realm, class_foo.key, "float == $0", 1, &float_arg));
-                auto q_double = cptr_checked(realm_query_parse(realm, class_foo.key, "double == $0", 1, &double_arg));
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "timestamp == $4", num_args, arg_list));
+                auto q_float =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "float == $5", num_args, arg_list));
+                auto q_double =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "double == $6", num_args, arg_list));
                 auto q_decimal =
-                    cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $0", 1, &decimal_arg));
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $7", num_args, arg_list));
                 auto q_object_id =
-                    cptr_checked(realm_query_parse(realm, class_foo.key, "object_id == $0", 1, &object_id_arg));
-                auto q_uuid = cptr_checked(realm_query_parse(realm, class_foo.key, "uuid == $0", 1, &uuid_arg));
-                auto q_link = cptr_checked(realm_query_parse(realm, class_foo.key, "link == $0", 1, &link_arg));
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "object_id == $8", num_args, arg_list));
+                auto q_uuid = cptr_checked(realm_query_parse(realm, class_foo.key, "uuid == $9", num_args, arg_list));
+                auto q_link =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "link == $10", num_args, arg_list));
+                auto q_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "int == ANY $11", num_args, arg_list));
+                auto q_empty_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "int == ALL $12", num_args, arg_list));
 
                 CHECK(cptr_checked(realm_query_find_all(q_int.get())));
                 CHECK(cptr_checked(realm_query_find_all(q_bool.get())));
@@ -1848,29 +1874,31 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(cptr_checked(realm_query_find_all(q_object_id.get())));
                 CHECK(cptr_checked(realm_query_find_all(q_uuid.get())));
                 CHECK(cptr_checked(realm_query_find_all(q_link.get())));
+                CHECK(cptr_checked(realm_query_find_all(q_list.get())));
+                CHECK(cptr_checked(realm_query_find_all(q_empty_list.get())));
 
                 SECTION("type mismatch") {
-                    CHECK(!realm_query_parse(realm, class_foo.key, "int == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "int == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "bool == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "bool == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 1, &decimal_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "string == $7", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "timestamp == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "timestamp == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "double == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "double == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "float == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "float == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "binary == $0", 1, &int_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "binary == $0", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "decimal == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "decimal == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "object_id == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "object_id == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "uuid == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "uuid == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
-                    CHECK(!realm_query_parse(realm, class_foo.key, "link == $0", 1, &string_arg));
+                    CHECK(!realm_query_parse(realm, class_foo.key, "link == $2", num_args, arg_list));
                     CHECK_ERR(RLM_ERR_INVALID_QUERY);
                 }
             }
@@ -3962,6 +3990,7 @@ struct Userdata {
 };
 
 #if REALM_ENABLE_SYNC
+
 static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
                                  const realm_async_error_t* async_error)
 {
@@ -4053,6 +4082,168 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 #endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
+
+std::atomic_bool baas_client_stop{false};
+std::atomic<std::size_t> error_handler_counter{0};
+std::atomic<std::size_t> before_client_reset_counter{0};
+std::atomic<std::size_t> after_client_reset_counter{0};
+
+TEST_CASE("C API - client reset", "[c_api][client-reset]") {
+    reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "c_api_client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+
+    auto app = test_app_session.app();
+    auto get_valid_config = [&]() -> SyncTestFile {
+        create_user_and_log_in(app);
+        return SyncTestFile(app->current_user(), partition.value, schema);
+    };
+    SyncTestFile local_config = get_valid_config();
+    SyncTestFile remote_config = get_valid_config();
+
+    auto make_reset = [&](Realm::Config config_local,
+                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
+    };
+
+    realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
+
+    struct ResetRealmFiles {
+        void set_app(std::shared_ptr<realm::app::App> app)
+        {
+            m_app = app;
+        }
+        void reset_realm(const char* path)
+        {
+            realm_app_t realm_app{m_app};
+            realm_sync_immediately_run_file_actions(&realm_app, path);
+        }
+        static ResetRealmFiles& instance()
+        {
+            static ResetRealmFiles instance;
+            return instance;
+        }
+        std::shared_ptr<realm::app::App> m_app;
+    };
+    ResetRealmFiles::instance().set_app(app);
+
+    SECTION("Manual reset") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
+
+        realm_sync_config_set_error_handler(
+            local_sync_config,
+            [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                REQUIRE(sync_error.c_original_file_path_key);
+                REQUIRE(sync_error.c_recovery_file_path_key);
+                REQUIRE(sync_error.is_client_reset_requested);
+                ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                baas_client_stop.store(true);
+            },
+            nullptr, nullptr);
+
+        make_reset(local_config, remote_config)
+            ->on_post_reset([&](SharedRealm) {
+                util::EventLoop::main().run_until([&] {
+                    return baas_client_stop.load();
+                });
+            })
+            ->run();
+    }
+
+    SECTION("Local Discard") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
+
+        SECTION("Before client reset success") {
+            realm_sync_config_set_before_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*) -> bool {
+                    before_client_reset_counter.fetch_add(1);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_after_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
+                    after_client_reset_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return baas_client_stop.load();
+                    });
+                })
+                ->run();
+
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 1);
+        }
+
+        SECTION("Before client reset fails") {
+            baas_client_stop.store(false);
+            before_client_reset_counter.store(0);
+            after_client_reset_counter.store(0);
+
+            realm_sync_config_set_error_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                    REQUIRE(sync_error.c_original_file_path_key);
+                    REQUIRE(sync_error.c_recovery_file_path_key);
+                    REQUIRE(sync_error.is_client_reset_requested);
+                    ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                    error_handler_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_before_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*) -> bool {
+                    before_client_reset_counter.fetch_add(1);
+                    return false;
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_after_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
+                    after_client_reset_counter.fetch_add(1);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return baas_client_stop.load();
+                    });
+                })
+                ->run();
+
+            REQUIRE(error_handler_counter.load() == 1);
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 0);
+        }
+    }
+}
+
 
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
@@ -4495,9 +4686,10 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
                 {
                     using namespace std::chrono_literals;
                     std::unique_lock<std::mutex> lock{m_mutex};
-                    m_cv.wait_for(lock, 300ms, [this]() {
+                    bool completed_within_time_limit = m_cv.wait_for(lock, 5s, [this]() {
                         return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE && m_userdata != nullptr;
                     });
+                    CHECK(completed_within_time_limit);
                     return m_state;
                 }
             };

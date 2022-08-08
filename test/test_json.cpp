@@ -510,7 +510,7 @@ TEST(Xjson_LinkList1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
@@ -568,7 +568,7 @@ TEST(Xjson_LinkSet1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
@@ -624,7 +624,7 @@ TEST(Xjson_LinkDictionary1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
@@ -847,14 +847,14 @@ TEST(Json_Schema)
     const std::string json = ss.str();
     std::string expected =
         "[\n"
-        "{\"name\":\"person\",\"properties\":["
+        "{\"name\":\"person\",\"tableType\":\"TopLevel\",\"properties\":["
         "{\"name\":\"name\",\"type\":\"string\"},"
         "{\"name\":\"isMarried\",\"type\":\"bool\"},"
         "{\"name\":\"age\",\"type\":\"int\",\"isOptional\":true},"
         "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true},"
         "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true}"
         "]},\n"
-        "{\"name\":\"dog\",\"isEmbedded\":true,\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
+        "{\"name\":\"dog\",\"tableType\":\"Embedded\",\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
         "]\n";
     CHECK_EQUAL(expected, json);
 }

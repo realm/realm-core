@@ -27,10 +27,8 @@
 #include <iomanip>
 #include <thread>
 
-#include <realm/history.hpp>
+#include <realm.hpp>
 #include <realm/util/file.hpp>
-#include <realm/db.hpp>
-#include <realm/list.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"

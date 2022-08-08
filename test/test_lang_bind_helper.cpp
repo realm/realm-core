@@ -30,7 +30,6 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
-#include <realm/history.hpp>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -843,7 +842,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
             }
             wt.commit();
         }
-        sg->get_stats(free_space, used_space, locked_space);
+        sg->get_stats(free_space, used_space, &locked_space);
     }
 
     CHECK_GREATER(locked_space, 0);
@@ -867,7 +866,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
         wt.commit();
         // History entries now finally free
     }
-    sg->get_stats(free_space, used_space, new_locked_space);
+    sg->get_stats(free_space, used_space, &new_locked_space);
 
     // Some space must have been released
     CHECK_LESS(new_locked_space, locked_space);
@@ -2725,7 +2724,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
     auto col0 = origin->add_column(*target, "");
     target->add_column(type_Int, "");
     auto o0 = origin->create_object();
-    auto t0 = target->create_object();
+    target->create_object();
     auto t1 = target->create_object();
     auto t2 = target->create_object();
 
@@ -4401,7 +4400,7 @@ TEST(LangBindHelper_HandoverLinkView)
     ColKey col_link2 = table2->add_column_list(*table1, "linklist");
 
     auto o1 = table2->create_object();
-    auto o2 = table2->create_object();
+    table2->create_object();
     LnkLstPtr lvr = o1.get_linklist_ptr(col_link2);
     lvr->clear();
     lvr->add(to1.get_key());
@@ -4462,7 +4461,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             TableRef table = writer->add_table("table2");
             auto col = table->add_column(type_Int, "first");
             auto obj1 = table->create_object().set_all(100);
-            auto obj2 = table->create_object().set_all(100);
+            table->create_object().set_all(100);
 
             writer->commit_and_continue_as_read();
             tv1 = table->where().find_all();
@@ -4634,8 +4633,8 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     // add some rows
     auto o10 = table1->create_object().set_all(100, "foo");
     auto o11 = table1->create_object().set_all(200, "!");
-    auto o12 = table1->create_object().set_all(300, "bar");
-    auto o20 = table2->create_object().set_all(400, "hello");
+    table1->create_object().set_all(300, "bar");
+    table2->create_object().set_all(400, "hello");
     auto o21 = table2->create_object().set_all(500, "world");
     auto o22 = table2->create_object().set_all(600, "!");
 
@@ -5400,9 +5399,9 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
     auto t1 = g->add_table("t1");
 
     auto col = t0->add_column(*t1, "t0_link_to_t1");
-    auto o0 = t0->create_object();
+    t0->create_object();
     auto o1 = t0->create_object();
-    auto v0 = t1->create_object();
+    t1->create_object();
     auto v1 = t1->create_object();
     o1.set(col, v1.get_key());
 
@@ -5440,9 +5439,9 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
     auto t1 = g->add_table("t1");
 
     auto col = t0->add_column(*t1, "t0_link_to_t1");
-    auto o0 = t0->create_object();
+    t0->create_object();
     auto o1 = t0->create_object();
-    auto v0 = t1->create_object();
+    t1->create_object();
     auto v1 = t1->create_object();
     o1.set(col, v1.get_key());
 

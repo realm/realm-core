@@ -167,63 +167,6 @@ TEST(Optional_DestroyOnAssignNone)
     CHECK(b);
 }
 
-TEST(Optional_References)
-{
-    int n = 0;
-    Optional<int&> x{n};
-    if (x) {
-        x.value() = 123;
-    }
-    CHECK(x);
-    CHECK_EQUAL(x.value(), 123);
-    x = realm::none;
-    CHECK(!x);
-}
-
-TEST(Optional_PolymorphicReferences)
-{
-    struct Foo {
-        virtual ~Foo()
-        {
-        }
-    };
-    struct Bar : Foo {
-        virtual ~Bar()
-        {
-        }
-    };
-
-    Bar bar;
-    Optional<Bar&> bar_ref{bar};
-    Optional<Foo&> foo_ref{bar_ref};
-    CHECK(foo_ref);
-    CHECK_EQUAL(&foo_ref.value(), &bar);
-}
-
-namespace {
-
-int make_rvalue()
-{
-    return 1;
-}
-
-} // unnamed namespace
-
-TEST(Optional_RvalueReferences)
-{
-    // Should compile:
-    const int foo = 1;
-    Optional<const int&> x{foo};
-    static_cast<void>(x);
-
-
-    static_cast<void>(make_rvalue());
-    // Should not compile (would generate references to temporaries):
-    // Optional<const int&> y{1};
-    // Optional<const int&> z = 1;
-    // Optional<const int&> w = make_rvalue();
-}
-
 namespace {
 
 /// See:
@@ -267,9 +210,6 @@ TEST(Optional_ValueDoesntGenerateWarning)
     // Shouldn't generate any warnings:
     const Optional<int> i{1};
     CHECK(*i);
-    int one = 1;
-    const Optional<int&> ii{one};
-    CHECK(*ii);
 }
 
 TEST(Optional_ConstExpr)
@@ -288,23 +228,6 @@ TEST(Optional_ConstExpr)
     CHECK_EQUAL(false, f);
     constexpr int g = b.value_or(1234);
     CHECK_EQUAL(1234, g);
-}
-
-TEST(Optional_ReferenceConstExpr)
-{
-    // Should compile:
-    constexpr Optional<const int&> a;
-    constexpr Optional<const int&> b{none};
-    constexpr Optional<const int&> c{global_i};
-    CHECK_EQUAL(bool(a), false);
-    CHECK_EQUAL(bool(b), false);
-    CHECK_EQUAL(bool(c), true);
-    constexpr int d = *c;
-    CHECK_EQUAL(0, d);
-    constexpr bool e = bool(Optional<const int&>{global_i});
-    CHECK_EQUAL(true, e);
-    constexpr bool f = bool(Optional<const int&>{none});
-    CHECK_EQUAL(false, f);
 }
 
 // Disabled for compliance with std::optional

@@ -19,7 +19,7 @@
 #include <realm/table_view.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/index_string.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 
 #include <unordered_set>
 
@@ -662,6 +662,9 @@ bool TableView::is_in_table_order() const
         return false;
     }
     else if (m_source_column_key) {
+        return false;
+    }
+    else if (!m_query.m_table) {
         return false;
     }
     else {

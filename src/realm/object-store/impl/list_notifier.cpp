@@ -20,8 +20,7 @@
 
 #include <realm/object-store/list.hpp>
 
-#include <realm/db.hpp>
-#include <realm/group.hpp>
+#include <realm/transaction.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

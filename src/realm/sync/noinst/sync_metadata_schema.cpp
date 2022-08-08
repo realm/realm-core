@@ -19,7 +19,7 @@
 #include "realm/sync/noinst/sync_metadata_schema.hpp"
 
 #include "realm/data_type.hpp"
-#include "realm/db.hpp"
+#include "realm/transaction.hpp"
 #include "realm/util/flat_map.hpp"
 #include "realm/util/optional.hpp"
 #include <stdexcept>
@@ -55,7 +55,7 @@ void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetad
             table_ref = tr->add_table(table.name);
         }
 
-        found_tables.insert({table.name, std::move(table_ref)});
+        found_tables.insert({table.name, table_ref});
         *table.key_out = table_ref->get_key();
     }
 

@@ -40,6 +40,38 @@ TEST(EmbeddedObjects_Basic)
     CHECK(compare_groups(read_server, read_client_2));
 }
 
+TEST(AsymmetricTable_EmbeddedObjects_Basic)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    client_1->create_schema([](WriteTransaction& tr) {
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk", false,
+                                                                 Table::Type::TopLevelAsymmetric);
+        TableRef sub = tr.add_table("class_Sub", Table::Type::Embedded);
+        top->add_column(*sub, "sub");
+        sub->add_column(type_Int, "i");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto top = tr.get_table("class_Top");
+        auto top_obj = top->create_object_with_primary_key(123);
+        auto sub_col = top->get_column_key("sub");
+        top_obj.create_and_set_linked_object(sub_col).set("i", 1);
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1, test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2));
+}
+
 TEST(Table_EmbeddedObjectsCircular)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
@@ -103,6 +135,41 @@ TEST(EmbeddedObjects_ArrayOfObjects)
     CHECK(compare_groups(read_server, read_client_2));
 }
 
+TEST(AsymmetricTable_EmbeddedObjects_ArrayOfObjects)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    client_1->create_schema([](WriteTransaction& tr) {
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk", false,
+                                                                 Table::Type::TopLevelAsymmetric);
+        TableRef sub = tr.add_table("class_Sub", Table::Type::Embedded);
+        top->add_column_list(*sub, "sub");
+        sub->add_column(type_Int, "i");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto top = tr.get_table("class_Top");
+        auto top_obj = top->create_object_with_primary_key(123);
+        auto sub_col = top->get_column_key("sub");
+        auto obj_list = top_obj.get_linklist(sub_col);
+        for (size_t i = 0; i < 10; ++i) {
+            obj_list.create_and_insert_linked_object(i).set("i", int64_t(i));
+        }
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1, test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2));
+}
+
 TEST(EmbeddedObjects_DictionaryOfObjects)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
@@ -112,6 +179,41 @@ TEST(EmbeddedObjects_DictionaryOfObjects)
 
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
+        TableRef sub = tr.add_table("class_Sub", Table::Type::Embedded);
+        top->add_column_dictionary(*sub, "sub");
+        sub->add_column(type_Int, "i");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto top = tr.get_table("class_Top");
+        auto top_obj = top->create_object_with_primary_key(123);
+        auto sub_col = top->get_column_key("sub");
+        auto dict = top_obj.get_dictionary(sub_col);
+        for (int64_t i = 0; i < 10; ++i) {
+            dict.create_and_insert_linked_object(util::to_string(i)).set("i", i);
+        }
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1, test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2));
+}
+
+TEST(AsymmetricTable_EmbeddedObjects_DictionaryOfObjects)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    client_1->create_schema([](WriteTransaction& tr) {
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk", false,
+                                                                 Table::Type::TopLevelAsymmetric);
         TableRef sub = tr.add_table("class_Sub", Table::Type::Embedded);
         top->add_column_dictionary(*sub, "sub");
         sub->add_column(type_Int, "i");
@@ -312,7 +414,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
             sub->add_column(type_Int, "i");
 
             auto top_obj = top->create_object_with_primary_key(123);
-            auto sub_obj = top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
+            top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
         });
 
         it.sync_all();
@@ -511,7 +613,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
             auto embedded = tr.add_table("class_embedded", Table::Type::Embedded);
             embedded->add_column(type_Int, "int");
             table->add_column(*embedded, "embedded");
-            auto obj = table->create_object_with_primary_key(123);
+            table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 
@@ -579,7 +681,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
             embedded->add_column(type_Int, "int");
             embedded->add_column(*embedded, "embedded");
             table->add_column(*embedded, "embedded");
-            auto obj = table->create_object_with_primary_key(123);
+            table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 

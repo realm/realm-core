@@ -37,6 +37,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
     switch (provider) {
         case AuthProvider::ANONYMOUS:
+        case AuthProvider::ANONYMOUS_NO_REUSE:
             return IdentityProviderAnonymous;
         case AuthProvider::APPLE:
             return IdentityProviderApple;
@@ -129,9 +130,10 @@ std::string AppCredentials::serialize_as_json() const
     return bson::Bson(*m_payload).to_string();
 }
 
-AppCredentials AppCredentials::anonymous()
+AppCredentials AppCredentials::anonymous(bool reuse_credentials)
 {
-    return AppCredentials(AuthProvider::ANONYMOUS, {});
+    return reuse_credentials ? AppCredentials(AuthProvider::ANONYMOUS, {})
+                             : AppCredentials(AuthProvider::ANONYMOUS_NO_REUSE, {});
 }
 
 AppCredentials AppCredentials::apple(AppCredentialsToken id_token)

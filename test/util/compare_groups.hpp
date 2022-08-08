@@ -3,7 +3,7 @@
 
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/group.hpp>
+#include <realm/transaction.hpp>
 #include <realm/table.hpp>
 
 namespace realm::test_util {
