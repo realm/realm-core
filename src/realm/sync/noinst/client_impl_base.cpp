@@ -115,6 +115,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
+    , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
@@ -2000,8 +2001,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return make_error_code(sync::ClientError::auto_client_reset_failure);
     }
     if (!did_client_reset) {
-        constexpr bool fix_up_object_ids = true;
-        repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
         this->m_last_version_selected_for_upload = 0;

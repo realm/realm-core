@@ -985,9 +985,9 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         return false;
     };
 
+    Group::TableNameBuffer buffer;
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
         REALM_ASSERT(class_name.size() < Group::max_table_name_length - 6);
-        Group::TableNameBuffer buffer;
         return group.get_table(Group::class_name_to_table_name(class_name, buffer));
     };
 
@@ -1003,8 +1003,6 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         if (m_arrays->origin_file_idents.get(i) != 0)
             continue;
 
-        // FIXME: We have to do this when transmitting/receiving changesets
-        // over the network instead.
         ChunkedBinaryData changeset{m_arrays->changesets, i};
         ChunkedBinaryInputStream is{changeset};
         size_t decompressed_size;

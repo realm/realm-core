@@ -8,6 +8,7 @@
 * Automatic handling backlinks for schema migrations where a class changes to being embedded. ([PR #5737](https://github.com/realm/realm-core/pull/5737)).
 * Expose `Obj::add_int()` in the CAPI. ([PR #5770](https://github.com/realm/realm-core/pull/5770)).
 * Expose `Realm::async_begin_transaction`, `Realm::async_commit_transaction`, `Realm::async_cancel_transaction` in the CAPI.([PR 5783 #](https://github.com/realm/realm-core/pull/5783)).
+* Improve performance when a new Realm file connects to the server for the first time, especially when significant amounts of data has been written while offline.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
