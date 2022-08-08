@@ -182,7 +182,7 @@ expr
 value
     : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
     | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
-
+    | list                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
 
 prop
     : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
@@ -223,11 +223,12 @@ direction
     : ASCENDING                 { $$ = true; }
     | DESCENDING                { $$ = false; }
 
-list : '{' list_content '}'     { $$ = $2; }
-
+list : '{' list_content '}'             { $$ = $2; }
+     | comp_type '{' list_content '}'   { $3->set_comp_type(ExpressionComparisonType($1)); $$ = $3; }
 
 list_content
     : constant                  { $$ = drv.m_parse_nodes.create<ListNode>($1); }
+    | %empty                    { $$ = drv.m_parse_nodes.create<ListNode>(); }
     | list_content ',' constant { $1->add_element($3); $$ = $1; } 
 
 constant
@@ -247,6 +248,8 @@ constant
     | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
     | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
+    | comp_type ARG             { $$ = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType($1), $2); }
+
 
 boolexpr
     : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }

@@ -145,9 +145,10 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, SyncConfig::FLXSyncEnabled{});
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.what())
+    sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
+        std::cerr << util::format(
+                         "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
+                         error.what(), session->path())
                   << std::endl;
         abort();
     };

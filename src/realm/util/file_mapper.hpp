@@ -75,18 +75,6 @@ inline void set_page_reclaim_governor_to_default()
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
-// Retrieves the
-// - amount of memory used for decrypted pages, across all open files.
-// - current target for the reclaimer (desired number of decrypted pages)
-// - current workload size for the reclaimer, across all open files.
-struct decrypted_memory_stats_t {
-    size_t memory_size;
-    size_t reclaimer_target;
-    size_t reclaimer_workload;
-};
-
-decrypted_memory_stats_t get_decrypted_memory_stats();
-
 #if REALM_ENABLE_ENCRYPTION
 
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
@@ -104,6 +92,12 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 void* mmap_reserve(FileDesc fd, size_t size, File::AccessMode am, size_t offset, const char* enc_key,
                    EncryptedFileMapping*& mapping);
 
+EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
+                                      const char* encryption_key);
+
+void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
+                              size_t new_size);
+void remove_encrypted_mapping(void* addr, size_t size);
 void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 

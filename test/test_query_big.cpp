@@ -20,7 +20,6 @@
 #ifdef TEST_QUERY
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"

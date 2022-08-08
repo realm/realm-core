@@ -1,5 +1,4 @@
-#include <realm/db.hpp>
-#include <realm/history.hpp>
+#include <realm.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 

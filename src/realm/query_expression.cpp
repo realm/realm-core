@@ -414,7 +414,7 @@ public:
         Allocator& alloc = this->m_link_map.get_target_table()->get_alloc();
         Value<int64_t> list_refs;
         this->get_lists(index, list_refs, 1);
-        destination.init(list_refs.m_from_link_list, list_refs.size());
+        destination.init(list_refs.m_from_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type ref = to_ref(list_refs[i].get_int());
             size_t s = ClusterTree::size_from_ref(ref, alloc);

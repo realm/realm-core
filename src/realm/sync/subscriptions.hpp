@@ -159,6 +159,9 @@ public:
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
 
+    // The database version that this subscription set was created at or -1 if Uncommitted.
+    DB::version_type snapshot_version() const;
+
     // The current state of this subscription set
     State state() const;
 
@@ -205,7 +208,7 @@ protected:
     int64_t m_version = 0;
     State m_state = State::Uncommitted;
     std::string m_error_str;
-    DB::version_type m_snapshot_version;
+    DB::version_type m_snapshot_version = -1;
     std::vector<Subscription> m_subs;
 };
 
@@ -238,6 +241,8 @@ public:
     // The inserted subscription will have an empty name - to update this Subscription's query, the caller
     // will have
     std::pair<iterator, bool> insert_or_assign(const Query& query);
+
+    void import(const SubscriptionSet&);
 
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
@@ -319,6 +324,13 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
+    // Fulfill all previous subscriptions by superceding them. This does not
+    // affect the mutable subscription identified by the parameter.
+    void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
+
+    // Returns true if there have been commits to the DB since the given version
+    bool would_refresh(DB::version_type version) const noexcept;
+
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
@@ -329,6 +341,7 @@ public:
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
+    std::vector<SubscriptionSet> get_pending_subscriptions() const;
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;

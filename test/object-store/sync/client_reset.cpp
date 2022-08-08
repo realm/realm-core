@@ -30,7 +30,10 @@
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
@@ -227,8 +230,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->config().path == local_config.path);
         REQUIRE(util::File::exists(local_config.path));
     };
-    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after, bool) {
+    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                              bool) {
         std::lock_guard<std::mutex> lock(mtx);
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
         ++after_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
@@ -675,6 +680,31 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(after_callback_invocations == 0);
         }
 
+        SECTION("callbacks are seeded with Realm instances even if the coordinator dies") {
+            auto client_reset_harness = make_reset(local_config, remote_config);
+            client_reset_harness->disable_wait_for_reset_completion();
+            std::shared_ptr<SyncSession> session;
+            client_reset_harness
+                ->on_post_local_changes([&](SharedRealm local) {
+                    // retain a reference so the sync session completes, even though the Realm is cleaned up
+                    session = local->sync_session();
+                })
+                ->run();
+            auto local_coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(local_config.path);
+            REQUIRE(!local_coordinator);
+            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(after_callback_invocations == 0);
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return after_callback_invocations > 0;
+                },
+                std::chrono::seconds(60));
+            // this test also relies on the test config above to verify the Realm instances in the callbacks
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+
         SECTION("notifiers work if the session instance changes") {
             // run this test with ASAN to check for use after free
             size_t before_callback_invoctions_2 = 0;
@@ -690,7 +720,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions_2;
                 };
-                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm, bool) {
+                config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++after_callback_invocations_2;
                 };
@@ -1374,8 +1404,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 ++before_callback_invoctions;
             };
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, SharedRealm realm,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
                                                                       bool did_recover) {
+                SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_default());
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
@@ -1441,8 +1472,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // discarded insert due to fallback to DiscardLocal mode
@@ -1467,8 +1501,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // not recovered
@@ -2532,8 +2569,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     if (test_mode == ClientResyncMode::Recover) {
-        SECTION("local removes source object, remote modifies list") {
+        SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
+                                                    {Add{dest_pk_5}});
+        }
+        SECTION("local erases list item then removes source object, remote modifies list") {
+            reset_collection_removing_source_object({Remove{dest_pk_1}, RemoveObject{"source", source_pk}},
                                                     {Add{dest_pk_5}});
         }
         SECTION("remote removes source object, recover local modifications") {
@@ -2646,7 +2687,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
               "EmbeddedObject"},
          }},
         {"EmbeddedObject",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
@@ -2655,7 +2696,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
              {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
              {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},
@@ -2862,7 +2903,11 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
         using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
-        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        DictType dict_values = DictType::container_type{
+            {"foo", EmbeddedContent()},
+            {"bar", EmbeddedContent()},
+            {"baz", EmbeddedContent()},
+        };
         void apply_recovery_from(const TopLevelContent& other)
         {
             combine_array_values(array_values, other.array_values);

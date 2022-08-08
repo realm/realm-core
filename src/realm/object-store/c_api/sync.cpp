@@ -46,6 +46,9 @@ static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Manual) == RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::DiscardLocal) ==
               RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Recover) == RLM_SYNC_SESSION_RESYNC_MODE_RECOVER);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::RecoverOrDiscard) ==
+              RLM_SYNC_SESSION_RESYNC_MODE_RECOVER_OR_DISCARD);
 
 static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::Immediately) ==
               RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY);
@@ -271,6 +274,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
+        c_user_info.reserve(error.user_info.size());
         for (auto& info : error.user_info) {
             c_user_info.push_back({info.first.c_str(), info.second.c_str()});
         }
@@ -395,10 +399,10 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                                                               realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
-                  SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
+                  SharedRealm before_realm, ThreadSafeReference after_realm, bool did_recover) {
         realm_t r1{before_realm};
-        realm_t r2{after_realm};
-        if (!callback(userdata.get(), &r1, &r2, did_recover)) {
+        auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
+        if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
             throw CallbackFailed();
         }
     };

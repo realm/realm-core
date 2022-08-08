@@ -831,7 +831,7 @@ TEST_CASE("list of mixed links", "[primitives]") {
     ColKey col_link1 = target1->get_column_key("link1");
     r->begin_transaction();
     Obj obj = table->create_object();
-    Obj obj1 = table->create_object(); // empty dictionary
+    table->create_object(); // empty dictionary
     Obj target1_obj = target1->create_object().set(col_value1, 100);
     Obj target2_obj = target2->create_object().set(col_value2, 200);
     ColKey col = table->get_column_key("value");

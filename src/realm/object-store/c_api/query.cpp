@@ -11,9 +11,9 @@ namespace realm::c_api {
 
 namespace {
 struct QueryArgumentsAdapter : query_parser::Arguments {
-    const realm_value_t* m_args = nullptr;
+    const realm_query_arg_t* m_args = nullptr;
 
-    QueryArgumentsAdapter(size_t num_args, const realm_value_t* args) noexcept
+    QueryArgumentsAdapter(size_t num_args, const realm_query_arg_t* args) noexcept
         : Arguments(num_args)
         , m_args(args)
     {
@@ -22,98 +22,115 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     bool bool_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_BOOL);
-        return m_args[i].boolean;
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_BOOL);
+        return m_args[i].arg[0].boolean;
     }
 
     long long long_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_INT);
-        return m_args[i].integer;
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_INT);
+        return m_args[i].arg[0].integer;
     }
 
     float float_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_FLOAT);
-        return m_args[i].fnum;
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_FLOAT);
+        return m_args[i].arg[0].fnum;
     }
 
     double double_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_DOUBLE);
-        return m_args[i].dnum;
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_DOUBLE);
+        return m_args[i].arg[0].dnum;
     }
 
     StringData string_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_STRING);
-        return from_capi(m_args[i].string);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_STRING);
+        return from_capi(m_args[i].arg[0].string);
     }
 
     BinaryData binary_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_BINARY);
-        return from_capi(m_args[i].binary);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_BINARY);
+        return from_capi(m_args[i].arg[0].binary);
     }
 
     Timestamp timestamp_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_TIMESTAMP);
-        return from_capi(m_args[i].timestamp);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_TIMESTAMP);
+        return from_capi(m_args[i].arg[0].timestamp);
     }
 
     ObjKey object_index_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_LINK);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_LINK);
         // FIXME: Somehow check the target table type?
-        return from_capi(m_args[i].link).get_obj_key();
+        return from_capi(m_args[i].arg[0].link).get_obj_key();
     }
 
     ObjectId objectid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_OBJECT_ID);
-        return from_capi(m_args[i].object_id);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_OBJECT_ID);
+        return from_capi(m_args[i].arg[0].object_id);
     }
 
     Decimal128 decimal128_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_DECIMAL128);
-        return from_capi(m_args[i].decimal128);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_DECIMAL128);
+        return from_capi(m_args[i].arg[0].decimal128);
     }
 
     UUID uuid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_UUID);
-        return from_capi(m_args[i].uuid);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_UUID);
+        return from_capi(m_args[i].arg[0].uuid);
     }
 
     ObjLink objlink_for_argument(size_t i) final
     {
         verify_ndx(i);
-        REALM_ASSERT(m_args[i].type == RLM_TYPE_LINK);
-        return from_capi(m_args[i].link);
+        REALM_ASSERT(m_args[i].arg[0].type == RLM_TYPE_LINK);
+        return from_capi(m_args[i].arg[0].link);
     }
 
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);
-        return m_args[i].type == RLM_TYPE_NULL;
+        return !m_args[i].is_list && m_args[i].arg[0].type == RLM_TYPE_NULL;
     }
 
+    bool is_argument_list(size_t i) final
+    {
+        verify_ndx(i);
+        return m_args[i].is_list;
+    }
+
+    std::vector<Mixed> list_for_argument(size_t ndx) final
+    {
+        verify_ndx(ndx);
+        REALM_ASSERT(m_args[ndx].is_list);
+        std::vector<Mixed> list;
+        list.reserve(m_args[ndx].nb_args);
+        for (size_t i = 0; i < m_args[ndx].nb_args; ++i) {
+            list.push_back(from_capi(m_args[ndx].arg[i]));
+        }
+        return list;
+    }
     DataType type_for_argument(size_t i) override
     {
         verify_ndx(i);
-        switch (m_args[i].type) {
+        switch (m_args[i].arg[0].type) {
             case RLM_TYPE_NULL:                                                  // LCOV_EXCL_LINE
                 REALM_TERMINATE("Query parser did not call is_argument_null()"); // LCOV_EXCL_LINE
             case RLM_TYPE_INT:
@@ -146,7 +163,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 } // namespace
 
 static Query parse_and_apply_query(const std::shared_ptr<Realm>& realm, ConstTableRef table, const char* query_string,
-                                   size_t num_args, const realm_value_t* args)
+                                   size_t num_args, const realm_query_arg_t* args)
 {
     query_parser::KeyPathMapping mapping;
     realm::populate_keypath_mapping(mapping, *realm);
@@ -156,7 +173,7 @@ static Query parse_and_apply_query(const std::shared_ptr<Realm>& realm, ConstTab
 }
 
 RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_class_key_t target_table_key,
-                                         const char* query_string, size_t num_args, const realm_value_t* args)
+                                         const char* query_string, size_t num_args, const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
         auto table = (*realm)->read_group().get_table(TableKey(target_table_key));
@@ -174,7 +191,7 @@ RLM_API const char* realm_query_get_description(realm_query_t* query)
 }
 
 RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_query, const char* query_string,
-                                                size_t num_args, const realm_value_t* args)
+                                                size_t num_args, const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
         auto realm = existing_query->weak_realm.lock();
@@ -191,7 +208,7 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
 }
 
 RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, const char* query_string, size_t num_args,
-                                                  const realm_value_t* args)
+                                                  const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
         auto realm = list->get_realm();
@@ -203,7 +220,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
 }
 
 RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* results, const char* query_string,
-                                                     size_t num_args, const realm_value_t* args)
+                                                     size_t num_args, const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
         auto realm = results->get_realm();

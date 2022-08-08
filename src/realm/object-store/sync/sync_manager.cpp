@@ -643,18 +643,20 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const SyncConfig& sync_config)
+std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const RealmConfig& config)
 {
     auto& client = get_sync_client(); // Throws
     auto path = db->get_path();
+    REALM_ASSERT_EX(path == config.path, path, config.path);
+    REALM_ASSERT(config.sync_config);
 
     util::CheckedUniqueLock lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
-        sync_config.user->register_session(session);
+        config.sync_config->user->register_session(session);
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, std::move(db), sync_config, this);
+    auto shared_session = SyncSession::create(client, std::move(db), config, this);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
@@ -665,7 +667,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, co
     // denied by the server: Active -> WaitingForAccessToken -> handle_refresh(401
     // error) -> user.log_out() -> unregister_session (locks m_session_mutex again)
     lock.unlock();
-    sync_config.user->register_session(std::move(shared_session));
+    config.sync_config->user->register_session(std::move(shared_session));
 
     return external_reference;
 }

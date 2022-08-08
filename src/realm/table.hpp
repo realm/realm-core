@@ -88,6 +88,8 @@ class Table {
 public:
     /// The type of tables supported by a realm.
     /// Note: Any change to this enum is a file-format breaking change.
+    /// Note: Enumeration value assignments must be kept in sync with
+    /// <realm/object-store/object_schema.hpp>.
     enum class Type : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
     constexpr static uint8_t table_type_mask = 0x3;
 
@@ -216,7 +218,7 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key, ExpressionComparisonType = ExpressionComparisonType::Any) const;
+    Columns<T> column(ColKey col_key, util::Optional<ExpressionComparisonType> = util::none) const;
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
@@ -561,8 +563,11 @@ public:
     }
     Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
-    Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
+    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments = {}) const;
+    Query query(const std::string& query_string, const std::vector<Mixed>& arguments) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                const query_parser::KeyPathMapping& mapping) const;
+    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
@@ -640,6 +645,24 @@ public:
     bool links_to_self(ColKey col_key) const;
     ColKey get_opposite_column(ColKey col_key) const;
     ColKey find_opposite_column(ColKey col_key) const;
+
+    class DisableReplication {
+    public:
+        DisableReplication(Table& table) noexcept
+            : m_table(table)
+            , m_repl(table.m_repl)
+        {
+            m_table.m_repl = &g_dummy_replication;
+        }
+        ~DisableReplication()
+        {
+            m_table.m_repl = m_repl;
+        }
+
+    private:
+        Table& m_table;
+        Replication* const* m_repl;
+    };
 
 private:
     enum LifeCycleCookie {
@@ -866,16 +889,13 @@ inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 {
     switch (table_type) {
         case Table::Type::TopLevel:
-            o << "TopLevel";
-            break;
+            return o << "TopLevel";
         case Table::Type::Embedded:
-            o << "Embedded";
-            break;
+            return o << "Embedded";
         case Table::Type::TopLevelAsymmetric:
-            o << "TopLevelAsymmetric";
-            break;
+            return o << "TopLevelAsymmetric";
     }
-    return o;
+    return o << "Invalid table type: " << uint8_t(table_type);
 }
 
 class ColKeyIterator {
@@ -957,7 +977,7 @@ private:
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
+    LinkChain(ConstTableRef t = {}, util::Optional<ExpressionComparisonType> type = util::none)
         : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
@@ -1066,7 +1086,7 @@ private:
     std::vector<ColKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
-    ExpressionComparisonType m_comparison_type;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
 
     void add(ColKey ck);
 
@@ -1243,7 +1263,7 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key, ExpressionComparisonType cmp_type) const
+inline Columns<T> Table::column(ColKey col_key, util::Optional<ExpressionComparisonType> cmp_type) const
 {
     LinkChain lc(m_own_ref, cmp_type);
     return lc.column<T>(col_key);

@@ -1192,27 +1192,30 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (type != col_type_Mixed)
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a Mixed");
-
+    if (value_is_null(value) && !col_key.is_nullable()) {
+        throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
+    }
     if (value.is_type(type_Link)) {
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Link must be fully qualified");
+    }
+
+    Mixed old_value = get<Mixed>(col_key);
+    ObjLink old_link{};
+    ObjLink new_link{};
+    if (old_value.is_type(type_TypedLink)) {
+        old_link = old_value.get<ObjLink>();
     }
 
     if (value.is_type(type_TypedLink)) {
         if (m_table->is_asymmetric()) {
             throw IllegalOperation("Links not allowed in asymmetric tables");
         }
-
-        ObjLink new_link = value.template get<ObjLink>();
-        Mixed old_value = get<Mixed>(col_key);
-        ObjLink old_link;
-        if (old_value.is_type(type_TypedLink)) {
-            old_link = old_value.get<ObjLink>();
-            if (new_link == old_link)
-                return *this;
-        }
+        new_link = value.template get<ObjLink>();
         m_table->get_parent_group()->validate(new_link);
-        recurse = replace_backlink(col_key, old_link, new_link, state);
+        if (new_link == old_link)
+            return *this;
     }
+    recurse = replace_backlink(col_key, old_link, new_link, state);
 
     StringIndex* index = m_table->get_search_index(col_key);
     // The following check on unresolved is just a precaution as it should not
@@ -2191,6 +2194,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     if (col_type == col_type_Link) {
         set(col_key, null_key);
     }
+    else if (col_type == col_type_Mixed) {
+        set(col_key, Mixed{});
+    }
     else {
         auto attrs = col_key.get_attrs();
         if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
@@ -2233,13 +2239,14 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_Decimal:
                 do_set_null<ArrayDecimal128>(col_key);
                 break;
-            case col_type_Mixed:
-                do_set_null<ArrayMixed>(col_key);
-                break;
             case col_type_UUID:
                 do_set_null<ArrayUUIDNull>(col_key);
                 break;
-            default:
+            case col_type_Mixed:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+            case col_type_TypedLink:
                 REALM_UNREACHABLE();
         }
     }

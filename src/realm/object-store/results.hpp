@@ -36,6 +36,7 @@
 
 namespace realm {
 class Mixed;
+class SectionedResults;
 
 namespace _impl {
 class ResultsNotifierBase;
@@ -281,12 +282,40 @@ public:
         m_update_policy = policy;
     }
 
+    /**
+     * Creates a SectionedResults object by using a user defined sectioning algorithm to project the key for each
+     * section.
+     *
+     * @param section_key_func The callback to be itterated on each value in the underlying Results.
+     * This callback must return a value which defines the section key
+     *
+     * @return A SectionedResults object using a user defined sectioning algoritm.
+     */
+    SectionedResults
+    sectioned_results(util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)> section_key_func);
+    enum class SectionedResultsOperator {
+        FirstLetter // Section by the first letter of each string element. Note that col must be a string.
+    };
+
+    /**
+     * Creates a SectionedResults object by using a built in sectioning algorithm to help with efficiency and reduce
+     * overhead from the SDK level.
+     *
+     * @param op The `SectionedResultsOperator` operator to use
+     * @param property_name Takes a property name if sectioning on a collection of links, the property name needs to
+     * reference the column being sectioned on.
+     *
+     * @return A SectionedResults object with results sectioned based on the chosen built in operator.
+     */
+    SectionedResults sectioned_results(SectionedResultsOperator op,
+                                       util::Optional<StringData> property_name = util::none);
+
 private:
     std::shared_ptr<Realm> m_realm;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     Query m_query GUARDED_BY(m_mutex);
-    TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
+    TableView m_table_view GUARDED_BY(m_mutex);
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
@@ -294,7 +323,9 @@ private:
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> m_notifier;
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
+    friend class SectionedResults;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
+    uint64_t m_last_collection_content_version GUARDED_BY(m_mutex) = 0;
 
     void validate_read() const;
     void validate_write() const;
@@ -320,6 +351,9 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
+    /// Returns true if the underlying table_view or collection has changed, and is waiting
+    /// for `ensure_up_to_date` to run.
+    bool has_changed() REQUIRES(!m_mutex);
     void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
 
     // Shared logic between freezing and thawing Results as the Core API is the same.

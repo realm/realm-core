@@ -356,7 +356,7 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Outgoing links from an asymmetric table are not allowed.
+    // Only links to embedded objects are allowed.
     if (is_asymmetric() && !target.is_embedded()) {
         throw IllegalOperation("Object property not supported in asymmetric table");
     }
@@ -404,8 +404,8 @@ ColKey Table::add_column_list(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
+    // Only links to embedded objects are allowed.
+    if (is_asymmetric() && !target.is_embedded()) {
         throw IllegalOperation("List of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
@@ -477,8 +477,8 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
+    // Only links to embedded objects are allowed.
+    if (is_asymmetric() && !target.is_embedded()) {
         throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
@@ -2651,12 +2651,7 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         out << ",";
         out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
     }
-    if (is_embedded()) {
-        out << ",\"isEmbedded\":true";
-    }
-    if (is_asymmetric()) {
-        out << ",\"isAsymmetric\":true";
-    }
+    out << ",\"tableType\":\"" << this->get_table_type() << "\"";
     out << ",\"properties\":[";
     auto col_keys = get_column_keys();
     int sz = int(col_keys.size());
@@ -3669,22 +3664,22 @@ typename util::RemoveOptional<T>::type remove_optional(T val)
 template <>
 int64_t remove_optional<Optional<int64_t>>(Optional<int64_t> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 bool remove_optional<Optional<bool>>(Optional<bool> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
 {
-    return val.value();
+    return *val;
 }
 } // namespace
 

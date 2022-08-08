@@ -58,10 +58,6 @@ The `S` bit is at position 22 (float) or 51 (double).
 
 struct null {
     constexpr null() = default;
-    operator int64_t()
-    {
-        throw LogicError(ErrorCodes::TypeMismatch, "Trying to convert null to int");
-    }
     template <class T>
     operator util::Optional<T>()
     {

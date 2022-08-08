@@ -1,12 +1,11 @@
 add_subdirectory(util)
+add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
 endif()
-
-add_custom_target(benchmarks)
 
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
@@ -129,28 +128,18 @@ file(GLOB REQUIRED_TEST_FILES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.realm"
      "expect_string.txt")
 
-add_executable(CoreTests ${CORE_TESTS} main.cpp ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
-set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
+add_executable(CoreTests main.cpp ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+set_target_resources(CoreTests "${REQUIRED_TEST_FILES}")
+set_target_properties(CoreTests PROPERTIES
+    OUTPUT_NAME "realm-tests"
+    VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+)
 
 if (REALM_TEST_DURATION)
     add_compile_definitions(TEST_DURATION=${REALM_TEST_DURATION})
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set_target_properties(CoreTests PROPERTIES
-        MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_GUI_IDENTIFIER "io.realm.core.CoreTests"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_LONG_VERSION_STRING "${REALM_VERSION}"
-        MACOSX_BUNDLE_BUNDLE_VERSION "1"
-
-        RESOURCE "${REQUIRED_TEST_FILES}"
-    )
-elseif(WINDOWS_STORE)
-    set_target_properties(CoreTests PROPERTIES
-        VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
-    )
-
+if(WINDOWS_STORE)
     file(GLOB UWP_ASSETS "${CMAKE_ROOT}/Templates/Windows/*")
 
     set(UWP_SOURCES
@@ -163,25 +152,10 @@ elseif(WINDOWS_STORE)
     set_property(SOURCE ${UWP_SOURCES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
 
     set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
-    set_property(SOURCE ${REQUIRED_TEST_FILES} PROPERTY VS_DEPLOYMENT_LOCATION "TestAssets")
-else()
-    # Resources required for running the tests copied to the target directory
-    add_custom_command(TARGET CoreTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${REQUIRED_TEST_FILES} $<TARGET_FILE_DIR:CoreTests>
-    )
 endif()
 
 target_link_libraries(CoreTests TestUtil QueryParser)
-
-# Enable std::filesystem in core tests
-if(APPLE)
-    target_compile_definitions(CoreTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
-endif()
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-        target_link_libraries(CoreTests stdc++fs)
-    endif()
-endif()
+enable_stdfilesystem(CoreTests)
 
 if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces
@@ -190,30 +164,21 @@ endif()
 
 target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-add_test(NAME StorageTests COMMAND realm-tests)
+add_bundled_test(CoreTests)
 
 if(REALM_ENABLE_SYNC)
-
-    set(TEST_MAIN_SOURCES
-        main.cpp
-    )
-
     set(SYNC_TESTS
         test_all.cpp
-        test_allocation_metrics.cpp
         test_array_sync.cpp
         test_changeset_encoding.cpp
         test_client_reset.cpp
         test_compact_changesets.cpp
         test_crypto.cpp
         test_embedded_objects.cpp
-        test_encrypt_fingerprint.cpp
-        test_encrypt_transform.cpp
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
         test_noinst_vacuum.cpp
-        test_scratch_allocator.cpp
         test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
@@ -256,25 +221,25 @@ if(REALM_ENABLE_SYNC)
         test_all.cpp
     )
 
+    file(GLOB TEST_RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
+        *.json *.pem
+        ../certificate-authority/certs/*
+        ../certificate-authority/root-ca/*.pem
+        resources/*.realm
+        resources/history_migration/*.realm
+        test_flx_metadata_tables_v1.realm)
+
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
         # Embed the manifest on Windows. The manifest allows very long paths (>255).
         list(APPEND SYNC_TESTS test.manifest)
     endif()
 
-    add_executable(SyncTests ${SYNC_TESTS} ${TEST_MAIN_SOURCES} ${TEST_HEADERS})
+    add_executable(SyncTests main.cpp ${SYNC_TESTS} ${TEST_HEADERS} ${TEST_RESOURCES})
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
+    set_target_resources(SyncTests "${TEST_RESOURCES}")
+    enable_stdfilesystem(SyncTests)
     target_link_libraries(SyncTests Sync SyncServer TestUtil)
-    add_test(NAME SyncTests COMMAND realm-sync-tests)
-
-    # Enable std::filesystem in sync tests.
-    if(APPLE)
-        target_compile_definitions(SyncTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
-    endif()
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-            target_link_libraries(SyncTests stdc++fs)
-        endif()
-    endif()
+    add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)
         # This enables symbols in backtraces
@@ -284,27 +249,4 @@ if(REALM_ENABLE_SYNC)
     add_executable(BenchTransform EXCLUDE_FROM_ALL ${BENCH_TRANSFORM_SOURCES})
     set_target_properties(BenchTransform PROPERTIES OUTPUT_NAME "bench-transform")
     target_link_libraries(BenchTransform TestUtil Sync)
-
-    if(REALM_BUILD_DOGLESS)
-        add_executable(SyncTestClient ${TEST_CLIENT_SOURCES} ${TEST_CLIENT_HEADERS})
-        set_target_properties(SyncTestClient PROPERTIES OUTPUT_NAME "test-client")
-        target_link_libraries(SyncTestClient Sync Dogless)
-    endif()
-
-    file(GLOB test_resources *.json *.pem)
-
-    add_custom_command(TARGET SyncTests POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                               ${test_resources}
-                               $<TARGET_FILE_DIR:SyncTests>)
-
-    add_custom_command(TARGET SyncTests POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory
-                               ${PROJECT_SOURCE_DIR}/certificate-authority
-                               $<TARGET_FILE_DIR:SyncTests>/../certificate-authority)
-
-    add_custom_command(TARGET SyncTests POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory
-                               ${PROJECT_SOURCE_DIR}/test/resources
-                               $<TARGET_FILE_DIR:SyncTests>/resources)
 endif()

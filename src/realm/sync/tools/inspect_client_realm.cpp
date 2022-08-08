@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 
+#include <realm.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 
 namespace {

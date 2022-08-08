@@ -124,7 +124,6 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager::Config config;
-    config.base_path = "a";
     config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
     config.should_teardown_test_directory = false;
     SyncServer::Config server_config = {false};

@@ -36,8 +36,12 @@
 #include <Windows.h>
 #endif
 
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/flx_sync_harness.hpp"
+#endif // REALM_ENABLE_AUTH_TESTS
+
 using namespace realm;
-using IsEmbedded = ObjectSchema::IsEmbedded;
+using ObjectType = ObjectSchema::ObjectType;
 using util::any_cast;
 
 #define VERIFY_SCHEMA(r, m) verify_schema((r), __LINE__, m)
@@ -173,9 +177,9 @@ Schema set_primary_key(Schema schema, StringData object_name, StringData new_pri
     return schema;
 }
 
-Schema set_embedded(Schema schema, StringData object_name, IsEmbedded embedded)
+Schema set_table_type(Schema schema, StringData object_name, ObjectType table_type)
 {
-    schema.find(object_name)->is_embedded = embedded;
+    schema.find(object_name)->table_type = table_type;
     return schema;
 }
 
@@ -209,10 +213,10 @@ TEST_CASE("migration: Automatic") {
             Schema schema1 = {};
             Schema schema2 = add_table(
                 schema1, {"object1", {{"link", PropertyType::Object | PropertyType::Nullable, "embedded1"}}});
-            schema2 = add_table(schema2, {"embedded1", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            schema2 = add_table(schema2, {"embedded1", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             Schema schema3 =
                 add_table(schema2, {"object2", {{"link", PropertyType::Object | PropertyType::Array, "embedded2"}}});
-            schema3 = add_table(schema3, {"embedded2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            schema3 = add_table(schema3, {"embedded2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
@@ -430,7 +434,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto schema2 = add_table(
                 add_property(schema1, "object", {"link", PropertyType::Object | PropertyType::Nullable, "object2"}),
-                {"object2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+                {"object2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
         }
@@ -441,12 +445,12 @@ TEST_CASE("migration: Automatic") {
             Schema schema = {
                 {"top", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
                 {"object",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
             };
-            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", false));
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_table_type(schema, "object", ObjectType::TopLevel));
         }
 
         SECTION("change table from top-level to embedded without version bump") {
@@ -459,7 +463,7 @@ TEST_CASE("migration: Automatic") {
                      {"value", PropertyType::Int},
                  }},
             };
-            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", true));
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_table_type(schema, "object", ObjectType::Embedded));
         }
     }
 
@@ -594,7 +598,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_THROWS(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - no migration block") {
@@ -609,7 +614,7 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - table has no backlinks") {
@@ -624,7 +629,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, [](auto, auto, auto&) {}));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded), 2,
+                                                [](auto, auto, auto&) {}));
         }
 
         SECTION("change table to embedded - multiple incoming link per object") {
@@ -653,7 +659,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_THROWS(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - adding more links in migration block") {
@@ -680,8 +687,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(
-                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
+            REQUIRE_THROWS(realm->update_schema(
+                set_table_type(schema, "child_table", ObjectType::Embedded), 2, [](auto, auto new_realm, auto&) {
                     Object child_object(new_realm, "child_table", 0);
                     auto parent_table = ObjectStore::table_for_object_type(new_realm->read_group(), "parent_table");
                     Obj parent_obj = parent_table->create_object();
@@ -830,7 +837,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(child_table->is_embedded());
@@ -839,7 +847,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("change empty table from embedded to top-level") {
             Schema schema = {
                 {"child_table",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -853,7 +861,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::TopLevel), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE_FALSE(child_table->is_embedded());
@@ -862,7 +871,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("re-apply embedded flag to table") {
             Schema schema = {
                 {"child_table",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -876,7 +885,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(child_table->is_embedded());
@@ -911,7 +921,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 2);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(parent_table->size() == 2);
@@ -941,7 +952,7 @@ TEST_CASE("migration: Automatic") {
             };
             Schema schema2 = {
                 {"child_table",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -1011,8 +1022,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(
-                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
+            REQUIRE_NOTHROW(realm->update_schema(
+                set_table_type(schema, "child_table", ObjectType::Embedded), 2, [](auto, auto new_realm, auto&) {
                     Object parent_object1(new_realm, "parent_table", 0);
                     CppContext context(new_realm);
                     Object child_object1 =
@@ -1095,16 +1106,16 @@ TEST_CASE("migration: Automatic") {
             VERIFY_SCHEMA_IN_MIGRATION(add_table(
                 add_property(schema, "object", {"link", PropertyType::Object | PropertyType::Nullable, "new table"}),
                 {"new table",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }}));
         }
         SECTION("change table type") {
             VERIFY_SCHEMA_IN_MIGRATION(
-                set_embedded(add_property(schema, "object",
-                                          {"link", PropertyType::Object | PropertyType::Nullable, "no pk object"}),
-                             "no pk object", true));
+                set_table_type(add_property(schema, "object",
+                                            {"link", PropertyType::Object | PropertyType::Nullable, "no pk object"}),
+                               "no pk object", ObjectType::Embedded));
         }
         SECTION("add property to table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}));
@@ -1990,7 +2001,7 @@ TEST_CASE("migration: Immutable") {
                      {"value", PropertyType::Int},
                  }},
             });
-            Schema schema = set_embedded(realm->schema(), "object", true);
+            Schema schema = set_table_type(realm->schema(), "object", ObjectType::Embedded);
             REQUIRE_NOTHROW(realm->update_schema(schema));
         }
     }
@@ -2135,7 +2146,7 @@ TEST_CASE("migration: ReadOnly") {
                  }},
             };
             auto realm = realm_with_schema(schema);
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(realm->schema(), "object", true)));
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(realm->schema(), "object", ObjectType::Embedded)));
         }
     }
 
@@ -2374,7 +2385,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
                 // in discovered mode, adding embedded orphan types is allowed but ignored
                 REQUIRE_NOTHROW(realm->update_schema(
                     add_table(schema, {"origin",
-                                       ObjectSchema::IsEmbedded{true},
+                                       ObjectType::Embedded,
                                        {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}})));
                 REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
                 REQUIRE(!ObjectStore::table_for_object_type(realm->read_group(), "origin"));
@@ -2383,13 +2394,13 @@ TEST_CASE("migration: AdditiveDiscovered") {
                 // explicitly included embedded orphan types is an error
                 REQUIRE_THROWS(realm->update_schema(
                     add_table(schema, {"origin",
-                                       ObjectSchema::IsEmbedded{true},
+                                       ObjectType::Embedded,
                                        {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}})));
             }
         }
 
         DYNAMIC_SECTION("cannot change existing table type" << mode_string) {
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true)));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded)));
         }
 
         DYNAMIC_SECTION("indexes are updated when schema version is bumped" << mode_string) {
@@ -2767,3 +2778,111 @@ TEST_CASE("migration: Manual") {
         REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->update_schema(new_schema, 1, nullptr), ErrorCodes::SchemaMismatch);
     }
 }
+
+#if REALM_ENABLE_AUTH_TESTS
+
+TEST_CASE("migrations with asymmetric tables") {
+    realm::app::FLXSyncTestHarness harness("asymmetric_sync_migrations");
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.automatic_change_notifications = false;
+
+    SECTION("migration: Automatic") {
+        config.schema_mode = SchemaMode::Automatic;
+
+        SECTION("add asymmetric object schema") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"object",
+                                                 ObjectType::TopLevelAsymmetric,
+                                                 {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                  {"value", PropertyType::Int}}});
+            Schema schema3 =
+                add_table(schema2, {"object2",
+                                    ObjectType::TopLevelAsymmetric,
+                                    {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                     {"link", PropertyType::Object | PropertyType::Array, "embedded2"}}});
+            schema3 = add_table(schema3, {"embedded2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 1);
+        }
+
+        SECTION("cannot change table from top-level to top-level asymmetric without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "object", ObjectType::TopLevelAsymmetric), 1),
+                "Class 'object' has been changed from TopLevel to TopLevelAsymmetric.");
+        }
+
+        SECTION("cannot change table from top-level asymmetric to top-level without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 ObjectType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(realm->update_schema(set_table_type(schema, "object", ObjectType::TopLevel), 1),
+                                      "Class 'object' has been changed from TopLevelAsymmetric to TopLevel.");
+        }
+
+        SECTION("cannot change empty table from top-level to top-level asymmetric") {
+            Schema schema = {
+                {"table",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", ObjectType::TopLevelAsymmetric), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+        }
+
+        SECTION("cannot change empty table from top-level asymmetric to top-level") {
+            Schema schema = {
+                {"table",
+                 ObjectType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", ObjectType::TopLevel), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+        }
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS

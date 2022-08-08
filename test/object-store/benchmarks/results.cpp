@@ -134,26 +134,26 @@ TEST_CASE("Benchmark results", "[benchmark]") {
 
         BENCHMARK("Table forwards") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = r.get<Obj>(i);
+                r.get<Obj>(i);
             }
         };
 
         BENCHMARK("Table reverse") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = r.get<Obj>(size - i - 1);
+                r.get<Obj>(size - i - 1);
             }
         };
 
         auto tv = r.snapshot();
         BENCHMARK("TableView forwards") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = tv.get<Obj>(i);
+                tv.get<Obj>(i);
             }
         };
 
         BENCHMARK("TableView reverse") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = tv.get<Obj>(size - i - 1);
+                tv.get<Obj>(size - i - 1);
             }
         };
     }

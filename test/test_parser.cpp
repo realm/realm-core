@@ -25,7 +25,6 @@
 
 #include "test.hpp"
 
-
 // Test independence and thread-safety
 // -----------------------------------
 //
@@ -56,8 +55,6 @@
 // check-testcase` (or one of its friends) from the command line.
 
 #include <realm.hpp>
-#include <realm/history.hpp>
-#include <realm/query_expression.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -220,6 +217,26 @@ static std::vector<std::string> valid_queries = {
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  and c==d sort(a   ASC, b DESC)   DISTINCT( p )  sort( c   ASC  ,  d  DESC  ) DISTINCT(q.r ,   p)   ",
 
+    // constant list comparisons
+    "a BETWEEN {1, 2}",
+    "a IN {1, 2, 3}",
+    "a IN {'one', 2, -3.0, null}",
+    "a IN {}",
+    "a == {1, 2}",
+    "a > {1, 2}",
+    "a >= {1, 2}",
+    "a < {1, 2}",
+    "a <= {1, 2}",
+    "a != {1, 2}",
+    "a ==[c] {'a'}",
+    "a beginswith {'a', 'b'}",
+    "a endswith {'a', 'b'}",
+    "a contains {'a', 'b'}",
+    "a like {'a*', 'b*'}",
+    "NOT a IN {1, 2}",
+    "ALL a IN {1, 2}",
+    "NONE a IN {1, 2}",
+
     // limit
     "a=b LIMIT(1)",
     "a=b LIMIT ( 1 )",
@@ -233,20 +250,6 @@ static std::vector<std::string> valid_queries = {
     "a=b && c=d LIMIT(5) LIMIT(2)",
     "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) LIMIT(2)",
 
-    /*
-    // include
-    "a=b INCLUDE(c)",
-    "a=b include(c,d)",
-    "a=b INCLUDE(c.d)",
-    "a=b INCLUDE(c.d.e, f.g, h)",
-    "a=b INCLUDE ( c )",
-    "a=b INCLUDE(d, e, f    , g )",
-    "a=b INCLUDE(c) && d=f",
-    "a=b INCLUDE(c) INCLUDE(d)",
-    "a=b && c=d || e=f INCLUDE(g)",
-    "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) INCLUDE(links1, links2)",
-    "a=b INCLUDE(links1, links2) LIMIT(5) SORT(age ASC) DISTINCT(name)",
-     */
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -282,11 +285,9 @@ static std::vector<std::string> invalid_queries = {
     "0x = 1",
     "- = a",
     "a..b = a",
-    "{} = $0",
 
     // operators
     "0===>0",
-    "a between {}",
     "a between {1 2}",
     "0 contains1",
     "a contains_something",
@@ -315,6 +316,14 @@ static std::vector<std::string> invalid_queries = {
 
     "truepredicate &&",
     "truepredicate & truepredicate",
+
+    // constant list comparisons
+    "a IN {1, 2, 3",
+    "a IN 1, 2, 3}",
+    "a IN (1, 2, 3)",
+    "a IN [1, 2, 3]",
+    "a IN 1, 2, 3",
+    "a IN {b, c}",
 
     // sort/distinct
     "SORT(p ASCENDING)",                      // no query conditions
@@ -1471,11 +1480,11 @@ TEST(Parser_substitution)
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $0", std::vector<Mixed>{}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $0", std::vector<Mixed>{}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $1", std::vector<Mixed>{{1}}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $1", std::vector<Mixed>{{1}}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $2", std::vector<Mixed>{{1}, {2}}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $2", std::vector<Mixed>{{1}, {2}}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // Mixed types
@@ -2001,7 +2010,7 @@ TEST(Parser_list_of_primitive_ints)
             list1.add(it->get_key());
         }
         // empty object, null link, empty list
-        Obj obj2 = t2->create_object();
+        t2->create_object();
     }
 
     for (size_t i = 0; i < num_objects; ++i) {
@@ -2030,7 +2039,7 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers.@size == 1", num_objects);
 
     // add two more objects; one with defaults, one with null in the list
-    Obj obj_defaults = t->create_object();
+    t->create_object();
     Obj obj_nulls_in_lists = t->create_object();
     obj_nulls_in_lists.get_list<Optional<Int>>(col_int_list_nullable).add(Optional<Int>());
     num_objects += 2;
@@ -2114,7 +2123,6 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
     verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
 
-    Obj obj0 = *t->begin();
     util::Any args[] = {Int(1)};
     size_t num_args = 1;
     verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
@@ -2188,7 +2196,7 @@ TEST(Parser_list_of_primitive_strings)
         std::string si = get_string(i);
         obj.get_list<String>(col_str_list).add(si);
     }
-    Obj obj_empty_list = t->create_object();
+    t->create_object();
     Obj obj_with_null = t->create_object();
     obj_with_null.get_list<String>(col_str_list).add(StringData(realm::null()));
     Obj obj_with_empty_string = t->create_object();
@@ -2257,7 +2265,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     t->add_column(type_Int, "length"); // "length" is still a usable column name
     auto col_link = t->add_column(*t, "link");
 
-    Obj obj_empty_list = t->create_object();
+    t->create_object();
     Obj obj_with_null = t->create_object();
     TEST_TYPE null_value;
     CHECK(null_value.is_null());
@@ -2341,7 +2349,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     auto obj1 = t->create_object();
     std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
-    auto obj2 = t->create_object(); // empty list
+    t->create_object();             // empty list
     auto obj3 = t->create_object(); // {1}
     underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
     obj3.get_list<type>(col).add(value_1);
@@ -2497,6 +2505,18 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(mixed_list.sum(), Mixed(7.2));
     CHECK_EQUAL(mixed_list.avg(), Mixed(2.4));
 
+    /*
+    "table":[
+        {"_key":0,"values":[]},
+        {"_key":1,"values":[null]},
+        {"_key":2,"values":[""]},
+        {"_key":3,"values":[0,1,2]},
+        {"_key":4,"values":[1,"2.20000000000000",3.3000000e+00,4.4000000000000004e+00]},
+        {"_key":5,"values":["one","two","three","",null]},
+        {"_key":6,"values":["foo",1,"1970-01-01 00:00:01","2.5",3.7000000e+00,"62e2905feb23128a10ab3973",
+                            "00000000-0000-0000-0000-000000000000",null,false,true,null,null,null,"NaN"]}
+    ]
+    */
     verify_query(test_context, t, "values.@count == 0", 1);
     verify_query(test_context, t, "values.@size == 1", 2);
     verify_query(test_context, t, "ANY values == NULL", 3);
@@ -2524,6 +2544,10 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "values.@max == 2", 1);
     verify_query(test_context, t, "values.@max == 4.4", 1);
     verify_query(test_context, t, "values.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
+    verify_query(test_context, t, "ANY values == {'one', 'two'}", 1);
+    verify_query(test_context, t, "values == {'one', 'two', 'three', '', null}", 1);
+    verify_query(test_context, t, "values == {}", 1);
+    verify_query(test_context, t, "NONE values == ANY {null, ''}", 3);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
@@ -2594,9 +2618,9 @@ TEST(Parser_SortAndDistinctSerialisation)
 
 static TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
 {
-    Query q = t->query(query_string, {}, mapping);
+    Query q = t->query(query_string, std::vector<Mixed>{}, mapping);
     std::string query_description = q.get_description(mapping.get_backlink_class_prefix());
-    Query q2 = t->query(query_description, {}, mapping);
+    Query q2 = t->query(query_description, std::vector<Mixed>{}, mapping);
     return q2.find_all();
 }
 
@@ -3051,7 +3075,7 @@ TEST(Parser_Backlinks)
     }
 
     {
-        auto obj1 = things->create_object().set(int_col, 1);
+        things->create_object().set(int_col, 1);
         auto obj2 = things->create_object().set(int_col, 2);
         auto obj3 = things->create_object().set(int_col, 3);
         obj3.set(link_col, obj2.get_key());
@@ -3697,10 +3721,6 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "NONE items.name == fav_item.name",
                  1); // only person 1 has items which are not their favourite
 
-    // ANY/SOME is not necessary but accepted
-    verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1);
-    verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1);
-
     // multiple lists in path is supported
     verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 3);
     verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 3);
@@ -3708,14 +3728,17 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 0);
 
     std::string message;
-    // no list in path should throw
+    // the expression following ANY/SOME/ALL/NONE must be a keypath list
+    // currently this is restricted by the parser syntax so it is a predicate error
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'ALL' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
 
-    // the expression following ANY/SOME/ALL/NONE must be a keypath list
-    // currently this is restricted by the parser syntax so it is a predicate error
     CHECK_THROW_ANY(verify_query(test_context, t, "ANY 'milk' == fav_item.name", 1));
     CHECK_THROW_ANY(verify_query(test_context, t, "SOME 'milk' == fav_item.name", 1));
     CHECK_THROW_ANY(verify_query(test_context, t, "ALL 'milk' == fav_item.name", 1));
@@ -3800,6 +3823,61 @@ TEST(Parser_OperatorIN)
         }
     }
 
+    // RHS is a constant list
+    verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
+    verify_query(test_context, t, "NOT customer_id IN {0}", 2);
+    verify_query(test_context, t, "customer_id != {0}", 2);
+    verify_query(test_context, t, "customer_id != {0, 1}", 3);
+    verify_query(test_context, t, "NOT customer_id IN {0, 1}", 1);
+    verify_query(test_context, t, "customer_id != {0, 1, 2}", 3);
+    verify_query(test_context, t, "customer_id > {0, 1}", 2);
+    verify_query(test_context, t, "customer_id > {4, 5, 6}", 0);
+    verify_query(test_context, t, "customer_id < {0, 1}", 1);
+    verify_query(test_context, t, "customer_id < {0}", 0);
+    verify_query(test_context, t, "customer_id >= {0, 1}", 3);
+    verify_query(test_context, t, "customer_id >= {2, 3, 4}", 1);
+    verify_query(test_context, t, "customer_id <= {0, 1}", 2);
+    verify_query(test_context, t, "customer_id <= {-1}", 0);
+
+    verify_query(test_context, t, "fav_item.name IN {'milk', 'oranges', 'cereal'}", 2);
+    verify_query(test_context, t, "fav_item.price IN {6.5, 9.5}", 1);
+    verify_query(test_context, t, "fav_item.name IN {0, null, -1, 'not found', 3.14, oid(000000000000000000000000)}",
+                 0);
+    verify_query(test_context, t, "fav_item.name != {'milk', 'oranges'}", 3);
+    verify_query(test_context, t, "NOT fav_item.name IN {'milk', 'oranges'}", 1);
+    verify_query(test_context, t, "fav_item.name contains[c] {'ILK', 'Range'}", 2);
+    verify_query(test_context, t, "fav_item.name beginswith[c] {'MIL', 'CERe'}", 1);
+    verify_query(test_context, t, "fav_item.name endswith {'lk', 'EAL', 'GeS'}", 1);
+    verify_query(test_context, t, "fav_item.name endswith[c] {'lk', 'EAL', 'GeS'}", 2);
+    verify_query(test_context, t, "fav_item.name like {'*lk', '*zz*'}", 2);
+
+    std::vector<Mixed> int_list = {0, 1, 2};
+    std::vector<Mixed> strings_list = {"milk", "oranges", "cereal"};
+    std::vector<Mixed> mixed_list = {"no match",
+                                     -1,
+                                     3.14,
+                                     UUID(),
+                                     ObjectId::gen(),
+                                     Timestamp{0, 0},
+                                     Mixed{},
+                                     false,
+                                     2.6f,
+                                     Decimal128(8.888),
+                                     ObjKey{},
+                                     ObjLink{t->get_key(), people_keys[0]}};
+    std::vector<Mixed> empty_list = {};
+    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list, empty_list};
+    size_t num_args = 5;
+    verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
+    verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
+    verify_query_sub(test_context, t, "fav_item.name IN $4", args, num_args, 0);
+    verify_query_sub(test_context, t, "customer_id IN ANY $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "customer_id IN ALL $1", args, num_args, 0);
+    verify_query_sub(test_context, t, "customer_id IN NONE $1", args, num_args, 0);
+    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
+
+    // RHS is a list property
     verify_query(test_context, t, "5.5 IN items.price", 2);
     verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
     verify_query(test_context, t, "'milk' IN items.name", 2);               // string compare
@@ -3809,21 +3887,198 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1); // backlinks
     verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
 
+    // list property compared to a constant list
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 1);
+    verify_query(test_context, t, "ALL {5.5} IN items.price", 2);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 2);
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN ALL items.price", 1);
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN NONE items.price", 2);
+    verify_query(test_context, t, "!(ANY {5.5, 4.0} IN ANY items.price)", 1);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "ALL {5.5, 5.5} IN ALL items.price", 1);
+    verify_query(test_context, t, "ALL {6.0, 6.1, 1.1} <= ALL items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ANY items.price", 0);
+    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 2);
+
+    verify_query(test_context, t, "ANY items.name contains[c] ANY {'A', 'B'}", 2);
+    verify_query(test_context, t, "ALL items.name contains[c] {'A', 'B'}", 1);
+    verify_query(test_context, t, "ALL items.name contains[c] NONE {'A', 'B'}", 1); // customer_id: 1
+    verify_query(test_context, t, "NONE items.name contains[c] {'A', 'B'}", 1);
+    verify_query(test_context, t, "NONE items.name contains[c] ALL {'A', 'L'}", 1); // customer_id: 1 only "milk"
+    verify_query(test_context, t, "ANY items.name contains[c] NONE {'A', 'B'}", 2); // 0 and 1 both contains "milk"
+    verify_query(test_context, t, "ANY items.name contains[c] ALL {'A', 'B'}", 0);
+    // In the following we have a match if neither 5.5 or 4.0 cannot be found in item prices
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN NONE items.price", 1); // customer_id: 0
+
+    // when neither side specifies ANY/ALL/NONE we do ordered list matching
+    verify_query(test_context, t, "{5.5, 4.0, 9.5, 6.5} == items.price", 1);
+    verify_query(test_context, t, "{5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5} == items.price", 1);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5} == items.price", 1);
+    verify_query(test_context, t, "{5.5, 4.0} IN items.price", 0);
+    verify_query(test_context, t, "{} == items.price", 0);
+    verify_query(test_context, t, "!{} == items.price", 3);
+    verify_query(test_context, t, "{} != items.price", 3);
+    verify_query(test_context, t, "{5.5, 4.0, 9.5, 6.5} != items.price", 2);
+    verify_query(test_context, t, "{5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5} != items.price", 2);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5} != items.price", 2);
+    verify_query(test_context, t, "{null} != items.price", 3);
+    verify_query(test_context, t, "items.price != items.price", 0);
+    verify_query(test_context, t, "{5.5, 9.5, 4.0, 6.5} == items.price", 0);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5, 6.5} == items.price", 0);
+    verify_query(test_context, t, "items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 1);
+    verify_query(test_context, t, "items.name == {'MILk', 'ORanges', 'piZZA', 'CeReAl'}", 0);
+    verify_query(test_context, t, "NOT items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "items.name ==[c] {'MILk', 'ORanges', 'piZZA', 'CeReAl'}", 1);
+    verify_query(test_context, t, "items.name contains[c] {'ilk', 'range', 'zza', 'cer'}", 1);
+    verify_query(test_context, t, "items.name != {'milk', 'oranges', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "items.name != {'asdf', 'sdf', 'asdf', 'asdf'}", 3);
+    verify_query(test_context, t, "items.name != {}", 3);
+    verify_query(test_context, t, "items.name != {'pizza', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "{5.6, 4.1, 9.6, 6.6} > items.price", 1);
+
+    // empty constant list
+    verify_query(test_context, t, "{} IN items.price", 0);
+    verify_query(test_context, t, "{ } IN ALL items.price", 0);
+    verify_query(test_context, t, "{   } IN NONE items.price", 0);
+    verify_query(test_context, t, "ALL {} IN ALL items.price", 3);
+    verify_query(test_context, t, "ALL { } IN NONE items.price", 3);
+    verify_query(test_context, t, "ALL { } IN ANY items.price", 3);
+    verify_query(test_context, t, "NONE {   } IN ALL items.price", 3);
+    verify_query(test_context, t, "NONE {} IN ANY items.price", 3);
+
+    // one item in constant list
+    verify_query(test_context, t, "ANY {6.5} IN ANY items.price", 2);
+    verify_query(test_context, t, "{6.5} IN ANY items.price", 2);
+    verify_query(test_context, t, "{6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "{6.5} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "ALL {6.5} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {6.5} IN ANY items.price", 2);
+    verify_query(test_context, t, "NONE {6.5} IN ALL items.price", 3);
+    verify_query(test_context, t, "NONE {6.5} IN ANY items.price", 1);
+
+    // operators on a list
+    verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
+    verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
+    verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+
+    // list property vs list property
+    verify_query(test_context, t, "items.price IN items.price", 3);
+    verify_query(test_context, t, "ALL items.price IN ALL items.price", 1);
+    verify_query(test_context, t, "ALL items.price IN ANY items.price", 3);
+    verify_query(test_context, t, "NONE items.price IN ANY items.price", 0);
+    verify_query(test_context, t, "items.price * 2 > items.price", 3);
+    verify_query(test_context, t, "ALL items.price * 2 > ALL items.price", 2);
+    verify_query(test_context, t, "ALL items.price * 2 > ANY items.price", 3);
+    verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
+
+    // unsupported combinations
+    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), std::logic_error);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@max >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@min >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@avg >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.length >= ANY items.price", 3), query_parser::SyntaxError);
+
     // aggregate modifiers must operate on a list
     CHECK_THROW(verify_query(test_context, t, "ANY 5.5 IN items.price", 2), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "SOME 5.5 IN items.price", 2), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "ALL 5.5 IN items.price", 1), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "NONE 5.5 IN items.price", 1), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "ALL customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "NONE customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN NONE $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN ANY $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN ALL $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
 
     CHECK_THROW_EX(verify_query(test_context, t, "items.price IN 5.5", 1), query_parser::InvalidQueryArgError,
-                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
-                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
-    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
-    // list property vs list property is not supported by core yet
-    CHECK_THROW_EX(
-        verify_query(test_context, t, "items.price IN items.price", 0), query_parser::InvalidQueryError,
-        CHECK_EQUAL(e.what(), "Comparison between two lists is not supported ('items.price' and 'items.price')"));
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
+}
+
+TEST(Parser_ListVsList)
+{
+    Group g;
+    TableRef table = g.add_table_with_primary_key("table", type_Int, "id");
+    auto col = table->add_column_list(type_Int, "integers");
+    auto list = table->create_object_with_primary_key(1).get_list<Int>(col);
+    list.add(1);
+    list.add(2);
+    list = table->create_object_with_primary_key(2).get_list<Int>(col);
+    list.add(11);
+    list.add(5);
+    list.add(9);
+    list.add(5);
+
+    // None of {1, 2, 3} matches all of integers
+    verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
+    verify_query(test_context, table, "ALL integers == ANY {1, 2, 3}", 1);
+    verify_query(test_context, table, "{7, 3, 8, 0} < integers", 1);
+
+    TableView tv;
+    // ANY
+    tv = table->query("ANY {1, 2, 3} == ALL integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("ANY {1, 2, 3} > ALL integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+
+    tv = table->query("ANY {4, 8} == ANY integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("ANY {1, 2, 3} == ANY integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+
+    tv = table->query("ANY {1, 2, 3} == NONE integers").find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    tv = table->query("ANY {1, 2, 7} <= NONE integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+    tv = table->query("ANY {-1, 0} < NONE integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+
+    // ALL
+    tv = table->query("ALL {1, 2, 3} > ALL integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("ALL {4, 8} > ALL integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+    tv = table->query("ALL {1, 2, 12} < ANY integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("ALL {4, 8} > ANY integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+    tv = table->query("ALL {2, 5} == NONE integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("ALL {3, 1, 4, 3} == NONE integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
+
+    // NONE
+    tv = table->query("NONE {1, 2, 3, 12} > ALL integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("NONE {4, 8} > ALL integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
+    tv = table->query("NONE {1, 12} > ANY integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("NONE {4, 8} < ANY integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
+    tv = table->query("NONE {-1, 12} < NONE integers").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->query("NONE {-1, 5} < NONE integers").find_all();
+    if (CHECK_EQUAL(tv.size(), 1))
+        CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
+    tv = table->query("NONE {0, 1} < NONE integers").find_all();
+    CHECK_EQUAL(tv.size(), 2);
 }
 
 TEST(Parser_Object)
@@ -4511,8 +4766,7 @@ TEST(Parser_TypeOfValue)
                  origin->size());
     verify_query(test_context, origin, "links.mixed.@type == 'numeric' || links.mixed.@type == 'string'",
                  origin->size());
-    // TODO: enable this when IN is supported for list constants
-    // verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
+    verify_query(test_context, origin, "ANY links.mixed.@type IN ANY {'numeric', 'string'}", origin->size());
 
     verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
@@ -4541,6 +4795,10 @@ TEST(Parser_TypeOfValue)
     std::string message;
     CHECK_THROW_EX(
         verify_query(test_context, table, "mixed.@type == 'asdf'", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string 'asdf'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'asdf'}", 0),
+        query_parser::InvalidQueryArgError,
         CHECK(std::string(e.what()).find("Unable to parse the type attribute string 'asdf'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query(test_context, table, "mixed.@type == ''", 1), query_parser::InvalidQueryArgError,
@@ -4641,6 +4899,11 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
+    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
+    verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
+    verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
+    verify_query(test_context, foo, "dict['Value'] == {}", 0);
+    verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
@@ -4952,6 +5215,12 @@ TEST(Parser_SetMixed)
     verify_query(test_context, table, "ALL set < value && set.@size > 0", 0);
     verify_query(test_context, table, "ALL set == value", 2);  // 2, 3
     verify_query(test_context, table, "NONE set == value", 3); // 1, 3, 5
+    verify_query(test_context, table, "set == {}", 1);
+    verify_query(test_context, table, "ANY set == {300}", 2);
+    verify_query(test_context, table, "ALL set == ALL {300} && set.@size > 0", 1);
+    verify_query(test_context, table, "set == {300}", 1);
+    verify_query(test_context, table, "set == {300, 3, 'hello'}", 0); // order not matching
+    verify_query(test_context, table, "set == {3, 300, 'hello'}", 1); // order matching
     verify_query(test_context, table, "set == NULL", 2);
     verify_query(test_context, table, "set beginswith[c] 'HE'", 1);
     verify_query(test_context, table, "set endswith[c] 'D'", 1);

@@ -20,7 +20,7 @@
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>

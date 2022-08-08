@@ -19,7 +19,7 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
             ObjectSchema object_schema;
             object_schema.name = class_info.name;
             object_schema.primary_key = class_info.primary_key;
-            object_schema.is_embedded = ObjectSchema::IsEmbedded{bool(class_info.flags & RLM_CLASS_EMBEDDED)};
+            object_schema.table_type = static_cast<ObjectSchema::ObjectType>(class_info.flags & RLM_CLASS_MASK);
             object_schema.persisted_properties.reserve(class_info.num_properties);
             object_schema.computed_properties.reserve(class_info.num_computed_properties);
 

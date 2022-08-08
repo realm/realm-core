@@ -24,7 +24,6 @@ set(TEST_UTIL_HEADERS
     demangle.hpp
     dump_changesets.hpp
     misc.hpp
-    mock_metrics.hpp
     number_names.hpp
     quote.hpp
     random.hpp
@@ -47,7 +46,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND TEST_UTIL_SOURCES
         compare_groups.cpp
         dump_changesets.cpp
-        mock_metrics.cpp
     )
 endif()
 
@@ -59,10 +57,8 @@ if(UNIX AND NOT APPLE)
     find_library(LIBRT rt)
     if(LIBRT)
         target_link_libraries(TestUtil ${LIBRT})
-    else()
+    # Android has librt included in libc
+    elseif(NOT ANDROID)
         message(WARNING "librt was not found. This means that the benchmarks will not be able to link properly.")
     endif()
 endif()
-
-
-

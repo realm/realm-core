@@ -19,9 +19,6 @@
 #include "testsettings.hpp"
 
 #include <realm.hpp>
-#include <realm/dictionary.hpp>
-#include <realm/group.hpp>
-#include <realm/history.hpp>
 
 #include "test.hpp"
 #include <chrono>

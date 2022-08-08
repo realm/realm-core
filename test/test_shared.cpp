@@ -40,7 +40,6 @@
 #include <windows.h>
 #endif
 
-#include <realm/history.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
@@ -101,7 +100,7 @@ ONLY(Query_QuickSort2)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-                                                // Triggers QuickSort because range > len
+    // Triggers QuickSort because range > len
     Table ttt;
     auto ints = ttt.add_column(type_Int, "1");
     auto strings = ttt.add_column(type_String, "2");
@@ -2694,7 +2693,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
             // If using std::cerr, you can copy/paste the console output into a unit test
             // to get a reproduction test case
             // parse_and_apply_instructions(instr, path, std::cerr);
-            parse_and_apply_instructions(instr, path, util::none);
+            parse_and_apply_instructions(instr, path, nullptr);
         }
     }
 }

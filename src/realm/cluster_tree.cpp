@@ -1181,7 +1181,6 @@ ClusterTree::Iterator& ClusterTree::Iterator::operator+=(ptrdiff_t adj)
         if (n < left_in_leaf) {
             m_state.m_current_index += n;
             m_key = m_leaf.get_real_key(m_state.m_current_index);
-            n = 0;
         }
         else {
             if (m_position < m_tree.size()) {

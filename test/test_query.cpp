@@ -29,7 +29,6 @@ using namespace std::chrono;
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/array_bool.hpp>
-#include <realm/history.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_expression.hpp>
@@ -146,12 +145,12 @@ TEST(Query_Parser)
     books.add_column(type_String, "author");
     books.add_column(type_Int, "pages");
 
-    Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
+    books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
     Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
-    Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
+    books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.query("pages >= $0 && author == $1", {{200, "David Griffiths"}});
+    Query q = books.query("pages >= $0 && author == $1", std::vector<Mixed>{200, "David Griffiths"});
     auto match = q.find();
     CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
@@ -1444,10 +1443,7 @@ TEST(Query_StrIndexCrash)
             if (v == 8) {
                 eights++;
             }
-            char dst[100];
-            memset(dst, 0, sizeof(dst));
-            sprintf(dst, "%d", v);
-            table->create_object().set(col, dst);
+            table->create_object().set(col, util::to_string(v));
         }
 
         table->add_search_index(col);
@@ -2231,7 +2227,7 @@ TEST(Query_TwoColsVaryOperators)
 
     Obj obj0 = table.create_object().set_all(5, 10, 5.0f, 10.0f, 5.0, 10.0);
     Obj obj1 = table.create_object().set_all(10, 5, 10.0f, 5.0f, 10.0, 5.0);
-    Obj obj2 = table.create_object().set_all(-10, -5, -10.0f, -5.0f, -10.0, -5.0);
+    table.create_object().set_all(-10, -5, -10.0f, -5.0f, -10.0, -5.0);
 
     CHECK_EQUAL(null_key, table.where().equal(col_int0, col_int1).find());
     CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_int0, col_int1).find());
@@ -3997,10 +3993,10 @@ TEST(Query_SortLinkChains)
                                               .get<util::Optional<int64_t>>(t3_int_col);
         if (last) {
             CHECK(current);
-            CHECK(current.value() >= last.value());
+            CHECK(*current >= *last);
         }
         if (current) {
-            last = current.value();
+            last = current;
         }
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
@@ -5543,7 +5539,7 @@ NONCONCURRENT_TEST(Query_IntPerformance)
     auto col_2 = table.add_column(type_Int, "2");
 
     for (int i = 0; i < 1000; i++) {
-        Obj o = table.create_object().set(col_1, i).set(col_2, i == 500 ? 500 : 2);
+        table.create_object().set(col_1, i).set(col_2, i == 500 ? 500 : 2);
     }
 
     Query q1 = table.where().equal(col_2, 2);

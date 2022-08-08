@@ -223,10 +223,10 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("paths have a fallback hashed location if the preferred path is too long") {
-            const std::string long_path_name = std::string(300, 'a');
+            const std::string long_path_name = std::string(500, 'a');
             REQUIRE(long_path_name.length() > 255); // linux name length limit
             auto actual = manager.realm_file_path(identity, local_identity, long_path_name, partition);
-            REQUIRE(actual.length() < 300);
+            REQUIRE(actual.length() < 500);
             REQUIRE(create_dummy_realm(actual));
             REQUIRE(File::exists(actual));
             manager.remove_user_realms(identity, {actual});

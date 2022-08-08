@@ -1695,17 +1695,17 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
               "TopLevel_embedded_dict"},
          }},
         {"TopLevel_array_of_objs",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},
         {"TopLevel_embedded_obj",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},
         {"TopLevel_embedded_dict",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},
@@ -3195,6 +3195,18 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         CHECK(error.is_json_error());
         CHECK(error.code() == ErrorCodes::BadToken);
     }
+
+    SECTION("login_anonynous multiple users") {
+        UnitTestTransport::access_token = good_access_token;
+        config.base_path = util::make_temp_dir();
+        config.should_teardown_test_directory = false;
+        TestSyncManager tsm(config);
+        auto app = tsm.app();
+
+        auto user1 = log_in(app);
+        auto user2 = log_in(app, AppCredentials::anonymous(false));
+        CHECK(user1 != user2);
+    }
 }
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
@@ -3658,6 +3670,13 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "anon-user"}});
     }
 
+    SECTION("auth providers anonymous no reuse") {
+        auto credentials = AppCredentials::anonymous(false);
+        CHECK(credentials.provider() == AuthProvider::ANONYMOUS_NO_REUSE);
+        CHECK(credentials.provider_as_string() == IdentityProviderAnonymous);
+        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "anon-user"}});
+    }
+
     SECTION("auth providers google authCode") {
         auto credentials = AppCredentials::google(AuthCode("a_token"));
         CHECK(credentials.provider() == AuthProvider::GOOGLE);
@@ -3959,10 +3978,13 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
         void wait_for(TestState new_state)
         {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
+            std::unique_lock lk(mutex);
+            bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
                 return state == new_state;
             });
+            if (failed) {
+                throw std::runtime_error("wait timed out");
+            }
         }
 
         mutable std::mutex mutex;
@@ -4054,18 +4076,9 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         auto cur_user = std::move(cur_user_future).get();
         CHECK(cur_user);
 
-        Realm::Config realm_config;
-        realm_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cout << error.what() << std::endl;
-        };
-        realm_config.schema_version = 1;
-        realm_config.path =
-            app->sync_manager()->path_for_realm(*realm_config.sync_config, std::string("default.realm"));
-
-        auto r = Realm::get_shared_realm(std::move(realm_config));
-        auto session = cur_user->session_for_on_disk_path(r->config().path);
+        SyncTestFile config(app->current_user(), bson::Bson("foo"));
+        auto r = Realm::get_shared_realm(config);
+        auto session = r->sync_session();
         mock_transport_worker.add_work_item([session] {
             session->initiate_access_token_refresh();
         });
@@ -4074,7 +4087,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         user->log_out();
     }
 
-    util::EventLoop::main().run_until([&] {
+    timed_wait_for([&] {
         return !app->sync_manager()->has_existing_sessions();
     });
 

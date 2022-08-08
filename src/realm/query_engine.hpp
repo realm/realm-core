@@ -1533,7 +1533,7 @@ public:
         REALM_ASSERT(m_condition_column_key);
         StringData sd;
         if (bool(StringNodeBase::m_value)) {
-            sd = StringData(StringNodeBase::m_value.value());
+            sd = StringData(*StringNodeBase::m_value);
         }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(sd);

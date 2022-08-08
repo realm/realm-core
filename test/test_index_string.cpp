@@ -1782,7 +1782,7 @@ TEST(StringIndex_QuerySingleObject)
 {
     Group g;
     auto table = g.add_table_with_primary_key("class_StringClass", type_String, "name", true);
-    auto obj = table->create_object_with_primary_key("Foo");
+    table->create_object_with_primary_key("Foo");
 
     auto q = table->where().equal(table->get_column_key("name"), "Foo", true);
     CHECK_EQUAL(q.count(), 1);

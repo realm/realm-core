@@ -309,7 +309,8 @@ struct FakeLocalClientReset : public TestClientReset {
             auto remote_db = TestHelper::get_db(remote_realm);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
-            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr);
+            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,
+                                      nullptr, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -326,6 +327,36 @@ private:
 #if REALM_ENABLE_SYNC
 
 #if REALM_ENABLE_AUTH_TESTS
+
+static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                       const std::string& schema_name, const bson::BsonDocument& filter_bson)
+{
+    // While at this point the object has been sync'd successfully, we must also
+    // wait for it to appear in the backing database before terminating sync
+    // otherwise the translator may be terminated before it has a chance to
+    // integrate it into the backing database. If the server were to change
+    // the meaning of "upload complete" to include writing to atlas then this would
+    // not be necessary.
+    app::MongoClient remote_client = user->mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
+    app::MongoCollection object_coll = db[schema_name];
+    uint64_t count_external = 0;
+
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            if (count_external == 0) {
+                object_coll.count(filter_bson, [&](uint64_t count, util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                    count_external = count;
+                });
+            }
+            if (count_external == 0) {
+                millisleep(2000); // don't spam the server too much
+            }
+            return count_external > 0;
+        },
+        std::chrono::minutes(15));
+}
 
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
@@ -368,32 +399,9 @@ struct BaasClientReset : public TestClientReset {
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            // While at this point the object has been sync'd successfully, we must also
-            // wait for it to appear in the backing database before terminating sync
-            // otherwise the translator may be terminated before it has a chance to
-            // integrate it into the backing database. If the server were to change
-            // the meaning of "upload complete" to include writing to atlas then this would
-            // not be necessary.
-            app::MongoClient remote_client = m_local_config.sync_config->user->mongo_client("BackingDB");
-            app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-            app::MongoCollection object_coll = db[object_schema_name];
-            uint64_t count_external = 0;
+            wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
+                                       {{pk_col_name, m_pk_driving_reset}});
 
-            timed_sleeping_wait_for(
-                [&]() -> bool {
-                    if (count_external == 0) {
-                        object_coll.count({{pk_col_name, m_pk_driving_reset}},
-                                          [&](uint64_t count, util::Optional<app::AppError> error) {
-                                              REQUIRE(!error);
-                                              count_external = count;
-                                          });
-                    }
-                    if (count_external == 0) {
-                        millisleep(2000); // don't spam the server too much
-                    }
-                    return count_external > 0;
-                },
-                std::chrono::minutes(15));
             session->log_out();
 
             realm->begin_transaction();
@@ -461,6 +469,9 @@ struct BaasClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
+        if (!m_wait_for_reset_completion) {
+            return;
+        }
         wait_for_upload(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
@@ -471,11 +482,150 @@ private:
     TestAppSession& m_test_app_session;
 };
 
+struct BaasFLXClientReset : public TestClientReset {
+    BaasFLXClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
+                       const TestAppSession& test_app_session)
+        : TestClientReset(local_config, remote_config)
+        , m_test_app_session(test_app_session)
+    {
+        REALM_ASSERT(m_local_config.sync_config->flx_sync_requested);
+        REALM_ASSERT(m_remote_config.sync_config->flx_sync_requested);
+        REALM_ASSERT(m_local_config.schema->find(c_object_schema_name) != m_local_config.schema->end());
+    }
+
+    void run() override
+    {
+        m_did_run = true;
+        const AppSession& app_session = m_test_app_session.app_session();
+
+        auto realm = Realm::get_shared_realm(m_local_config);
+        auto session = realm->sync_session();
+        const ObjectId pk_of_added_object("123456789000000000000000");
+        {
+            if (m_on_setup) {
+                m_on_setup(realm);
+            }
+            constexpr bool create_object = true;
+            subscribe_to_object_by_id(realm, pk_of_added_object, create_object);
+
+            wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
+                                       std::string(c_object_schema_name),
+                                       {{std::string(c_id_col_name), pk_of_added_object}});
+            session->log_out();
+
+            if (m_make_local_changes) {
+                m_make_local_changes(realm);
+            }
+        }
+
+        // cause a client reset by restarting the sync service
+        // this causes the server's sync history to be resynthesized
+        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+            app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
+        }
+
+        {
+            auto realm2 = Realm::get_shared_realm(m_remote_config);
+            wait_for_download(*realm2);
+            load_initial_data(realm2);
+
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    realm2->begin_transaction();
+                    auto table = get_table(*realm2, c_object_schema_name);
+                    auto objkey = table->find_primary_key({pk_of_added_object});
+                    realm2->cancel_transaction();
+                    return bool(objkey);
+                },
+                std::chrono::seconds(60));
+
+            // expect the last sync'd object to be in place
+            realm2->begin_transaction();
+            auto table = get_table(*realm2, c_object_schema_name);
+            REQUIRE(table->size() >= 1);
+            auto obj = table->get_object_with_primary_key({pk_of_added_object});
+            REQUIRE(obj.is_valid());
+            realm2->commit_transaction();
+
+            if (m_make_remote_changes) {
+                m_make_remote_changes(realm2);
+            }
+            wait_for_upload(*realm2);
+            auto subs = realm2->get_latest_subscription_set();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            realm2->close();
+        }
+
+        // Resuming sync on the first realm should now result in a client reset
+        session->revive_if_needed();
+        if (m_on_post_local) {
+            m_on_post_local(realm);
+        }
+        wait_for_upload(*realm);
+        if (m_on_post_reset) {
+            m_on_post_reset(realm);
+        }
+    }
+
+private:
+    void subscribe_to_object_by_id(SharedRealm realm, ObjectId pk, bool create_object = false)
+    {
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        Group::TableNameBuffer buffer;
+        auto class_name = Group::class_name_to_table_name(c_object_schema_name, buffer);
+        TableRef table = realm->read_group().get_table(class_name);
+        REALM_ASSERT(table);
+        ColKey id_col = table->get_column_key(c_id_col_name);
+        REALM_ASSERT(id_col);
+        ColKey str_col = table->get_column_key(c_str_col_name);
+        REALM_ASSERT(str_col);
+        Query query_for_added_object = table->where().equal(id_col, pk);
+        mut_subs.insert_or_assign(query_for_added_object);
+        auto subs = std::move(mut_subs).commit();
+        if (create_object) {
+            realm->begin_transaction();
+            table->create_object_with_primary_key(pk, {{str_col, "initial value"}});
+            realm->commit_transaction();
+        }
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    void load_initial_data(SharedRealm realm)
+    {
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        for (const auto& table : realm->schema()) {
+            Query query_for_table(realm->read_group().get_table(table.table_key));
+            mut_subs.insert_or_assign(query_for_table);
+        }
+        auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
+
+    const TestAppSession& m_test_app_session;
+    constexpr static std::string_view c_object_schema_name = "TopLevel";
+    constexpr static std::string_view c_id_col_name = "_id";
+    constexpr static std::string_view c_str_col_name = "queryable_str_field";
+};
+
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
                                                         TestAppSession& test_app_session)
 {
     return std::make_unique<BaasClientReset>(local_config, remote_config, test_app_session);
+}
+
+std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
+                                                            const Realm::Config& remote_config,
+                                                            const TestAppSession& session)
+{
+    return std::make_unique<BaasFLXClientReset>(local_config, remote_config, session);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -528,6 +678,11 @@ void TestClientReset::set_pk_of_object_driving_reset(const ObjectId& pk)
 ObjectId TestClientReset::get_pk_of_object_driving_reset() const
 {
     return m_pk_driving_reset;
+}
+
+void TestClientReset::disable_wait_for_reset_completion()
+{
+    m_wait_for_reset_completion = false;
 }
 
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
