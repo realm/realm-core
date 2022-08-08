@@ -1259,9 +1259,8 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         m_actualized = true;
     }
     catch (...) {
-        if (was_created) {
+        if (was_created)
             m_client.remove_connection(conn);
-        }
         throw;
     }
 
