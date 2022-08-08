@@ -747,15 +747,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
     bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets);
 
-    if (batch_state == DownloadBatchState::MoreToCome) {
-        on_flx_sync_progress(query_version, batch_state);
-        if (m_wrapper.m_on_bootstrap_message_processed_hook) {
-            m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state);
-        }
-
-        return true;
-    }
-
+    on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     if (m_wrapper.m_on_bootstrap_message_processed_hook &&
         !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
         return true;
@@ -970,7 +962,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
 
-    SubscriptionSet::State new_state = SubscriptionSet::State::Complete; // Initialize to make compiler happy
+    SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
     switch (batch_state) {
         case DownloadBatchState::LastInBatch:
