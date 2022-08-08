@@ -1065,12 +1065,11 @@ RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm
                                                                  realm_free_userdata_func_t userdata_free);
 
 /**
- * Add a callback that will be invoked every time the read transaction version is going to be advaced to the desidered version for the realm
- * file passed as argument.
+ * Add a callback that will be invoked every time the read transaction version is going to be advaced to the desidered
+ * version for the realm file passed as argument.
  * @return a refresh token to remove the callback
  */
-RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t*,
-                                                                         realm_on_realm_refresh_func_t,
+RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t*, realm_on_realm_refresh_func_t,
                                                                          realm_userdata_t userdata,
                                                                          realm_free_userdata_func_t userdata_free);
 
