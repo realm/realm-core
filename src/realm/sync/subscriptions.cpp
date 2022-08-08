@@ -364,11 +364,9 @@ MutableSubscriptionSet SubscriptionSet::make_mutable_copy() const
 void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
-    auto refreshed_self = mgr->get_by_version(version());
-    m_state = refreshed_self.m_state;
-    m_error_str = refreshed_self.m_error_str;
-    m_cur_version = refreshed_self.m_cur_version;
-    *this = mgr->get_by_version(version());
+    if (mgr->would_refresh(m_cur_version)) {
+        *this = mgr->get_by_version(version());
+    }
 }
 
 util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
@@ -830,6 +828,11 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     }
 
     return new_set_obj;
+}
+
+bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
+{
+    return version < m_db->get_version_of_latest_snapshot();
 }
 
 } // namespace realm::sync

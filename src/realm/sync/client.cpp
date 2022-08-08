@@ -963,7 +963,9 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     }
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
-    SubscriptionSet::State new_state;
+
+    SubscriptionSet::State new_state = SubscriptionSet::State::Complete; // Initialize to make compiler happy
+
     switch (batch_state) {
         case DownloadBatchState::LastInBatch:
             if (m_flx_active_version == new_version) {
