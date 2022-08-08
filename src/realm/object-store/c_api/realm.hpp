@@ -39,7 +39,7 @@ public:
         return m_realm_changed_callbacks;
     }
 
-    CallbackRegistry<>& realm_pending_refresh_callbacks()
+    CallbackRegistryWithVersion<>& realm_pending_refresh_callbacks()
     {
         return m_realm_pending_refresh_callbacks;
     }
@@ -59,7 +59,7 @@ protected:
 
 private:
     CallbackRegistry<> m_realm_changed_callbacks;
-    CallbackRegistry<> m_realm_pending_refresh_callbacks;
+    CallbackRegistryWithVersion<> m_realm_pending_refresh_callbacks;
     CallbackRegistry<const Schema&> m_schema_changed_callbacks;
 };
 

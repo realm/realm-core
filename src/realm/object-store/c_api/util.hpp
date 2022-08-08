@@ -163,19 +163,45 @@ public:
         }
     }
 
-    void invoke_if(uint64_t expected, Args... args)
+private:
+    std::map<uint64_t, Callback_T> m_callbacks;
+    uint64_t m_next_token = 0;
+};
+
+template <typename... Args>
+class CallbackRegistryWithVersion {
+public:
+    using Callback_T = util::UniqueFunction<void(Args...)>;
+
+    uint64_t add(uint64_t version, Callback_T&& callback)
     {
-        for (const auto& [current, callback] : m_callbacks) {
-            if (current <= expected) {
+        uint64_t token = m_next_token++;
+        m_callbacks.emplace_hint(m_callbacks.end(), token, std::make_pair(version, std::move(callback)));
+        return token;
+    }
+
+    void remove(uint64_t token)
+    {
+        m_callbacks.erase(token);
+    }
+
+    void invoke(DB::version_type version, Args... args)
+    {
+        for (const auto& [token, callback_object] : m_callbacks) {
+            auto& [expected, callback] = callback_object;
+            if (expected <= version) {
                 callback(args...);
+                remove(token);
+                break;
             }
         }
     }
 
 private:
-    std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
+    std::map<uint64_t, std::pair<uint64_t, Callback_T>> m_callbacks;
     uint64_t m_next_token = 0;
 };
+
 
 /**
  * Convenience struct for safely filling external arrays with new-allocated pointers.

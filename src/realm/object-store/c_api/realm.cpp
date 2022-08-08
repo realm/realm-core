@@ -187,8 +187,15 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
-    return new realm_refresh_callback_token(
-        realm, CBindingContext::get(*realm).realm_pending_refresh_callbacks().add(std::move(func)));
+    const auto& current_snap_version = (*realm)->current_transaction_snapshot_version();
+    const auto& current_realm_version = (*realm)->current_transaction_version();
+
+    if (!current_realm_version || !current_snap_version)
+        return nullptr;
+
+    auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
+    return new realm_refresh_callback_token(realm,
+                                            refresh_callbacks.add(current_snap_version.value(), std::move(func)));
 }
 
 RLM_API bool realm_refresh(realm_t* realm)
@@ -250,7 +257,7 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
 {
     if (auto ptr = realm.lock()) {
         auto version_id = ptr->read_transaction_version();
-        m_realm_pending_refresh_callbacks.invoke_if(version_id.version);
+        m_realm_pending_refresh_callbacks.invoke(version_id.version);
     }
     m_realm_changed_callbacks.invoke();
 }

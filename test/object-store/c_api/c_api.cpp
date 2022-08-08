@@ -1056,7 +1056,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
-    SECTION("realm refresh is pending") {
+    SECTION("realm refresh registering callback outside transaction") {
         bool realm_refresh_callback_called = false;
         auto token = cptr(realm_add_realm_refresh_callback(
             realm,
@@ -1064,9 +1064,49 @@ TEST_CASE("C API", "[c_api]") {
                 *reinterpret_cast<bool*>(userdata) = true;
             },
             &realm_refresh_callback_called, [](void*) {}));
-
         realm_begin_write(realm);
         realm_commit(realm);
+        CHECK_FALSE(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh registering callback in transaction") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_write(realm);
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+        realm_commit(realm);
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh async pending") {
+        bool realm_refresh_callback_called = false;
+        // bool on_transaction_completed = false;
+        bool done = false;
+        auto wait_for_done = [&]() {
+            util::EventLoop::main().run_until([&] {
+                return done;
+            });
+            REQUIRE(done);
+        };
+        (*realm)->async_begin_transaction([&]() {
+            auto token = cptr(realm_add_realm_refresh_callback(
+                realm,
+                [](void* userdata) {
+                    *reinterpret_cast<bool*>(userdata) = true;
+                },
+                &realm_refresh_callback_called, [](void*) {}));
+
+            (*realm)->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+
+
+        wait_for_done();
         CHECK(realm_refresh_callback_called);
     }
 
