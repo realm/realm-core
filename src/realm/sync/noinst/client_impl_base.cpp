@@ -828,10 +828,13 @@ void Connection::handle_pong_timeout()
 }
 
 
-void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
+void Connection::initiate_write_message(const OutputBuffer& out, Session* sess,
+                                        util::UniqueFunction<void()>&& on_message_sent)
 {
-    auto handler = [this] {
+    auto handler = [this, message_sent_handler = std::move(on_message_sent)] {
         handle_write_message(); // Throws
+        if (message_sent_handler)
+            message_sent_handler();
     };
     m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
     m_sending_session = sess;
@@ -1411,7 +1414,15 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    m_conn.close_due_to_protocol_error(error.code(), error.what());
+
+    m_client_error = util::make_optional<IntegrationException>(error);
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
 void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
@@ -1605,6 +1616,9 @@ void Session::send_message()
             send_ident_message(); // Throws
         return;
     }
+
+    if (m_client_error)
+        return send_json_error_message(); // Throws
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -1904,6 +1918,35 @@ void Session::send_unbind_message()
     m_conn.initiate_write_message(out, this);         // Throws
 
     m_unbind_message_sent = true;
+}
+
+
+void Session::send_json_error_message()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    session_ident_type session_ident = get_ident();
+    std::error_code ec = m_client_error->code();
+    auto message = m_client_error->what();
+
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+                session_ident); // Throws
+
+    nlohmann::json error_body_json;
+    error_body_json["message"] = message;
+    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
+
+    auto handler = [this, ec, message]() {
+        // Close the connection after the message is sent.
+        m_conn.close_due_to_protocol_error(ec, message);
+    };
+    m_conn.initiate_write_message(out, this, std::move(handler)); // Throws
+
+    m_client_error = util::none;
 }
 
 

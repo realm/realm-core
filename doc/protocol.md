@@ -571,6 +571,20 @@ network connection. The server may need these for statistics purposes. The value
 must be a nonnegative integer strictly less than 2^63.
 
 
+### JSON_ERROR
+
+    head  =  'json_error' <error_code> <message size> <session ident>
+    body  =  <message>
+
+Introduced in protocol version 4.
+When the client encounters an error that appears to be caused by the connected server,
+it will send an [JSON_ERROR](#json_error)  message to that server.
+
+The body of the message will be in JSON format with the following keys currently supported:
+    - `message` is a detailed description of the error.
+The connection to the server is closed immediately after the [JSON_ERROR](#json_error) message is sent.
+
+
 
 Server --> client
 -----------------

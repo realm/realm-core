@@ -176,6 +176,8 @@ public:
 
     void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
 
+    void make_json_error_message(OutputBuffer&, session_ident_type, int error_code, std::string_view error_body);
+
     class UploadMessageBuilder {
     public:
         util::Logger& logger;

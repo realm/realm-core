@@ -438,7 +438,8 @@ private:
     void handle_ping_delay();
     void initiate_pong_timeout();
     void handle_pong_timeout();
-    void initiate_write_message(const OutputBuffer&, Session*);
+    void initiate_write_message(const OutputBuffer&, Session*,
+                                util::UniqueFunction<void()>&& on_message_sent = nullptr);
     void handle_write_message();
     void send_next_message();
     void send_ping();
@@ -921,6 +922,8 @@ private:
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
 
+    util::Optional<IntegrationException> m_client_error;
+
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
@@ -1056,6 +1059,7 @@ private:
     void send_alloc_message();
     void send_unbind_message();
     void send_query_change_message();
+    void send_json_error_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
