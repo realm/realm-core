@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -27,7 +27,6 @@
 * Allow multiple anonymous sessions. ([PR #5693](https://github.com/realm/realm-core/pull/5693)).
 * Introducing query parser support for constant list expressions such as `fruit IN {'apple', 'orange'}`. This also includes general query support for list vs list matching such as `NONE fruits IN {'apple', 'orange'}`. ([Issue #4266](https://github.com/realm/realm-core/issues/4266))
 * SubscriptionSet::refresh() does less work if no commits have been made since the last call to refresh(). ([PR #5695](https://github.com/realm/realm-core/pull/5695))
-* Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
 
 ### Fixed
 * Fix error message when validating outgoing links from asymmetric objects to non-embedded objects. ([PR #5702](https://github.com/realm/realm-core/pull/5702))
