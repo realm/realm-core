@@ -1065,7 +1065,8 @@ RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm
                                                                  realm_free_userdata_func_t userdata_free);
 
 /**
- * Add a callback that will be invoked the first time that the given realm is refreshed to the version which is the latest version at the time when this is called.
+ * Add a callback that will be invoked the first time that the given realm is refreshed to the version which is the
+ * latest version at the time when this is called.
  * @return a refresh token to remove the callback
  */
 RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t*, realm_on_realm_refresh_func_t,
