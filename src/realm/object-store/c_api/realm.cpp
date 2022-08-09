@@ -187,15 +187,13 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
-    const auto& current_snap_version = (*realm)->current_transaction_snapshot_version();
-    const auto& current_realm_version = (*realm)->current_transaction_version();
+    const util::Optional<DB::version_type>& latest_snapshot_version = (*realm)->latest_snapshot_version();
 
-    if (!current_realm_version || !current_snap_version)
+    if (!latest_snapshot_version)
         return nullptr;
 
     auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
-    return new realm_refresh_callback_token(realm,
-                                            refresh_callbacks.add(current_snap_version.value(), std::move(func)));
+    return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
 }
 
 RLM_API bool realm_refresh(realm_t* realm)

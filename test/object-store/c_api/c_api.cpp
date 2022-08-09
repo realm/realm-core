@@ -1110,6 +1110,29 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_refresh_callback_called);
     }
 
+    SECTION("realm async refresh use case") {
+        bool realm_refresh_callback_called = false;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+
+        realm_refresh(realm2.get());
+        CHECK(realm_refresh_callback_called);
+    }
+
     SECTION("schema is set after opening") {
         const realm_class_info_t baz = {
             "baz",
