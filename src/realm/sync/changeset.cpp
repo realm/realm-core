@@ -10,37 +10,21 @@ using namespace realm;
 using namespace realm::sync;
 using namespace realm::util;
 
-Changeset::Changeset()
-{
-    m_strings = std::make_shared<InternStrings>();
-    m_string_buffer = std::make_shared<std::string>();
-}
-
-Changeset::Changeset(const Changeset& other, share_buffers_tag)
-    : version(other.version)
-    , last_integrated_remote_version(other.last_integrated_remote_version)
-    , origin_timestamp(other.origin_timestamp)
-    , origin_file_ident(other.origin_file_ident)
-{
-    m_strings = other.m_strings;
-    m_string_buffer = other.m_string_buffer;
-}
-
 InternString Changeset::intern_string(StringData str)
 {
     if (InternString interned = find_string(str))
         return interned;
 
-    REALM_ASSERT(m_string_buffer->size() < std::numeric_limits<uint32_t>::max());
-    REALM_ASSERT(m_strings->size() < std::numeric_limits<uint32_t>::max());
+    REALM_ASSERT(m_string_buffer.size() < std::numeric_limits<uint32_t>::max());
+    REALM_ASSERT(m_strings.size() < std::numeric_limits<uint32_t>::max());
     REALM_ASSERT(str.size() < std::numeric_limits<uint32_t>::max());
 
     // FIXME: Very slow.
     uint32_t size = uint32_t(str.size());
-    uint32_t offset = uint32_t(m_string_buffer->size());
-    m_string_buffer->append(str.data(), size);
-    uint32_t index = uint32_t(m_strings->size());
-    m_strings->push_back(StringBufferRange{offset, size});
+    uint32_t offset = uint32_t(m_string_buffer.size());
+    m_string_buffer.append(str.data(), size);
+    uint32_t index = uint32_t(m_strings.size());
+    m_strings.push_back(StringBufferRange{offset, size});
     return InternString{index};
 }
 
@@ -48,10 +32,10 @@ InternString Changeset::intern_string(StringData str)
 InternString Changeset::find_string(StringData string) const noexcept
 {
     // FIXME: Linear search can be very expensive as changesets can be very big
-    std::size_t n = m_strings->size();
+    std::size_t n = m_strings.size();
     for (std::size_t i = 0; i < n; ++i) {
-        const auto& range = (*m_strings)[i];
-        StringData string_2{m_string_buffer->data() + range.offset, range.size};
+        const auto& range = m_strings[i];
+        StringData string_2{m_string_buffer.data() + range.offset, range.size};
         if (string_2 == string)
             return InternString{std::uint_least32_t(i)};
     }
@@ -89,7 +73,7 @@ PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 bool Changeset::operator==(const Changeset& that) const noexcept
 {
     if (m_instructions == that.m_instructions) {
-        return *m_strings == *that.m_strings;
+        return m_strings == that.m_strings;
     }
     return false;
 }
@@ -212,9 +196,9 @@ void Changeset::print(std::ostream& os) const
     Changeset::Printer printer{os};
     Changeset::Reflector reflector{printer, *this};
     os << std::left << std::setw(16) << "InternStrings";
-    for (size_t i = 0; i < m_strings->size(); ++i) {
-        os << i << "=\"" << get_string(m_strings->at(i)) << '"';
-        if (i + 1 != m_strings->size())
+    for (size_t i = 0; i < m_strings.size(); ++i) {
+        os << i << "=\"" << get_string(m_strings.at(i)) << '"';
+        if (i + 1 != m_strings.size())
             os << ", ";
     }
     os << "\n";
@@ -230,15 +214,15 @@ void Changeset::print() const
 
 void Changeset::verify() const
 {
-    for (size_t i = 0; i < m_strings->size(); ++i) {
-        auto& range = m_strings->at(i);
-        REALM_ASSERT(range.offset <= m_string_buffer->size());
-        REALM_ASSERT(range.offset + range.size <= m_string_buffer->size());
+    for (size_t i = 0; i < m_strings.size(); ++i) {
+        auto& range = m_strings.at(i);
+        REALM_ASSERT(range.offset <= m_string_buffer.size());
+        REALM_ASSERT(range.offset + range.size <= m_string_buffer.size());
     }
 
     auto verify_string_range = [&](StringBufferRange range) {
-        REALM_ASSERT(range.offset <= m_string_buffer->size());
-        REALM_ASSERT(range.offset + range.size <= m_string_buffer->size());
+        REALM_ASSERT(range.offset <= m_string_buffer.size());
+        REALM_ASSERT(range.offset + range.size <= m_string_buffer.size());
     };
 
     auto verify_intern_string = [&](InternString str) {

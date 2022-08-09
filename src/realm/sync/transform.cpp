@@ -2586,14 +2586,11 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
 Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
                                                      version_type version, const HistoryEntry& history_entry)
 {
-    auto p = m_reciprocal_transform_cache.emplace(version, nullptr); // Throws
-    auto i = p.first;
-    if (p.second) {
-        i->second = std::make_unique<Changeset>(); // Throws
+    auto& changeset = m_reciprocal_transform_cache[version]; // Throws
+    if (changeset.empty()) {
         bool is_compressed = false;
         ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
-        Changeset& changeset = *i->second;
         if (is_compressed) {
             size_t total_size;
             auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
@@ -2612,7 +2609,7 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
             origin_file_ident = local_file_ident;
         changeset.origin_file_ident = origin_file_ident;
     }
-    return *i->second;
+    return changeset;
 }
 
 
@@ -2622,8 +2619,8 @@ void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history
     m_reciprocal_transform_cache.clear();
     ChangesetEncoder::Buffer output_buffer;
     for (const auto& [version, changeset] : changesets) {
-        if (changeset->is_dirty()) {
-            encode_changeset(*changeset, output_buffer); // Throws
+        if (changeset.is_dirty()) {
+            encode_changeset(changeset, output_buffer); // Throws
             BinaryData data{output_buffer.data(), output_buffer.size()};
             history.set_reciprocal_transform(version, data); // Throws
             output_buffer.clear();

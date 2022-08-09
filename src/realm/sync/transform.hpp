@@ -209,7 +209,7 @@ protected:
                                   Changeset** our_changesets, std::size_t our_size, util::Logger* logger);
 
 private:
-    std::map<version_type, std::unique_ptr<Changeset>> m_reciprocal_transform_cache;
+    std::map<version_type, Changeset> m_reciprocal_transform_cache;
 
     TransactLogParser m_changeset_parser;
 
