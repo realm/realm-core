@@ -254,7 +254,7 @@ public:
     void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
                                      VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
-                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
+                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr = nullptr,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
@@ -381,8 +381,7 @@ private:
     // ServerHistory object.
     mutable util::Optional<Arrays> m_arrays;
 
-    mutable std::vector<char> m_changeset_from_server_owner;
-    mutable util::Optional<HistoryEntry> m_changeset_from_server;
+    mutable const HistoryEntry* m_changeset_from_server = nullptr;
 
     util::Optional<BinaryData> m_client_reset_changeset;
 
@@ -412,7 +411,7 @@ private:
 
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
-    void add_sync_history_entry(HistoryEntry);
+    void add_sync_history_entry(const HistoryEntry&);
     void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
     void trim_ct_history();
     void trim_sync_history();
@@ -480,7 +479,6 @@ public:
 
     // Overriding member functions in realm::Replication
     version_type prepare_changeset(const char*, size_t, version_type) override;
-    void finalize_changeset() noexcept override;
 
     ClientHistory& get_history() noexcept
     {

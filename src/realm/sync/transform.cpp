@@ -2522,8 +2522,8 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 }
 
 void TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                  version_type current_local_version, Changeset* parsed_changesets,
-                                                  std::size_t num_changesets, util::Logger* logger)
+                                                  version_type current_local_version,
+                                                  util::Span<Changeset> parsed_changesets, util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
@@ -2532,8 +2532,8 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
     try {
         // p points to the beginning of a range of changesets that share the same
         // "base", i.e. are based on the same local version.
-        auto p = parsed_changesets;
-        auto parsed_changesets_end = parsed_changesets + num_changesets;
+        auto p = parsed_changesets.begin();
+        auto parsed_changesets_end = parsed_changesets.end();
         while (p != parsed_changesets_end) {
             // Find the range of incoming changesets that share the same
             // last_integrated_local_version, which means we can merge them in one go.

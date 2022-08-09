@@ -170,8 +170,8 @@ public:
     /// FIXME: Consider using std::error_code instead of throwing
     /// TransformError.
     virtual void transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
-                                             version_type current_local_version, Changeset* changesets,
-                                             std::size_t num_changesets, util::Logger* = nullptr) = 0;
+                                             version_type current_local_version, util::Span<Changeset> changesets,
+                                             util::Logger* = nullptr) = 0;
 
     virtual ~Transformer() noexcept {}
 };
@@ -194,7 +194,7 @@ public:
 
     TransformerImpl();
 
-    void transform_remote_changesets(TransformHistory&, file_ident_type, version_type, Changeset*, std::size_t,
+    void transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
                                      util::Logger*) override;
 
     struct Side;

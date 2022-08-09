@@ -6753,7 +6753,7 @@ TEST(Sync_NonIncreasingServerVersions)
     util::StderrLogger logger;
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded.data(),
                                         server_changesets_encoded.size(), version_info,
-                                        DownloadBatchState::LastInBatch, logger, {});
+                                        DownloadBatchState::LastInBatch, logger);
 }
 
 } // unnamed namespace
