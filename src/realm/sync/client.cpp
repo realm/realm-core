@@ -753,6 +753,10 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         return true;
     }
 
+    if (batch_state == DownloadBatchState::MoreToCome) {
+        return true;
+    }
+
     try {
         process_pending_flx_bootstrap();
     }
