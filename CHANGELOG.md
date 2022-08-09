@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 12.5.0 Release notes
+
+### Enhancements
 * Allow multiple anonymous sessions. ([PR #5693](https://github.com/realm/realm-core/pull/5693)).
 * Introducing query parser support for constant list expressions such as `fruit IN {'apple', 'orange'}`. This also includes general query support for list vs list matching such as `NONE fruits IN {'apple', 'orange'}`. ([Issue #4266](https://github.com/realm/realm-core/issues/4266))
 * SubscriptionSet::refresh() does less work if no commits have been made since the last call to refresh(). ([PR #5695](https://github.com/realm/realm-core/pull/5695))
@@ -10,6 +32,8 @@
 ### Fixed
 * Fix error message when validating outgoing links from asymmetric objects to non-embedded objects. ([PR #5702](https://github.com/realm/realm-core/pull/5702))
 * Fix a use-after-free when an AuditContext is destroyed while a different thread is in the completion handler for an audit Realm upload. ([PR #5714](https://github.com/realm/realm-core/pull/5714))
+* Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` did not set the schema version, which could lead to `m_schema_version != ObjectStore::NotVersioned` assertion failures.
+* Using the Query Parser, it was not allowed to query on a property named 'desc'. ([#5723](https://github.com/realm/realm-core/issues/5723))
 
 ### Breaking changes
 * None.
