@@ -9,7 +9,7 @@
 #include <realm/table.hpp>
 #include <realm/util/base64.hpp>
 
-#include <set>
+#include <unordered_set>
 
 using namespace realm;
 using namespace realm::sync;
@@ -36,10 +36,9 @@ struct State {
     const char* m_input_end = nullptr;
 
     std::string m_buffer;
-    std::set<uint32_t> m_valid_interned_strings;
     // Cannot use StringData as key type since m_input_begin may start pointing
     // to a new chunk of memory.
-    std::set<std::string, std::less<>> m_intern_strings;
+    std::unordered_set<std::string> m_intern_strings;
 
 
     void parse_one(); // Throws
@@ -112,6 +111,7 @@ struct InstructionBuilder : InstructionHandler {
     explicit InstructionBuilder(Changeset& log)
         : m_log(log)
     {
+        log.interned_strings().clear();
     }
     Changeset& m_log;
 
@@ -128,10 +128,8 @@ struct InstructionBuilder : InstructionHandler {
     void set_intern_string(uint32_t index, StringBufferRange range) final
     {
         InternStrings& strings = m_log.interned_strings();
-        if (strings.size() <= index) {
-            strings.resize(index + 1, StringBufferRange{0, 0});
-        }
-        strings[index] = range;
+        REALM_ASSERT(index == strings.size());
+        strings.push_back(range);
     }
 };
 
@@ -335,16 +333,14 @@ void State::parse_one()
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
         StringData str = read_string();
-        if (auto it = m_intern_strings.find(static_cast<std::string_view>(str)); it != m_intern_strings.end()) {
-            parser_error("Unexpected intern string");
-        }
-        if (auto it = m_valid_interned_strings.find(index); it != m_valid_interned_strings.end()) {
+        if (index != m_intern_strings.size()) {
             parser_error("Unexpected intern index");
+        }
+        if (!m_intern_strings.insert(str).second) {
+            parser_error("Unexpected intern string");
         }
         StringBufferRange range = m_handler.add_string_range(str);
         m_handler.set_intern_string(index, range);
-        m_valid_interned_strings.emplace(index);
-        m_intern_strings.emplace(std::string{str});
         return;
     }
 
@@ -581,7 +577,7 @@ double State::read_double()
 InternString State::read_intern_string()
 {
     uint32_t index = read_int<uint32_t>(); // Throws
-    if (m_valid_interned_strings.find(index) == m_valid_interned_strings.end())
+    if (index >= m_intern_strings.size())
         parser_error("Invalid interned string");
     return InternString{index};
 }

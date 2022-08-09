@@ -2618,22 +2618,16 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
 
 void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history)
 {
-    try {
-        ChangesetEncoder::Buffer output_buffer;
-        for (const auto& entry : m_reciprocal_transform_cache) {
-            if (entry.second->is_dirty()) {
-                encode_changeset(*entry.second, output_buffer); // Throws
-                version_type version = entry.first;
-                BinaryData data{output_buffer.data(), output_buffer.size()};
-                history.set_reciprocal_transform(version, data); // Throws
-                output_buffer.clear();
-            }
+    auto changesets = std::move(m_reciprocal_transform_cache);
+    m_reciprocal_transform_cache.clear();
+    ChangesetEncoder::Buffer output_buffer;
+    for (const auto& [version, changeset] : changesets) {
+        if (changeset->is_dirty()) {
+            encode_changeset(*changeset, output_buffer); // Throws
+            BinaryData data{output_buffer.data(), output_buffer.size()};
+            history.set_reciprocal_transform(version, data); // Throws
+            output_buffer.clear();
         }
-        m_reciprocal_transform_cache.clear();
-    }
-    catch (...) {
-        m_reciprocal_transform_cache.clear();
-        throw;
     }
 }
 
