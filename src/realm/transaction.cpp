@@ -277,12 +277,9 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 
 void Transaction::commit_and_continue_writing()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(is_attached());
+        throw WrongTransactionState("Not a write transaction");
 
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();

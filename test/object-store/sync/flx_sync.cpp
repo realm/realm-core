@@ -491,7 +491,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 auto sync_error = std::move(err_future).get();
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
-                REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                REQUIRE(sync_error.get_system_error() ==
+                        sync::make_error_code(sync::ClientError::auto_client_reset_failure));
                 REQUIRE(sync_error.is_client_reset_requested());
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -537,7 +538,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto sync_error = std::move(err_future).get();
             REQUIRE(before_reset_count == 1);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.get_system_error() ==
+                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
             REQUIRE(sync_error.is_client_reset_requested());
             local_realm->refresh();
             auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -564,7 +566,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto sync_error = std::move(error_future2).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.get_system_error() ==
+                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
             REQUIRE(sync_error.is_client_reset_requested());
         }
 
@@ -700,11 +703,12 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 auto sync_error = std::move(err_future).get();
                 // There is a race here depending on if the server produces a query error or responds to
                 // the ident message first. We consider either error to be a sufficient outcome.
-                if (sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure)) {
+                if (sync_error.get_system_error() ==
+                    sync::make_error_code(sync::ClientError::auto_client_reset_failure)) {
                     CHECK(sync_error.is_client_reset_requested());
                 }
                 else {
-                    CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::bad_query));
+                    CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_query));
                 }
             })
             ->run();

@@ -52,7 +52,7 @@ std::istream& operator>>(std::istream& in, GlobalKey& object_id)
             object_id = GlobalKey::from_string(string);
         }
     }
-    catch (const util::invalid_argument&) {
+    catch (const InvalidArgument&) {
         object_id = GlobalKey();
         in.setstate(std::ios_base::failbit);
     }
@@ -69,18 +69,18 @@ std::string GlobalKey::to_string() const
 GlobalKey GlobalKey::from_string(StringData string)
 {
     if (string.size() < 5) // Must be at least "{0-0}"
-        throw util::invalid_argument("Invalid object ID.");
+        throw InvalidArgument(ErrorCodes::InvalidArgument, "Invalid object ID.");
 
     const char* begin = string.data();
     const char* end = string.data() + string.size();
     const char* last = end - 1;
 
     if (*begin != '{' || *last != '}')
-        throw util::invalid_argument("Invalid object ID.");
+        throw InvalidArgument(ErrorCodes::InvalidArgument, "Invalid object ID.");
 
     auto dash_pos = std::find(begin, end, '-');
     if (dash_pos == end)
-        throw util::invalid_argument("Invalid object ID.");
+        throw InvalidArgument(ErrorCodes::InvalidArgument, "Invalid object ID.");
     size_t dash_index = dash_pos - begin;
 
     const char* hi_begin = begin + 1;
@@ -89,12 +89,12 @@ GlobalKey GlobalKey::from_string(StringData string)
     size_t lo_len = string.size() - dash_index - 2;
 
     if (hi_len == 0 || hi_len > 16 || lo_len == 0 || lo_len > 16) {
-        throw util::invalid_argument("Invalid object ID.");
+        throw InvalidArgument(ErrorCodes::InvalidArgument, "Invalid object ID.");
     }
 
     auto isxdigit = static_cast<int (*)(int)>(std::isxdigit);
     if (!std::all_of(hi_begin, hi_begin + hi_len, isxdigit) || !std::all_of(lo_begin, lo_begin + lo_len, isxdigit)) {
-        throw util::invalid_argument("Invalid object ID.");
+        throw InvalidArgument(ErrorCodes::InvalidArgument, "Invalid object ID.");
     }
 
     // hi_begin and lo_begin do not need to be copied into a NUL-terminated

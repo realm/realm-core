@@ -466,7 +466,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                 std::size_t size_1 = assembled_transformed_changeset.size();
                 std::size_t size_2 = size_1;
                 if (util::int_add_with_overflow_detect(size_2, transformed_changeset.size()))
-                    throw util::overflow_error{"Changeset size overflow"};
+                    throw std::overflow_error{"Changeset size overflow"};
                 assembled_transformed_changeset.resize(size_2); // Throws
                 std::copy(transformed_changeset.data(), transformed_changeset.data() + transformed_changeset.size(),
                           assembled_transformed_changeset.data() + size_1);

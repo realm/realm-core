@@ -50,7 +50,7 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {
             // LCOV_EXCL_START
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw util::bad_alloc();
+            throw std::bad_alloc();
             // LCOV_EXCL_STOP
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
@@ -65,7 +65,7 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             // LCOV_EXCL_START
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw util::bad_alloc();
+            throw std::bad_alloc();
             // LCOV_EXCL_STOP
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
