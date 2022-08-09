@@ -10,6 +10,7 @@
 * Fix error message when validating outgoing links from asymmetric objects to non-embedded objects. ([PR #5702](https://github.com/realm/realm-core/pull/5702))
 * Fix a use-after-free when an AuditContext is destroyed while a different thread is in the completion handler for an audit Realm upload. ([PR #5714](https://github.com/realm/realm-core/pull/5714))
 * Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` did not set the schema version, which could lead to `m_schema_version != ObjectStore::NotVersioned` assertion failures.
+* Using the Query Parser, it was not allowed to query on a property named 'desc'. ([#5723](https://github.com/realm/realm-core/issues/5723))
 
 ### Breaking changes
 * None.
