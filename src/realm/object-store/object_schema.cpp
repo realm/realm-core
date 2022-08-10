@@ -297,8 +297,9 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     }
     if (parent_object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric &&
         it->table_type != ObjectSchema::ObjectType::Embedded) {
-        exceptions.emplace_back("Asymmetric table with property '%1.%2' of type '%3' cannot have an object type.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+        exceptions.emplace_back(
+            "Asymmetric table with property '%1.%2' of type '%3' cannot have a non-embedded object type.",
+            object_name, prop.name, string_for_property_type(prop.type));
         return;
     }
     if (it->table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {

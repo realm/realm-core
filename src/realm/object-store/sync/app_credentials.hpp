@@ -72,6 +72,7 @@ extern IdentityProvider const IdentityProviderServerAPIKey;
 
 enum class AuthProvider {
     ANONYMOUS,
+    ANONYMOUS_NO_REUSE,
     FACEBOOK,
     GOOGLE,
     APPLE,
@@ -92,7 +93,7 @@ struct AppCredentials {
     static AppCredentials facebook(const AppCredentialsToken access_token);
 
     // Construct and return anonymous credentials
-    static AppCredentials anonymous();
+    static AppCredentials anonymous(bool reuse_anonymous_credentials = true);
 
     // Construct and return credentials from an Apple account token.
     static AppCredentials apple(const AppCredentialsToken id_token);

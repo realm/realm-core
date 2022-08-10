@@ -749,7 +749,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
                 auto frozen_results = frozen_links.get_values();
                 size_t frozen_links_counter = 0;
                 // Implementation of the hashing function for dictionaries vary between 32 and 64 bit.
-                // Order is not preserved and assumptions around at which position ad object is cannot be found.
+                // Order is not preserved and assumptions around at which position an object is inside the Set is
+                // wrong and cannot be used for testing.
                 // TODO : fix the implementation for Dicitionaries in order to match order between 32 and 64 bit archs
                 for (size_t i = 0; i < frozen_results.size(); ++i) {
                     if (frozen_results.get(i)) {
@@ -919,8 +920,8 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     auto target = r->read_group().get_table("class_target");
     r->begin_transaction();
     Obj obj = table->create_object();
-    Obj obj1 = table->create_object(); // empty dictionary
-    Obj empty_target = target->create_object();
+    table->create_object(); // empty dictionary
+    target->create_object();
     ColKey col_links = table->get_column_key("links");
     ColKey col_target_value = target->get_column_key("value");
 
@@ -1003,7 +1004,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     ColKey col_link1 = target1->get_column_key("link1");
     r->begin_transaction();
     Obj obj = table->create_object();
-    Obj obj1 = table->create_object(); // empty dictionary
+    table->create_object(); // empty dictionary
     Obj target1_obj = target1->create_object().set(col_value1, 100);
     Obj target2_obj = target2->create_object().set(col_value2, 200);
     ColKey col = table->get_column_key("value");

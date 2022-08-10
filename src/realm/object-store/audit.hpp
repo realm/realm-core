@@ -72,6 +72,7 @@ public:
     // record_write() should be handled automatically
     virtual void record_query(VersionID, const TableView&) = 0;
     virtual void record_read(VersionID, const Obj& obj, const Obj& parent, ColKey col) = 0;
+    virtual void prepare_for_write(VersionID old_version) = 0;
     virtual void record_write(VersionID old_version, VersionID new_version) = 0;
 
     // -- Audit functionality which should be exposed in the SDK

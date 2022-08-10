@@ -89,6 +89,8 @@ const Schema g_simple_embedded_obj_schema{
      }},
 };
 
+// Reenable when needed by tests currently disabled
+#if 0
 // Populates a FLXSyncTestHarness with the g_large_array_schema with objects that are large enough that
 // they are guaranteed to fill multiple bootstrap download messages. Currently this means generating 5
 // objects each with 1024 array entries of 1024 bytes each.
@@ -116,6 +118,7 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
     });
     return ret;
 }
+#endif
 
 void wait_for_advance(const SharedRealm& realm)
 {
@@ -986,6 +989,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     });
 }
 
+#if 0
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
@@ -1059,6 +1063,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     REQUIRE(active_subs.version() == latest_subs.version());
     REQUIRE(active_subs.version() == int64_t(1));
 }
+#endif
 
 TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
@@ -1303,6 +1308,9 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_upload(*realm));
 
     CHECK(!realm->sync_session()->get_flx_subscription_store());
+
+    CHECK_THROWS_AS(realm->get_active_subscription_set(), std::runtime_error);
+    CHECK_THROWS_AS(realm->get_latest_subscription_set(), std::runtime_error);
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {

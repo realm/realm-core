@@ -83,7 +83,7 @@ public:
         int64_t last_modified;
     };
     struct ServiceConfig {
-        enum class SyncMode { Partitioned, Flexible, Disabled } mode = SyncMode::Partitioned;
+        enum class SyncMode { Partitioned, Flexible } mode = SyncMode::Partitioned;
         std::string database_name;
         util::Optional<nlohmann::json> partition;
         util::Optional<nlohmann::json> queryable_field_names;

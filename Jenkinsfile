@@ -16,6 +16,7 @@ ctest_cmd = "ctest -VV"
 warningFilters = [
     excludeFile('/external/*'), // submodules and external libraries
     excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
+    excludeFile('/src/realm/parser/generated/*'), // the auto generated parser code we didn't write
 ]
 
 jobWrapper {
@@ -47,18 +48,18 @@ jobWrapper {
             targetSHA1 = 'NONE'
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
-            } 
+            }
 
             isCoreCronJob = isCronJob()
             requireNightlyBuild = false
             if(isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
-        }   
+        }
 
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
-        println "Target branch: ${targetBranch}"        
+        println "Target branch: ${targetBranch}"
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
@@ -84,7 +85,7 @@ jobWrapper {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
-        
+
         if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
@@ -233,15 +234,17 @@ jobWrapper {
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
-                            unstash name: publishingStash
-                            def path = publishingStash.replaceAll('___', '/')
-
-                            for (file in findFiles(glob: '**')) {
-                                s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
-                                if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                    s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                            dir(publishingStash) {
+                                unstash name: publishingStash
+                                def path = publishingStash.replaceAll('___', '/')
+                                def files = findFiles(glob: '**')
+                                for (file in files) {
+                                    s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
+                                    if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
+                                        s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                                    }
                                 }
-                            } 
+                            }
                         }
                     }
                 }
@@ -548,9 +551,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                                 adb connect emulator
                                 timeout 30m adb wait-for-device
                                 adb push test/realm-tests /data/local/tmp
-                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                adb push test/resources /data/local/tmp
                                 adb shell 'cd /data/local/tmp; ${environment.join(' ')} ./realm-tests || echo __ADB_FAIL__' | tee adb.log
                                 ! grep __ADB_FAIL__ adb.log
                             """
@@ -627,7 +628,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         isWindows: true,
                         script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
                         name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
-                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject')] + warningFilters,
+                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject'), excludeFile('query_flex.ll')] + warningFilters,
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
@@ -775,7 +776,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/',
                      'XCODE_14_DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
-                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}'"
+                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
 
                 if (test) {
                     dir('build-xcode-platforms') {

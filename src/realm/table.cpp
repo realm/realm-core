@@ -3677,22 +3677,22 @@ typename util::RemoveOptional<T>::type remove_optional(T val)
 template <>
 int64_t remove_optional<Optional<int64_t>>(Optional<int64_t> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 bool remove_optional<Optional<bool>>(Optional<bool> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
-    return val.value();
+    return *val;
 }
 template <>
 UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
 {
-    return val.value();
+    return *val;
 }
 } // namespace
 

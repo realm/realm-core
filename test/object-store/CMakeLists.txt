@@ -23,6 +23,7 @@ set(SOURCES
     realm.cpp
     results.cpp
     schema.cpp
+    sectioned_results.cpp
     set.cpp
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
@@ -139,6 +140,7 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
             GIT_REPOSITORY https://github.com/libuv/libuv.git
             GIT_TAG ${libUV_Git_TAG}
         )
+        # Don't use FetchContent_MakeAvailable since it wants to build libuv.so as well
         FetchContent_Populate(libuv)
         add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
         set(libuv_target uv_a)

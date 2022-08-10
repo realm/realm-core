@@ -2,13 +2,37 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix exception when decoding interned strings in realm-apply-to-state tool. ([#5628](https://github.com/realm/realm-core/pull/5628))
-* Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * Fixed an issue where having realm-cocoa as SPM sub-target dependency leads to missing symbols error during iOS archiving. ([#7645](https://github.com/realm/realm-swift/issues/7645))
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 12.5.0 Release notes
+
+### Enhancements
+* Allow multiple anonymous sessions. ([PR #5693](https://github.com/realm/realm-core/pull/5693)).
+* Introducing query parser support for constant list expressions such as `fruit IN {'apple', 'orange'}`. This also includes general query support for list vs list matching such as `NONE fruits IN {'apple', 'orange'}`. ([Issue #4266](https://github.com/realm/realm-core/issues/4266))
+* SubscriptionSet::refresh() does less work if no commits have been made since the last call to refresh(). ([PR #5695](https://github.com/realm/realm-core/pull/5695))
+
+### Fixed
+* Fix error message when validating outgoing links from asymmetric objects to non-embedded objects. ([PR #5702](https://github.com/realm/realm-core/pull/5702))
+* Fix a use-after-free when an AuditContext is destroyed while a different thread is in the completion handler for an audit Realm upload. ([PR #5714](https://github.com/realm/realm-core/pull/5714))
+* Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` did not set the schema version, which could lead to `m_schema_version != ObjectStore::NotVersioned` assertion failures.
+* Using the Query Parser, it was not allowed to query on a property named 'desc'. ([#5723](https://github.com/realm/realm-core/issues/5723))
 
 ### Breaking changes
 * None.
@@ -19,7 +43,51 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 12.4.0 Release notes
+
+### Enhancements
+* Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* Expose MongoDB client interface in the C API. ([PR #5638](https://github.com/realm/realm-core/pull/5638)).
+* Add support in the C API for constructing a new `realm_app_t` object via `realm_app_create`. ([PR #5570](https://github.com/realm/realm-core/issues/5570))
+* Reduce use of memory mappings and virtual address space ([PR #5645](https://github.com/realm/realm-core/pull/5645)). Also fixes some errors (see below)
+
+### Fixed
+* Fix exception when decoding interned strings in realm-apply-to-state tool. ([PR #5628](https://github.com/realm/realm-core/pull/5628))
+* Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* Throw `runtime_error` if subscription set is requested and flexible sync is not enabled. ([PR #5637](https://github.com/realm/realm-core/pull/5637))
+* Fix compilation failures on watchOS platforms which do not support thread-local storage. ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
+* Fix a data race when committing a transaction while multiple threads are waiting for the write lock on platforms using emulated interprocess condition variables (most platforms other than non-Android Linux).
+* Fix a data race when writing audit events which could occur if the sync client thread was busy with other work when the event Realm was opened.
+* Fix some cases of running out of virtual address space (seen/reported as mmap failures) ([PR #5645](https://github.com/realm/realm-core/pull/5645))
+* Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
+* Fixed the client reset callbacks not populating the Realm instance arguments correctly if the Realm coordinator lifetime had ended. ([#5654](https://github.com/realm/realm-core/pull/5654), since the introduction of DiscardLocal reset mode in v11.5.0)
+* Decimal128 values with more than 110 significant bits were not synchronized correctly with the server ([#7868](https://github.com/realm/realm-swift/issues/7868), since v10.0.0)
+
+### Breaking changes
+* Make `realm::util::Optional<T>` be an alias for `std::optional<T>` and `realm::none` an alias for `std::nullopt`. ([PR #5667](https://github.com/realm/realm-core/pull/5667)) For now the existing name and some of the helpers are sticking around so this shouldn't affect most consumers, however:
+  * At some point in the future we will likely want to remove the aliases, so consumers may want to switch to using `std::optional` and `std::nullopt` directly.
+  * `std::optional<T&>` isn't supported. In general, `T*`/`nullptr` is a better replacement. The few uses of optional references in core APIs have been replaced with pointers. Any usages in SDKs will also need to be replaced.
+  * `std::optional` cannot be directly streamed (`<<`) to an `ostream`. A helper `realm::util::stream_possible_optional` is provided that can be used instead. For convenience, it will work with both optional and non-optional types.
+  * [CTAD](https://en.cppreference.com/w/cpp/language/class_template_argument_deduction) doesn't work through aliases until C++20, so any code like `util::Optional(EXPRESSION)` without the `<Type>` template arguments will need to switch to using `std::optional(Expression)` directly.
+  * Aliases and helpers not used by core were removed. If needed by SDKs they can be added back, but it would probably be better to just use the `std::` names instead.
+  * The method `std::optional<T>::value()` requires a higher deployment target on iOS than we currently target because it throws exceptions when used incorrectly. You should use `*opt` and `opt->method()` instead to access the value anyway.
+  * C++ overload resolution rules are always fun. Since `std::optional` is implicitly convertable from more types, it is possible that this will generate new ambiguous overload errors in overload sets that include optionals. If you have any vexing compiler errors due to this change, please ask the core team for help.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* MemRef is now trivially copyable.
+* Fix bloaty CI test that is currently failing on Ubuntu. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
+* Fix benchmark tests that are failing on Ubuntu and MacOS. ([PR #5656](https://github.com/realm/realm-core/pull/5656))
+* We no longer swap left and right in queries produced by the parser and we now have optimization for right hand side being constant ([#5685](https://github.com/realm/realm-core/pull/5685))
 
 ----------------------------------------------
 
@@ -28,6 +96,7 @@
 ### Enhancements
 * Allow flexible sync with discard local client resets. ([#5404](https://github.com/realm/realm-core/pull/5404))
 * Allow flexible sync with recovery client resets. ([#5562](https://github.com/realm/realm-core/issues/5562))
+* Add `Results::sectioned_results` which allows Results to be accessed in sections specified by a comparison function. (PR [#5403](https://github.com/realm/realm-core/pull/5403))
 
 ### Fixed
 * Fix a UBSan failure when mapping encrypted pages.

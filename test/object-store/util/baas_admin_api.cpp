@@ -620,30 +620,27 @@ AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& ap
     auto endpoint = service_config_endpoint(app_id, service.id);
     auto response = endpoint.get_json();
     AdminAPISession::ServiceConfig config;
-    try {
-        if (response.contains("flexible_sync")) {
-            auto sync = response["flexible_sync"];
-            config.mode = AdminAPISession::ServiceConfig::SyncMode::Flexible;
-            config.state = sync["state"];
-            config.database_name = sync["database_name"];
-            config.permissions = sync["permissions"];
-            config.queryable_field_names = sync["queryable_fields_names"];
-            config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
-        }
-        else if (response.contains("sync")) {
-            auto sync = response["sync"];
-            config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
-            config.state = sync["state"];
-            config.database_name = sync["database_name"];
-            config.partition = sync["partition"];
-            config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
-        }
-        else {
-            config.mode = AdminAPISession::ServiceConfig::SyncMode::Disabled;
-        }
+    if (response.contains("flexible_sync")) {
+        auto sync = response["flexible_sync"];
+        config.mode = AdminAPISession::ServiceConfig::SyncMode::Flexible;
+        config.state = sync["state"];
+        config.database_name = sync["database_name"];
+        config.permissions = sync["permissions"];
+        config.queryable_field_names = sync["queryable_fields_names"];
+        auto recovery_disabled = sync["is_recovery_mode_disabled"];
+        config.recovery_is_disabled = recovery_disabled.is_boolean() ? recovery_disabled.get<bool>() : false;
     }
-    catch (const std::exception&) {
-        // ignored - the config for a disabled sync service will be empty
+    else if (response.contains("sync")) {
+        auto sync = response["sync"];
+        config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
+        config.state = sync["state"];
+        config.database_name = sync["database_name"];
+        config.partition = sync["partition"];
+        auto recovery_disabled = sync["is_recovery_mode_disabled"];
+        config.recovery_is_disabled = recovery_disabled.is_boolean() ? recovery_disabled.get<bool>() : false;
+    }
+    else {
+        throw std::runtime_error(util::format("Unsupported config format from server: %1", response));
     }
     return config;
 }
@@ -652,7 +649,7 @@ bool AdminAPISession::is_sync_enabled(const std::string& app_id) const
 {
     auto sync_service = get_sync_service(app_id);
     auto config = get_config(app_id, sync_service);
-    return config.mode != AdminAPISession::ServiceConfig::SyncMode::Disabled;
+    return config.state == "enabled";
 }
 
 AdminAPIEndpoint AdminAPISession::apps() const

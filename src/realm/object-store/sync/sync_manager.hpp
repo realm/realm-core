@@ -139,7 +139,7 @@ public:
     util::Logger::Level log_level() const noexcept REQUIRES(!m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> get_all_sessions() const REQUIRES(!m_session_mutex);
-    std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const SyncConfig& config)
+    std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const RealmConfig& config)
         REQUIRES(!m_mutex, !m_session_mutex);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const REQUIRES(!m_session_mutex);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const

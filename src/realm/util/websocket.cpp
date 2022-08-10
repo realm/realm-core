@@ -683,6 +683,7 @@ public:
             }
 
             auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
+                                         ec == util::error::make_error_code(util::error::broken_pipe) ||
                                          ec == util::make_error_code(util::MiscExtErrors::end_of_input));
             // If the socket has been closed then we should continue to read from it until we've drained
             // the receive buffer. Eventually we will either receive an in-band error message from the

@@ -817,7 +817,7 @@ struct BenchmarkQueryIntListSize : Benchmark {
         TableRef t = tr.add_table(name());
         int_list_col_ndx = t->add_column_list(type_Int, "ints");
         for (size_t i = 0; i < num_rows; ++i) {
-            auto obj = t->create_object().set_list_values<Int>(int_list_col_ndx, {0, 1, 2});
+            t->create_object().set_list_values<Int>(int_list_col_ndx, {0, 1, 2});
         }
         tr.commit();
     }
@@ -2024,7 +2024,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
 
         // Open a SharedGroup:
         realm::test_util::DBTestPathGuard realm_path(
-            test_util::get_test_path("benchmark_common_tasks" + ident, ".realm"));
+            test_util::get_test_path("benchmark_common_tasks_" + ident, ".realm"));
         DBRef group;
         group = create_new_shared_group(realm_path, level, key);
         benchmark.before_all(group);
@@ -2069,7 +2069,9 @@ extern "C" int benchmark_common_tasks_main();
 
 int benchmark_common_tasks_main()
 {
-    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
+    std::string results_file_stem = realm::test_util::get_test_path_prefix();
+    std::cout << "Results path: " << results_file_stem << std::endl;
+    results_file_stem += "results";
     BenchmarkResults results(40, "benchmark-common-tasks", results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
@@ -2151,6 +2153,22 @@ int benchmark_common_tasks_main()
 
 int main(int argc, const char** argv)
 {
+    if (argc > 1) {
+        std::string arg_path = argv[1];
+        if (arg_path == "-h" || arg_path == "--help") {
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+                      << "Run the common tasks benchmark test application." << std::endl
+                      << "Results are placed in the executable directory by default." << std::endl
+                      << std::endl
+                      << "Arguments:" << std::endl
+                      << "  -h, --help      display this help" << std::endl
+                      << "  PATH            alternate path to store the results files;" << std::endl
+                      << "                  this path should end with a slash." << std::endl
+                      << std::endl;
+            return 1;
+        }
+    }
+
     if (!initialize_test_path(argc, argv))
         return 1;
     return benchmark_common_tasks_main();
