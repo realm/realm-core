@@ -206,7 +206,6 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ApplicationBu
               RLM_SYNC_ERROR_ACTION_APPLICATION_BUG);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Warning) == RLM_SYNC_ERROR_ACTION_WARNING);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Transient) == RLM_SYNC_ERROR_ACTION_TRANSIENT);
-static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::LogOut) == RLM_SYNC_ERROR_ACTION_LOG_OUT);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::DeleteRealm) ==
               RLM_SYNC_ERROR_ACTION_DELETE_REALM);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) ==

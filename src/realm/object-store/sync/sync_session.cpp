@@ -180,7 +180,6 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
         auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
-        user_facing_error.server_requests_action = realm::sync::ProtocolErrorInfo::Action::LogOut;
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
@@ -502,6 +501,13 @@ void SyncSession::handle_error(SyncError error)
     else if (error_code.category() == realm::sync::protocol_error_category()) {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
+                // Although a protocol error, this is not sent by the server.
+                // Therefore, there is no action.
+                if (error_code == realm::sync::ProtocolError::bad_authentication) {
+                    next_state = NextStateAfterError::inactive;
+                    log_out_user = true;
+                    break;
+                }
                 REALM_UNREACHABLE(); // This is not sent by the MongoDB server
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
@@ -513,10 +519,6 @@ void SyncSession::handle_error(SyncError error)
             case sync::ProtocolErrorInfo::Action::Transient:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case sync::ProtocolErrorInfo::Action::LogOut:
-                next_state = NextStateAfterError::inactive;
-                log_out_user = true;
-                break;
             case sync::ProtocolErrorInfo::Action::DeleteRealm:
                 next_state = NextStateAfterError::inactive;
                 delete_file = ShouldBackup::no;

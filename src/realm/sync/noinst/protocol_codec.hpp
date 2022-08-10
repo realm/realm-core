@@ -469,7 +469,6 @@ private:
             {"ApplicationBug", action::ApplicationBug},
             {"Warning", action::Warning},
             {"Transient", action::Transient},
-            {"LogOut", action::LogOut},
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},

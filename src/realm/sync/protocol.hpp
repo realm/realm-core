@@ -212,7 +212,6 @@ struct ProtocolErrorInfo {
         ApplicationBug,
         Warning,
         Transient,
-        LogOut,
         DeleteRealm,
         ClientReset,
         ClientResetNoRecovery
@@ -398,8 +397,6 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "Warning";
         case ProtocolErrorInfo::Action::Transient:
             return o << "Transient";
-        case ProtocolErrorInfo::Action::LogOut:
-            return o << "LogOut";
         case ProtocolErrorInfo::Action::DeleteRealm:
             return o << "DeleteRealm";
         case ProtocolErrorInfo::Action::ClientReset:
