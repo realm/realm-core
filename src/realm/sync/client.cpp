@@ -745,9 +745,16 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     if (batch_state == DownloadBatchState::LastInBatch) {
         maybe_progress = progress;
     }
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets);
 
-    on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
+    bool new_batch = false;
+    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+
+    // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
+    // bootstrapping.
+    if (new_batch && batch_state == DownloadBatchState::MoreToCome) {
+        on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
+    }
+
     if (m_wrapper.m_on_bootstrap_message_processed_hook &&
         !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
         return true;
