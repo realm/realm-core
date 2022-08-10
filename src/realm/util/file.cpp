@@ -48,6 +48,8 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 
+using namespace realm::util;
+
 namespace {
 #ifdef _WIN32 // Windows - GetLastError()
 
