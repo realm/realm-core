@@ -808,8 +808,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             }
         }
         if (top_ref) {
-            // Check if file size can be reduced
-            constexpr size_t file_size_ndx = 2;
+            // Get the expected file size by looking up logical file size stored in top array
+            constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
             constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
             size_t top_page_base = top_ref & ~(page_size() - 1);
             size_t top_offset = top_ref - top_page_base;
@@ -847,6 +847,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
+    // Check if we can shrink the file
     if (cfg.session_initiator && expected_size < size) {
         m_file.resize(expected_size);
         size = expected_size;
