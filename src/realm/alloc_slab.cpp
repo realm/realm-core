@@ -751,6 +751,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
+    size_t expected_size = size_t(-1);
     try {
         note_reader_start(this);
         // we'll read header and (potentially) footer
@@ -766,65 +767,59 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         auto header = reinterpret_cast<const Header*>(map_header.get_addr());
         auto footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         top_ref = validate_header(header, footer, size, path); // Throws
-
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 
-        if (cfg.session_initiator) {
-            // Make sure the database is not on streaming format. If we did not do this,
-            // a later commit would have to do it. That would require coordination with
-            // anybody concurrently joining the session, so it seems easier to do it at
-            // session initialization, even if it means writing the database during open.
-            if (is_file_on_streaming_form(*header)) {
-                // Don't compare file format version fields as they are allowed to differ.
-                // Also don't compare reserved fields.
-                REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_mnemonic[0] == uint8_t('T'), header->m_mnemonic[0],
-                                get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_mnemonic[1] == uint8_t('-'), header->m_mnemonic[1],
-                                get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_mnemonic[2] == uint8_t('D'), header->m_mnemonic[2],
-                                get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_mnemonic[3] == uint8_t('B'), header->m_mnemonic[3],
-                                get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header->m_top_ref[0],
-                                get_file_path_for_assertions());
-                REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
-                REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
-                                get_file_path_for_assertions());
-                {
-                    File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-                    Header& writable_header = *writable_map.get_addr();
-                    realm::util::encryption_read_barrier(writable_map, 0);
-                    writable_header.m_top_ref[1] = footer->m_top_ref;
-                    writable_header.m_file_format[1] = writable_header.m_file_format[0];
-                    realm::util::encryption_write_barrier(writable_map, 0);
-                    writable_map.sync();
-                    realm::util::encryption_read_barrier(writable_map, 0);
-                    writable_header.m_flags |= flags_SelectBit;
-                    realm::util::encryption_write_barrier(writable_map, 0);
-                    writable_map.sync();
+        // Make sure the database is not on streaming format. If we did not do this,
+        // a later commit would have to do it. That would require coordination with
+        // anybody concurrently joining the session, so it seems easier to do it at
+        // session initialization, even if it means writing the database during open.
+        if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
+            // Don't compare file format version fields as they are allowed to differ.
+            // Also don't compare reserved fields.
+            REALM_ASSERT_EX(header->m_flags == 0, header->m_flags, get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[0] == uint8_t('T'), header->m_mnemonic[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[1] == uint8_t('-'), header->m_mnemonic[1],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[2] == uint8_t('D'), header->m_mnemonic[2],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_mnemonic[3] == uint8_t('B'), header->m_mnemonic[3],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[0] == 0xFFFFFFFFFFFFFFFFULL, header->m_top_ref[0],
+                            get_file_path_for_assertions());
+            REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
+            REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
+                            get_file_path_for_assertions());
+            {
+                File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+                Header& writable_header = *writable_map.get_addr();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_top_ref[1] = footer->m_top_ref;
+                writable_header.m_file_format[1] = writable_header.m_file_format[0];
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
+                realm::util::encryption_read_barrier(writable_map, 0);
+                writable_header.m_flags |= flags_SelectBit;
+                realm::util::encryption_write_barrier(writable_map, 0);
+                writable_map.sync();
 
-                    realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
-                }
+                realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
             }
-            else if (top_ref) {
-                // Check if file size can be reduced
-                constexpr size_t file_size_ndx = 2;
-                constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
-                size_t top_page_base = top_ref & ~(page_size() - 1);
-                size_t top_offset = top_ref - top_page_base;
-                File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, max_top_size + top_offset, 0);
-                realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
-                auto top_header = map_top.get_addr() + top_offset;
-                auto top_data = NodeHeader::get_data_from_header(top_header);
-                auto w = NodeHeader::get_width_from_header(top_header);
-                auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
-                if (logical_size < size) {
-                    m_file.resize(logical_size);
-                    size = logical_size;
-                }
-            }
+        }
+        if (top_ref) {
+            // Check if file size can be reduced
+            constexpr size_t file_size_ndx = 2;
+            constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
+            size_t top_page_base = top_ref & ~(page_size() - 1);
+            size_t top_offset = top_ref - top_page_base;
+            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, max_top_size + top_offset, 0);
+            realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
+            auto top_header = map_top.get_addr() + top_offset;
+            auto top_data = NodeHeader::get_data_from_header(top_header);
+            auto w = NodeHeader::get_width_from_header(top_header);
+            auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
+            expected_size = round_up_to_page_size(logical_size);
         }
     }
     catch (const DecryptionFailed&) {
@@ -852,6 +847,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
+    if (cfg.session_initiator && expected_size < size) {
+        m_file.resize(expected_size);
+        size = expected_size;
+    }
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
     if (size != round_up_to_page_size(size)) {
