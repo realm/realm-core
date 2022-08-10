@@ -813,7 +813,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
             size_t top_page_base = top_ref & ~(page_size() - 1);
             size_t top_offset = top_ref - top_page_base;
-            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, max_top_size + top_offset, 0);
+            size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
+            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0);
             realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
             auto top_header = map_top.get_addr() + top_offset;
             auto top_data = NodeHeader::get_data_from_header(top_header);
