@@ -3337,6 +3337,7 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED = 228,
     RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED = 229,
     RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED = 230,
+    RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE = 231,
 } realm_sync_errno_session_e;
 
 typedef struct realm_sync_session realm_sync_session_t;
