@@ -175,6 +175,9 @@ struct RealmConfig {
 
     // Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
+    
+    //delete embedded orphan objects
+    bool delete_embedded_ophan_objects = false;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {

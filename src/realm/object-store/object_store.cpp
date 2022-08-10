@@ -821,6 +821,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
+            post_migration_embedded_objects_cleanup(op.object);
             table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(RemoveTable) {}
@@ -828,6 +829,44 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
+        
+        void post_migration_embedded_objects_cleanup(const ObjectSchema* object_schema)
+        {
+            if(object_schema->table_type == ObjectSchema::ObjectType::Embedded)
+            {
+                auto original_object_schema = initial_schema.find(object_schema->name);
+                if(original_object_schema != initial_schema.end() && original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel)
+                {
+                    auto table = table_for_object_schema(group, *original_object_schema);
+                    size_t n = table->size();
+                    for (size_t i = 0; i<n; ++i)
+                    {
+                        
+                        auto object = table->get_object(i);
+                        //check if we are doing a migration from TopLevel => Embedded
+                        size_t backlink_count = object.get_backlink_count();
+                        //check back link count.
+                        // 1. if object is an orphan (no backlicks, then delete it if instructed to do so)
+                        // 2. if object has multiple backlicks, then just clone N times the object (for each backlick) and assign to each a different parent
+                        
+                        if (backlink_count == 0 /*&& object_schema->m_delete_object_if_embedded_and_orphan*/)
+                            object.remove();
+                        
+                        //Migration from Realm Object ==> Embedded Object. By default there can only be one parent per embedded object. So Dup the object for each parent
+                        //and assign only 1 parent to each instance.
+                        else if (backlink_count > 1) {
+                            for(size_t i=0; i<backlink_count; ++i)
+                            {
+                                auto new_obj = table->create_object();
+                                
+                                new_obj.assign(object);
+                            }
+                            object.remove();
+                        }
+                    }
+                }
+            }
+        }
     } applier{group, initial_schema, did_reread_schema};
 
     for (auto& change : changes) {

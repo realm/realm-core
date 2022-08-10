@@ -64,6 +64,7 @@ public:
     TableKey table_key;
     ObjectType table_type = ObjectType::TopLevel;
     std::string alias;
+    bool m_delete_object_if_embedded_and_orphan{false};
 
     Property* property_for_public_name(StringData public_name) noexcept;
     const Property* property_for_public_name(StringData public_name) const noexcept;
