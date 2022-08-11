@@ -261,6 +261,7 @@ public:
     Obj& set_all(Head v, Tail... tail);
 
     void assign(const Obj& other);
+    void dup_and_handle_multiple_backlinks();
 
     Obj get_linked_object(ColKey link_col_key) const
     {
@@ -420,6 +421,8 @@ private:
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
+
+    void copy_other_object(const Obj& other);
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

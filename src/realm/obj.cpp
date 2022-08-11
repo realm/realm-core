@@ -1936,6 +1936,60 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
 
 void Obj::assign(const Obj& other)
 {
+    copy_other_object(other);
+    auto copy_links = [this, &other](ColKey col) {
+        auto t = m_table->get_opposite_table(col);
+        auto c = m_table->get_opposite_column(col);
+        auto backlinks = other.get_all_backlinks(col);
+        for (auto bl : backlinks) {
+            auto linking_obj = t->get_object(bl);
+            if (c.get_type() == col_type_Link) {
+                // Single link
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
+                linking_obj.set(c, get_key());
+            }
+            else {
+                auto l = linking_obj.get_linklist(c);
+                auto n = l.find_first(other.get_key());
+                REALM_ASSERT(n != realm::npos);
+                l.set(n, get_key());
+            }
+        }
+        return false;
+    };
+    m_table->for_each_backlink_column(copy_links);
+}
+
+void Obj::dup_and_handle_multiple_backlinks()
+{
+    auto copy_links = [this](ColKey col) {
+        auto t = m_table->get_opposite_table(col);
+        auto c = m_table->get_opposite_column(col);
+        auto backlinks = get_all_backlinks(col);
+
+        for (auto bl : backlinks) {
+            auto obj = m_table->create_object();
+            obj.copy_other_object(*this);
+            auto linking_obj = t->get_object(bl);
+            if (c.get_type() == col_type_Link) {
+                // Single link
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
+                linking_obj.set(c, obj.get_key());
+            }
+            else {
+                auto l = linking_obj.get_linklist(c);
+                auto n = l.find_first(get_key());
+                REALM_ASSERT(n != realm::npos);
+                l.set(n, obj.get_key());
+            }
+        }
+        return false;
+    };
+    m_table->for_each_backlink_column(copy_links);
+}
+
+void Obj::copy_other_object(const Obj& other)
+{
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
     for (auto col : cols) {
@@ -1974,28 +2028,6 @@ void Obj::assign(const Obj& other)
             }
         }
     }
-
-    auto copy_links = [this, &other](ColKey col) {
-        auto t = m_table->get_opposite_table(col);
-        auto c = m_table->get_opposite_column(col);
-        auto backlinks = other.get_all_backlinks(col);
-        for (auto bl : backlinks) {
-            auto linking_obj = t->get_object(bl);
-            if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set(c, get_key());
-            }
-            else {
-                auto l = linking_obj.get_linklist(c);
-                auto n = l.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
-            }
-        }
-        return false;
-    };
-    m_table->for_each_backlink_column(copy_links);
 }
 
 Dictionary Obj::get_dictionary(ColKey col_key) const

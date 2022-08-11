@@ -177,7 +177,7 @@ struct RealmConfig {
     bool backup_at_file_format_change = true;
     
     //delete embedded orphan objects
-    bool delete_embedded_ophan_objects = false;
+    bool automatic_handle_backlicks_in_migrations = false;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {

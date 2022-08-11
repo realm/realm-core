@@ -762,23 +762,28 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 }
 
 enum class DidRereadSchema { Yes, No };
+enum class HandleBackLinksAutomatically { Yes, No };
 
 static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes,
-                                         Schema const& initial_schema, DidRereadSchema did_reread_schema)
+                                         Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                                         HandleBackLinksAutomatically handle_backlinks_automatically)
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema)
+        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                HandleBackLinksAutomatically handle_backlinks_automatically)
             : group{group}
             , initial_schema(initial_schema)
             , table(group)
             , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
+            , handle_backlinks_automatically(handle_backlinks_automatically == HandleBackLinksAutomatically::Yes)
         {
         }
         Group& group;
         Schema const& initial_schema;
         TableHelper table;
         bool did_reread_schema;
+        bool handle_backlinks_automatically;
 
         void operator()(RemoveProperty op)
         {
@@ -821,7 +826,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            post_migration_embedded_objects_cleanup(op.object);
+            if (handle_backlinks_automatically)
+                post_migration_embedded_objects_backlinks_handling(op.object);
             table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(RemoveTable) {}
@@ -829,45 +835,43 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
-        
-        void post_migration_embedded_objects_cleanup(const ObjectSchema* object_schema)
+
+        void post_migration_embedded_objects_backlinks_handling(const ObjectSchema* object_schema)
         {
+            // check if we are doing a migration from TopLevel Object to Embedded.
+            // check back link count.
+            //  1. if object is an orphan (no backlicks, then delete it if instructed to do so)
+            //  2. if object has multiple backlicks, then just clone N times the object (for each backlick) and assign
+            //  to each a different parent
+            // object_schema->handle_automatically_backlinks_for_embedded_object = true;
+
             if(object_schema->table_type == ObjectSchema::ObjectType::Embedded)
             {
                 auto original_object_schema = initial_schema.find(object_schema->name);
                 if(original_object_schema != initial_schema.end() && original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel)
                 {
                     auto table = table_for_object_schema(group, *original_object_schema);
-                    size_t n = table->size();
-                    for (size_t i = 0; i<n; ++i)
-                    {
-                        
-                        auto object = table->get_object(i);
-                        //check if we are doing a migration from TopLevel => Embedded
+                    std::vector<Obj> objects_to_erase;
+                    std::vector<Obj> objects_to_fix_backlinks;
+                    for (auto& object : *table) {
                         size_t backlink_count = object.get_backlink_count();
-                        //check back link count.
-                        // 1. if object is an orphan (no backlicks, then delete it if instructed to do so)
-                        // 2. if object has multiple backlicks, then just clone N times the object (for each backlick) and assign to each a different parent
-                        
-                        if (backlink_count == 0 /*&& object_schema->m_delete_object_if_embedded_and_orphan*/)
-                            object.remove();
-                        
-                        //Migration from Realm Object ==> Embedded Object. By default there can only be one parent per embedded object. So Dup the object for each parent
-                        //and assign only 1 parent to each instance.
-                        else if (backlink_count > 1) {
-                            for(size_t i=0; i<backlink_count; ++i)
-                            {
-                                auto new_obj = table->create_object();
-                                
-                                new_obj.assign(object);
-                            }
-                            object.remove();
-                        }
+                        if (backlink_count == 0)
+                            objects_to_erase.push_back(object);
+                        else if (backlink_count > 1)
+                            objects_to_fix_backlinks.push_back(object);
+                    }
+
+                    for (auto& object : objects_to_erase)
+                        object.remove();
+
+                    for (auto& object : objects_to_fix_backlinks) {
+                        object.dup_and_handle_multiple_backlinks();
+                        object.remove();
                     }
                 }
             }
         }
-    } applier{group, initial_schema, did_reread_schema};
+    } applier{group, initial_schema, did_reread_schema, handle_backlinks_automatically};
 
     for (auto& change : changes) {
         change.visit(applier);
@@ -877,7 +881,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
-                                       std::vector<SchemaChange> const& changes,
+                                       std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
@@ -925,17 +929,20 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 
     auto old_schema = schema_from_group(group);
     apply_pre_migration_changes(group, changes);
+    HandleBackLinksAutomatically handle_backlinks =
+        handle_automatically_backlinks ? HandleBackLinksAutomatically::Yes : HandleBackLinksAutomatically::No;
     if (migration_function) {
         set_schema_keys(group, target_schema);
         migration_function();
 
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
-        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes);
+        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes,
+                                     handle_backlinks);
         group.validate_primary_columns();
     }
     else {
-        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
+        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No, handle_backlinks);
     }
 
     set_schema_version(group, target_schema_version);

@@ -822,6 +822,11 @@ RLM_API void realm_config_set_cached(realm_config_t*, bool cached) RLM_API_NOEXC
 RLM_API bool realm_config_get_cached(realm_config_t*) RLM_API_NOEXCEPT;
 
 /**
+ * Allow realm to manage automatically embedded objects when a migration from TopLevel to Embedded takes place.
+ */
+RLM_API void realm_config_set_automatic_backlink_handling(realm_config_t*, bool) RLM_API_NOEXCEPT;
+ 
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param notify Function which will be called whenever the scheduler has work
