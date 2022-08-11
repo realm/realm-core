@@ -175,8 +175,8 @@ struct RealmConfig {
 
     // Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
-    
-    //delete embedded orphan objects
+
+    // delete embedded orphan objects
     bool automatic_handle_backlicks_in_migrations = false;
 };
 

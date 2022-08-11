@@ -845,11 +845,10 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
             //  to each a different parent
             // object_schema->handle_automatically_backlinks_for_embedded_object = true;
 
-            if(object_schema->table_type == ObjectSchema::ObjectType::Embedded)
-            {
+            if (object_schema->table_type == ObjectSchema::ObjectType::Embedded) {
                 auto original_object_schema = initial_schema.find(object_schema->name);
-                if(original_object_schema != initial_schema.end() && original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel)
-                {
+                if (original_object_schema != initial_schema.end() &&
+                    original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel) {
                     auto table = table_for_object_schema(group, *original_object_schema);
                     std::vector<Obj> objects_to_erase;
                     std::vector<Obj> objects_to_fix_backlinks;
