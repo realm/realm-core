@@ -925,6 +925,81 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(realm->schema().find("added") != realm->schema().end());
         REQUIRE_FALSE(realm->read_group().get_table("class_added"));
     }
+
+    SECTION("adding a property to a newly downloaded read-only Realm reports an error") {
+        // Create the Realm on the server
+        wait_for_upload(*Realm::get_shared_realm(config2));
+
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                    {"value", PropertyType::Int},
+                                    {"value2", PropertyType::Int},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE_FALSE(ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+    }
+
+    SECTION("adding a property to an existing read-only Realm reports an error") {
+        Realm::get_shared_realm(config);
+
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                    {"value", PropertyType::Int},
+                                    {"value2", PropertyType::Int},
+                                }}};
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "Property 'object.value2' has been added.");
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE_FALSE(ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+    }
+
+    SECTION("removing a property from a newly downloaded read-only Realm leaves the column in place") {
+        // Create the Realm on the server
+        wait_for_upload(*Realm::get_shared_realm(config2));
+
+        // Remove the "value" property from the schema
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))
+                    ->read_group()
+                    .get_table("class_object")
+                    ->get_column_key("value") != ColKey{});
+    }
+
+    SECTION("removing a property from a existing read-only Realm leaves the column in place") {
+        Realm::get_shared_realm(config);
+
+        // Remove the "value" property from the schema
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))
+                    ->read_group()
+                    .get_table("class_object")
+                    ->get_column_key("value") != ColKey{});
+    }
 }
 
 TEST_CASE("SharedRealm: convert") {
