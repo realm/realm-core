@@ -1279,29 +1279,14 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
         }
     }
 
-    std::unique_ptr<Value<Mixed>> ret = std::make_unique<Value<Mixed>>();
-    constexpr bool is_list = true;
-    ret->init(is_list, elements.size());
+    auto ret = std::make_unique<ConstantMixedList>(elements.size());
     ret->set_comparison_type(m_comp_type);
     size_t ndx = 0;
     for (auto constant : elements) {
         auto evaulated_constant = constant->visit(drv, hint);
         if (auto value = dynamic_cast<const ValueBase*>(evaulated_constant.get())) {
             REALM_ASSERT_EX(value->size() == 1, value->size());
-            Mixed mixed = value->get(0);
-            if (mixed.is_type(type_String)) {
-                StringData str = mixed.get_string();
-                drv->m_args.buffer_space.push_back(OwnedData{str.data(), str.size()});
-                ret->set(ndx++, StringData(drv->m_args.buffer_space.back().data(), str.size()));
-            }
-            else if (mixed.is_type(type_Binary)) {
-                BinaryData bin = mixed.get_binary();
-                drv->m_args.buffer_space.push_back(OwnedData{bin.data(), bin.size()});
-                ret->set(ndx++, BinaryData(drv->m_args.buffer_space.back().data(), bin.size()));
-            }
-            else {
-                ret->set(ndx++, value->get(0));
-            }
+            ret->set(ndx++, value->get(0));
         }
         else {
             throw InvalidQueryError("Invalid constant inside constant list");
