@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* The top function of an assertion stack trace now includes the core version number.
 
 ----------------------------------------------
 

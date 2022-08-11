@@ -23,6 +23,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/version.hpp>
 
 #if REALM_PLATFORM_APPLE
 
@@ -38,17 +39,35 @@
 #include <android/log.h>
 #endif
 
-
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core();
+// The macro indirection here puts the core version number in the actual stack trace
 
 // LCOV_EXCL_START
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core()
-{
-    std::abort();
-}
+#define REALM_DEFINE_TERMINATE_VERSIONED_(x)                                                                         \
+    extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core_v##x();        \
+                                                                                                                     \
+    extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core_v##x()         \
+    {                                                                                                                \
+        std::abort();                                                                                                \
+    }
+
+#define REALM_DEFINE_TERMINATE_VERSIONED(x) REALM_DEFINE_TERMINATE_VERSIONED_(x)
+#define REALM_EVALUATE_(x) _##x
+#define REALM_EVALUATE(x) REALM_EVALUATE_(x)
+#define REALM_MACRO_CONCAT(A, B) REALM_MACRO_CONCAT_(A, B)
+#define REALM_MACRO_CONCAT_(A, B) A##B
+#define REALM_VERSION_SUFFIX_CONCAT                                                                                  \
+    REALM_MACRO_CONCAT(REALM_EVALUATE(REALM_VERSION_MAJOR),                                                          \
+                       REALM_MACRO_CONCAT(REALM_EVALUATE(REALM_VERSION_MINOR), REALM_EVALUATE(REALM_VERSION_PATCH)))
+
+REALM_DEFINE_TERMINATE_VERSIONED(REALM_VERSION_SUFFIX_CONCAT)
+
+#define REALM_TERMINATE_VERSIONED_(x) please_report_this_issue_in_github_realm_realm_core_v##x()
+#define REALM_TERMINATE_VERSIONED(x) REALM_TERMINATE_VERSIONED_(x)
+#define REALM_TERMINATE_AUTO_VERSIONED() REALM_TERMINATE_VERSIONED(REALM_VERSION_SUFFIX_CONCAT)
+
 // LCOV_EXCL_STOP
 
 namespace {
@@ -120,7 +139,7 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
             std::cerr << "Thread name: " << thread_name << "\n";
     }
 
-    please_report_this_issue_in_github_realm_realm_core();
+    REALM_TERMINATE_AUTO_VERSIONED();
 }
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
