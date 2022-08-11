@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Exposed the boolean `merge_with_existing` in the C-API's functions `realm_convert_with_config` and `realm_convert_with_path`. ([#5713](https://github.com/realm/realm-core/issues/5713))
+* Processing a pending bootstrap before the sync client connects will properly surface errors to the user's error handler ([#5707](https://github.com/realm/realm-core/issues/5707), since v12.0.0)
  
 ### Breaking changes
 * None.
