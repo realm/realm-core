@@ -1042,16 +1042,14 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
             decode_buffer.resize(*decoded_size); // truncate
-            drv->m_args.buffer_space.push_back(OwnedData{decode_buffer.data(), decode_buffer.size()});
-            const char* data = drv->m_args.buffer_space.back().data();
             if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Binary) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Mixed) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             break;
         }
