@@ -72,7 +72,7 @@ public:
 
     // Adds a set of changesets to the store.
     void add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
-                   const std::vector<Transformer::RemoteChangeset>& changesets);
+                   const std::vector<Transformer::RemoteChangeset>& changesets, bool* created_new_batch);
 
     void clear();
 

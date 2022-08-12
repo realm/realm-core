@@ -535,12 +535,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            INSTALL_BAAS_BRANCH=""
-            if [ -n "${baas_branch}" ]; then
-                INSTALL_BAAS_BRANCH="-b ${baas_branch}"
-            fi
-
-            ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b master 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec

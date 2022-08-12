@@ -196,6 +196,8 @@ static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_chang
 static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
               RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
 static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
+static_assert(realm_sync_errno_session_e(ProtocolError::compensating_write) ==
+              RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
 } // namespace
 
 static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)

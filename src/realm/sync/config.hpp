@@ -195,6 +195,8 @@ struct SyncConfig {
     std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_bootstrap_message_processed_hook;
 
+    bool simulate_integration_error = false;
+
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

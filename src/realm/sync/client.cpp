@@ -745,22 +745,31 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     if (batch_state == DownloadBatchState::LastInBatch) {
         maybe_progress = progress;
     }
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets);
 
-    if (batch_state == DownloadBatchState::MoreToCome) {
-        on_flx_sync_progress(query_version, batch_state);
-        if (m_wrapper.m_on_bootstrap_message_processed_hook) {
-            m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state);
-        }
+    bool new_batch = false;
+    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
 
-        return true;
+    // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
+    // bootstrapping.
+    if (new_batch && batch_state == DownloadBatchState::MoreToCome) {
+        on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
     if (m_wrapper.m_on_bootstrap_message_processed_hook &&
         !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
         return true;
     }
-    process_pending_flx_bootstrap();
+
+    if (batch_state == DownloadBatchState::MoreToCome) {
+        return true;
+    }
+
+    try {
+        process_pending_flx_bootstrap();
+    }
+    catch (const IntegrationException& e) {
+        on_integration_failure(e, batch_state);
+    }
 
     return true;
 }
@@ -780,44 +789,44 @@ void SessionImpl::process_pending_flx_bootstrap()
     VersionInfo new_version;
     DownloadCursor download_cursor;
     int64_t query_version = -1;
-    try {
-        while (bootstrap_store->has_pending()) {
-            auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
-            if (!pending_batch.progress) {
-                logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-                bootstrap_store->clear();
-                return;
-            }
-
-            auto batch_state =
-                pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
-            uint64_t downloadable_bytes = 0;
-            query_version = pending_batch.query_version;
-
-            if (batch_state == DownloadBatchState::LastInBatch) {
-                update_progress(*pending_batch.progress);
-            }
-
-            history.integrate_server_changesets(
-                *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-                pending_batch.changesets.size(), new_version, batch_state, logger,
-                [&](const TransactionRef& tr) {
-                    bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
-                },
-                get_transact_reporter());
-            download_cursor = pending_batch.progress->download;
-
-            logger.info(
-                "Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                "%3. %4 changesets remaining in bootstrap",
-                pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                pending_batch.remaining);
+    while (bootstrap_store->has_pending()) {
+        auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
+        if (!pending_batch.progress) {
+            logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            bootstrap_store->clear();
+            return;
         }
-        on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
+
+        auto batch_state =
+            pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
+        uint64_t downloadable_bytes = 0;
+        query_version = pending_batch.query_version;
+        bool simulate_integration_error =
+            (m_wrapper.m_simulate_integration_error && !pending_batch.changesets.empty());
+        if (simulate_integration_error) {
+            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
+        }
+
+
+        if (batch_state == DownloadBatchState::LastInBatch) {
+            update_progress(*pending_batch.progress);
+        }
+
+        history.integrate_server_changesets(
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
+            pending_batch.changesets.size(), new_version, batch_state, logger,
+            [&](const TransactionRef& tr) {
+                bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
+            },
+            get_transact_reporter());
+        download_cursor = pending_batch.progress->download;
+
+        logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
+                    "%3. %4 changesets remaining in bootstrap",
+                    pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
+                    pending_batch.remaining);
     }
-    catch (const IntegrationException& e) {
-        on_integration_failure(e, DownloadBatchState::LastInBatch);
-    }
+    on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
 
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();
@@ -964,7 +973,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
 
-    SubscriptionSet::State new_state = SubscriptionSet::State::Complete; // Initialize to make compiler happy
+    SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
     switch (batch_state) {
         case DownloadBatchState::LastInBatch:
@@ -1390,10 +1399,7 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 {
     m_suspended = true;
     if (m_connection_state_change_listener) {
-        ClientImpl::Connection& conn = m_sess->get_connection();
-        if (conn.get_state() != ConnectionState::disconnected) {
-            m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
-        }
+        m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
     }
 }
 

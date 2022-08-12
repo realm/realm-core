@@ -1320,6 +1320,38 @@ private:
     std::string m_buffer;
 };
 
+class ConstantMixedList : public Value<Mixed> {
+public:
+    ConstantMixedList(size_t nb_values)
+        : Value()
+        , m_buffer(nb_values)
+    {
+        this->init(true, nb_values);
+    }
+    void set(size_t n, Mixed val)
+    {
+        Value<Mixed>::set(n, val);
+        (*this)[n].use_buffer(m_buffer[n]);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantMixedList(*this));
+    }
+
+private:
+    ConstantMixedList(const ConstantMixedList& other)
+        : Value(other)
+        , m_buffer(other.size())
+    {
+        for (size_t i = 0; i < size(); i++) {
+            (*this)[i].use_buffer(m_buffer[i]);
+        }
+    }
+
+    std::vector<std::string> m_buffer;
+};
+
 class ConstantStringValue : public Value<StringData> {
 public:
     ConstantStringValue(const StringData& string)
