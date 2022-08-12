@@ -1361,7 +1361,6 @@ void Session::cancel_resumption_delay()
         return;
 
     m_suspended = false;
-    m_stopped_for_testing = false;
 
     logger.debug("Resumed"); // Throws
 
