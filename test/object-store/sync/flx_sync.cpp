@@ -784,7 +784,6 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
     {
         auto error_received_pf = util::make_promise_future<void>();
-        auto [download_received_promise, download_received_future] = util::make_promise_future<void>();
 
         config.sync_config->on_error_message_received_hook =
             [promise = std::make_shared<util::Promise<void>>(std::move(error_received_pf.promise))](
@@ -800,25 +799,8 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
                 REQUIRE(error_code == sync::ProtocolError::compensating_write);
                 promise->emplace_value();
+                std::this_thread::sleep_for(std::chrono::seconds{2});
                 return false;
-            };
-
-
-        config.sync_config->on_download_message_received_hook =
-            [promise = std::make_shared<util::Promise<void>>(std::move(download_received_promise)),
-             &error_received_pf](std::weak_ptr<SyncSession> weak_session, const sync::SyncProgress&, int64_t,
-                                 sync::DownloadBatchState) mutable {
-                auto session = weak_session.lock();
-                if (!session) {
-                    return;
-                }
-                if (!error_received_pf.future.is_ready() || !promise) {
-                    return;
-                }
-
-                promise->emplace_value();
-                promise.reset();
-                session->close();
             };
 
         auto realm = Realm::get_shared_realm(config);
@@ -849,7 +831,6 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         realm->commit_transaction();
 
         error_received_pf.future.get();
-        download_received_future.get();
         realm->sync_session()->shutdown_and_wait();
         config.sync_config->on_error_message_received_hook = {};
     }
