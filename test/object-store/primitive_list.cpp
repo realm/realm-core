@@ -584,15 +584,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
-        auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = list.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++calls;
         });
-        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c) {
             rchange = c;
             ++calls;
         });
-        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
             srchange = c;
             ++calls;
         });
@@ -679,7 +679,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         SECTION("delete and modify") {
             auto distinct = results.distinct({{"self"}});
             CollectionChangeSet drchange;
-            auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c) {
                 drchange = c;
                 ++calls;
             });
@@ -847,7 +847,7 @@ TEST_CASE("list of mixed links", "[primitives]") {
     Results all_objects(r, table->where());
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
-    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
         local_changes = c;
     });
     advance_and_notify(*r);

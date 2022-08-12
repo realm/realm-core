@@ -106,7 +106,7 @@ TEST_CASE("list") {
         List lst(r, obj, col_link);
 
         auto require_change = [&] {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -115,7 +115,7 @@ TEST_CASE("list") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = lst.add_notification_callback([&, first](CollectionChangeSet, std::exception_ptr) mutable {
+            auto token = lst.add_notification_callback([&, first](CollectionChangeSet) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -189,7 +189,7 @@ TEST_CASE("list") {
         }
 
         SECTION("deleting list before first run of notifier reports deletions") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -202,7 +202,7 @@ TEST_CASE("list") {
 
         SECTION("deleting an empty list triggers the notifier") {
             size_t notifier_count = 0;
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
                 ++notifier_count;
             });
@@ -341,10 +341,9 @@ TEST_CASE("list") {
 
             for (int i = 0; i < 3; ++i) {
                 lists[i] = get_list();
-                tokens[i] =
-                    lists[i].add_notification_callback([i, &changes](CollectionChangeSet c, std::exception_ptr) {
-                        changes[i] = std::move(c);
-                    });
+                tokens[i] = lists[i].add_notification_callback([i, &changes](CollectionChangeSet c) {
+                    changes[i] = std::move(c);
+                });
                 change_list();
             }
 
@@ -391,7 +390,7 @@ TEST_CASE("list") {
             auto token = require_no_change();
 
             List list2(r, obj, col_link);
-            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -433,7 +432,7 @@ TEST_CASE("list") {
         SECTION("changes are reported correctly for multiple tables") {
             List list2(r, *other_lv);
             CollectionChangeSet other_changes;
-            auto token1 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token1 = list2.add_notification_callback([&](CollectionChangeSet c) {
                 other_changes = std::move(c);
             });
             auto token2 = require_change();
@@ -471,7 +470,7 @@ TEST_CASE("list") {
             // that the tables of interest are updated correctly as we process
             // new notifiers
             CollectionChangeSet changes1, changes2;
-            auto token1 = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token1 = lst.add_notification_callback([&](CollectionChangeSet c) {
                 changes1 = std::move(c);
             });
 
@@ -484,7 +483,7 @@ TEST_CASE("list") {
             r2->commit_transaction();
 
             List list2(r2, r2->read_group().get_table("class_other_origin")->get_object(0), other_col_link);
-            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c) {
                 changes2 = std::move(c);
             });
 
@@ -529,7 +528,7 @@ TEST_CASE("list") {
         }
 
         SECTION("changes are sent in initial notification") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             r2->begin_transaction();
@@ -540,7 +539,7 @@ TEST_CASE("list") {
         }
 
         SECTION("changes are sent in initial notification after removing and then re-adding callback") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet) {
                 REQUIRE(false);
             });
             token = {};
@@ -552,7 +551,7 @@ TEST_CASE("list") {
             };
 
             SECTION("add new callback before transaction") {
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                token = lst.add_notification_callback([&](CollectionChangeSet c) {
                     change = c;
                 });
 
@@ -565,7 +564,7 @@ TEST_CASE("list") {
             SECTION("add new callback after transaction") {
                 write();
 
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                token = lst.add_notification_callback([&](CollectionChangeSet c) {
                     change = c;
                 });
 
@@ -577,7 +576,7 @@ TEST_CASE("list") {
                 write();
                 coordinator.on_change();
 
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                token = lst.add_notification_callback([&](CollectionChangeSet c) {
                     change = c;
                 });
 
@@ -593,8 +592,7 @@ TEST_CASE("list") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -641,8 +639,7 @@ TEST_CASE("list") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -721,8 +718,7 @@ TEST_CASE("list") {
         // Distinguishing between these two cases would be a big change for little value.
         SECTION("some callbacks have filters") {
             auto require_change_no_filter = [&] {
-                auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                auto token = list.add_notification_callback([&](CollectionChangeSet c) {
                     collection_change_set_without_filter = c;
                 });
                 advance_and_notify(*r);
@@ -731,8 +727,7 @@ TEST_CASE("list") {
 
             auto require_change_target_value_filter = [&] {
                 auto token = list.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet c) {
                         collection_change_set_with_filter_on_target_value = c;
                     },
                     key_path_array_target_value);
@@ -773,8 +768,7 @@ TEST_CASE("list") {
         SECTION("all callbacks have filters") {
             auto require_change = [&] {
                 auto token = list.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet c) {
                         collection_change_set_with_filter_on_target_value = c;
                     },
                     key_path_array_target_value);
@@ -785,8 +779,7 @@ TEST_CASE("list") {
             auto require_no_change = [&] {
                 bool first = true;
                 auto token = list.add_notification_callback(
-                    [&, first](CollectionChangeSet, std::exception_ptr error) mutable {
-                        REQUIRE_FALSE(error);
+                    [&, first](CollectionChangeSet) mutable {
                         REQUIRE(first);
                         first = false;
                     },
@@ -820,8 +813,7 @@ TEST_CASE("list") {
 
             auto require_change_origin_to_target = [&] {
                 auto token = object.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet c) {
                         collection_change_set_linked_filter = c;
                     },
                     key_path_array_origin_to_target_value);
@@ -1265,7 +1257,7 @@ TEST_CASE("embedded List") {
         List lst(r, obj, col_link);
 
         auto require_change = [&] {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -1274,7 +1266,7 @@ TEST_CASE("embedded List") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = lst.add_notification_callback([&, first](CollectionChangeSet, std::exception_ptr) mutable {
+            auto token = lst.add_notification_callback([&, first](CollectionChangeSet) mutable {
                 REQUIRE(first);
                 first = false;
             });
@@ -1314,7 +1306,7 @@ TEST_CASE("embedded List") {
         }
 
         SECTION("deleting list before first run of notifier reports deletions") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -1367,8 +1359,7 @@ TEST_CASE("embedded List") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -1405,8 +1396,7 @@ TEST_CASE("embedded List") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -1813,7 +1803,7 @@ TEST_CASE("list with unresolved links") {
     bool called = false;
 
     auto require_change = [&] {
-        auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
             if (!c.empty()) {
                 change = c;
                 called = true;

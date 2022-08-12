@@ -126,8 +126,7 @@ TEST_CASE("notifications: async delivery") {
     Results results(r, table->where().greater(col, 0).less(col, 10));
 
     int notification_calls = 0;
-    auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-        REQUIRE_FALSE(err);
+    auto token = results.add_notification_callback([&](CollectionChangeSet) {
         ++notification_calls;
     });
 
@@ -323,9 +322,9 @@ TEST_CASE("notifications: async delivery") {
     SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
-            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token3 = results.add_notification_callback([&](CollectionChangeSet) {
                 called = true;
             });
         });
@@ -343,9 +342,9 @@ TEST_CASE("notifications: async delivery") {
 
         bool called = false;
         auto check = [&](Results& outer, Results& inner) {
-            token2 = outer.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = outer.add_notification_callback([&](CollectionChangeSet) {
                 token2 = {};
-                token3 = inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = inner.add_notification_callback([&](CollectionChangeSet) {
                     called = true;
                 });
             });
@@ -366,13 +365,13 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("Results which used to have callbacks but no longer does") {
             SECTION("notifier before active") {
-                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet) {
                     token3 = {};
                 });
                 check(results3, results2);
             }
             SECTION("notifier after active") {
-                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet) {
                     token3 = {};
                 });
                 check(results, results2);
@@ -381,11 +380,11 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("Results which already has callbacks") {
             SECTION("notifier before active") {
-                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+                token4 = results2.add_notification_callback([&](CollectionChangeSet) {});
                 check(results3, results2);
             }
             SECTION("notifier after active") {
-                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+                token4 = results2.add_notification_callback([&](CollectionChangeSet) {});
                 check(results, results2);
             }
         }
@@ -394,11 +393,11 @@ TEST_CASE("notifications: async delivery") {
     SECTION("remote changes made before adding a callback from within a callback are not reported") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
             make_remote_change();
             coordinator->on_change();
-            token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            token3 = results.add_notification_callback([&](CollectionChangeSet c) {
                 called = true;
                 REQUIRE(c.empty());
                 REQUIRE(table->begin()->get<int64_t>(col) == 5);
@@ -413,10 +412,10 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("notifications are not delivered when a callback is removed from within a callback") {
         NotificationToken token2, token3;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token3 = {};
         });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token3 = results.add_notification_callback([&](CollectionChangeSet) {
             REQUIRE(false);
         });
 
@@ -426,10 +425,10 @@ TEST_CASE("notifications: async delivery") {
     SECTION("removing the current callback does not stop later ones from being called") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
         });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token3 = results.add_notification_callback([&](CollectionChangeSet) {
             called = true;
         });
 
@@ -440,7 +439,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("the first call of a notification can include changes if it previously ran for a different callback") {
         r->begin_transaction();
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             REQUIRE(!c.empty());
         });
 
@@ -630,8 +629,7 @@ TEST_CASE("notifications: async delivery") {
     }
 
     SECTION("refresh() from within a notification is a no-op") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             REQUIRE_FALSE(r->refresh()); // would deadlock if it actually tried to refresh
         });
         advance_and_notify(*r);
@@ -646,8 +644,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("begin_transaction() from within a notification sends notifications recursively") {
         size_t calls = 0;
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
             if (++calls != 2)
                 return;
 
@@ -671,14 +668,14 @@ TEST_CASE("notifications: async delivery") {
     SECTION("begin_transaction() from within a notification adds new changes to the pending callbacks"
             " and restarts invoking callbacks recursively") {
         size_t calls1 = 0, calls2 = 0, calls3 = 0;
-        token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        token = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls1;
             // This callback is before the callback performing writes and so
             // sees each notification normally
             if (calls1 > 1)
                 REQUIRE_INDICES(c.insertions, calls1 + 2);
         });
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls2;
             if (calls2 > 1)
                 REQUIRE_INDICES(c.insertions, calls2 + 2);
@@ -701,7 +698,7 @@ TEST_CASE("notifications: async delivery") {
             // recurred all the way to 10
             REQUIRE(calls2 == 10);
         });
-        auto token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls3;
             // This callback comes after the one performing writes, and so doesn't
             // even get the initial notification until after all the writes.
@@ -718,8 +715,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
         size_t calls = 0;
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (++calls != 2)
                 return;
 
@@ -731,8 +727,7 @@ TEST_CASE("notifications: async delivery") {
 
         auto results2 = results;
         size_t calls2 = 0;
-        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c) {
             if (++calls2 == 1)
                 return;
             REQUIRE_INDICES(c.insertions, 0);
@@ -781,8 +776,7 @@ TEST_CASE("notifications: async delivery") {
     SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes "
             "can be made") {
         bool first = true;
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (first) {
                 REQUIRE_FALSE(r->is_in_transaction());
                 first = false;
@@ -802,8 +796,7 @@ TEST_CASE("notifications: async delivery") {
     }
 
     SECTION("invalidate() from within notification is a no-op") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             r->invalidate();
             REQUIRE(r->is_in_read_transaction());
         });
@@ -818,8 +811,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION(
         "cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (r->is_in_transaction())
                 r->cancel_transaction();
         });
@@ -836,12 +828,12 @@ TEST_CASE("notifications: async delivery") {
         auto table2 = r2->read_group().get_table("class_object");
 
         SECTION("other write set skip version") {
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token = results.add_notification_callback([&](CollectionChangeSet) {
                 if (++calls != 1)
                     return;
 
                 Results results2(r2, table2);
-                auto token2 = results2.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+                auto token2 = results2.add_notification_callback([](CollectionChangeSet) {});
                 advance_and_notify(*r2);
                 r2->begin_transaction();
                 table2->begin()->set(col, 5);
@@ -856,7 +848,7 @@ TEST_CASE("notifications: async delivery") {
         }
 
         SECTION("other write did not set skip version") {
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token = results.add_notification_callback([&](CollectionChangeSet) {
                 if (++calls != 1)
                     return;
 
@@ -899,8 +891,7 @@ TEST_CASE("notifications: skip") {
     Results results(r, table->where());
 
     auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
-        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        return results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls;
             changes = std::move(c);
         });
@@ -1131,7 +1122,7 @@ TEST_CASE("notifications: skip") {
         // Create a new notifier and then immediately remove the callback so
         // that begin_transaction() doesn't block
         Results results2(r, r->read_group().get_table("class_object")->where());
-        results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+        results2.add_notification_callback([&](CollectionChangeSet) {});
 
         r->begin_transaction();
         table->create_object();
@@ -1147,7 +1138,7 @@ TEST_CASE("notifications: skip") {
     }
 
     SECTION("skipping from a write inside the skipped callback works") {
-        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             if (c.empty())
                 return;
             r->begin_transaction();
@@ -1179,7 +1170,7 @@ TEST_CASE("notifications: skip") {
         int calls3 = 0;
         CollectionChangeSet changes3;
         NotificationToken token3;
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
             if (calls1 != 2)
                 return;
             REQUIRE(calls3 == 1);
@@ -1212,7 +1203,7 @@ TEST_CASE("notifications: skip") {
         int calls2 = 0;
         CollectionChangeSet changes2;
         NotificationToken token2 = add_callback(results, calls2, changes2);
-        auto token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet) {
             if (calls1 != 2)
                 return;
             REQUIRE(calls2 == 2);
@@ -1275,7 +1266,7 @@ TEST_CASE("notifications: TableView delivery") {
     results.evaluate_query_if_needed();
     // Create and immediately remove a callback so that the notifier gets created
     // even though we have automatic change notifications disabled
-    static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+    static_cast<void>(results.add_notification_callback([&](CollectionChangeSet) {}));
     REQUIRE(results.get_mode() == Results::Mode::TableView);
     REQUIRE(results.size() == 0);
 
@@ -1378,7 +1369,7 @@ TEST_CASE("notifications: TableView delivery") {
             // weird state and switching back to Auto doesn't work.
             Results results(r, table->where());
             results.evaluate_query_if_needed();
-            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet) {}));
             advance_and_notify(*r);
             REQUIRE(results.size() == 10);
             make_remote_change();
@@ -1447,8 +1438,7 @@ TEST_CASE("notifications: async error handling") {
         OpenFileLimiter limiter;
 
         bool called = false;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             REQUIRE_FALSE(called);
             called = true;
         });
@@ -1512,8 +1502,7 @@ TEST_CASE("notifications: async error handling") {
             REQUIRE(called);
 
             bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
                 REQUIRE_FALSE(called2);
                 called2 = true;
             });
@@ -1526,8 +1515,7 @@ TEST_CASE("notifications: async error handling") {
             advance_and_notify(*r);
 
             bool called = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
                 REQUIRE_FALSE(called);
                 called = true;
             });
@@ -1539,9 +1527,8 @@ TEST_CASE("notifications: async error handling") {
 
         SECTION("adding another callback from within an error callback defers delivery") {
             NotificationToken token2;
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                    REQUIRE(err);
+            token = results.add_notification_callback([&](CollectionChangeSet) {
+                token2 = results.add_notification_callback([&](CollectionChangeSet) {
                     REQUIRE_FALSE(called);
                     called = true;
                 });
@@ -1555,9 +1542,8 @@ TEST_CASE("notifications: async error handling") {
         SECTION("adding a callback to a different collection from within the error callback defers delivery") {
             auto results2 = results;
             NotificationToken token2;
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                    REQUIRE(err);
+            token = results.add_notification_callback([&](CollectionChangeSet) {
+                token2 = results2.add_notification_callback([&](CollectionChangeSet) {
                     REQUIRE_FALSE(called);
                     called = true;
                 });
@@ -1572,8 +1558,7 @@ TEST_CASE("notifications: async error handling") {
     SECTION("error when opening the executor SG") {
         SECTION("error is delivered asynchronously") {
             bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
+            auto token = results.add_notification_callback([&](CollectionChangeSet) {
                 called = true;
             });
             OpenFileLimiter limiter;
@@ -1587,8 +1572,7 @@ TEST_CASE("notifications: async error handling") {
 
         SECTION("adding another callback only sends the error to the new one") {
             bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
+            auto token = results.add_notification_callback([&](CollectionChangeSet) {
                 REQUIRE_FALSE(called);
                 called = true;
             });
@@ -1597,8 +1581,7 @@ TEST_CASE("notifications: async error handling") {
             advance_and_notify(*r);
 
             bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
                 REQUIRE_FALSE(called2);
                 called2 = true;
             });
@@ -1634,8 +1617,8 @@ TEST_CASE("notifications: sync") {
 
         Results results(r, r->read_group().get_table("class_object"));
         Results wait_results(wait_realm, wait_realm->read_group().get_table("class_object"));
-        auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
-        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+        auto token1 = results.add_notification_callback([&](CollectionChangeSet) {});
+        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet) {});
 
         // Add an object to the Realm so that notifications are needed
         {
@@ -1755,8 +1738,7 @@ TEST_CASE("notifications: results") {
     SECTION("unsorted notifications") {
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -1947,10 +1929,6 @@ TEST_CASE("notifications: results") {
                 ++after_calls;
                 on_after();
             }
-            void error(std::exception_ptr)
-            {
-                FAIL("error() should not be called");
-            }
         } callback;
         auto token = results.add_notification_callback(&callback);
         advance_and_notify(*r);
@@ -2012,8 +1990,7 @@ TEST_CASE("notifications: results") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -2249,29 +2226,25 @@ TEST_CASE("notifications: results") {
         // Distinguishing between these two cases would be a big change for little value.
         SECTION("some callbacks have filters") {
             auto token_without_filter = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_without_filter = collection_change_set;
                     ++notification_calls_without_filter;
                 });
             auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_table_value = collection_change_set;
                     ++notification_calls_table_value;
                 },
                 key_path_array_table_value);
             auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_linked_to_value = collection_change_set;
                     ++notification_calls_linked_to_value;
                 },
                 key_path_array_linked_to_value);
             auto token_for_filter_on_other_linked_to_value =
                 results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_other_linked_to_value = collection_change_set;
                         ++notification_calls_other_linked_to_value;
                     },
@@ -2429,8 +2402,7 @@ TEST_CASE("notifications: results") {
         SECTION("all callbacks have filters") {
             SECTION("keypath filter on root table 'object', property 'value'") {
                 auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_table_value = collection_change_set;
                         ++notification_calls_table_value;
                     },
@@ -2500,8 +2472,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value'") {
                 auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2575,8 +2546,7 @@ TEST_CASE("notifications: results") {
                 "keypath filter on related table 'linked to object', property 'value' - using object link dictionary"
                 "dictionary") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2638,8 +2608,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using object link set") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2702,8 +2671,7 @@ TEST_CASE("notifications: results") {
             SECTION(
                 "keypath filter on related table 'linked to object', property 'value' - using object link array") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2765,8 +2733,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed dictionary") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2829,8 +2796,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed set") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2892,8 +2858,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed array") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2986,8 +2951,7 @@ TEST_CASE("notifications: results") {
             SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value'") {
                 SECTION("all callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
@@ -3036,17 +3000,15 @@ TEST_CASE("notifications: results") {
 
                 SECTION("some callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
                         key_path_array_backlink_to_value);
                     int notification_calls_without_filter = 0;
                     CollectionChangeSet collection_change_set_without_filter;
-                    auto token_without_filter = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                    auto token_without_filter =
+                        results_linked_to.add_notification_callback([&](CollectionChangeSet collection_change_set) {
                             collection_change_set_without_filter = collection_change_set;
                             notification_calls_without_filter++;
                         });
@@ -3105,8 +3067,7 @@ TEST_CASE("notifications: results") {
             SECTION("keypath filter on related table 'linked to object's backlink to 'object'") {
                 SECTION("all callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
@@ -3135,17 +3096,15 @@ TEST_CASE("notifications: results") {
 
                 SECTION("some callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
                         key_path_array_backlink);
                     int notification_calls_without_filter = 0;
                     CollectionChangeSet collection_change_set_without_filter;
-                    auto token_backlink_second_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                    auto token_backlink_second_value =
+                        results_linked_to.add_notification_callback([&](CollectionChangeSet collection_change_set) {
                             collection_change_set_without_filter = collection_change_set;
                             notification_calls_without_filter++;
                         });
@@ -3181,8 +3140,7 @@ TEST_CASE("notifications: results") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -3250,8 +3208,7 @@ TEST_CASE("notifications: results") {
 
     SECTION("schema changes") {
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
         });
         advance_and_notify(*r);
@@ -3371,8 +3328,7 @@ TEST_CASE("results: notifications after move") {
     auto results = std::make_unique<Results>(r, table);
 
     int notification_calls = 0;
-    auto token = results->add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-        REQUIRE_FALSE(err);
+    auto token = results->add_notification_callback([&](CollectionChangeSet) {
         ++notification_calls;
     });
 
@@ -3432,7 +3388,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // Create and then immediately remove a callback because
         // `automatic_change_notifications = false` makes Results not implicitly
         // create a notifier
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
 
         auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
@@ -3443,7 +3399,7 @@ TEST_CASE("results: notifier with no callbacks") {
     }
 
     SECTION("refresh() does not attempt to deliver stale results") {
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
 
         // Create version 1
         r->begin_transaction();
@@ -3787,9 +3743,7 @@ TEST_CASE("results: snapshots") {
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
 
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
-        });
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {});
         advance_and_notify(*r);
 
         SECTION("snapshot of lvalue") {
@@ -3815,7 +3769,7 @@ TEST_CASE("results: snapshots") {
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
         auto snapshot = results.snapshot();
-        CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
+        CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet) {}));
     }
 
     SECTION("accessors should return none for detached row") {
@@ -4991,8 +4945,7 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("notifications on results using all descriptor types") {
         r = r.distinct({"value"}).sort({{"value", false}}).limit(2);
         int notification_calls = 0;
-        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = r.add_notification_callback([&](CollectionChangeSet c) {
             if (notification_calls == 0) {
                 REQUIRE(c.empty());
                 REQUIRE(r.size() == 2);
@@ -5023,8 +4976,7 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("notifications on only limited results") {
         r = r.limit(2);
         int notification_calls = 0;
-        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = r.add_notification_callback([&](CollectionChangeSet c) {
             if (notification_calls == 0) {
                 REQUIRE(c.empty());
                 REQUIRE(r.size() == 2);
@@ -5082,8 +5034,7 @@ TEST_CASE("notifications: objects with PK recreated") {
     });
 
     auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
-        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        return results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls;
             changes = std::move(c);
         });

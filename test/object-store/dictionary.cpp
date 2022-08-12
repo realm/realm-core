@@ -549,15 +549,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
-        auto token = dict.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++calls;
         });
-        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c) {
             rchange = c;
             ++calls;
         });
-        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
             srchange = c;
             ++calls;
         });
@@ -619,10 +619,9 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
         SECTION("key based notification") {
             DictionaryChangeSet key_change;
-            auto token =
-                dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c, std::exception_ptr) {
-                    key_change = c;
-                });
+            auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
+                key_change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -728,7 +727,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(&res.get_object_schema() == objectschema);
 
             CollectionChangeSet local_change;
-            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
+            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c) {
                 local_change = c;
             });
             advance_and_notify(*r);
@@ -778,10 +777,9 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             Results all_sources(r, source->where());
             REQUIRE(all_sources.size() == 2);
             CollectionChangeSet local_changes;
-            auto x =
-                all_sources.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
-                    local_changes = c;
-                });
+            auto x = all_sources.add_notification_callback([&local_changes](CollectionChangeSet c) {
+                local_changes = c;
+            });
             advance_and_notify(*r);
 
             SECTION("direct insertion") {
@@ -1021,7 +1019,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     Results all_objects(r, table->where());
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
-    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
         local_changes = c;
     });
     advance_and_notify(*r);

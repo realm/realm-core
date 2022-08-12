@@ -179,7 +179,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("Result constructor - Empty") {
@@ -351,9 +351,8 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
-        REQUIRE_THROWS(
-            frozen_primitive_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_THROWS(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {
@@ -417,7 +416,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {
@@ -492,8 +491,8 @@ TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
-        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {
