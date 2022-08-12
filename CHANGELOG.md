@@ -10,6 +10,7 @@
 * Processing a pending bootstrap before the sync client connects will properly surface errors to the user's error handler ([#5707](https://github.com/realm/realm-core/issues/5707), since v12.0.0)
 * Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` would remove any columns present on the server but not in the local schema (since 12.5.0).
 * Parsing a constant list of strings from RealmJS SDK to QueryParser would result in a "use after free situation". ([#5735](https://github.com/realm/realm-core/issues/5735))
+* Syncing of a Decimal128 with big significand could result in a crash. ([#5728](https://github.com/realm/realm-core/issues/5728))
  
 ### Breaking changes
 * None.
