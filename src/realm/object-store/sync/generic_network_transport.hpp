@@ -189,6 +189,11 @@ struct Request {
 
     /// Indicates if the request uses the refresh token or the access token
     bool uses_refresh_token = false;
+
+    /**
+     * A recursion counter to prevent too many redirects
+     */
+    util::Optional<size_t> max_redirects;
 };
 
 /**
@@ -218,8 +223,8 @@ struct Response {
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completionBlock) = 0;
+    virtual void send_request_to_server(
+        Request&& request, util::UniqueFunction<void(const Request&, Response&&)>&& completionBlock) = 0;
     virtual ~GenericNetworkTransport() = default;
 };
 

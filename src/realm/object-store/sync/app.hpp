@@ -37,6 +37,7 @@ class SyncUser;
 class SyncSession;
 class SyncManager;
 struct SyncClientConfig;
+class SyncAppMetadata;
 
 namespace app {
 
@@ -387,7 +388,13 @@ private:
 
     std::string url_for_path(const std::string& path) const override;
 
-    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion);
+    /// Return the app route for this App instance, or creates a new app route string if
+    /// a new hostname is provided
+    /// @param hostname The hostname to generate a new app route
+    std::string get_app_route(const std::optional<std::string>& hostname = util::none) const;
+
+    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
+                           const util::Optional<std::string>& new_hostname = util::none);
 
     void basic_request(std::string&& route, std::string&& body,
                        util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
@@ -397,7 +404,16 @@ private:
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
+    /// @param new_hostname The optional hostname to use for the request
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                    const util::Optional<std::string>& new_hostname = util::none);
+
+    /// Process the response received from send_request_to_server to handle the redirection response
+    /// @param request The request to be performed (in case it needs to be sent again)
+    /// @param error The response from the send_request_to_server operation
+    /// @param completion Returns the response from the server if not a redirect
+    void handle_redirect_response(Request&& request, Response&& error,
+                                  util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
@@ -431,6 +447,12 @@ private:
     std::string function_call_url_path() const;
 
     void configure(const SyncClientConfig& sync_client_config);
+
+    std::string make_sync_route(const std::string& http_app_route);
+
+    void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata);
+
+    void update_hostname(const std::string& hostname, const std::optional<std::string>& ws_hostname = util::none);
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };
