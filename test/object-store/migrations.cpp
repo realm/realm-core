@@ -1127,8 +1127,9 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 0);
             REQUIRE(parent_table->size() == 0);
         }
-        SECTION("change table from top-level to embedded, delete objects with 1 incoming links. Resolve automatic "
-                "should not trigger") {
+        SECTION("change table from top-level to embedded, migration allowed, embedded object with 1 incoming link. "
+                "Resolve automatic "
+                "should not be triggered") {
             InMemoryTestFile config;
             config.automatic_handle_backlicks_in_migrations = true;
             Schema schema = {
