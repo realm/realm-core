@@ -283,7 +283,7 @@ TestAppSession::TestAppSession()
 
 TestAppSession::TestAppSession(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
-                               DeleteApp delete_app)
+                               DeleteApp delete_app, ReconnectMode reconnect_mode)
     : m_app_session(std::make_unique<AppSession>(session))
     , m_base_file_path(util::make_temp_dir() + random_string(10))
     , m_delete_app(delete_app)
@@ -299,6 +299,7 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.base_file_path = m_base_file_path;
     sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+    sc_config.reconnect_mode = reconnect_mode;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 

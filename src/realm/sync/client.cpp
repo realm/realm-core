@@ -937,7 +937,7 @@ void SessionImpl::receive_error_message_hook(const ProtocolErrorInfo& error_info
     }
 
     if (!m_wrapper.m_on_error_message_received_hook(error_info)) {
-        m_stopped_for_testing = true;
+        m_conn.disconnect(SessionErrorInfo(make_error_code(ProtocolError::connection_closed), false));
     }
 }
 

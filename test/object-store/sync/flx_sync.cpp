@@ -771,7 +771,9 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
     FLXSyncTestHarness::ServerSchema server_schema{
         g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
-    FLXSyncTestHarness harness("flx_bad_query", server_schema);
+    FLXSyncTestHarness::Config harness_config("flx_bad_query", server_schema);
+    harness_config.reconnect_mode = ReconnectMode::testing;
+    FLXSyncTestHarness harness(std::move(harness_config));
 
     auto test_obj_id_1 = ObjectId::gen();
     auto test_obj_id_2 = ObjectId::gen();
@@ -885,15 +887,22 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
     std::mutex errors_mutex;
     std::vector<SyncError> errors;
+    std::condition_variable error_cond;
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::lock_guard<std::mutex> lk(errors_mutex);
         errors.push_back(std::move(error));
+        error_cond.notify_one();
     };
 
     auto realm = Realm::get_shared_realm(config);
-    wait_for_upload(*realm);
-    wait_for_download(*realm);
+
+    {
+        std::unique_lock<std::mutex> lk(errors_mutex);
+        error_cond.wait_for(lk, std::chrono::minutes{5}, [&] {
+            return errors.size() == 2;
+        });
+    }
 
     {
         REQUIRE(error_messages_received.load() == 1);

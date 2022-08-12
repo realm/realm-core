@@ -898,9 +898,6 @@ private:
 
     bool m_suspended = false;
 
-    // Can be set by testing hooks to stop the sync client from processing further DOWNLOAD messages.
-    bool m_stopped_for_testing = false;
-
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
