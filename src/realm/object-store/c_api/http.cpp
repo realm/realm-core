@@ -29,13 +29,9 @@ static_assert(realm_http_request_method_e(HttpMethod::patch) == RLM_HTTP_REQUEST
 static_assert(realm_http_request_method_e(HttpMethod::put) == RLM_HTTP_REQUEST_METHOD_PUT);
 static_assert(realm_http_request_method_e(HttpMethod::del) == RLM_HTTP_REQUEST_METHOD_DELETE);
 
-class CNetworkTransport final : public GenericNetworkTransport {
-    using Completion = realm::util::UniqueFunction<void(const Request&, Response&&)>;
-    using CompletionData = struct completion_data {
-        Request&& request;
-        Completion&& completion;
-    };
+using HttpCompletionData = struct completion_data {Request&& request; http_completion_t&& completion; };
 
+class CNetworkTransport final : public GenericNetworkTransport {
 public:
     CNetworkTransport(UserdataPtr userdata, realm_http_request_func_t request_executor)
         : m_userdata(std::move(userdata))
@@ -45,7 +41,7 @@ public:
 
     static void on_response_completed(void* completion_data, const realm_http_response_t* response) noexcept
     {
-        std::unique_ptr<CompletionData> comp_data(reinterpret_cast<CompletionData*>(completion_data));
+        std::unique_ptr<HttpCompletionData> comp_data(reinterpret_cast<HttpCompletionData*>(completion_data));
 
         std::map<std::string, std::string> headers;
         for (size_t i = 0; i < response->num_headers; i++) {
@@ -58,7 +54,7 @@ public:
     }
 
 private:
-    void send_request_to_server(Request&& request, Completion&& completion_block) final
+    void send_request_to_server(Request&& request, http_completion_t&& completion_block) final
     {
         std::vector<realm_http_header_t> c_headers;
         c_headers.reserve(request.headers.size());
@@ -73,8 +69,8 @@ private:
                                        c_headers.size(),
                                        request.body.data(),
                                        request.body.size()};
-        auto completion_data = std::unique_ptr<CompletionData>(new CompletionData{std::move(request),
-                                                                                  std::move(completion_block)});
+        auto completion_data = std::unique_ptr<HttpCompletionData>(
+            new HttpCompletionData{std::move(request), std::move(completion_block)});
         m_request_executor(m_userdata.get(), c_request, completion_data.release());
     }
 

@@ -405,14 +405,14 @@ private:
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     /// @param new_hostname The optional hostname to use for the request
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+    void do_request(const Request& request, util::UniqueFunction<void(const Response&)>&& completion,
                     const util::Optional<std::string>& new_hostname = util::none);
 
     /// Process the response received from send_request_to_server to handle the redirection response
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param error The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
-    void handle_redirect_response(Request&& request, Response&& error,
+    void handle_redirect_response(const Request& request, const Response& error,
                                   util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state

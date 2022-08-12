@@ -274,7 +274,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
 
 } // namespace
 
-app::Response do_http_request(app::Request&& request)
+app::Response do_http_request(const app::Request& request)
 {
     CurlGlobalGuard curl_global_guard;
     auto curl = curl_easy_init();

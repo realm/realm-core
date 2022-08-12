@@ -770,7 +770,7 @@ void App::init_app_metadata(UniqueFunction<void(const util::Optional<Response>&)
 
     m_config.transport->send_request_to_server(
         std::move(req), [this, completion = std::move(completion)](const Request&,
-                                                                   Response&& response) {
+                                                                   const Response& response) {
         // If the response contains an error, then pass it up
         if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
             completion(std::move(response));
@@ -805,22 +805,21 @@ void App::post(std::string&& route, util::UniqueFunction<void(util::Optional<App
                handle_default_response(std::move(completion)));
 }
 
-void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion,
+void App::do_request(const Request& request, UniqueFunction<void(const Response&)>&& completion,
                      const std::optional<std::string>& new_hostname)
 {
-    request.timeout_ms = default_timeout_ms;
+    auto request_c = std::move(request);
+    request_c.timeout_ms = default_timeout_ms;
 
     // Normal do_request operation, just send the request to the server and return the response
     if (!new_hostname && m_sync_manager->app_metadata()) {
         m_config.transport->send_request_to_server(
-            std::move(request), [completion = std::move(completion), anchor = shared_from_this()]
-            (const Request& request, Response&& error) mutable {
+            std::move(request_c), [completion = std::move(completion), anchor = shared_from_this()]
+            (const Request& request, const Response& error) mutable {
 
             // If the response contains a redirection, then process it
             if (error.http_status_code == 301) {
-                auto new_request = std::move(request);
-                anchor->handle_redirect_response(std::move(new_request), std::move(error),
-                                                 std::move(completion));
+                anchor->handle_redirect_response(request, error, std::move(completion));
                 return;
             }
             completion(std::move(error));
@@ -830,13 +829,11 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     // if we do not have metadata yet, we need to initialize it and send the
     // request once that's complete; or if a new_hostname is provided, re-initialize
     // the metadata with the updated location info
-    init_app_metadata([completion = std::move(completion), request = std::move(request),
+    init_app_metadata([completion = std::move(completion), request = std::move(request_c),
                        anchor = shared_from_this()](const util::Optional<Response>& error) mutable {
         if (error) {
             if (error->http_status_code == 301) {
-                auto new_error = std::move(*error);
-                anchor->handle_redirect_response(std::move(request), std::move(new_error),
-                                                std::move(completion));
+                anchor->handle_redirect_response(request, *error, std::move(completion));
             } else {
                 completion(std::move(*error));
             }
@@ -855,11 +852,9 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
         // Retry the original request with the updated url
         anchor->m_config.transport->send_request_to_server(
             std::move(request), [completion = std::move(completion), anchor = std::move(anchor)]
-            (const Request& request, Response&& error) mutable {
+            (const Request& request, const Response& error) mutable {
             if (error.http_status_code == 301) {
-                auto new_request = std::move(request);
-                anchor->handle_redirect_response(std::move(new_request), std::move(error),
-                                                 std::move(completion));
+                anchor->handle_redirect_response(request, error, std::move(completion));
                 return;
             }
             completion(std::move(error));
@@ -867,7 +862,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     }, new_hostname);
 }
 
-void App::handle_redirect_response(Request&& request, Response&& error,
+void App::handle_redirect_response(const Request& request, const Response& error,
                                    util::UniqueFunction<void(const Response&)>&& completion)
 {
     // Permanent redirect - get the location and init the metadata again
@@ -892,20 +887,23 @@ void App::handle_redirect_response(Request&& request, Response&& error,
             new_url.erase(split);
         }
 
-        if (request.max_redirects) {
+        auto request_c = std::move(request);
+
+        if (request_c.max_redirects) {
             // Make sure we don't do too many redirects (20 is an arbitrary number)
-            if (*(request.max_redirects) > 20) {
-                error.http_status_code = 399; // custom status code for too many redirects
-                completion(std::move(error));
+            if (*(request_c.max_redirects) > 20) {
+                auto error_c = std::move(error);
+                error_c.http_status_code = 399; // custom status code for too many redirects
+                completion(std::move(error_c));
                 return;
             }
-            *(request.max_redirects) += 1;
+            *(request_c.max_redirects) += 1;
         } else {
-            request.max_redirects = 1;
+            request_c.max_redirects = 1;
         }
 
         // Replay the request with the updated hostname
-        do_request(std::move(request), std::move(completion), new_url);
+        do_request(std::move(request_c), std::move(completion), new_url);
         return;
     }
     // Location not found in the response, pass error response up the chain
