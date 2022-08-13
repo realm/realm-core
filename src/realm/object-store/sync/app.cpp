@@ -754,13 +754,13 @@ void App::init_app_metadata(UniqueFunction<void(const util::Optional<Response>&)
 {
     std::string route;
 
-    if (new_hostname) {
-        route = util::format("%1/location", get_app_route(*new_hostname));
-    } else if (m_sync_manager->app_metadata()) {
+    if (!new_hostname && m_sync_manager->app_metadata()){
         // If the app_metadata has already been initialized and a new hostname is not provided, call completion
-        return completion(util::none);
+        completion(util::none);
+        return;  // early return
     } else {
-        route = util::format("%1/location", get_app_route());
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
     }
 
     Request req;
@@ -774,7 +774,7 @@ void App::init_app_metadata(UniqueFunction<void(const util::Optional<Response>&)
         // If the response contains an error, then pass it up
         if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
             completion(std::move(response));
-            return;
+            return;  // early return
         }
 
         try {
@@ -791,7 +791,7 @@ void App::init_app_metadata(UniqueFunction<void(const util::Optional<Response>&)
         }
         catch (const AppError& app_err) {
             completion(std::move(response));
-            return;
+            return;  // early return
         }
         completion(util::none);
     });
@@ -820,10 +820,11 @@ void App::do_request(const Request& request, UniqueFunction<void(const Response&
             // If the response contains a redirection, then process it
             if (error.http_status_code == 301) {
                 anchor->handle_redirect_response(request, error, std::move(completion));
-                return;
+            } else {
+                completion(std::move(error));
             }
-            completion(std::move(error));
         });
+        return;  // early return
     }
 
     // if we do not have metadata yet, we need to initialize it and send the
@@ -837,7 +838,7 @@ void App::do_request(const Request& request, UniqueFunction<void(const Response&
             } else {
                 completion(std::move(*error));
             }
-            return;
+            return;  // early return
         }
 
         // if this is the first time we have received app metadata, the
@@ -855,9 +856,9 @@ void App::do_request(const Request& request, UniqueFunction<void(const Response&
             (const Request& request, const Response& error) mutable {
             if (error.http_status_code == 301) {
                 anchor->handle_redirect_response(request, error, std::move(completion));
-                return;
+            } else {
+                completion(std::move(error));
             }
-            completion(std::move(error));
         });
     }, new_hostname);
 }
@@ -881,30 +882,32 @@ void App::handle_redirect_response(const Request& request, const Response& error
     if (location != error.headers.end()) {
         constexpr auto https_len = std::char_traits<char>::length("https://");
         auto new_url = location->second;
-        // Trim off any trailing path/anchor/query string
-        size_t split = new_url.find_first_of("/#?", https_len);
-        if (split != std::string::npos) {
-            new_url.erase(split);
-        }
-
-        auto request_c = std::move(request);
-
-        if (request_c.max_redirects) {
-            // Make sure we don't do too many redirects (20 is an arbitrary number)
-            if (*(request_c.max_redirects) > 20) {
-                auto error_c = std::move(error);
-                error_c.http_status_code = 399; // custom status code for too many redirects
-                completion(std::move(error_c));
-                return;
+        if (new_url.length() > 0) {
+            // Trim off any trailing path/anchor/query string
+            size_t split = new_url.find_first_of("/#?", https_len);
+            if (split != std::string::npos) {
+                new_url.erase(split);
             }
-            *(request_c.max_redirects) += 1;
-        } else {
-            request_c.max_redirects = 1;
-        }
 
-        // Replay the request with the updated hostname
-        do_request(std::move(request_c), std::move(completion), new_url);
-        return;
+            auto request_c = std::move(request);
+
+            if (request_c.max_redirects) {
+                // Make sure we don't do too many redirects (20 is an arbitrary number)
+                if (*(request_c.max_redirects) > 20) {
+                    auto error_c = std::move(error);
+                    error_c.http_status_code = 399; // custom status code for too many redirects
+                    completion(std::move(error_c));
+                    return;  // early return
+                }
+                *(request_c.max_redirects) += 1;
+            } else {
+                request_c.max_redirects = 1;
+            }
+
+            // Replay the request with the updated hostname
+            do_request(std::move(request_c), std::move(completion), new_url);
+            return; // early return
+        }
     }
     // Location not found in the response, pass error response up the chain
     completion(std::move(error));
