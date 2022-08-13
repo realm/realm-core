@@ -276,7 +276,7 @@ void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata) {
     }
 }
 
-void App::update_hostname(const std::string& hostname, const std::optional<std::string>& ws_hostname) {
+void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname) {
     // Update url components based on new hostname value
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
@@ -740,7 +740,7 @@ std::string App::url_for_path(const std::string& path = "") const
     return util::format("%1%2", m_base_route, path);
 }
 
-std::string App::get_app_route(const std::optional<std::string>& hostname) const {
+std::string App::get_app_route(const Optional<std::string>& hostname) const {
     if (hostname) {
         return *hostname + base_path + app_path + "/" + m_config.app_id;
     } else {
@@ -749,8 +749,8 @@ std::string App::get_app_route(const std::optional<std::string>& hostname) const
 }
 
 // FIXME: This passes back the response to bubble up any potential errors, making this somewhat leaky
-void App::init_app_metadata(UniqueFunction<void(const util::Optional<Response>&)>&& completion,
-                            const util::Optional<std::string>& new_hostname)
+void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& completion,
+                            const Optional<std::string>& new_hostname)
 {
     std::string route;
 
@@ -806,7 +806,7 @@ void App::post(std::string&& route, util::UniqueFunction<void(util::Optional<App
 }
 
 void App::do_request(const Request& request, UniqueFunction<void(const Response&)>&& completion,
-                     const std::optional<std::string>& new_hostname)
+                     const Optional<std::string>& new_hostname)
 {
     auto request_c = std::move(request);
     request_c.timeout_ms = default_timeout_ms;

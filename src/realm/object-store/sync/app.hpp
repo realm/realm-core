@@ -391,7 +391,7 @@ private:
     /// Return the app route for this App instance, or creates a new app route string if
     /// a new hostname is provided
     /// @param hostname The hostname to generate a new app route
-    std::string get_app_route(const std::optional<std::string>& hostname = util::none) const;
+    std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const;
 
     void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
                            const util::Optional<std::string>& new_hostname = util::none);
@@ -452,7 +452,7 @@ private:
 
     void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata);
 
-    void update_hostname(const std::string& hostname, const std::optional<std::string>& ws_hostname = util::none);
+    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none);
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };
