@@ -816,7 +816,6 @@ void App::do_request(const Request& request, UniqueFunction<void(const Response&
         m_config.transport->send_request_to_server(
             std::move(request_c), [completion = std::move(completion), anchor = shared_from_this()]
             (const Request& request, const Response& error) mutable {
-
             // If the response contains a redirection, then process it
             if (error.http_status_code == 301) {
                 anchor->handle_redirect_response(request, error, std::move(completion));
