@@ -6,6 +6,7 @@
 * Action returned from the server in the json error messages is surfaced through the SyncError. ([PR #5690](https://github.com/realm/realm-core/pull/5690)).
 * `NotificationToken` grew an `unregister()` method as an alternative to destroying it or doing `token = {};` ([PR #5776](https://github.com/realm/realm-core/pull/5776)).
 * Expose `Obj::add_int()` in the CAPI. ([PR #5770](https://github.com/realm/realm-core/pull/5770)).
+* Handle redirect (301) server responses to update the server URL and resend the request to the new host.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -15,7 +16,7 @@
 
 
 ### Breaking changes
-* None.
+* Callback for `GenericNetworkTransport::send_request_to_server()` now receives both the original Request and Response objects (does not affect the C-API).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
