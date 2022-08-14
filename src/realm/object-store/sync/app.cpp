@@ -795,7 +795,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 
             update_hostname(m_sync_manager->app_metadata());
         }
-        catch (const AppError& app_err) {
+        catch (const AppError&) {
             completion(std::move(response));
             return; // early return
         }
