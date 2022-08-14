@@ -21,10 +21,10 @@ CTestTestfile.cmake
 Makefile
 Realm.xcodeproj
 CMakeScripts
+
+# Ignore build artifacts
 /build*
 /debug*
-/_CPack_Packages*
-realm-*.tar.gz
 
 # Ignore all user files except one which includes execution path for test
 *.user
@@ -56,6 +56,10 @@ compile_commands.json
 
 # ref doc
 /doc/ref_cpp/html/*
+
+# cpack artifacts
+/_CPack_Packages*
+/realm-*.tar.gz
 
 # sh build.sh build-cocoa
 /core-*.zip
