@@ -22,6 +22,9 @@ Makefile
 Realm.xcodeproj
 CMakeScripts
 /build*
+/debug*
+/_CPack_Packages*
+realm-*.tar.gz
 
 # Ignore all user files except one which includes execution path for test
 *.user
