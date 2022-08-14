@@ -1381,10 +1381,10 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(std::move(request),
-                                                             [&](const Request& request, const Response& response) {
-                completion_block(std::move(request), std::move(response));
-            });
+            SynchronousTestTransport::send_request_to_server(
+                std::move(request), [&](const Request& request, const Response& response) {
+                    completion_block(std::move(request), std::move(response));
+                });
         }
         util::UniqueFunction<void(Request&)> request_hook;
     };

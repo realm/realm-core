@@ -31,7 +31,10 @@ static_assert(realm_http_request_method_e(HttpMethod::del) == RLM_HTTP_REQUEST_M
 
 class CNetworkTransport final : public GenericNetworkTransport {
 public:
-    using HttpCompletionData = struct completion_data {Request&& request; http_completion_t&& completion; };
+    using HttpCompletionData = struct completion_data {
+        Request&& request;
+        http_completion_t&& completion;
+    };
 
     CNetworkTransport(UserdataPtr userdata, realm_http_request_func_t request_executor)
         : m_userdata(std::move(userdata))

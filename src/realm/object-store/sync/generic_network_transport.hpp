@@ -225,8 +225,7 @@ using http_completion_t = realm::util::UniqueFunction<void(const Request&, const
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(
-        Request&& request, http_completion_t&& completion_block) = 0;
+    virtual void send_request_to_server(Request&& request, http_completion_t&& completion_block) = 0;
     virtual ~GenericNetworkTransport() = default;
 };
 

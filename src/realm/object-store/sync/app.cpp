@@ -260,7 +260,8 @@ void App::configure(const SyncClientConfig& sync_client_config)
     }
 }
 
-std::string App::make_sync_route(const std::string& http_app_route) {
+std::string App::make_sync_route(const std::string& http_app_route)
+{
     // change the scheme in the base url to ws from http to satisfy the sync client
     auto sync_route = http_app_route + sync_path;
     size_t uri_scheme_start = sync_route.find("http");
@@ -269,14 +270,16 @@ std::string App::make_sync_route(const std::string& http_app_route) {
     return sync_route;
 }
 
-void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata) {
+void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
+{
     // Update url components based on new hostname value
     if (metadata) {
         update_hostname(metadata->hostname, metadata->ws_hostname);
     }
 }
 
-void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname) {
+void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname)
+{
     // Update url components based on new hostname value
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
@@ -285,7 +288,8 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
     m_auth_route = m_app_route + auth_path;
     if (ws_hostname && ws_hostname->length() > 0) {
         m_sync_manager->set_sync_route(*ws_hostname + base_path + this_app_path + sync_path);
-    } else if (m_sync_manager) {
+    }
+    else if (m_sync_manager) {
         m_sync_manager->set_sync_route(make_sync_route(m_app_route));
     }
 }
@@ -740,10 +744,12 @@ std::string App::url_for_path(const std::string& path = "") const
     return util::format("%1%2", m_base_route, path);
 }
 
-std::string App::get_app_route(const Optional<std::string>& hostname) const {
+std::string App::get_app_route(const Optional<std::string>& hostname) const
+{
     if (hostname) {
         return *hostname + base_path + app_path + "/" + m_config.app_id;
-    } else {
+    }
+    else {
         return m_app_route;
     }
 }
@@ -754,11 +760,12 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_sync_manager->app_metadata()){
+    if (!new_hostname && m_sync_manager->app_metadata()) {
         // If the app_metadata has already been initialized and a new hostname is not provided, call completion
         completion(util::none);
-        return;  // early return
-    } else {
+        return; // early return
+    }
+    else {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
         route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
     }
@@ -768,13 +775,12 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
 
-    m_config.transport->send_request_to_server(
-        std::move(req), [this, completion = std::move(completion)](const Request&,
-                                                                   const Response& response) {
+    m_config.transport->send_request_to_server(std::move(req), [this, completion = std::move(completion)](
+                                                                   const Request&, const Response& response) {
         // If the response contains an error, then pass it up
         if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
             completion(std::move(response));
-            return;  // early return
+            return; // early return
         }
 
         try {
@@ -791,7 +797,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
         }
         catch (const AppError& app_err) {
             completion(std::move(response));
-            return;  // early return
+            return; // early return
         }
         completion(util::none);
     });
@@ -814,52 +820,57 @@ void App::do_request(const Request& request, UniqueFunction<void(const Response&
     // Normal do_request operation, just send the request to the server and return the response
     if (!new_hostname && m_sync_manager->app_metadata()) {
         m_config.transport->send_request_to_server(
-            std::move(request_c), [completion = std::move(completion), anchor = shared_from_this()]
-            (const Request& request, const Response& error) mutable {
-            // If the response contains a redirection, then process it
-            if (error.http_status_code == 301) {
-                anchor->handle_redirect_response(request, error, std::move(completion));
-            } else {
-                completion(std::move(error));
-            }
-        });
-        return;  // early return
+            std::move(request_c), [completion = std::move(completion), anchor = shared_from_this()](
+                                      const Request& request, const Response& error) mutable {
+                // If the response contains a redirection, then process it
+                if (error.http_status_code == 301) {
+                    anchor->handle_redirect_response(request, error, std::move(completion));
+                }
+                else {
+                    completion(std::move(error));
+                }
+            });
+        return; // early return
     }
 
     // if we do not have metadata yet, we need to initialize it and send the
     // request once that's complete; or if a new_hostname is provided, re-initialize
     // the metadata with the updated location info
-    init_app_metadata([completion = std::move(completion), request = std::move(request_c),
-                       anchor = shared_from_this()](const util::Optional<Response>& error) mutable {
-        if (error) {
-            if (error->http_status_code == 301) {
-                anchor->handle_redirect_response(request, *error, std::move(completion));
-            } else {
-                completion(std::move(*error));
+    init_app_metadata(
+        [completion = std::move(completion), request = std::move(request_c),
+         anchor = shared_from_this()](const util::Optional<Response>& error) mutable {
+            if (error) {
+                if (error->http_status_code == 301) {
+                    anchor->handle_redirect_response(request, *error, std::move(completion));
+                }
+                else {
+                    completion(std::move(*error));
+                }
+                return; // early return
             }
-            return;  // early return
-        }
 
-        // if this is the first time we have received app metadata, the
-        // original request will not have the correct URL hostname for
-        // non global deployments.
-        auto app_metadata = anchor->m_sync_manager->app_metadata();
-        if (app_metadata && app_metadata->deployment_model != "GLOBAL" &&
-            request.url.rfind(anchor->m_base_url, 0) != std::string::npos) {
-            request.url.replace(0, anchor->m_base_url.size(), app_metadata->hostname);
-        }
-
-        // Retry the original request with the updated url
-        anchor->m_config.transport->send_request_to_server(
-            std::move(request), [completion = std::move(completion), anchor = std::move(anchor)]
-            (const Request& request, const Response& error) mutable {
-            if (error.http_status_code == 301) {
-                anchor->handle_redirect_response(request, error, std::move(completion));
-            } else {
-                completion(std::move(error));
+            // if this is the first time we have received app metadata, the
+            // original request will not have the correct URL hostname for
+            // non global deployments.
+            auto app_metadata = anchor->m_sync_manager->app_metadata();
+            if (app_metadata && app_metadata->deployment_model != "GLOBAL" &&
+                request.url.rfind(anchor->m_base_url, 0) != std::string::npos) {
+                request.url.replace(0, anchor->m_base_url.size(), app_metadata->hostname);
             }
-        });
-    }, new_hostname);
+
+            // Retry the original request with the updated url
+            anchor->m_config.transport->send_request_to_server(
+                std::move(request), [completion = std::move(completion), anchor = std::move(anchor)](
+                                        const Request& request, const Response& error) mutable {
+                    if (error.http_status_code == 301) {
+                        anchor->handle_redirect_response(request, error, std::move(completion));
+                    }
+                    else {
+                        completion(std::move(error));
+                    }
+                });
+        },
+        new_hostname);
 }
 
 void App::handle_redirect_response(const Request& request, const Response& error,
@@ -874,7 +885,7 @@ void App::handle_redirect_response(const Request& request, const Response& error
                 return tolower(a) == tolower(b);
             })) {
             location = it;
-            break;  // value found, stop looping
+            break; // value found, stop looping
         }
     }
 
@@ -896,10 +907,11 @@ void App::handle_redirect_response(const Request& request, const Response& error
                     auto error_c = std::move(error);
                     error_c.http_status_code = 399; // custom status code for too many redirects
                     completion(std::move(error_c));
-                    return;  // early return
+                    return; // early return
                 }
                 *(request_c.max_redirects) += 1;
-            } else {
+            }
+            else {
                 request_c.max_redirects = 1;
             }
 

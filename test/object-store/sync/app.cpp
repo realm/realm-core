@@ -96,7 +96,6 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 } // namespace
 
 
-
 #if REALM_ENABLE_AUTH_TESTS
 
 static std::string HMAC_SHA256(std::string_view key, std::string_view data)
@@ -1980,11 +1979,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             }
             SynchronousTestTransport::send_request_to_server(
                 std::move(request), [&](const Request& request, const Response& response) {
-                if (response_hook) {
-                    response_hook(const_cast<Request&>(request), const_cast<Response&>(response));
-                }
-                completion_block(request, response);
-            });
+                    if (response_hook) {
+                        response_hook(const_cast<Request&>(request), const_cast<Response&>(response));
+                    }
+                    completion_block(request, response);
+                });
         }
         util::UniqueFunction<void(Request&, Response&)> response_hook;
         util::UniqueFunction<void(Request&)> request_hook;
@@ -3893,8 +3892,8 @@ public:
     void add_work_item(Request request, Response response, http_completion_t completion_block)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(ResponseWorkItem{std::move(request), std::move(response),
-                                                   std::move(completion_block)});
+        transport_work.push_front(
+            ResponseWorkItem{std::move(request), std::move(response), std::move(completion_block)});
         transport_work_cond.notify_one();
     }
 
@@ -4113,15 +4112,14 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                completion_block(std::move(request),
-                                 {200,
-                                  0,
-                                  {},
-                                  nlohmann::json({{"deployment_model", "LOCAL"},
-                                                  {"location", "IE"},
-                                                  {"hostname", test_hostname},
-                                                  {"ws_hostname", test_ws_hostname}})
-                                      .dump()});
+                completion_block(std::move(request), {200,
+                                                      0,
+                                                      {},
+                                                      nlohmann::json({{"deployment_model", "LOCAL"},
+                                                                      {"location", "IE"},
+                                                                      {"hostname", test_hostname},
+                                                                      {"ws_hostname", test_ws_hostname}})
+                                                          .dump()});
             }
             else if (request.url.find("functions/call") != std::string::npos) {
                 REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
@@ -4312,8 +4310,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
                 state.advance_to(TestState::login);
                 state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
-                    std::move(request),
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
+                    std::move(request), Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion_block));
             }
             else if (request.url.find("/profile") != std::string::npos) {

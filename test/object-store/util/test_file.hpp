@@ -253,7 +253,8 @@ public:
         realm::app::Request request;
         realm::app::http_completion_t completion_block;
 
-        void operator()(realm::app::Response&& response) {
+        void operator()(realm::app::Response&& response)
+        {
             REQUIRE(completion_block);
             completion_block(request, std::move(response));
         }
