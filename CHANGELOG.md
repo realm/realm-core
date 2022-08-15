@@ -6,7 +6,7 @@
 * Action returned from the server in the json error messages is surfaced through the SyncError. ([PR #5690](https://github.com/realm/realm-core/pull/5690)).
 * `NotificationToken` grew an `unregister()` method as an alternative to destroying it or doing `token = {};` ([PR #5776](https://github.com/realm/realm-core/pull/5776)).
 * Expose `Obj::add_int()` in the CAPI. ([PR #5770](https://github.com/realm/realm-core/pull/5770)).
-* Handle redirect (301) server responses to update the server URL and resend the request to the new host.
+* Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
