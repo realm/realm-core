@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 12.6.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed an issue where having realm-cocoa as SPM sub-target dependency leads to missing symbols error during iOS archiving. ([#7645](https://github.com/realm/realm-swift/issues/7645))
 * Exposed the boolean `merge_with_existing` in the C-API's functions `realm_convert_with_config` and `realm_convert_with_path`. ([#5713](https://github.com/realm/realm-core/issues/5713))
 * Processing a pending bootstrap before the sync client connects will properly surface errors to the user's error handler ([#5707](https://github.com/realm/realm-core/issues/5707), since v12.0.0)
