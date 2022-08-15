@@ -996,8 +996,11 @@ void RealmCoordinator::run_async_notifiers()
 
     // We need to pick the final version to advance to while the lock is held
     // as otherwise if a commit is made while new notifiers are being advanced
-    // we could end up advancing over the skip version.
-    VersionID version = m_db->get_version_id_of_latest_snapshot();
+    // we could end up advancing over the skip version. We create a transaction
+    // object for it to make sure the version stays valid
+    TransactionRef newest_transaction = m_db->start_read();
+    VersionID version = newest_transaction->get_version_of_current_transaction();
+
     auto skip_version = std::move(m_notifier_skip_version);
 
     // Make a copy of the notifiers vector and then release the lock to avoid
@@ -1047,7 +1050,6 @@ void RealmCoordinator::run_async_notifiers()
         // to the latest.
         std::sort(new_notifiers.begin(), new_notifiers.end(), compare_notifier_versions);
         new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
-
         new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
         for (auto& notifier : new_notifiers) {
             new_notifier_change_info->advance_incremental(notifier->version());
@@ -1081,7 +1083,6 @@ void RealmCoordinator::run_async_notifiers()
         for (auto& notifier : notifiers)
             notifier->add_required_change_info(change_info.current());
         change_info.advance_to_final(skip_version->get_version_of_current_transaction());
-
         for (auto& notifier : notifiers)
             notifier->run();
 
