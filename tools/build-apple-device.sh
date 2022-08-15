@@ -3,7 +3,7 @@
 set -eo pipefail
 
 # Make sure SDKROOT variable is not set before building
-export SDKROOT=
+unset SDKROOT
 
 # Make sure the DEVELOPER_DIR variable is set before building
 if [[ -z "${DEVELOPER_DIR}" || ! -d "${DEVELOPER_DIR}" ]]; then
