@@ -5,12 +5,11 @@ set -eo pipefail
 # Make sure SDKROOT variable is not set before building
 unset SDKROOT
 
-# Make sure the DEVELOPER_DIR variable is set before building
-if [[ -z "${DEVELOPER_DIR}" || ! -d "${DEVELOPER_DIR}" ]]; then
-    echo "error: DEVELOPER_DIR must be set to the xcode developer directory"
+# If set, make sure the DEVELOPER_DIR variable is set to a valid directory
+if [[ -n "${DEVELOPER_DIR}" && ! -d "${DEVELOPER_DIR}" ]]; then
+    echo "error: DEVELOPER_DIR is not a valid directory: ${DEVELOPER_DIR}"
     exit 1
 fi
-
 
 SCRIPT="$(basename "${BASH_SOURCE[0]}")"
 VERSION="$(git describe)"
