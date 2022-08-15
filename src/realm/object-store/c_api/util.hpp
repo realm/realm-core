@@ -173,7 +173,7 @@ class CallbackRegistryWithVersion {
 public:
     using Callback_T = util::UniqueFunction<void(Args...)>;
 
-    uint64_t add(uint64_t version, Callback_T&& callback)
+    uint64_t add(DB::version_type version, Callback_T&& callback)
     {
         uint64_t token = m_next_token++;
         m_callbacks.emplace_hint(m_callbacks.end(), token, std::make_pair(version, std::move(callback)));
@@ -187,13 +187,16 @@ public:
 
     void invoke(DB::version_type version, Args... args)
     {
+        std::vector<uint64_t> tokens;
+        tokens.reserve(m_callbacks.size());
         for (const auto& [token, callback_object] : m_callbacks) {
-            auto& [expected, callback] = callback_object;
-            if (expected <= version) {
+            if (auto& [expected, callback] = callback_object; expected <= version) {
                 callback(args...);
-                remove(token);
-                break;
+                tokens.push_back(token);
             }
+        }
+        for (const auto& token : tokens) {
+            remove(token);
         }
     }
 

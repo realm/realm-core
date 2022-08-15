@@ -1110,7 +1110,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_refresh_callback_called);
     }
 
-    SECTION("realm async refresh use case") {
+    SECTION("realm async refresh - main use case") {
         bool realm_refresh_callback_called = false;
         auto config = make_config(test_file.path.c_str(), false);
         auto realm2 = cptr(realm_open(config.get()));
@@ -1131,6 +1131,48 @@ TEST_CASE("C API", "[c_api]") {
 
         realm_refresh(realm2.get());
         CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm async refresh - main use case, multiple callbacks") {
+        std::atomic_int counter = 0;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto f = [](void* userdata) {
+            auto ptr = reinterpret_cast<std::atomic_int*>(userdata);
+            ptr->fetch_add(1);
+        };
+        auto token1 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        auto token2 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+        realm_refresh(realm2.get());
+        CHECK(counter.load() == 2);
+    }
+
+    SECTION("realm refresh read transaction frozen") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(!realm_refresh_callback_called);
     }
 
     SECTION("schema is set after opening") {

@@ -609,6 +609,7 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
+    REALM_ASSERT(m_transaction);
     return m_transaction->get_version_of_current_transaction();
 }
 
