@@ -641,7 +641,7 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     return ret;
 }
 
-// Get the version of the current snapshot
+// Get the version of the latest snapshot
 util::Optional<DB::version_type> Realm::latest_snapshot_version() const
 {
     util::Optional<DB::version_type> ret;
