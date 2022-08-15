@@ -423,9 +423,6 @@ public:
      */
     static void delete_files(const std::string& realm_file_path, bool* did_delete_realm = nullptr);
 
-    // returns the file format version upgraded from if an upgrade took place
-    util::Optional<int> file_format_upgraded_from_version() const;
-
     bool has_pending_async_work() const;
 
     Realm(const Realm&) = delete;

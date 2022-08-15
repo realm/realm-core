@@ -155,7 +155,7 @@ public:
 
     /// Construct empty view, ready for addition of row indices.
     explicit TableView(ConstTableRef parent);
-    TableView(Query& query, size_t limit);
+    TableView(const Query& query, size_t limit);
     TableView(ConstTableRef parent, ColKey column, const Obj& obj);
     TableView(LinkCollectionPtr&& collection);
 
@@ -465,7 +465,7 @@ inline TableView::TableView(ConstTableRef parent)
     }
 }
 
-inline TableView::TableView(Query& query, size_t lim)
+inline TableView::TableView(const Query& query, size_t lim)
     : m_table(query.get_table())
     , m_query(query)
     , m_limit(lim)

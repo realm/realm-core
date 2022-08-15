@@ -1500,10 +1500,17 @@ void Session::activate()
     reset_protocol_state();
     m_state = Active;
 
-    process_pending_flx_bootstrap();
-
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
+
+    try {
+        process_pending_flx_bootstrap();
+    }
+    catch (const IntegrationException& error) {
+        logger.error("Error integrating bootstrap changesets: %1", error.what());
+        on_suspended(SessionErrorInfo{error.code(), false});
+        m_conn.one_less_active_unsuspended_session(); // Throws
+    }
 }
 
 

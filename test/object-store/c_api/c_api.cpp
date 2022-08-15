@@ -4122,6 +4122,87 @@ TEST_CASE("C API", "[c_api]") {
     realm_release(realm);
 }
 
+TEST_CASE("C API: convert", "[c_api]") {
+    TestFile test_file;
+    TestFile dest_test_file;
+    realm_t* realm;
+    ObjectSchema object_schema = {"Foo",
+                                  {
+                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                      {"string_value", PropertyType::String},
+                                  }};
+
+    { // seed a Realm with an object
+        auto config = make_config(test_file.path.c_str(), false);
+        config->schema = Schema{object_schema};
+        config->schema_version = 0;
+        realm = realm_open(config.get());
+        REQUIRE(checked(realm));
+        CHECK(!realm_equals(realm, nullptr));
+        realm_class_info_t class_foo;
+        bool found = false;
+        CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
+        REQUIRE(found);
+
+        realm_property_key_t foo_str_col_key;
+        realm_property_info_t info;
+        found = false;
+        REQUIRE(realm_find_property(realm, class_foo.key, "string_value", &found, &info));
+        REQUIRE(found);
+        CHECK(info.key != RLM_INVALID_PROPERTY_KEY);
+        foo_str_col_key = info.key;
+
+        CPtr<realm_object_t> obj1;
+        checked(realm_begin_write(realm));
+        realm_value_t pk = rlm_int_val(42);
+        obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+        CHECK(obj1);
+        CHECK(checked(realm_set_value(obj1.get(), foo_str_col_key, rlm_str_val("Hello, World!"), false)));
+        checked(realm_commit(realm));
+        checked(realm_refresh(realm));
+
+        size_t foo_count;
+        CHECK(checked(realm_get_num_objects(realm, class_foo.key, &foo_count)));
+        REQUIRE(foo_count == 1);
+    }
+
+    CHECK(realm_get_num_classes(realm) == 1);
+
+    SECTION("convert with path") {
+        bool merge_with_existing = false;
+        realm_binary encryption_key{nullptr, 0};
+
+        REQUIRE(realm_convert_with_path(realm, dest_test_file.path.c_str(), encryption_key, merge_with_existing));
+
+        SECTION("convert again without merge should fail") {
+            REQUIRE_FALSE(
+                realm_convert_with_path(realm, dest_test_file.path.c_str(), encryption_key, merge_with_existing));
+        }
+        SECTION("convert again with merge should succeed") {
+            merge_with_existing = true;
+            REQUIRE(realm_convert_with_path(realm, dest_test_file.path.c_str(), encryption_key, merge_with_existing));
+        }
+    }
+
+    SECTION("convert with config") {
+        auto dest_config = make_config(dest_test_file.path.c_str(), false);
+        dest_config->schema = Schema{object_schema};
+        dest_config->schema_version = 0;
+        bool merge_with_existing = false;
+        REQUIRE(realm_convert_with_config(realm, dest_config.get(), merge_with_existing));
+        SECTION("convert again without merge should fail") {
+            REQUIRE_FALSE(realm_convert_with_config(realm, dest_config.get(), merge_with_existing));
+        }
+        SECTION("convert again with merge should succeed") {
+            merge_with_existing = true;
+            REQUIRE(realm_convert_with_config(realm, dest_config.get(), merge_with_existing));
+        }
+    }
+    realm_close(realm);
+    REQUIRE(realm_is_closed(realm));
+    realm_release(realm);
+}
+
 struct Userdata {
     std::atomic<bool> called{false};
     bool has_error;

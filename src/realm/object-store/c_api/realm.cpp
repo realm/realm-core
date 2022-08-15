@@ -74,15 +74,16 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
-RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config)
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config, bool merge_with_existing)
 {
     return wrap_err([&]() {
-        (*realm)->convert(*config);
+        (*realm)->convert(*config, merge_with_existing);
         return true;
     });
 }
 
-RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key)
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key,
+                                     bool merge_with_existing)
 {
     return wrap_err([&]() {
         Realm::Config config;
@@ -90,7 +91,7 @@ RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, rea
         if (encryption_key.data) {
             config.encryption_key.assign(encryption_key.data, encryption_key.data + encryption_key.size);
         }
-        (*realm)->convert(config);
+        (*realm)->convert(config, merge_with_existing);
         return true;
     });
 }
