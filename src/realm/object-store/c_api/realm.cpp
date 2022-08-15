@@ -187,6 +187,10 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
+
+    if ((*realm)->is_frozen())
+        return nullptr;
+
     const util::Optional<DB::version_type>& latest_snapshot_version = (*realm)->latest_snapshot_version();
 
     if (!latest_snapshot_version)

@@ -1155,7 +1155,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(counter.load() == 2);
     }
 
-    SECTION("realm refresh read transaction frozen") {
+    SECTION("realm refresh read transaction frozen - register on unfrozen realm") {
         bool realm_refresh_callback_called = false;
         realm_begin_read(realm);
 
@@ -1172,6 +1172,27 @@ TEST_CASE("C API", "[c_api]") {
             &realm_refresh_callback_called, [](void*) {}));
 
         realm_refresh(realm);
+        CHECK(!realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh read transaction frozen - register on frozen realm") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(token == nullptr);
         CHECK(!realm_refresh_callback_called);
     }
 
