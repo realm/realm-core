@@ -436,7 +436,7 @@ void Connection::initiate_reconnect_wait()
     constexpr milliseconds_type min_delay = 1000;   // 1 second (barring deductions)
     constexpr milliseconds_type max_delay = 300000; // 5 minutes
 
-    // Delay must increase when scaled by a facter grater than 1.
+    // Delay must increase when scaled by a factor greater than 1.
     static_assert(min_delay > 0, "");
     static_assert(max_delay >= min_delay, "");
 
@@ -828,13 +828,10 @@ void Connection::handle_pong_timeout()
 }
 
 
-void Connection::initiate_write_message(const OutputBuffer& out, Session* sess,
-                                        util::UniqueFunction<void()>&& on_message_sent)
+void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    auto handler = [this, message_sent_handler = std::move(on_message_sent)] {
+    auto handler = [this] {
         handle_write_message(); // Throws
-        if (message_sent_handler)
-            message_sent_handler();
     };
     m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
     m_sending_session = sess;
@@ -1416,6 +1413,7 @@ void Session::on_integration_failure(const IntegrationException& error)
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
 
     m_client_error = util::make_optional<IntegrationException>(error);
+    m_error_to_send = true;
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1617,8 +1615,11 @@ void Session::send_message()
         return;
     }
 
-    if (m_client_error)
+    if (m_error_to_send)
         return send_json_error_message(); // Throws
+
+    if (m_connection_to_close)
+        return close_connection(); // Throws
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -1926,6 +1927,8 @@ void Session::send_json_error_message()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_error_to_send);
+    REALM_ASSERT(m_client_error);
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
@@ -1940,12 +1943,23 @@ void Session::send_json_error_message()
     error_body_json["message"] = message;
     protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
 
-    auto handler = [this, ec, message]() {
-        // Close the connection after the message is sent.
-        m_conn.close_due_to_protocol_error(ec, message);
-    };
-    m_conn.initiate_write_message(out, this, std::move(handler)); // Throws
+    m_conn.initiate_write_message(out, this); // Throws
 
+    m_error_to_send = false;
+    m_connection_to_close = true;
+}
+
+
+void Session::close_connection()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_connection_to_close);
+    REALM_ASSERT(m_client_error);
+
+    m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
+    m_connection_to_close = false;
     m_client_error = util::none;
 }
 

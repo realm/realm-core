@@ -438,8 +438,7 @@ private:
     void handle_ping_delay();
     void initiate_pong_timeout();
     void handle_pong_timeout();
-    void initiate_write_message(const OutputBuffer&, Session*,
-                                util::UniqueFunction<void()>&& on_message_sent = nullptr);
+    void initiate_write_message(const OutputBuffer&, Session*);
     void handle_write_message();
     void send_next_message();
     void send_ping();
@@ -923,6 +922,8 @@ private:
     int64_t m_last_sent_flx_query_version = 0;
 
     util::Optional<IntegrationException> m_client_error;
+    bool m_error_to_send;
+    bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1050,6 +1051,7 @@ private:
     void complete_deactivation();
     void connection_established(bool fast_reconnect);
     void connection_lost();
+    void close_connection();
     void send_message();
     void message_sent();
     void send_bind_message();
@@ -1430,6 +1432,8 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
+    m_connection_to_close                 = false;
+    m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
