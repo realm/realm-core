@@ -26,6 +26,9 @@ CMakeScripts
 /build*
 /debug*
 
+# Ignore unit test result files
+*results.xml
+
 # Ignore all user files except one which includes execution path for test
 *.user
 !Realm.vcxproj.user
