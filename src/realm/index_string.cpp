@@ -512,6 +512,8 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
     key_type key = StringIndex::create_key(index_data, stringoffset);
 
     for (;;) {
+        std::cout << "\t\t\t\tIndexArray::index_string_all(" << value << ") stringoffset: " << stringoffset
+                  << std::endl;
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
 

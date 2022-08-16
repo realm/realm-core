@@ -151,6 +151,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 #include <numeric>
 #include <algorithm>
+#include <iostream>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -1784,6 +1785,7 @@ public:
             ret.insert(ret.end(), ndxs.begin(), ndxs.end());
         }
 
+        std::cout << "\t\t\tObjPropertyExpr::find_all() returning results: " << ret.size() << std::endl;
         return ret;
     }
 
@@ -4078,6 +4080,7 @@ public:
                             // column, we cannot use the index
                             return dT;
                         }
+                        std::cout << "\t\t\twill find_all(" << const_value << ") for indexed column " << std::endl;
                         m_matches = column->find_all(const_value);
                     }
                     // Sort
