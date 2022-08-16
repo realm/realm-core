@@ -1769,6 +1769,7 @@ public:
                 result.push_back(k);
         }
         else {
+            std::cout << "\t\t\tObjPropertyExpr::find_all() getting string index" << std::endl;
             StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
             REALM_ASSERT(index);
             if (value.is_null()) {
@@ -1776,7 +1777,10 @@ public:
             }
             else {
                 T val = value.get<T>();
+                std::cout << "\t\t\tObjPropertyExpr::find_all() finding " << val << " in index" << std::endl;
                 index->find_all(result, val);
+                std::cout << "\t\t\tObjPropertyExpr::find_all() returned with results: " << result.size()
+                          << std::endl;
             }
         }
 

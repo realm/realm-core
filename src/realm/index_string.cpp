@@ -19,9 +19,7 @@
 #include <cstdio>
 #include <iomanip>
 
-#ifdef REALM_DEBUG
 #include <iostream>
-#endif
 
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
