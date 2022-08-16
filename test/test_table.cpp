@@ -4312,7 +4312,7 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
     }
 }
 
-TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
+ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
            Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Prop<UUID>, Nullable<Int>, Nullable<double>,
            Nullable<float>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>,
            Nullable<Decimal128>, Nullable<UUID>, Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>,

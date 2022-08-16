@@ -608,7 +608,13 @@ int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
 
     long num_open_files = get_num_open_files();
 
-    bool success = run_tests(logger);
+    bool success = false;
+    try {
+        success = run_tests(logger);
+    }
+    catch (const std::exception& e) {
+        std::cout << "run tests uncaught exception: " << e.what() << std::endl;
+    }
 
     if (num_open_files >= 0) {
         long num_open_files_2 = get_num_open_files();
