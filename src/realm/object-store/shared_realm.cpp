@@ -295,7 +295,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
-            return false;
+            return m_schema_version == ObjectStore::NotVersioned;
 
         case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
@@ -436,7 +436,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;

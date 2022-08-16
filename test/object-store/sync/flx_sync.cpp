@@ -89,8 +89,6 @@ const Schema g_simple_embedded_obj_schema{
      }},
 };
 
-// Reenable when needed by tests currently disabled
-#if 0
 // Populates a FLXSyncTestHarness with the g_large_array_schema with objects that are large enough that
 // they are guaranteed to fill multiple bootstrap download messages. Currently this means generating 5
 // objects each with 1024 array entries of 1024 bytes each.
@@ -118,7 +116,6 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
     });
     return ret;
 }
-#endif
 
 void wait_for_advance(const SharedRealm& realm)
 {
@@ -989,7 +986,6 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     });
 }
 
-#if 0
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
@@ -1063,7 +1059,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     REQUIRE(active_subs.version() == latest_subs.version());
     REQUIRE(active_subs.version() == int64_t(1));
 }
-#endif
 
 TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
@@ -1424,8 +1419,6 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     REQUIRE(seen_waiting_for_access_token);
 }
 
-// TODO Re-enable this test in RCORE-1150
-#if 0
 TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
@@ -1457,6 +1450,71 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             res.clear();
         });
     };
+
+    SECTION("exception occurs during bootstrap application") {
+        {
+            auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+            Realm::Config config = interrupted_realm_config;
+            config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
+            auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
+            config.sync_config->on_bootstrap_message_processed_hook =
+                [promise = std::move(shared_promise)](std::weak_ptr<SyncSession> weak_session,
+                                                      const sync::SyncProgress&, int64_t query_version,
+                                                      sync::DownloadBatchState batch_state) mutable {
+                    auto session = weak_session.lock();
+                    if (!session) {
+                        return true;
+                    }
+
+                    if (query_version == 1 && batch_state == sync::DownloadBatchState::LastInBatch) {
+                        session->close();
+                        promise->emplace_value();
+                        return false;
+                    }
+                    return true;
+                };
+            auto realm = Realm::get_shared_realm(config);
+            {
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                mut_subs.insert_or_assign(Query(table));
+                std::move(mut_subs).commit();
+            }
+
+            interrupted.get();
+            realm->sync_session()->shutdown_and_wait();
+            realm->close();
+        }
+
+        _impl::RealmCoordinator::clear_all_caches();
+
+        // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
+        // we expected it to be in.
+        {
+            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+            util::StderrLogger logger;
+            sync::PendingBootstrapStore bootstrap_store(realm, &logger);
+            REQUIRE(bootstrap_store.has_pending());
+            auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
+            REQUIRE(pending_batch.query_version == 1);
+            REQUIRE(pending_batch.progress);
+
+            check_interrupted_state(realm);
+        }
+
+        interrupted_realm_config.sync_config->simulate_integration_error = true;
+        auto error_pf = util::make_promise_future<SyncError>();
+        interrupted_realm_config.sync_config->error_handler =
+            [promise = std::make_shared<util::Promise<SyncError>>(std::move(error_pf.promise))](
+                std::shared_ptr<SyncSession>, SyncError error) {
+                promise->emplace_value(std::move(error));
+            };
+
+        auto realm = Realm::get_shared_realm(interrupted_realm_config);
+        const auto& error = error_pf.future.get();
+        REQUIRE(error.is_fatal);
+        REQUIRE(error.error_code == make_error_code(sync::ClientError::bad_changeset));
+    }
 
     SECTION("interrupted before final bootstrap message") {
         {
@@ -1647,7 +1705,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         }
     }
 }
-#endif
 
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     static auto server_schema = [] {

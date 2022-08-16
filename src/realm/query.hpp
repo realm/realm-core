@@ -250,13 +250,13 @@ public:
 
 
     // Searching
-    ObjKey find();
-    TableView find_all(size_t limit = size_t(-1));
+    ObjKey find() const;
+    TableView find_all(size_t limit = size_t(-1)) const;
 
     // Aggregates
     size_t count() const;
-    TableView find_all(const DescriptorOrdering& descriptor);
-    size_t count(const DescriptorOrdering& descriptor);
+    TableView find_all(const DescriptorOrdering& descriptor) const;
+    size_t count(const DescriptorOrdering& descriptor) const;
     int64_t sum_int(ColKey column_key) const;
     double average_int(ColKey column_key, size_t* resultcount = nullptr) const;
     int64_t maximum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
@@ -281,7 +281,7 @@ public:
     Decimal128 average_mixed(ColKey column_key, size_t* resultcount = nullptr) const;
 
     // Deletion
-    size_t remove();
+    size_t remove() const;
 
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
@@ -320,7 +320,7 @@ public:
     // or empty vector if the query is not associated with a table.
     TableVersions sync_view_if_needed() const;
 
-    std::string validate();
+    std::string validate() const;
 
     std::string get_description(const std::string& class_prefix = "") const;
     std::string get_description(util::serializer::SerialisationState& state) const;

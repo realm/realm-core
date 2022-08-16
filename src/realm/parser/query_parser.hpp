@@ -146,11 +146,6 @@ public:
     {
         return m_count;
     }
-
-    // dynamic conversion space with lifetime tied to this
-    // it is used for storing literal binary/string data
-    std::vector<OwnedData> buffer_space;
-
 protected:
     void verify_ndx(size_t ndx) const
     {

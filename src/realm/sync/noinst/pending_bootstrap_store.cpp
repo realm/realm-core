@@ -120,7 +120,8 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger* logger)
 }
 
 void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
-                                      const _impl::ClientProtocol::ReceivedChangesets& changesets)
+                                      const _impl::ClientProtocol::ReceivedChangesets& changesets,
+                                      bool* created_new_batch_out)
 {
     std::vector<util::AppendBuffer<char>> compressed_changesets;
     compressed_changesets.reserve(changesets.size());
@@ -168,6 +169,10 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     tr->commit();
+
+    if (created_new_batch_out) {
+        *created_new_batch_out = did_create;
+    }
 
     if (did_create) {
         m_logger->trace("Created new pending bootstrap object for query version %1", query_version);

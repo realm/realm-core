@@ -154,6 +154,7 @@ static std::vector<std::string> valid_queries = {
     "'a'CONTAINS[c]b",
     "0 BeGiNsWiTh 0",
     "0 ENDSWITH 0",
+    "desc CONTAINS[c] $0",
     "in in 'in'",
     "contains contains 'contains'",
     "beginswith beginswith 'beginswith'",
@@ -4022,7 +4023,7 @@ TEST(Parser_ListVsList)
 
     // None of {1, 2, 3} matches all of integers
     verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
-    verify_query(test_context, table, "ALL integers == ANY {1, 2, 3}", 1);
+    verify_query(test_context, table, "ALL integers == ANY {2, 1, 3}", 1);
     verify_query(test_context, table, "{7, 3, 8, 0} < integers", 1);
 
     TableView tv;
@@ -4119,8 +4120,13 @@ TEST(Parser_OddColumnNames)
     auto int_col_key = table->add_column(type_Int, "age", true);
     auto between_col_key = table->add_column(type_Int, "between", true);
     auto in_col_key = table->add_column(type_Int, "in", true);
+    auto desc_col_key = table->add_column(type_String, "desc", true);
     for (int i = 0; i < 3; ++i) {
-        table->create_object().set(int_col_key, i + 24).set(between_col_key, i).set(in_col_key, i + 100);
+        table->create_object()
+            .set(int_col_key, i + 24)
+            .set(between_col_key, i)
+            .set(in_col_key, i + 100)
+            .set(desc_col_key, "Empty");
     }
 
     // normal querying on a property named "between" is allowed.
@@ -4132,6 +4138,9 @@ TEST(Parser_OddColumnNames)
     verify_query(test_context, table, "in == 100", 1);
     verify_query(test_context, table, "in > 100", 2);
     verify_query(test_context, table, "in <= 103", 3);
+
+    // normal querying on a property named "desc" is allowed.
+    verify_query(test_context, table, "desc CONTAINS[c] 'empty'", 3);
 
     verify_query(test_context, table, "age between {24, 26}", 3);
 
