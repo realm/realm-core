@@ -4362,8 +4362,9 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
               << " num_default_non_nullables: " << num_default_non_nullables << std::endl;
 
     for (underlying_type v : values) {
-        std::cout << "\t queries for value: " << v << std::endl;
         const size_t num_expected = (v == default_non_null_value ? num_default_non_nullables : 1);
+        std::cout << "\t queries for value: " << v << " expected " << num_expected << std::endl;
+
         Query q0 = t->column<underlying_type>(col0) == v;
         CHECK_EQUAL(q0.count(), num_expected);
         Query q1 = t->link(col_link).column<underlying_type>(col0) == v;

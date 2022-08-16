@@ -30,7 +30,7 @@
 #include <realm/array_integer_tpl.hpp>
 
 #include <algorithm>
-
+#include <iostream>
 
 using namespace realm;
 using namespace realm::metrics;
@@ -1616,7 +1616,10 @@ size_t Query::count() const
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
-    return do_count();
+    std::cout << "\t\tcount() for query: " << this->get_description() << std::endl;
+    size_t result = do_count();
+    std::cout << "\t\tcount() is: " << result << std::endl;
+    return result;
 }
 
 TableView Query::find_all(const DescriptorOrdering& descriptor) const
