@@ -4321,6 +4321,7 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
+    std::cout << "Begin Table_QuerySearchEqualsNull" << std::endl;
     TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
@@ -4330,6 +4331,7 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
 
     if constexpr (TEST_TYPE::is_indexed) {
         t->add_search_index(col0);
+        std::cout << "index added" << std::endl;
     }
 
     std::vector<underlying_type> values = gen.values_from_int<underlying_type>({9, 4, 2, 7});
@@ -4356,7 +4358,11 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
     constexpr size_t num_nulls = TEST_TYPE::is_nullable ? num_defaults_added : 0;
     constexpr size_t num_default_non_nullables = TEST_TYPE::is_nullable ? 1 : num_defaults_added + 1;
 
+    std::cout << "creation success; num_nulls: " << num_nulls
+              << " num_default_non_nullables: " << num_default_non_nullables << std::endl;
+
     for (underlying_type v : values) {
+        std::cout << "\t queries for value: " << v << std::endl;
         const size_t num_expected = (v == default_non_null_value ? num_default_non_nullables : 1);
         Query q0 = t->column<underlying_type>(col0) == v;
         CHECK_EQUAL(q0.count(), num_expected);
@@ -4369,7 +4375,7 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
         Query q4 = t->column<Lst<underlying_type>>(col1) == v;
         CHECK_EQUAL(q4.count(), 1);
     }
-
+    std::cout << "\t final queries...";
     {
         Query q0 = t->column<underlying_type>(col0) == realm::null();
         CHECK_EQUAL(q0.count(), num_nulls);
@@ -4384,6 +4390,7 @@ ONLY_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
         Query q5 = t->link(col_link).link(col_link).column<underlying_type>(col0) == default_non_null_value;
         CHECK_EQUAL(q5.count(), num_default_non_nullables);
     }
+    std::cout << "success in Table_QuerySearchEqualsNull" << std::endl;
 }
 
 namespace {
