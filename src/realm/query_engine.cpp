@@ -729,6 +729,7 @@ void ExpressionNode::cluster_changed()
 
 void ExpressionNode::init(bool will_query_ranges)
 {
+    std::cout << "\t\t\ExpressionNode::init()" << std::endl;
     ParentNode::init(will_query_ranges);
     m_dT = m_expression->init();
 }

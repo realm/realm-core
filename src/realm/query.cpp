@@ -1873,6 +1873,7 @@ void Query::init() const
 {
     m_table.check();
     if (ParentNode* root = root_node()) {
+        std::cout << "\t\t\Query::init()" << std::endl;
         root->init(m_view == nullptr);
         std::vector<ParentNode*> vec;
         root->gather_children(vec);

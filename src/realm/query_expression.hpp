@@ -4049,8 +4049,13 @@ public:
 
     double init() override
     {
+        std::cout << "\t\t\tCompare::init()" << std::endl;
+
         double dT = 50.0;
         if ((m_left->has_single_value()) || (m_right->has_single_value())) {
+            std::cout << "\t\t\tCompare::init() has single value: (" << m_left->has_single_value() << ", "
+                      << m_right->has_single_value() << ")" << std::endl;
+
             dT = 10.0;
             if constexpr (std::is_same_v<TCond, Equal>) {
                 // If the property not being constant has a search index we can speed things up by
@@ -4065,9 +4070,13 @@ public:
                     const_value = m_right->get_mixed();
                     column = m_left.get();
                 }
+                std::cout << "\t\t\tCompare::init() loaded const and column values" << std::endl;
 
                 if (column->has_search_index() && *column->get_comparison_type() == ExpressionComparisonType::Any) {
+                    std::cout << "\t\t\tCompare::init() will try optimization" << std::endl;
+
                     if (const_value.is_null()) {
+                        std::cout << "\t\t\tCompare::init() const_value is null" << std::endl;
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,
                         // so we must compute the slow matching even if there is an index.
@@ -4079,7 +4088,10 @@ public:
                         }
                     }
                     else {
+                        std::cout << "\t\t\tCompare::init() const_value is not null" << std::endl;
+
                         if (column->get_type() != const_value.get_type()) {
+                            std::cout << "\t\t\tCompare::init() type mismatch, bailing early" << std::endl;
                             // If the type we are looking for is not the same type as the target
                             // column, we cannot use the index
                             return dT;
