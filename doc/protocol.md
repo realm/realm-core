@@ -576,9 +576,9 @@ must be a nonnegative integer strictly less than 2^63.
     head  =  'json_error' <error_code> <message size> <session ident>
     body  =  <message>
 
-Introduced in protocol version 4.
+Introduced in protocol version 7.
 When the client encounters an error that appears to be caused by the connected server,
-it will send an [JSON_ERROR](#json_error)  message to that server.
+it will send an [JSON_ERROR](#json_error)  message to the server.
 
 The body of the message will be in JSON format with the following keys currently supported:
     - `message` is a detailed description of the error.
