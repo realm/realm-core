@@ -493,6 +493,14 @@ struct realm_callback_token_schema : realm_callback_token {
     ~realm_callback_token_schema() override;
 };
 
+struct realm_refresh_callback_token : realm_callback_token {
+    realm_refresh_callback_token(realm_t* realm, uint64_t token)
+        : realm_callback_token(realm, token)
+    {
+    }
+    ~realm_refresh_callback_token() override;
+};
+
 struct realm_query : realm::c_api::WrapC {
     realm::Query query;
     std::weak_ptr<realm::Realm> weak_realm;

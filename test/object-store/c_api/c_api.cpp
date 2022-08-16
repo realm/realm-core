@@ -1056,6 +1056,146 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
+    SECTION("realm refresh registering callback outside transaction") {
+        bool realm_refresh_callback_called = false;
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+        realm_begin_write(realm);
+        realm_commit(realm);
+        CHECK_FALSE(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh registering callback in transaction") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_write(realm);
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+        realm_commit(realm);
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh async pending") {
+        bool realm_refresh_callback_called = false;
+        // bool on_transaction_completed = false;
+        bool done = false;
+        auto wait_for_done = [&]() {
+            util::EventLoop::main().run_until([&] {
+                return done;
+            });
+            REQUIRE(done);
+        };
+        (*realm)->async_begin_transaction([&]() {
+            auto token = cptr(realm_add_realm_refresh_callback(
+                realm,
+                [](void* userdata) {
+                    *reinterpret_cast<bool*>(userdata) = true;
+                },
+                &realm_refresh_callback_called, [](void*) {}));
+
+            (*realm)->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+
+
+        wait_for_done();
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm async refresh - main use case") {
+        bool realm_refresh_callback_called = false;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+
+        realm_refresh(realm2.get());
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm async refresh - main use case, multiple callbacks") {
+        std::atomic_int counter = 0;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto f = [](void* userdata) {
+            auto ptr = reinterpret_cast<std::atomic_int*>(userdata);
+            ptr->fetch_add(1);
+        };
+        auto token1 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        auto token2 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+        realm_refresh(realm2.get());
+        CHECK(counter.load() == 2);
+    }
+
+    SECTION("realm refresh read transaction frozen - register on unfrozen realm") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(!realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh read transaction frozen - register on frozen realm") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(token == nullptr);
+        CHECK(!realm_refresh_callback_called);
+    }
+
     SECTION("schema is set after opening") {
         const realm_class_info_t baz = {
             "baz",
