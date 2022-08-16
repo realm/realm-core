@@ -55,7 +55,7 @@ void ClientProtocol::make_query_change_message(OutputBuffer& out, session_ident_
 void ClientProtocol::make_json_error_message(OutputBuffer& out, session_ident_type session, int error_code,
                                              std::string_view error_body)
 {
-    out << "json_error " << error_code << " " << error_body.size() << session << "\n" << error_body; // throws
+    out << "json_error " << error_code << " " << error_body.size() << " " << session << "\n" << error_body; // throws
     REALM_ASSERT(!out.fail());
 }
 

@@ -123,6 +123,28 @@ void wait_for_advance(const SharedRealm& realm)
         return !TestHelper::can_advance(realm);
     });
 }
+
+// Returns true if `err` is among the erros received from the server, false otherwise.
+bool wait_for_error(const AppSession& app_session, const std::string& err)
+{
+    bool error_found = false;
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            auto errors = app_session.admin_api.get_errors(app_session.server_app_id);
+            auto it = std::find_if(errors.begin(), errors.end(), [&err](const auto& error) {
+                return err == error;
+            });
+
+            if (it == errors.end()) {
+                millisleep(200); // don't spam the server too much
+            }
+            error_found = it != errors.end();
+            return error_found;
+        },
+        std::chrono::seconds(1));
+
+    return error_found;
+}
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -1867,6 +1889,10 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             });
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
+
+        REQUIRE(wait_for_error(harness->session().app_session(),
+                               "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
+                               "on one side, but not on the other. (ProtocolErrorCode=112)"));
     }
 
     SECTION("basic embedded object construction") {
@@ -1967,6 +1993,46 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
         schema);
 }
 #endif
+
+TEST_CASE("flx: send client error", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_client_error");
+
+    // Bootstrap.
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.sync_config->simulate_integration_error = true;
+    auto&& [error_future, err_handler] = make_error_handler();
+    config.sync_config->error_handler = err_handler;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+    new_query.insert_or_assign(Query(table));
+    std::move(new_query).commit();
+
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    // Upload some changes from a new realm.
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                         {"queryable_str_field", std::string{"bar"}},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
+    });
+
+    // The bootstrapped realm now downloads the changes uploaded by the other realm.
+    // While integrating the latest changes, an error is simulated.
+    // This results in the client sending an error message to the server.
+    wait_for_download(*realm);
+
+    REQUIRE(wait_for_error(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
+}
 
 } // namespace realm::app
 
