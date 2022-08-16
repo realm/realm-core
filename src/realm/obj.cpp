@@ -1962,25 +1962,54 @@ void Obj::assign(const Obj& other)
 
 void Obj::dup_and_handle_multiple_backlinks()
 {
+    REALM_ASSERT(!m_table->get_primary_key_column());
+
     auto copy_links = [this](ColKey col) {
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
-
         for (auto bl : backlinks) {
             auto obj = m_table->create_object();
             obj.copy_other_object(*this);
+
             auto linking_obj = t->get_object(bl);
-            if (c.get_type() == col_type_Link) {
+
+            // the central piece that is missing is how we handle if there are multiple
+            // embedded objects that are parent of the one just created.
+
+
+            // backlink from list
+            if (c.get_type() == col_type_LinkList) {
+                auto linking_obj_list = linking_obj.get_linklist(c);
+                auto n = linking_obj_list.find_first(get_key());
+                REALM_ASSERT(n != realm::npos);
+                linking_obj_list.set(n, obj.get_key());
+            }
+            // backlink from set
+            else if (c.get_attrs().test(col_attr_Set)) {
+                auto linking_obj_set = linking_obj.get_setbase_ptr(c);
+                REALM_ASSERT(linking_obj_set);
+                linking_obj_set->insert_any(obj.get_key());
+            }
+            // backlink from dictionary
+            else if (c.get_attrs().test(col_attr_Dictionary)) {
+                auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(c);
+                REALM_ASSERT(linking_obj_dictionary);
+                auto pos = linking_obj_dictionary->find_any(get_key());
+                REALM_ASSERT(pos != realm::npos);
+                Mixed key = linking_obj_dictionary->get_key(pos);
+                linking_obj_dictionary->insert(key, obj.get_key());
+            }
+            // backlink from mixed
+            else if (c.get_type() == col_type_Mixed && linking_obj.get_any(c).get_type() == type_TypedLink) {
+                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
+                linking_obj.set_any(c, obj.get_key());
+            }
+            // normal backlink
+            else if (c.get_type() == col_type_Link) {
                 // Single link
                 REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
                 linking_obj.set(c, obj.get_key());
-            }
-            else {
-                auto l = linking_obj.get_linklist(c);
-                auto n = l.find_first(get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, obj.get_key());
             }
         }
         return false;
@@ -2001,6 +2030,26 @@ void Obj::copy_other_object(const Obj& other)
             for (size_t i = 0; i < sz; i++) {
                 Mixed val = src_list->get_any(i);
                 dst_list->insert_any(i, val);
+            }
+        }
+        else if (col.get_attrs().test(col_attr_Set)) {
+            auto src_set = other.get_setbase_ptr(col);
+            auto dst_set = get_setbase_ptr(col);
+            auto sz = src_set->size();
+            dst_set->clear();
+            for (size_t i = 0; i < sz; ++i) {
+                Mixed val = src_set->get_any(i);
+                dst_set->insert_any(val);
+            }
+        }
+        else if (col.get_attrs().test(col_attr_Dictionary)) {
+            auto src_dictionary = other.get_dictionary_ptr(col);
+            auto dst_dictionary = get_dictionary_ptr(col);
+            auto sz = src_dictionary->size();
+            dst_dictionary->clear();
+            for (size_t i = 0; i < sz; ++i) {
+                const auto& [key, value] = src_dictionary->get_pair(i);
+                dst_dictionary->insert(key, value);
             }
         }
         else {

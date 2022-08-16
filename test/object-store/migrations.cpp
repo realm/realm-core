@@ -1165,6 +1165,88 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE(parent_table->size() == 1);
         }
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary "
+                "verification") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {"child_table",
+                 {{"value", PropertyType::Int},
+                  {"value_dict", PropertyType::Dictionary | PropertyType::Int},
+                  {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                   "target"}}},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            ColKey col_dict_value = child_table->get_column_key("value_dict");
+            ColKey col_dict_links = child_table->get_column_key("links_dict");
+            object_store::Dictionary dict_vals(realm, child_object, col_dict_value);
+            dict_vals.insert("test", 10);
+
+            auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
+            Obj target_object = target_table->create_object();
+            target_object.set("value", 10);
+            object_store::Dictionary dict_links(realm, child_object, col_dict_links);
+            dict_links.insert("link", target_object.get_key());
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            parent_table->create_object().set_all(child_object_key);
+            parent_table->create_object().set_all(child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(dict_vals.size() == 1);
+            REQUIRE(dict_links.size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                REQUIRE(value == 42);
+                auto value_dictionary = util::any_cast<object_store::Dictionary>(
+                    child_object.get_property_value<util::Any>(context, "value_dict"));
+                REQUIRE(value_dictionary.size() == 1);
+                auto pair_val = value_dictionary.get_pair(0);
+                REQUIRE(pair_val.first == "test");
+                REQUIRE(pair_val.second == 10);
+                auto links_dictionary = util::any_cast<object_store::Dictionary>(
+                    child_object.get_property_value<util::Any>(context, "links_dict"));
+                REQUIRE(links_dictionary.size() == 1);
+                auto pair_link = links_dictionary.get_pair(0);
+                REQUIRE(pair_link.first == "link");
+                REQUIRE_FALSE(pair_link.second.is_unresolved_link());
+                REQUIRE(pair_link.second.get<ObjKey>() == target_object.get_key());
+            }
+        }
     }
 
     SECTION("schema correctness during migration") {
