@@ -4072,7 +4072,9 @@ public:
                 }
                 std::cout << "\t\t\tCompare::init() loaded const and column values" << std::endl;
 
-                if (column->has_search_index() && *column->get_comparison_type() == ExpressionComparisonType::Any) {
+                if (column->has_search_index() &&
+                    column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                        ExpressionComparisonType::Any) {
                     std::cout << "\t\t\tCompare::init() will try optimization" << std::endl;
 
                     if (const_value.is_null()) {
