@@ -22,6 +22,7 @@
 #endif
 
 #include <ctime>
+#include <csignal>
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
@@ -545,6 +546,16 @@ bool run_tests(util::Logger* logger)
 } // anonymous namespace
 
 
+static std::stringstream s_ss;
+static void signal_handler(int signal)
+{
+    std::cout << "signal handler: " << signal << std::endl;
+    util::Backtrace::capture().print(s_ss);
+    std::cout << "trace: " << s_ss.str() << std::endl;
+    exit(signal);
+}
+
+
 int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
 {
     // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
@@ -579,6 +590,13 @@ int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
     set_test_path_prefix(path);
 #endif
 #endif
+
+    std::signal(SIGTERM, signal_handler);
+    std::signal(SIGSEGV, signal_handler);
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGILL, signal_handler);
+    std::signal(SIGABRT, signal_handler);
+    std::signal(SIGFPE, signal_handler);
 
     set_random_seed();
     set_always_encrypt();

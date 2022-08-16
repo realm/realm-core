@@ -643,7 +643,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 def prefix = "Windows-${platform}-${buildType}";
                 // On Windows we run out of address space when running the core or sync tests in parallel, so use 1 test thread
                 def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1', 'UNITTEST_THREADS=1']
-                withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\core-results.xml", "UNITTEST_SUITE_NAME=${prefix}-core"]) {
+                withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\core-results.xml", "UNITTEST_SUITE_NAME=${prefix}-core", "UNITTEST_RANDOM_SEED=0"]) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
