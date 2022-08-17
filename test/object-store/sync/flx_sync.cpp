@@ -1997,7 +1997,8 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
 TEST_CASE("flx: send client error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_client_error");
 
-    // Bootstrap.
+    // An integration error is simulated while bootstrapping.
+    // This results in the client sending an error message to the server.
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->simulate_integration_error = true;
     auto&& [error_future, err_handler] = make_error_handler();
@@ -2008,27 +2009,6 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     new_query.insert_or_assign(Query(table));
     std::move(new_query).commit();
 
-    wait_for_upload(*realm);
-    wait_for_download(*realm);
-
-    // Upload some changes from a new realm.
-    harness.load_initial_data([&](SharedRealm realm) {
-        CppContext c(realm);
-        Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{{"_id", ObjectId::gen()},
-                                         {"queryable_str_field", std::string{"foo"}},
-                                         {"queryable_int_field", static_cast<int64_t>(5)},
-                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
-        Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{{"_id", ObjectId::gen()},
-                                         {"queryable_str_field", std::string{"bar"}},
-                                         {"queryable_int_field", static_cast<int64_t>(10)},
-                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
-    });
-
-    // The bootstrapped realm now downloads the changes uploaded by the other realm.
-    // While integrating the latest changes, an error is simulated.
-    // This results in the client sending an error message to the server.
     wait_for_download(*realm);
 
     REQUIRE(wait_for_error(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
