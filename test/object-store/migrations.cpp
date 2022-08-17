@@ -1170,11 +1170,15 @@ TEST_CASE("migration: Automatic") {
             InMemoryTestFile config;
             config.automatic_handle_backlicks_in_migrations = true;
             Schema schema = {
-                {"child_table",
-                 {{"value", PropertyType::Int},
-                  {"value_dict", PropertyType::Dictionary | PropertyType::Int},
-                  {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
-                   "target"}}},
+                {
+                    "child_table",
+                    {{"value", PropertyType::Int},
+                     {"value_dict", PropertyType::Dictionary | PropertyType::Int},
+                     {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                      "target"},
+                     {"value_set", PropertyType::Set | PropertyType::Int},
+                     {"links_set", PropertyType::Set | PropertyType::Object, "target"}},
+                },
                 {"parent_table",
                  {
                      {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
@@ -1192,14 +1196,22 @@ TEST_CASE("migration: Automatic") {
             child_object.set("value", 42);
             ColKey col_dict_value = child_table->get_column_key("value_dict");
             ColKey col_dict_links = child_table->get_column_key("links_dict");
+            ColKey col_set_value = child_table->get_column_key("value_set");
+            ColKey col_set_links = child_table->get_column_key("links_set");
             object_store::Dictionary dict_vals(realm, child_object, col_dict_value);
             dict_vals.insert("test", 10);
+            object_store::Set set_vals(realm, child_object, col_set_value);
+            set_vals.insert(10);
+            set_vals.insert(11);
+            set_vals.insert(9);
 
             auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
             Obj target_object = target_table->create_object();
             target_object.set("value", 10);
             object_store::Dictionary dict_links(realm, child_object, col_dict_links);
             dict_links.insert("link", target_object.get_key());
+            object_store::Set set_links(realm, child_object, col_set_links);
+            set_links.insert(target_object.get_key());
 
             auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
@@ -1211,6 +1223,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(target_table->size() == 1);
             REQUIRE(dict_vals.size() == 1);
             REQUIRE(dict_links.size() == 1);
+            REQUIRE(set_vals.size() == 3);
+            REQUIRE(set_links.size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
             REQUIRE_FALSE(parent_table->is_embedded());
             REQUIRE_FALSE(target_table->is_embedded());
@@ -1245,6 +1259,18 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(pair_link.first == "link");
                 REQUIRE_FALSE(pair_link.second.is_unresolved_link());
                 REQUIRE(pair_link.second.get<ObjKey>() == target_object.get_key());
+
+
+                auto value_set = util::any_cast<object_store::Set>(
+                    child_object.get_property_value<util::Any>(context, "value_set"));
+                REQUIRE(value_set.size() == 3);
+                REQUIRE(value_set.get_any(0) == 9);
+                REQUIRE(value_set.get_any(1) == 10);
+                REQUIRE(value_set.get_any(2) == 11);
+                auto links_set = util::any_cast<object_store::Set>(
+                    child_object.get_property_value<util::Any>(context, "links_set"));
+                REQUIRE(links_set.size() == 1);
+                REQUIRE(links_set.get_any(0).get<ObjKey>() == target_object.get_key());
             }
         }
     }
