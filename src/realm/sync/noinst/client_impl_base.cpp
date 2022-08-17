@@ -1947,6 +1947,9 @@ void Session::send_json_error_message()
 
     m_error_to_send = false;
     m_connection_to_close = true;
+
+    // Connection is waiting to be closed
+    enlist_to_send(); // Throws
 }
 
 
