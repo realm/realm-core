@@ -12,6 +12,7 @@
 * Improve performance when a new Realm file connects to the server for the first time, especially when significant amounts of data has been written while offline.
 * Shift more of the work done on the sync worker thread out of the write transaction used to apply server changes, reducing how long it blocks other threads from writing.
 * Improve the performance of the sync changeset parser, which speeds up applying changesets from the server.
+* Sync client sends integration errors to the server. ([PR #5719](https://github.com/realm/realm-core/pull/5719)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -35,6 +36,7 @@
 ### Internals
 * `util::Any` is now just a typedef for `std::any`. `util::any_cast()` remains for deployment support on older Apple platforms. Outside of niche ADL implications, this should not have any visible effects. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
 * Use correct endpoints for checking if sync has been terminated in client reset tests ([#5815](https://github.com/realm/realm-core/pull/5815))
+* The sync protocol is now version 7.
 
 ----------------------------------------------
 
