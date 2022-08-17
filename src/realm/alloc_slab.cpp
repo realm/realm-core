@@ -751,6 +751,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
+    size_t expected_size = size_t(-1);
     try {
         note_reader_start(this);
         // we'll read header and (potentially) footer
@@ -806,6 +807,21 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
             }
         }
+        if (top_ref) {
+            // Get the expected file size by looking up logical file size stored in top array
+            constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
+            constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
+            size_t top_page_base = top_ref & ~(page_size() - 1);
+            size_t top_offset = top_ref - top_page_base;
+            size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
+            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0);
+            realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
+            auto top_header = map_top.get_addr() + top_offset;
+            auto top_data = NodeHeader::get_data_from_header(top_header);
+            auto w = NodeHeader::get_width_from_header(top_header);
+            auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
+            expected_size = round_up_to_page_size(logical_size);
+        }
     }
     catch (const DecryptionFailed&) {
         note_reader_end(this);
@@ -832,6 +848,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
+    // Check if we can shrink the file
+    if (cfg.session_initiator && expected_size < size) {
+        m_file.resize(expected_size);
+        size = expected_size;
+    }
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
     if (size != round_up_to_page_size(size)) {

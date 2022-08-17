@@ -901,7 +901,9 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     }
 
     if (schema_version == ObjectStore::NotVersioned) {
-        create_initial_tables(group, changes);
+        if (mode != SchemaMode::ReadOnly) {
+            create_initial_tables(group, changes);
+        }
         set_schema_version(group, target_schema_version);
         set_schema_keys(group, target_schema);
         return;

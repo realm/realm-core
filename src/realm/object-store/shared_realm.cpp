@@ -436,7 +436,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
@@ -610,6 +611,7 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
+    REALM_ASSERT(m_transaction);
     return m_transaction->get_version_of_current_transaction();
 }
 
@@ -638,6 +640,16 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
+    }
+    return ret;
+}
+
+// Get the version of the latest snapshot
+util::Optional<DB::version_type> Realm::latest_snapshot_version() const
+{
+    util::Optional<DB::version_type> ret;
+    if (m_transaction) {
+        ret = m_transaction->get_version_of_latest_snapshot();
     }
     return ret;
 }

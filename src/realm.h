@@ -365,12 +365,14 @@ typedef enum realm_property_flags {
 /* Notification types */
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
+typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
 typedef void (*realm_callback_error_func_t)(realm_userdata_t userdata, const realm_async_error_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
+typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
 
 /**
  * Callback for realm schema changed notifications.
@@ -924,22 +926,31 @@ RLM_API realm_t* realm_open(const realm_config_t* config);
 /**
  * Copy or convert a Realm using a config.
  *
- * If the file already exists, data will be copied over object per object.
+ * If the file already exists and merge_with_existing is true, data will be copied over object per object.
+ * When merging, all classes must have a pk called '_id" otherwise an exception is thrown.
+ * If the file exists and merge_with_existing is false, an exception is thrown.
  * If the file does not exist, the realm file will be exported to the new location and if the
  * configuration object contains a sync part, a sync history will be synthesized.
  *
  * @param config The realm configuration that should be used to create a copy.
  *               This can be a local or a synced Realm, encrypted or not.
+ * @param merge_with_existing If this is true and the destination file exists, data will be copied over object by
+ * object. Otherwise, if this is false and the destination file exists, an exception is thrown.
  */
-RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config);
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config, bool merge_with_existing);
 /**
  * Copy a Realm using a path.
  *
  * @param path The path the realm should be copied to. Local realms will remain local, synced
  *             realms will remain synced realms.
  * @param encryption_key The optional encryption key for the new realm.
+ * @param merge_with_existing If this is true and the destination file exists, data will be copied over object by
+ object.
+ *  Otherwise, if this is false and the destination file exists, an exception is thrown.
+
  */
-RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key);
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key,
+                                     bool merge_with_existing);
 
 /**
  * Deletes the following files for the given `realm_file_path` if they exist:
@@ -1066,6 +1077,15 @@ RLM_API bool realm_rollback(realm_t*);
 RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
+
+/**
+ * Add a callback that will be invoked the first time that the given realm is refreshed to the version which is the
+ * latest version at the time when this is called.
+ * @return a refresh token to remove the callback
+ */
+RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t*, realm_on_realm_refresh_func_t,
+                                                                         realm_userdata_t userdata,
+                                                                         realm_free_userdata_func_t userdata_free);
 
 /**
  * Refresh the view of the realm file.
@@ -3333,6 +3353,7 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED = 228,
     RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED = 229,
     RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED = 230,
+    RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE = 231,
 } realm_sync_errno_session_e;
 
 typedef struct realm_sync_session realm_sync_session_t;

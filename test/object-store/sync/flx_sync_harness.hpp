@@ -101,6 +101,7 @@ public:
         }
         auto subs = std::move(mut_subs).commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_download(*realm);
 
         realm->begin_transaction();
         func(realm);

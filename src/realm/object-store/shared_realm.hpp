@@ -323,6 +323,8 @@ public:
     // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
+    // Get the version of the latest snapshot
+    util::Optional<DB::version_type> latest_snapshot_version() const;
 
     TransactionRef duplicate() const;
 
@@ -423,9 +425,6 @@ public:
      * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
      */
     static void delete_files(const std::string& realm_file_path, bool* did_delete_realm = nullptr);
-
-    // returns the file format version upgraded from if an upgrade took place
-    util::Optional<int> file_format_upgraded_from_version() const;
 
     bool has_pending_async_work() const;
 
