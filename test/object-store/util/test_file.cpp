@@ -170,7 +170,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
 
 #if TEST_ENABLE_SYNC_LOGGING
                    auto logger = new util::StderrLogger();
-                   logger->set_level_threshold(util::Logger::Level::all);
+                   logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
                    m_logger.reset(logger);
 #else
                    m_logger.reset(new TestLogger());
@@ -297,7 +297,7 @@ TestAppSession::TestAppSession(AppSession session,
     util::try_make_dir(m_base_file_path);
     SyncClientConfig sc_config;
     sc_config.base_file_path = m_base_file_path;
-    sc_config.log_level = TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
@@ -342,7 +342,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     util::try_make_dir(m_base_file_path);
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
-    sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.log_level = config.sync_client_log_level;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {
