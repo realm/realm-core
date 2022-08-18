@@ -46,9 +46,8 @@ TEST(Compaction_WhileGrowing)
     int num = 500;
     tr->promote_to_write();
     for (int j = 0; j < num; ++j) {
-        BinaryData sd(w, 200 + j);
-        table1->create_object().set(col_bin1, sd);
-        table2->create_object().set(col_bin2, sd);
+        table1->create_object().set(col_bin1, BinaryData(w, 400));
+        table2->create_object().set(col_bin2, BinaryData(w, 200));
         if (j % 10 == 0) {
             tr->commit_and_continue_as_read();
             tr->promote_to_write();
@@ -66,13 +65,20 @@ TEST(Compaction_WhileGrowing)
     // before all elements have been moved, which will terminate that session
     while (free_space > used_space) {
         tr->promote_to_write();
-        table1->create_object().set(col_bin1, BinaryData(w, 2500 + random.draw_int_mod(2500)));
+        table1->create_object().set(col_bin1, BinaryData(w, 4000));
         tr->commit_and_continue_as_read();
         db->get_stats(free_space, used_space);
         // std::cout << "Total: " << free_space + used_space << ", "
         //           << "Free: " << free_space << ", "
         //           << "Used: " << used_space << std::endl;
     }
+    db->get_stats(free_space, used_space);
+    tr->promote_to_write();
+    table1->create_object().set(col_bin1, BinaryData(w, 4000));
+    table1->create_object().set(col_bin1, BinaryData(w, 4000));
+    table1->create_object().set(col_bin1, BinaryData(w, 4000));
+    table1->create_object().set(col_bin1, BinaryData(w, 4000));
+    tr->commit_and_continue_as_read();
 }
 
 
@@ -121,7 +127,8 @@ TEST(Compaction_Large)
             }
             tr->commit_and_continue_as_read();
             db->get_stats(free_space, used_space);
-            // std::cout << "Total: " << free_space + used_space << ", "
+            total = free_space + used_space;
+            // std::cout << "Total: " << total << ", "
             //           << "Free: " << free_space << ", "
             //           << "Used: " << used_space << std::endl;
         } while (free_space > used_space);
@@ -132,5 +139,5 @@ TEST(Compaction_Large)
         DB::create(make_in_realm_history(), path);
     }
     // std::cout << "Size : " << f.get_size() << std::endl;
-    REALM_ASSERT(f.get_size() == total);
+    CHECK(f.get_size() == total);
 }

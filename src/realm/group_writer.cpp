@@ -847,20 +847,35 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
             std::sort(m_under_evacuation.begin(), m_under_evacuation.end(), [](const auto& a, const auto& b) {
                 return a.ref > b.ref;
             });
-            bool fulfilled = false;
-            while (!fulfilled) {
+            bool found_or_give_up = false;
+            while (!found_or_give_up) {
                 auto& elem = m_under_evacuation.back();
-                fulfilled = elem.size > 2 * size;
-
-                // Set new limit
-                m_evacuation_limit = elem.ref + elem.size;
-                // Add element to available space map
-                m_size_map.emplace(elem.size, elem.ref);
-                m_under_evacuation.pop_back();
-                if (m_under_evacuation.empty()) {
-                    m_evacuation_limit = 0;
-                    break;
+                if (elem.size >= size) {
+                    m_size_map.emplace(size, elem.ref);
+                    if (elem.size == size) {
+                        m_under_evacuation.pop_back();
+                    }
+                    else {
+                        elem.ref += size;
+                        elem.size -= size;
+                    }
+                    found_or_give_up = true;
                 }
+                else {
+                    // Chunk too small - just recycle so that we can try the next
+                    m_size_map.emplace(elem.size, elem.ref);
+                    m_under_evacuation.pop_back();
+                }
+            }
+            // Set new limit
+            if (m_under_evacuation.empty()) {
+                found_or_give_up = true;
+                m_evacuation_limit = 0;
+                // std::cout << "Give up" << std::endl;
+            }
+            else {
+                m_evacuation_limit = m_under_evacuation.back().ref;
+                // std::cout << "New limit = " << std::hex << m_evacuation_limit << std::dec << std::endl;
             }
             chunk = search_free_space_in_part_of_freelist(size);
         }

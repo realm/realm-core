@@ -947,7 +947,7 @@ public:
             if (progress.size() == level) {
                 progress.push_back(0);
             }
-            size_t& ndx = progress[level];
+            size_t ndx = progress[level];
             while (ndx < sz) {
                 auto val = parent.get(ndx);
                 if (val && !(val & 1)) {
@@ -958,7 +958,7 @@ public:
                         return false;
                     }
                 }
-                ndx++;
+                ndx = ++progress[level];
             }
             while (progress.size() > level)
                 progress.pop_back();
