@@ -346,6 +346,11 @@ public:
                 m_free_list_sizes.init(alloc, get_ref(4));
                 m_free_list_versions.init(alloc, get_ref(5));
             }
+            if (size() > 11) {
+                auto ref = get_ref(11);
+                if (ref)
+                    m_evacuation_info.init(alloc, ref);
+            }
         }
     }
     uint64_t get_file_size() const
@@ -388,9 +393,23 @@ public:
     {
         return int(get_val(10));
     }
-    size_t get_evacuation_limit() const
+    void print_evacuation_info(std::ostream& ostr) const
     {
-        return size_t(get_val(11));
+        if (m_evacuation_info.valid()) {
+            ostr << "Evacuation limit: " << size_t(m_evacuation_info.get_val(0));
+            if (m_evacuation_info.get_val(1)) {
+                ostr << " Scan done" << std::endl;
+            }
+            else {
+                ostr << " Progress: [";
+                for (size_t i = 2; i < m_evacuation_info.size(); i++) {
+                    if (i > 2)
+                        ostr << ',';
+                    ostr << m_evacuation_info.get_val(i);
+                }
+                ostr << "]" << std::endl;
+            }
+        }
     }
     unsigned get_nb_tables() const
     {
@@ -413,6 +432,7 @@ private:
     Array m_free_list_positions;
     Array m_free_list_sizes;
     Array m_free_list_versions;
+    Array m_evacuation_info;
 };
 
 class RealmFile {
@@ -463,8 +483,7 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
     if (g.valid()) {
         ostr << "Logical file size: " << human_readable(g.get_file_size()) << std::endl;
         if (g.size() > 11) {
-            if (auto limit = g.get_evacuation_limit())
-                ostr << "Evacuation limit: 0x" << std::hex << limit << std::dec << std::endl;
+            g.print_evacuation_info(ostr);
         }
         if (g.size() > 6) {
             ostr << "Current version: " << g.get_current_version() << std::endl;
