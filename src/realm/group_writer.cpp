@@ -302,16 +302,16 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 #define REALM_ALLOC_DEBUG 0
 
-auto GroupWriter::map_reachable() -> std::vector<ReachedBlockInfo>
+auto GroupWriter::map_reachable() -> std::vector<FreeSpaceEntry>
 {
     class Collector : public Array::MemUsageHandler {
 
     public:
         void handle(ref_type ref, size_t, size_t used) override
         {
-            blocks.emplace_back(ReachedBlockInfo{ref, used, current_version});
+            blocks.emplace_back(FreeSpaceEntry{ref, used, current_version});
         }
-        std::vector<ReachedBlockInfo> blocks;
+        std::vector<FreeSpaceEntry> blocks;
         uint64_t current_version;
     };
     // collect reachable blocks in all reachable versions
@@ -333,9 +333,9 @@ auto GroupWriter::map_reachable() -> std::vector<ReachedBlockInfo>
     }
 
     std::sort(collector.blocks.begin(), collector.blocks.end(),
-              [](const ReachedBlockInfo& a, const ReachedBlockInfo& b) {
+              [](const FreeSpaceEntry& a, const FreeSpaceEntry& b) {
                   if (a.ref == b.ref)
-                      return a.version < b.version;
+                      return a.released_at_version < b.released_at_version;
                   return a.ref < b.ref;
               });
     return collector.blocks;
@@ -439,7 +439,8 @@ void GroupWriter::backdate()
             // coallesce any subsequent contiguous entries
             auto next = index + 1;
             found_version = it->versions.get(index);
-            while (next < limit && it->positions.get(next) == (int64_t)end_pos) {
+            auto entry_end = entry.ref + entry.size;
+            while (next < limit && it->positions.get(next) == (int64_t)end_pos && end_pos < entry_end) {
                 end_pos += static_cast<ref_type>(it->lengths.get(next));
                 // pick youngest (highest) version of blocks
                 uint64_t tmp_version = it->versions.get(next);

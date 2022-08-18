@@ -123,11 +123,6 @@ private:
         size_t size;
         uint64_t released_at_version;
     };
-    struct ReachedBlockInfo {
-        ref_type ref;
-        size_t size;
-        uint64_t version;
-    };
     class FreeList : public std::vector<FreeSpaceEntry> {
     public:
         FreeList() = default;
@@ -204,7 +199,7 @@ private:
     void backdate();
 
     /// Debug helper
-    std::vector<ReachedBlockInfo> map_reachable();
+    std::vector<FreeSpaceEntry> map_reachable();
 };
 
 

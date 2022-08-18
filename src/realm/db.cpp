@@ -220,7 +220,7 @@ struct VersionList {
         return freelist == nil;
     }
 
-    void cleanup(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
+    void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
                  VersionVector& unreachable) noexcept
     {
         // build a map from version nr to top_ref
@@ -517,7 +517,7 @@ public:
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        r_info->readers.cleanup(oldest_version, oldest_live_version, top_refs, unreachable_versions);
+        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, unreachable_versions);
     }
 
     version_type get_newest_version()
