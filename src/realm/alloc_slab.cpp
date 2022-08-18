@@ -1209,6 +1209,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
         }
     }
 
+    for (auto& e : m_mappings) {
+        e.primary_mapping.get_encrypted_mapping()->mark_for_refresh(0, e.primary_mapping.get_size());
+    }
     rebuild_freelists_from_slab();
 
     // Build the fast path mapping
