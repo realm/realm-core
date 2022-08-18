@@ -563,9 +563,10 @@ std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id) 
     auto endpoint = apps()[app_id]["logs"];
     auto response = endpoint.get_json({{"errors_only", "true"}});
     std::vector<std::string> errors;
-    for (auto err : response["logs"]) {
-        errors.push_back(err["error"]);
-    }
+    const auto& logs = response["logs"];
+    std::transform(logs.begin(), logs.end(), std::back_inserter(errors), [](const auto& err) {
+        return err["error"];
+    });
     return errors;
 }
 

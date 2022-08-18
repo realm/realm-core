@@ -916,13 +916,13 @@ private:
     bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
     bool m_error_message_received;   // Session specific ERROR message received
     bool m_unbound_message_received; // UNBOUND message received
+    bool m_error_to_send;
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
 
     util::Optional<IntegrationException> m_client_error;
-    bool m_error_to_send;
     bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
