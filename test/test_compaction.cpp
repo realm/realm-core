@@ -19,10 +19,62 @@
 #include <realm.hpp>
 #include "test.hpp"
 
+#include <iostream>
+
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
+
+TEST(Compaction_WhileGrowing)
+{
+    Random random(random_int<unsigned long>());
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    size_t free_space, used_space;
+
+    auto tr = db->start_write();
+    auto table1 = tr->add_table("Binaries");
+    auto col_bin1 = table1->add_column(type_Binary, "str", true);
+    auto table2 = tr->add_table("Integers");
+    auto col_bin2 = table2->add_column(type_Binary, "str", true);
+    tr->commit_and_continue_as_read();
+    char w[5000];
+    for (int i = 0; i < 5000; ++i) {
+        w[i] = '0' + (i % 64);
+    }
+    int num = 500;
+    tr->promote_to_write();
+    for (int j = 0; j < num; ++j) {
+        BinaryData sd(w, 200 + j);
+        table1->create_object().set(col_bin1, sd);
+        table2->create_object().set(col_bin2, sd);
+        if (j % 10 == 0) {
+            tr->commit_and_continue_as_read();
+            tr->promote_to_write();
+        }
+    }
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    table1->clear();
+    tr->commit_and_continue_as_read();
+    db->get_stats(free_space, used_space);
+    CHECK(free_space > used_space);
+
+    // During the following, the space kept in "m_under_evacuation" will be used
+    // before all elements have been moved, which will terminate that session
+    while (free_space > used_space) {
+        tr->promote_to_write();
+        table1->create_object().set(col_bin1, BinaryData(w, 2500 + random.draw_int_mod(2500)));
+        tr->commit_and_continue_as_read();
+        db->get_stats(free_space, used_space);
+        // std::cout << "Total: " << free_space + used_space << ", "
+        //           << "Free: " << free_space << ", "
+        //           << "Used: " << used_space << std::endl;
+    }
+}
+
 
 TEST(Compaction_Large)
 {

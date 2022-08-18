@@ -357,20 +357,26 @@ ref_type GroupWriter::write_group()
             top.set(8, value_3); // Throws
         }
     }
-    if (m_evacuation_limit) {
+    if (top.size() > Group::s_evacuation_point_ndx) {
         ref_type ref = top.get_as_ref(Group::s_evacuation_point_ndx);
-        REALM_ASSERT(ref);
-        Array arr(m_alloc);
-        arr.init_from_ref(ref);
-        arr.truncate(2);
+        if (m_evacuation_limit) {
+            REALM_ASSERT(ref);
+            Array arr(m_alloc);
+            arr.init_from_ref(ref);
+            arr.truncate(2);
 
-        arr.set(0, int64_t(m_evacuation_limit));
-        arr.set(1, m_evacuation_progress.empty() ? 1 : 0); // Backoff
-        for (auto index : m_evacuation_progress) {
-            arr.add(int64_t(index));
+            arr.set(0, int64_t(m_evacuation_limit));
+            arr.set(1, m_evacuation_progress.empty() ? 1 : 0); // Backoff
+            for (auto index : m_evacuation_progress) {
+                arr.add(int64_t(index));
+            }
+            ref = arr.write(*this, false, only_if_modified);
+            top.set(Group::s_evacuation_point_ndx, from_ref(ref));
         }
-        ref = arr.write(*this, false, only_if_modified);
-        top.set(Group::s_evacuation_point_ndx, from_ref(ref));
+        else if (ref) {
+            Array::destroy(ref, m_alloc);
+            top.set(Group::s_evacuation_point_ndx, 0);
+        }
     }
 
 #if REALM_ALLOC_DEBUG
@@ -443,18 +449,20 @@ ref_type GroupWriter::write_group()
     // nodes in this range have been moved
     if (m_under_evacuation.size() == 1) {
         auto& elem = m_under_evacuation.back();
-        REALM_ASSERT(elem.ref + elem.size == m_logical_size);
-        // This is at the end of the file
-        size_t pos = elem.ref;
-        m_logical_size = util::round_up_to_page_size(pos);
-        elem.size = (m_logical_size - pos);
-        if (elem.size == 0)
-            m_under_evacuation.clear();
-        top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
-        auto ref = top.get(Group::s_evacuation_point_ndx);
-        REALM_ASSERT(ref);
-        Array::destroy(ref, m_alloc);
-        top.set(Group::s_evacuation_point_ndx, 0);
+        if (elem.ref + elem.size == m_logical_size) {
+            // This is at the end of the file
+            size_t pos = elem.ref;
+            m_logical_size = util::round_up_to_page_size(pos);
+            elem.size = (m_logical_size - pos);
+            if (elem.size == 0)
+                m_under_evacuation.clear();
+            top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
+            auto ref = top.get(Group::s_evacuation_point_ndx);
+            REALM_ASSERT(ref);
+            Array::destroy(ref, m_alloc);
+            top.set(Group::s_evacuation_point_ndx, 0);
+            m_evacuation_limit = 0;
+        }
     }
     // At this point we have allocated all the space we need, so we can add to
     // the free-lists any free space created during the current transaction (or
@@ -840,7 +848,7 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
                 return a.ref > b.ref;
             });
             bool fulfilled = false;
-            while (!(fulfilled || m_under_evacuation.empty())) {
+            while (!fulfilled) {
                 auto& elem = m_under_evacuation.back();
                 fulfilled = elem.size > 2 * size;
 
@@ -849,6 +857,10 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
                 // Add element to available space map
                 m_size_map.emplace(elem.size, elem.ref);
                 m_under_evacuation.pop_back();
+                if (m_under_evacuation.empty()) {
+                    m_evacuation_limit = 0;
+                    break;
+                }
             }
             chunk = search_free_space_in_part_of_freelist(size);
         }
