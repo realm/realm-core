@@ -125,7 +125,7 @@ void wait_for_advance(const SharedRealm& realm)
 }
 
 // Returns true if `err` is among the erros received from the server, false otherwise.
-bool wait_for_error(const AppSession& app_session, const std::string& err)
+bool wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
 {
     bool error_found = false;
     timed_sleeping_wait_for(
@@ -141,7 +141,7 @@ bool wait_for_error(const AppSession& app_session, const std::string& err)
             error_found = it != errors.end();
             return error_found;
         },
-        std::chrono::seconds(10));
+        std::chrono::minutes(1));
 
     return error_found;
 }
@@ -1890,9 +1890,10 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
 
-        REQUIRE(wait_for_error(harness->session().app_session(),
-                               "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
-                               "on one side, but not on the other. (ProtocolErrorCode=112)"));
+        REQUIRE(wait_for_error_to_persist(
+            harness->session().app_session(),
+            "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
+            "on one side, but not on the other. (ProtocolErrorCode=112)"));
     }
 
     SECTION("basic embedded object construction") {
@@ -2011,7 +2012,7 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
 
     wait_for_download(*realm);
 
-    REQUIRE(wait_for_error(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
+    REQUIRE(wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
 }
 
 } // namespace realm::app
