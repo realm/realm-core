@@ -104,9 +104,8 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          if [ -n "${enable_logging|}" ]; then
-              set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
-          fi
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING_LEVEL STRING "debug"
 
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
@@ -171,7 +170,14 @@ functions:
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
-          TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
+
+          if [[ -n "${verbose_test_output}" ]]; then
+              TEST_FLAGS="$TEST_FLAGS -VV"
+          else
+              TEST_FLAGS="$TEST_FLAGS -V"
+          fi
+
+          TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_PROGRESS=1
@@ -184,7 +190,7 @@ functions:
           fi
 
           cd build
-          $CTEST -C ${cmake_build_type|Debug} -V $TEST_FLAGS
+          $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
 
   "upload test results":
   - command: attach.results
@@ -565,6 +571,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: ObjectStoreTests
+      verbose_test_output: true
 
 - name: lint
   tags: [ "for_pull_requests" ]

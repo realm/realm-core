@@ -424,14 +424,13 @@ private:
                                     "Server version in downloaded changeset cannot be zero");
             }
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
-
+            logger.debug("Received: DOWNLOAD CHANGESET(server_version=%1, "
+                         "client_version=%2, origin_timestamp=%3, origin_file_ident=%4, "
+                         "original_changeset_size=%5, changeset_size=%6)",
+                         cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
+                         cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
+                         cur_changeset.original_changeset_size, changeset_size); // Throws
             if (logger.would_log(util::Logger::Level::trace)) {
-                logger.trace("Received: DOWNLOAD CHANGESET(server_version=%1, "
-                             "client_version=%2, origin_timestamp=%3, origin_file_ident=%4, "
-                             "original_changeset_size=%5, changeset_size=%6)",
-                             cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
-                             cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
-                             cur_changeset.original_changeset_size, changeset_size); // Throws;
                 if (changeset_data.size() < 1056) {
                     logger.trace("Changeset: %1",
                                  clamped_hex_dump(changeset_data)); // Throws
