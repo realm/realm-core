@@ -141,7 +141,7 @@ bool wait_for_error_to_persist(const AppSession& app_session, const std::string&
             error_found = it != errors.end();
             return error_found;
         },
-        std::chrono::minutes(1));
+        std::chrono::minutes(10));
 
     return error_found;
 }

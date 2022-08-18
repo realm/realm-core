@@ -5654,6 +5654,8 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     bool failed_twice = false;
     using ConnectionState = ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
+    std::mutex mx;
+    std::condition_variable cv;
     auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
@@ -5667,8 +5669,12 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
             fixture.cancel_reconnect_delay();
         }
         else {
-            failed_twice = true;
+            {
+                std::lock_guard<std::mutex> lk(mx);
+                failed_twice = true;
+            }
             fixture.stop();
+            cv.notify_one();
         }
     };
     Session::Config config;
@@ -5676,8 +5682,12 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     Session session = fixture.make_session(db_2, std::move(config));
     session.set_connection_state_change_listener(listener);
     fixture.bind_session(session, "/test");
-    session.wait_for_download_complete_or_client_stopped();
-    CHECK(failed_twice);
+    using namespace std::chrono_literals;
+    std::unique_lock<std::mutex> lk(mx);
+    bool completed_within_time_limit = cv.wait_for(lk, 1s, [&] {
+        return failed_twice;
+    });
+    CHECK(completed_within_time_limit);
 }
 
 template <typename T>
