@@ -1172,17 +1172,18 @@ TEST_CASE("migration: Automatic") {
             Schema schema = {
                 {
                     "child_table",
-                    {{"value", PropertyType::Int},
-                     {"value_dict", PropertyType::Dictionary | PropertyType::Int},
-                     {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
-                      "target"},
-                     {"value_set", PropertyType::Set | PropertyType::Int},
-                     {"links_set", PropertyType::Set | PropertyType::Object, "target"}},
+                    {
+                        {"value", PropertyType::Int},
+                        {"value_dict", PropertyType::Dictionary | PropertyType::Int},
+                        {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                         "target"},
+                        {"value_set", PropertyType::Set | PropertyType::Int},
+                        {"links_set", PropertyType::Set | PropertyType::Object, "target"},
+                    },
                 },
                 {"parent_table",
-                 {
-                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
-                 }},
+                 {{"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                  {"mixed_links", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
                 {"target",
                  {
                      {"value", PropertyType::Int},
@@ -1215,8 +1216,15 @@ TEST_CASE("migration: Automatic") {
 
             auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
-            parent_table->create_object().set_all(child_object_key);
-            parent_table->create_object().set_all(child_object_key);
+            auto o1 = parent_table->create_object();
+            auto o2 = parent_table->create_object();
+            ColKey col_mixed_links = parent_table->get_column_key("mixed_links");
+            object_store::Dictionary mixed_links_o1(realm, o1, col_mixed_links);
+            mixed_links_o1.insert("ref_mixed_link", ObjLink{target_table->get_key(), target_object.get_key()});
+            object_store::Dictionary mixed_links_o2(realm, o2, col_mixed_links);
+            mixed_links_o2.insert("ref_mixed_link", ObjLink{target_table->get_key(), target_object.get_key()});
+            o1.set_all(child_object_key);
+            o2.set_all(child_object_key);
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 1);
@@ -1225,6 +1233,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(dict_links.size() == 1);
             REQUIRE(set_vals.size() == 3);
             REQUIRE(set_links.size() == 1);
+            REQUIRE(mixed_links_o1.size() == 1);
+            REQUIRE(mixed_links_o2.size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
             REQUIRE_FALSE(parent_table->is_embedded());
             REQUIRE_FALSE(target_table->is_embedded());
@@ -1259,6 +1269,14 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(pair_link.first == "link");
                 REQUIRE_FALSE(pair_link.second.is_unresolved_link());
                 REQUIRE(pair_link.second.get<ObjKey>() == target_object.get_key());
+
+                auto mixed_links = util::any_cast<object_store::Dictionary>(
+                    parent_object.get_property_value<util::Any>(context, "mixed_links"));
+                REQUIRE(mixed_links.size() == 1);
+                auto pair_mixed_link = mixed_links.get_pair(0);
+                REQUIRE(pair_mixed_link.first == "ref_mixed_link");
+                REQUIRE_FALSE(pair_mixed_link.second.is_unresolved_link());
+                REQUIRE(pair_mixed_link.second.get<ObjKey>() == target_object.get_key());
 
 
                 auto value_set = util::any_cast<object_store::Set>(

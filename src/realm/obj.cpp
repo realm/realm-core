@@ -1988,10 +1988,7 @@ void Obj::dup_and_handle_multiple_backlinks()
             else if (c.get_attrs().test(col_attr_Set)) {
                 // this SHOULD NEVER HAPPEN, since SET sematincs forbids to have a backlink to the same object store
                 // multiple times. update_schema should throw longer before to perform this copy.
-                auto linking_obj_set = linking_obj.get_setbase_ptr(c);
-                auto pos = linking_obj_set->find_any(Mixed{get_key()});
-                REALM_ASSERT(pos != realm::npos);
-                linking_obj_set->insert_any(obj.get_key());
+                REALM_UNREACHABLE();
             }
             // backlink from dictionary
             else if (c.get_attrs().test(col_attr_Dictionary)) {
@@ -1999,13 +1996,13 @@ void Obj::dup_and_handle_multiple_backlinks()
                 auto pos = linking_obj_dictionary->find_any(ObjLink{m_table->get_key(), get_key()});
                 REALM_ASSERT(pos != realm::npos);
                 Mixed key = linking_obj_dictionary->get_key(pos);
-                linking_obj_dictionary->insert(key, obj.get_key());
+                linking_obj_dictionary->insert(key, ObjLink{m_table->get_key(), obj.get_key()});
             }
             // backlink from mixed
             else if (c.get_type() == col_type_Mixed && linking_obj.get_any(c).get_type() == type_TypedLink) {
                 // this is not supported yet.
                 REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
-                linking_obj.set_any(c, obj.get_key());
+                linking_obj.set_any(c, ObjLink{m_table->get_key(), obj.get_key()});
             }
             // normal backlink
             else if (c.get_type() == col_type_Link) {
