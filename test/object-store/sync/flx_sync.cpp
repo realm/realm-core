@@ -136,12 +136,12 @@ bool wait_for_error(const AppSession& app_session, const std::string& err)
             });
 
             if (it == errors.end()) {
-                millisleep(200); // don't spam the server too much
+                millisleep(500); // don't spam the server too much
             }
             error_found = it != errors.end();
             return error_found;
         },
-        std::chrono::seconds(1));
+        std::chrono::seconds(10));
 
     return error_found;
 }
