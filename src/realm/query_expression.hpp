@@ -4060,7 +4060,9 @@ public:
                     column = m_left.get();
                 }
 
-                if (column->has_search_index() && *column->get_comparison_type() == ExpressionComparisonType::Any) {
+                if (column->has_search_index() &&
+                    column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                        ExpressionComparisonType::Any) {
                     if (const_value.is_null()) {
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,
