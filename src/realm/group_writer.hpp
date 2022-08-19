@@ -38,6 +38,11 @@ class SlabAlloc;
 
 class VersionInfo {
 public:
+    VersionInfo(ref_type t, ref_type l)
+        : top_ref(t)
+        , logical_file_size(l)
+    {
+    }
     ref_type top_ref;
     ref_type logical_file_size;
 };

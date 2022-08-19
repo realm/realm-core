@@ -305,11 +305,10 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 auto GroupWriter::map_reachable() -> std::vector<FreeSpaceEntry>
 {
     class Collector : public Array::MemUsageHandler {
-
     public:
         void handle(ref_type ref, size_t, size_t used) override
         {
-            blocks.emplace_back(FreeSpaceEntry{ref, used, current_version});
+            blocks.emplace_back(ref, used, current_version);
         }
         std::vector<FreeSpaceEntry> blocks;
         uint64_t current_version;
@@ -484,10 +483,10 @@ void GroupWriter::backdate()
     for (auto& i : reachables) {
         if (i.ref != last) {
             last = i.ref;
-            std::cout << std::endl << "    " << i.ref << " - " << i.ref + i.size << " : " << i.version;
+            std::cout << std::endl << "    " << i.ref << " - " << i.ref + i.size << " : " << i.released_at_version;
         }
         else {
-            std::cout << ", " << i.version;
+            std::cout << ", " << i.released_at_version;
         }
     }
     std::cout << std::endl << "  Backdating:";
@@ -511,7 +510,7 @@ void GroupWriter::backdate()
         while (k < reachables.size() && reachables[k].ref + reachables[k].size > entry.ref &&
                reachables[k].ref < entry.ref + entry.size) {
 #if REALM_ALLOC_DEBUG
-            std::cout << reachables[k].version << " ";
+            std::cout << reachables[k].released_at_version << " ";
 #endif
             ++k;
             referenced = true;
