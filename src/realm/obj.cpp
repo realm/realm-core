@@ -1443,6 +1443,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
+    auto n = target_table->get_name();
     TableKey target_table_key = target_table->get_key();
     if (target_key) {
         ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
@@ -1936,7 +1937,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
 
 void Obj::assign(const Obj& other)
 {
-    copy_other_object(other);
+    dup(other);
     auto copy_links = [this, &other](ColKey col) {
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
@@ -1960,67 +1961,28 @@ void Obj::assign(const Obj& other)
     m_table->for_each_backlink_column(copy_links);
 }
 
-void Obj::dup_and_handle_multiple_backlinks()
+bool Obj::handle_multiple_backlinks_during_schema_migration(std::vector<Obj>& embedded_objects_to_fix)
 {
     REALM_ASSERT(!m_table->get_primary_key_column());
-
     auto copy_links = [this](ColKey col) {
-        auto t = m_table->get_opposite_table(col);
-        auto c = m_table->get_opposite_column(col);
+        auto opposite_table = m_table->get_opposite_table(col);
+        auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
-        for (auto bl : backlinks) {
-            auto obj = m_table->create_object();
-            obj.copy_other_object(*this);
-
-            auto linking_obj = t->get_object(bl);
-
-            // the central piece that is missing is how we handle if there are multiple
-            // embedded objects that are parent of the one just created.
-
-            // backlink from list
-            if (c.get_type() == col_type_LinkList) {
-                auto linking_obj_list = linking_obj.get_linklist(c);
-                auto n = linking_obj_list.find_first(get_key());
-                REALM_ASSERT(n != realm::npos);
-                linking_obj_list.set(n, obj.get_key());
-            }
-            // backlink from set
-            else if (c.get_attrs().test(col_attr_Set)) {
-                // this SHOULD NEVER HAPPEN, since SET sematincs forbids to have a backlink to the same object store
-                // multiple times. update_schema should throw longer before to perform this copy.
-                REALM_UNREACHABLE();
-            }
-            // backlink from dictionary
-            else if (c.get_attrs().test(col_attr_Dictionary)) {
-                auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(c);
-                auto pos = linking_obj_dictionary->find_any(ObjLink{m_table->get_key(), get_key()});
-                REALM_ASSERT(pos != realm::npos);
-                Mixed key = linking_obj_dictionary->get_key(pos);
-                linking_obj_dictionary->insert(key, ObjLink{m_table->get_key(), obj.get_key()});
-            }
-            // backlink from mixed
-            else if (c.get_type() == col_type_Mixed && linking_obj.get_any(c).get_type() == type_TypedLink) {
-                // this is not supported yet.
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
-                linking_obj.set_any(c, ObjLink{m_table->get_key(), obj.get_key()});
-            }
-            // normal backlink
-            else if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == get_key());
-                linking_obj.set(c, obj.get_key());
-            }
+        for (auto backlink : backlinks) {
+            clone_object_during_migration(opposite_table, opposite_column, backlink);
         }
         return false;
     };
     m_table->for_each_backlink_column(copy_links);
+    return true; // everything got cloned, so the original object can now be deleted
 }
 
-void Obj::copy_other_object(const Obj& other)
+void Obj::dup(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
     for (auto col : cols) {
+
         if (col.get_attrs().test(col_attr_List)) {
             auto src_list = other.get_listbase_ptr(col);
             auto dst_list = get_listbase_ptr(col);
@@ -2077,6 +2039,48 @@ void Obj::copy_other_object(const Obj& other)
         }
     }
 }
+
+void Obj::clone_object_during_migration(TableRef opposite_table, ColKey opposite_col_key, ObjKey backlink)
+{
+    // Algorithm: duplicate the object once for each backlick.
+    auto obj = m_table->create_object();
+    obj.dup(*this);
+    auto linking_obj = opposite_table->get_object(backlink);
+    // fix_links(linking_obj, opposite_col_key, obj)
+
+    // fix linking obj links in order to point to the new object just created
+    if (opposite_col_key.get_type() == col_type_LinkList) {
+        auto linking_obj_list = linking_obj.get_linklist(opposite_col_key);
+        auto n = linking_obj_list.find_first(get_key());
+        REALM_ASSERT(n != realm::npos);
+        linking_obj_list.set(n, obj.get_key());
+    }
+    else if (opposite_col_key.get_attrs().test(col_attr_Set)) {
+        // this SHOULD NEVER HAPPEN, since SET sematincs forbids to have a backlink to the same object store
+        // multiple times. update_schema should throw longer before to perform this copy.
+        REALM_UNREACHABLE();
+    }
+    else if (opposite_col_key.get_attrs().test(col_attr_Dictionary)) {
+        auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(opposite_col_key);
+        auto pos = linking_obj_dictionary->find_any(ObjLink{m_table->get_key(), get_key()});
+        REALM_ASSERT(pos != realm::npos);
+        Mixed key = linking_obj_dictionary->get_key(pos);
+        linking_obj_dictionary->insert(key, ObjLink{m_table->get_key(), obj.get_key()});
+    }
+    else if (opposite_col_key.get_type() == col_type_Mixed &&
+             linking_obj.get_any(opposite_col_key).get_type() == type_TypedLink) {
+        REALM_ASSERT(!linking_obj.get<ObjKey>(opposite_col_key) ||
+                     linking_obj.get<ObjKey>(opposite_col_key) == get_key());
+        linking_obj.set_any(opposite_col_key, ObjLink{m_table->get_key(), obj.get_key()});
+    }
+    else if (opposite_col_key.get_type() == col_type_Link) {
+        // Single link
+        REALM_ASSERT(!linking_obj.get<ObjKey>(opposite_col_key) ||
+                     linking_obj.get<ObjKey>(opposite_col_key) == get_key());
+        linking_obj.set(opposite_col_key, obj.get_key());
+    }
+}
+
 
 Dictionary Obj::get_dictionary(ColKey col_key) const
 {

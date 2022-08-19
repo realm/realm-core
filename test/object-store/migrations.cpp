@@ -1050,50 +1050,6 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(value == 42);
             }
         }
-        SECTION("change table to embedded - multiple incoming links - resolved automatically") {
-            InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
-            Schema schema = {
-                {"child_table",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"parent_table",
-                 {
-                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
-                 }},
-            };
-            auto realm = Realm::get_shared_realm(config);
-            realm->update_schema(schema, 1);
-            realm->begin_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
-            Obj child_object = child_table->create_object();
-            child_object.set("value", 42);
-            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
-            auto child_object_key = child_object.get_key();
-            parent_table->create_object().set_all(child_object_key);
-            parent_table->create_object().set_all(child_object_key);
-            realm->commit_transaction();
-            REQUIRE(parent_table->size() == 2);
-            REQUIRE(child_table->size() == 1);
-            REQUIRE_FALSE(child_table->is_embedded());
-
-            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
-                                                 [](auto, auto, auto&) {}));
-
-            REQUIRE(realm->schema_version() == 2);
-            REQUIRE(parent_table->size() == 2);
-            REQUIRE(child_table->size() == 2);
-            REQUIRE(child_table->is_embedded());
-            for (int i = 0; i < 2; i++) {
-                Object parent_object(realm, "parent_table", i);
-                CppContext context(realm);
-                Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
-                REQUIRE(value == 42);
-            }
-        }
         SECTION(
             "change table from top-level to embedded, delete objects with 0 incoming links, resolved automatically") {
             InMemoryTestFile config;
@@ -1429,6 +1385,158 @@ TEST_CASE("migration: Automatic") {
             for (size_t i = 1; i < linklist.size(); ++i) {
                 REQUIRE(linklist.get(i - 1) != linklist.get(i));
             }
+        }
+        SECTION("change table to embedded - convert the whole list of linking embedded objects") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {"child_table",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+                {"origin_table",
+                 {
+                     {"parent_property", PropertyType::Object | PropertyType::Nullable, "parent_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto p1 = parent_table->create_object();
+            auto p2 = parent_table->create_object();
+            p1.set_all(child_object_key);
+            p2.set_all(child_object_key);
+            auto origin_table = ObjectStore::table_for_object_type(realm->read_group(), "origin_table");
+            origin_table->create_object().set_all(p1.get_key());
+            origin_table->create_object().set_all(p2.get_key());
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 2);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "parent_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 3,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 3);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(origin_table->size() == 2);
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            std::vector<ObjKey> obj_children;
+            for (auto& child_obj : *child_table) {
+                obj_children.push_back(child_obj.get_key());
+            }
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                REQUIRE(child_object.obj().get_key() == obj_children[i]);
+            }
+        }
+        SECTION("change table to embedded - violate embedded object constraints") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+
+            Schema schema = {
+                {"child_embedded_table",
+                 ObjectType::Embedded,
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                      "child_embedded_table"},
+                 }},
+                {"origin_table",
+                 {
+                     {"parent_property", PropertyType::Object | PropertyType::Nullable, "parent_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_embedded_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            Obj parent_object = parent_table->create_object();
+            ColKey col_link = parent_table->get_column_key("child_property");
+            object_store::Dictionary dict_link(realm, parent_object, col_link);
+            dict_link.insert_embedded("Ref");
+
+            auto origin_table = ObjectStore::table_for_object_type(realm->read_group(), "origin_table");
+            origin_table->create_object().set_all(parent_object.get_key());
+            origin_table->create_object().set_all(parent_object.get_key());
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 2);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "parent_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(origin_table->size() == 2);
         }
     }
 

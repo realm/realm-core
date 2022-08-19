@@ -864,8 +864,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
                         object.remove();
 
                     for (auto& object : objects_to_fix_backlinks) {
-                        object.dup_and_handle_multiple_backlinks();
-                        object.remove();
+                        if (object.handle_multiple_backlinks_during_schema_migration(objects_to_fix_backlinks))
+                            object.remove();
                     }
                 }
             }
