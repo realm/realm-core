@@ -863,9 +863,57 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
                     for (auto& object : objects_to_erase)
                         object.remove();
 
+                    // to be moved
+                    //
+                    //
+
+                    struct RelObj {
+                        Obj source, target;
+                        TableRef table_source, table_target;
+                        size_t N;
+                    };
+                    using OutgoingLinksToEmbeddedTargets = std::vector<RelObj>;
+                    using EmbeddedObjects = std::vector<std::pair<Obj, TableRef>>;
+                    OutgoingLinksToEmbeddedTargets embedded_links_to_fix;
+                    EmbeddedObjects outgoing_embedded_links;
+
+                    auto populate_outgoing_embedded_links = [&embedded_links_to_fix](Obj object, TableRef table,
+                                                                                     const EmbeddedObjects& links) {
+                        for (auto& [target_object, target_table] : links) {
+                            embedded_links_to_fix.push_back(
+                                {object, target_object, table, target_table, object.get_backlink_count()});
+                        }
+                    };
+
                     for (auto& object : objects_to_fix_backlinks) {
-                        if (object.handle_multiple_backlinks_during_schema_migration(objects_to_fix_backlinks))
+                        // handle schema migration from TopLevel to Embedded for objects that have multiple backlinks.
+                        // delete the current object if the operation is succesful
+                        if (object.handle_multiple_backlinks_during_schema_migration(outgoing_embedded_links)) {
                             object.remove();
+                        }
+                        // if there are outgoing embedded links these will have to be processed later.
+                        populate_outgoing_embedded_links(object, table, outgoing_embedded_links);
+                    }
+
+                    for (size_t i = 0; i < embedded_links_to_fix.size(); i++) {
+                        auto& [source, target, source_table, target_table, n] = embedded_links_to_fix[i];
+                        EmbeddedObjects other_embedded_targets;
+                        target.verify_ongoing_links_to_embedded_objects(other_embedded_targets);
+                        if (other_embedded_targets.empty()) {
+                            for (size_t j = 0; j < n; ++j) {
+                                auto s = source.clone_with_link();
+
+                                // EmbeddedObjects tmp;
+                                // s.handle_multiple_backlinks_during_schema_migration(tmp);
+                            }
+                            // target.remove();
+                            source.remove();
+                            REALM_ASSERT(source_table->size() == 2);
+                            REALM_ASSERT(target_table->size() == 2);
+                        }
+                        else {
+                            populate_outgoing_embedded_links(target, target_table, other_embedded_targets);
+                        }
                     }
                 }
             }
