@@ -1,5 +1,6 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
+#include "realm/binary_data.hpp"
 
 realm_callback_token_realm::~realm_callback_token_realm()
 {
@@ -88,8 +89,9 @@ RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, rea
     return wrap_err([&]() {
         Realm::Config config;
         config.path = path;
-        if (encryption_key.data) {
-            config.encryption_key.assign(encryption_key.data, encryption_key.data + encryption_key.size);
+        if (encryption_key.size) {
+            config.encryption_key =
+                BinaryData(reinterpret_cast<const char*>(encryption_key.data), encryption_key.size);
         }
         (*realm)->convert(config, merge_with_existing);
         return true;

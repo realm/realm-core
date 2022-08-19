@@ -9,7 +9,7 @@
 * Fixed undefined behaviour on queries involving a constant and an indexed column on some property types like UUID and Timestamp. ([#5753](https://github.com/realm/realm-core/issues/5753), since 12.5.0)
  
 ### Breaking changes
-* None.
+* `RealmConfig::encryption_key` and `SyncClientConfig::custom_encryption_key` now both use `OwnedBinaryData`. They both treat empty and null keys as equivalent. (PR [#5760](https://github.com/realm/realm-core/pull/5760))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

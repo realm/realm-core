@@ -23,6 +23,7 @@
 
 #include <cstring>
 #include <memory>
+#include <utility>
 
 namespace realm {
 
@@ -59,8 +60,16 @@ public:
     }
     OwnedData& operator=(const OwnedData& other);
 
-    OwnedData(OwnedData&&) = default;
-    OwnedData& operator=(OwnedData&&) = default;
+    OwnedData(OwnedData&& other) noexcept
+        : OwnedData(std::move(other.m_data), std::exchange(other.m_size, 0))
+    {
+    }
+    OwnedData& operator=(OwnedData&& other) noexcept
+    {
+        m_data = std::move(other.m_data);
+        m_size = std::exchange(other.m_size, 0);
+        return *this;
+    }
 
     const char* data() const
     {
@@ -69,6 +78,11 @@ public:
     size_t size() const
     {
         return m_size;
+    }
+
+    bool empty() const
+    {
+        return m_size == 0;
     }
 
 private:

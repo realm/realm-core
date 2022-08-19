@@ -31,7 +31,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     , m_history(realm::make_in_realm_history())
     , m_sg(DB::create(*m_history, parent.get_path(),
                       DBOptions(parent.is_in_memory() ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full,
-                                parent.get_encryption_key().data())))
+                                parent.get_encryption_key().empty() ? nullptr : parent.get_encryption_key().data())))
     , m_thread(std::async(std::launch::async, [=] {
         auto tr = m_sg->start_read();
         while (m_sg->wait_for_change(tr)) {

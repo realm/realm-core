@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/binary_data.hpp"
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 
 #include <realm/util/cf_ptr.hpp>
@@ -73,7 +74,7 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
 }
 
 /// Get the encryption key for a given service, returning true if it either exists or the keychain is not usable.
-bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vector<char>>& result)
+bool get_key(CFStringRef account, CFStringRef service, OwnedBinaryData& result)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDataRef retained_key_data;
@@ -85,7 +86,7 @@ bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vecto
                 return false;
 
             auto key_bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(key_data.get()));
-            result.emplace(key_bytes, key_bytes + key_size);
+            result = OwnedBinaryData(key_bytes, key_size);
             return true;
         }
         case errSecItemNotFound:
@@ -102,14 +103,14 @@ bool get_key(CFStringRef account, CFStringRef service, util::Optional<std::vecto
     }
 }
 
-void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStringRef service)
+void set_key(OwnedBinaryData& key, CFStringRef account, CFStringRef service)
 {
-    if (!key)
+    if (key.empty())
         return;
 
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDictionaryAddValue(search_dictionary.get(), kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock);
-    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(key->data()), key_size));
+    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(key.data()), key_size));
     if (!key_data)
         throw std::bad_alloc();
 
@@ -124,7 +125,7 @@ void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStri
         case errSecInteractionNotAllowed:
         case errSecInvalidKeychain:
             // We were unable to save the key for "expected" reasons, so proceeed unencrypted
-            key = none;
+            key = {};
             return;
         default:
             // Unexpected keychain failure happened
@@ -157,13 +158,13 @@ CFPtr<CFStringRef> get_service_name(bool& have_bundle_id)
 
 namespace realm::keychain {
 
-util::Optional<std::vector<char>> get_existing_metadata_realm_key()
+OwnedBinaryData get_existing_metadata_realm_key()
 {
     bool have_bundle_id = false;
     CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
 
     // Try retrieving the existing key.
-    util::Optional<std::vector<char>> key;
+    OwnedBinaryData key;
     if (get_key(s_account, service.get(), key)) {
         return key;
     }
@@ -176,17 +177,17 @@ util::Optional<std::vector<char>> get_existing_metadata_realm_key()
             return key;
         }
     }
-    return util::none;
+    return {};
 }
 
-util::Optional<std::vector<char>> create_new_metadata_realm_key()
+OwnedBinaryData create_new_metadata_realm_key()
 {
     bool have_bundle_id = false;
     CFPtr<CFStringRef> service = get_service_name(have_bundle_id);
 
-    util::Optional<std::vector<char>> key;
-    key.emplace(key_size);
-    arc4random_buf(key->data(), key_size);
+    auto buf = std::make_unique<char[]>(key_size);
+    arc4random_buf(buf.get(), key_size);
+    auto key = OwnedBinaryData(std::move(buf), 64);
     set_key(key, s_account, service.get());
     return key;
 }

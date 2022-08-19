@@ -78,6 +78,10 @@ public:
     {
         return m_size;
     }
+    bool empty() const noexcept
+    {
+        return m_size == 0;
+    }
 
     /// Is this a null reference?
     ///

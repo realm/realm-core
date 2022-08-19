@@ -1100,20 +1100,18 @@ void Realm::convert(const Config& config, bool merge_into_existing)
         bool dst_is_sync = config.sync_config || config.force_sync_history;
 
         if (dst_is_sync) {
-            m_coordinator->write_copy(config.path, config.encryption_key.data());
+            m_coordinator->write_copy(config.path, config.encryption_key_ptr());
             if (!src_is_sync) {
 #if REALM_ENABLE_SYNC
                 DBOptions options;
-                if (config.encryption_key.size()) {
-                    options.encryption_key = config.encryption_key.data();
-                }
+                options.encryption_key = config.encryption_key_ptr();
                 auto db = DB::create(make_in_realm_history(), config.path, options);
                 db->create_new_history(sync::make_client_replication());
 #endif
             }
         }
         else {
-            tr.write(config.path, config.encryption_key.data());
+            tr.write(config.path, config.encryption_key_ptr());
         }
     }
     catch (...) {

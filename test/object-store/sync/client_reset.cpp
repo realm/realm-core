@@ -838,7 +838,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("should honor encryption key for downloaded Realm") {
-            local_config.encryption_key.resize(64, 'a');
+            local_config.encryption_key = BinaryData(std::string(64, 'a').data(), 64);
 
             make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm realm) {

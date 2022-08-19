@@ -19,6 +19,7 @@
 #ifndef REALM_OS_SYNC_MANAGER_HPP
 #define REALM_OS_SYNC_MANAGER_HPP
 
+#include "realm/binary_data.hpp"
 #include <realm/object-store/shared_realm.hpp>
 
 #include <realm/util/checked_mutex.hpp>
@@ -71,7 +72,7 @@ struct SyncClientConfig {
 
     std::string base_file_path;
     MetadataMode metadata_mode = MetadataMode::Encryption;
-    util::Optional<std::vector<char>> custom_encryption_key;
+    OwnedBinaryData custom_encryption_key;
 
     using LoggerFactory = std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;

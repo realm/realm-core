@@ -26,6 +26,7 @@
 #include <realm/util/basic_system_errors.hpp>
 
 #include "logging.hpp"
+#include "realm/binary_data.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
@@ -289,7 +290,7 @@ RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t* config,
                                                                   const uint8_t key[64]) noexcept
 {
-    config->custom_encryption_key = std::vector<char>(key, key + 64);
+    config->custom_encryption_key = OwnedBinaryData(reinterpret_cast<const char*>(&key), 64);
 }
 
 RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t* config, realm_log_func_t callback,

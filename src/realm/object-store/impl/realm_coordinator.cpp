@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/null.hpp"
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/object-store/impl/collection_notifier.hpp>
@@ -115,7 +116,7 @@ void RealmCoordinator::create_sync_session()
 
 void RealmCoordinator::set_config(const Realm::Config& config)
 {
-    if (config.encryption_key.data() && config.encryption_key.size() != 64)
+    if (!config.encryption_key.empty() && config.encryption_key.size() != 64)
         throw InvalidEncryptionKeyException();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
@@ -171,7 +172,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             throw MismatchedConfigException("Realm at path '%1' already opened with different inMemory settings.",
                                             config.path);
         }
-        if (m_config.encryption_key != config.encryption_key) {
+        if (m_config.encryption_key.get() != config.encryption_key.get()) {
             throw MismatchedConfigException("Realm at path '%1' already opened with a different encryption key.",
                                             config.path);
         }
@@ -512,7 +513,7 @@ void RealmCoordinator::open_db()
         if (!m_config.fifo_files_fallback_path.empty()) {
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
         }
-        options.encryption_key = m_config.encryption_key.data();
+        options.encryption_key = m_config.encryption_key_ptr();
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;

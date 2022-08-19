@@ -19,6 +19,7 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
+#include "realm/binary_data.hpp"
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <realm/util/file.hpp>
@@ -33,7 +34,7 @@ namespace realm {
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
-std::vector<char> make_test_encryption_key(const char start = 0);
+OwnedBinaryData make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
                                           util::FunctionRef<void()> func);
 
