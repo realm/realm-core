@@ -391,8 +391,7 @@ void GroupWriter::backdate()
         REALM_ASSERT(it != old_freelists.end());
         if (it == old_freelists.begin())
             return nullptr;
-        if ((*it)->version >= version)
-            --it;
+        --it;
         REALM_ASSERT((*it)->version < version);
         return it->get();
     };
