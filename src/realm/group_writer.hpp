@@ -67,7 +67,7 @@ public:
     GroupWriter(Group&, Durability dura = Durability::Full);
     ~GroupWriter();
 
-    void set_versions(uint64_t current, uint64_t read_lock, TopRefMap& top_refs, VersionVector& unreachable) noexcept;
+    void set_versions(uint64_t current, uint64_t read_lock, TopRefMap& top_refs, int num_unreachable) noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -111,7 +111,7 @@ private:
     uint64_t m_current_version = 0;
     uint64_t m_oldest_reachable_version;
     TopRefMap m_top_ref_map;
-    VersionVector m_unreachable_versions;
+    int m_num_unreachable;
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
@@ -211,12 +211,12 @@ private:
 // Implementation:
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock, TopRefMap& top_refs,
-                                      VersionVector& unreachable) noexcept
+                                      int num_unreachable) noexcept
 {
     REALM_ASSERT(read_lock <= current);
     m_current_version = current;
     m_oldest_reachable_version = read_lock; // oldest reachable version
-    m_unreachable_versions = std::move(unreachable);
+    m_num_unreachable = num_unreachable;
     m_top_ref_map = std::move(top_refs);
 }
 

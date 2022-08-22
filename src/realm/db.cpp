@@ -221,37 +221,29 @@ struct VersionList {
     }
 
     void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
-                 VersionVector& unreachable) noexcept
+                 int& num_unreachable) noexcept
     {
-        // build a map from version nr to top_ref
-        auto it = oldest;
-        while (it != nil) {
-            auto& r = get(it);
-            top_refs.emplace(r.version, VersionInfo{to_ref(r.current_top), to_ref(r.filesize)});
-            it = r.newer;
-        }
-        // run through list of versions and reclaim unused entries until a live entry is met
+        // run through list of versions and reclaim unused entries.
+        // buld a map of reachable versions on the way.
         // there is always at least one live entry
-        it = oldest;
+        auto it = oldest;
         bool looking_for_oldest_live = true;
         REALM_ASSERT(oldest != nil);
         while (it != nil) {
             auto& r = get(it);
+            it = r.newer;
             if (looking_for_oldest_live && r.count_live != 0) {
                 looking_for_oldest_live = false;
                 oldest_v = get(oldest).version;
                 oldest_live_v = r.version;
                 REALM_ASSERT(oldest_v <= oldest_live_v);
-                // remove this return to reclaim ALL intermediate versions
-                // not supported yet, as notifications need access to data
-                // in intermediate versions...
-                // return;
             }
-            it = r.newer;
             if (r.count_frozen == 0 && r.count_live == 0) {
-                unreachable.push_back(r.version);
+                num_unreachable++;
                 r.version = 0;
                 free_entry(index_of(r));
+            } else {
+                top_refs.emplace(r.version, VersionInfo{to_ref(r.current_top), to_ref(r.filesize)});
             }
         }
     }
@@ -513,11 +505,11 @@ public:
     }
 
     void cleanup_versions(uint64_t& oldest_version, uint64_t& oldest_live_version, TopRefMap& top_refs,
-                          VersionVector& unreachable_versions)
+                          int& num_unreachable)
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, unreachable_versions);
+        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, num_unreachable);
     }
 
     version_type get_newest_version()
@@ -2111,10 +2103,10 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     // of the current session.
     uint64_t oldest_version = 0, oldest_live_version = 0;
     TopRefMap top_refs;
-    VersionVector unreachable_versions;
+    int num_unreachable;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, unreachable_versions);
+        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, num_unreachable);
 
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest *live* bound snapshot.
@@ -2132,7 +2124,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 #endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
-    out.set_versions(new_version, oldest_version, top_refs, unreachable_versions);
+    out.set_versions(new_version, oldest_version, top_refs, num_unreachable);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {

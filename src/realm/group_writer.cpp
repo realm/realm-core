@@ -315,16 +315,10 @@ auto GroupWriter::map_reachable() -> std::vector<FreeSpaceEntry>
     };
     // collect reachable blocks in all reachable versions
     Collector collector;
-    auto kill_it = m_unreachable_versions.begin();
     for (auto& entry : m_top_ref_map) {
         collector.current_version = entry.first;
         // skip any empty entries
         if (entry.second.top_ref == 0)
-            continue;
-        // skip versions about to become unreachable
-        while (kill_it < m_unreachable_versions.end() && *kill_it < entry.first)
-            ++kill_it;
-        if (kill_it < m_unreachable_versions.end() && *kill_it == entry.first)
             continue;
         Array array(m_alloc);
         array.init_from_ref(entry.second.top_ref);
@@ -368,9 +362,6 @@ void GroupWriter::backdate()
     old_freelists.reserve(m_top_ref_map.size());
     for (auto& entry : m_top_ref_map) {
         if (entry.first < m_oldest_reachable_version)
-            continue;
-        auto it = std::lower_bound(m_unreachable_versions.begin(), m_unreachable_versions.end(), entry.first);
-        if (it != m_unreachable_versions.end() && *it == entry.first)
             continue;
         auto e =
             std::make_unique<FreeList>(m_alloc, entry.second.top_ref, entry.second.logical_file_size, entry.first);
@@ -623,7 +614,7 @@ ref_type GroupWriter::write_group()
 #endif
     // We now back-date (if possbible) any blocks freed in versions which
     // are becoming unreachable.
-    if (m_unreachable_versions.size())
+    if (m_num_unreachable)
         backdate();
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
