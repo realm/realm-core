@@ -1996,11 +1996,11 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
 void Obj::copy(const Obj& other)
 {
     // To be used carefully since it could potentially duplicate user data.
-    // since Obj::copy is for now basically only used for handling schema migration when there multiple
+    // since Obj::copy is for now basically only used for handling schema migration when there are multiple
     // incoming links to some embedded table, this method is basically harmless, but if Obj::assign get's exposed,
-    // we will have to have 2 versions of it, one designed for migrations (in which links to embedded objects are dup)
-    // and one for handling normal copies (where an expecption is thrown if an outgoing link to an embedded table is
-    // found).
+    // we will have to have 2 versions of it, one designed for migrations (in which links to embedded objects are
+    // duplicated) and one for handling normal copies (where an expecption is thrown if an outgoing link to an
+    // embedded table is found).
 
     // handle correctly the case in which the value to copy is an outgoing link to an embedded table.
     auto handle_object_to_copy = [this](Mixed value) -> Mixed {
