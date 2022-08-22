@@ -363,17 +363,14 @@ void GroupWriter::backdate()
     };
 
 
-    std::set<uint64_t> unreachables;
-    for (auto unreachable : m_unreachable_versions) {
-        unreachables.insert(unreachable);
-    }
     using FreeListMap = std::vector<std::unique_ptr<FreeList>>;
     FreeListMap old_freelists;
     old_freelists.reserve(m_top_ref_map.size());
     for (auto& entry : m_top_ref_map) {
-        if (unreachables.count(entry.first))
-            continue;
         if (entry.first < m_oldest_reachable_version)
+            continue;
+        auto it = std::lower_bound(m_unreachable_versions.begin(), m_unreachable_versions.end(), entry.first);
+        if (it != m_unreachable_versions.end() && *it == entry.first)
             continue;
         auto e =
             std::make_unique<FreeList>(m_alloc, entry.second.top_ref, entry.second.logical_file_size, entry.first);
