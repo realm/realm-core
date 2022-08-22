@@ -261,8 +261,7 @@ public:
     Obj& set_all(Head v, Tail... tail);
 
     void assign(const Obj& other);
-    bool
-    handle_multiple_backlinks_during_schema_migration(std::vector<std::pair<Obj, TableRef>>& embedded_objects_to_fix);
+    void handle_multiple_backlinks_during_schema_migration();
 
     Obj get_linked_object(ColKey link_col_key) const
     {
@@ -423,13 +422,9 @@ private:
     template <class T>
     inline void set_spec(T&, ColKey);
 
-    void dup(const Obj& other);
-    void clone_object_during_migration(TableRef opposite_table, ColKey opposite_col_key, ObjKey backlink);
-
-public:
-    Obj clone();
-    Obj clone_with_link();
-    bool verify_ongoing_links_to_embedded_objects(std::vector<std::pair<Obj, TableRef>>& embedded_objects_to_fix);
+    void copy(const Obj& other);
+    void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
+    bool is_outgoing_embedded_link(Mixed value, TableRef& target_table, ObjKey& target_obj_key) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

@@ -1488,7 +1488,7 @@ TEST_CASE("migration: Automatic") {
                  }},
                 {"parent_table",
                  {
-                     {"child_property", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                     {"child_property", PropertyType::Object | PropertyType::Nullable | PropertyType::Dictionary,
                       "child_embedded_table"},
                  }},
                 {"origin_table",
@@ -1505,7 +1505,8 @@ TEST_CASE("migration: Automatic") {
             Obj parent_object = parent_table->create_object();
             ColKey col_link = parent_table->get_column_key("child_property");
             object_store::Dictionary dict_link(realm, parent_object, col_link);
-            dict_link.insert_embedded("Ref");
+            auto child_obj = dict_link.insert_embedded("Ref");
+            child_obj.set("value", 42);
 
             auto origin_table = ObjectStore::table_for_object_type(realm->read_group(), "origin_table");
             origin_table->create_object().set_all(parent_object.get_key());
@@ -1537,6 +1538,17 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 2);
             REQUIRE(origin_table->size() == 2);
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                object_store::Dictionary dictionary_to_embedded_object = any_cast<object_store::Dictionary>(
+                    parent_object.get_property_value<util::Any>(context, "child_property"));
+                auto child = dictionary_to_embedded_object.get_any("Ref");
+                ObjLink link = child.get_link();
+                Object child_value(realm, link);
+                REQUIRE(child_value.get_column_value<Int>("value") == 42);
+            }
         }
     }
 
