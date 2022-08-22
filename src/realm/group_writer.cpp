@@ -461,6 +461,46 @@ void GroupWriter::backdate()
     };
 
 
+    auto backdate_single_entry = [&](FreeSpaceEntry& entry, bool referenced) -> void {
+        while (entry.released_at_version) {
+            // early out for references before oldest freelist:
+            if (entry.released_at_version <= this->m_oldest_reachable_version) {
+#ifdef REALM_DEBUG
+                REALM_ASSERT(!referenced);
+#endif
+                break;
+            }
+            auto earlier_it = get_earlier(entry.released_at_version);
+            // if no earlier versions than that exists, we're done
+            if (earlier_it == nullptr) {
+#if REALM_ALLOC_DEBUG
+                std::cout << "  backdating [" << entry.ref << ", " << entry.size << "] to zero (no earlier freelist)";
+#endif
+#ifdef REALM_DEBUG
+                REALM_ASSERT(!referenced);
+#endif
+                entry.released_at_version = 0;
+                break;
+            }
+            // earlier versions exist, we need to examine the freelist for it
+#if REALM_ALLOC_DEBUG
+            std::cout << " - earlier freelist: " << earlier_it->version;
+#endif
+            auto covering_blocks_released_at = find_cover_for(entry, earlier_it);
+            if (covering_blocks_released_at == entry.released_at_version) {
+#ifdef REALM_DEBUG
+                REALM_ASSERT(referenced);
+#endif
+                break;
+            }
+#ifdef REALM_DEBUG
+            REALM_ASSERT(!referenced);
+#endif
+            entry.released_at_version = covering_blocks_released_at;
+        }
+    };
+
+
 #ifdef REALM_DEBUG
     auto reachables = map_reachable();
 #if REALM_ALLOC_DEBUG
@@ -515,44 +555,7 @@ void GroupWriter::backdate()
 #endif
             continue;
         }
-        // early out for references before oldest freelist:
-        if (entry.released_at_version <= this->m_oldest_reachable_version) {
-#ifdef REALM_DEBUG
-            REALM_ASSERT(!referenced);
-#endif
-            continue;
-        }
-        auto earlier_it = get_earlier(entry.released_at_version);
-        // if no earlier versions than that exists, we're done
-        if (earlier_it == nullptr) {
-#if REALM_ALLOC_DEBUG
-            std::cout << "  backdating [" << entry.ref << ", " << entry.size << "] to zero (no earlier freelist)";
-#endif
-#ifdef REALM_DEBUG
-            REALM_ASSERT(!referenced);
-#endif
-            entry.released_at_version = 0;
-            continue;
-        }
-        // earlier versions exist, we need to examine the freelist for it
-#if REALM_ALLOC_DEBUG
-        std::cout << " - earlier freelist: " << earlier_it->version;
-#endif
-        auto covering_blocks_released_at = find_cover_for(entry, earlier_it);
-        if (covering_blocks_released_at != entry.released_at_version) {
-#ifdef REALM_DEBUG
-            REALM_ASSERT(!referenced);
-#endif
-            entry.released_at_version = covering_blocks_released_at;
-            if (entry.released_at_version) {
-                // retry backdating from the newly found older version:
-                --index;
-            }
-            continue;
-        }
-#ifdef REALM_DEBUG
-        REALM_ASSERT(referenced);
-#endif
+        backdate_single_entry(entry, referenced);
     }
 #if REALM_ALLOC_DEBUG
     std::cout << std::endl;
