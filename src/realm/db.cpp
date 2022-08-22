@@ -221,7 +221,7 @@ struct VersionList {
     }
 
     void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
-                 int& num_unreachable) noexcept
+                        int& num_unreachable) noexcept
     {
         // run through list of versions and reclaim unused entries.
         // buld a map of reachable versions on the way.
@@ -246,7 +246,8 @@ struct VersionList {
                     num_unreachable++;
                 r.version = 0;
                 free_entry(index_of(r));
-            } else {
+            }
+            else {
                 have_seen_a_reachable_version = true;
                 top_refs.emplace(r.version, VersionInfo{to_ref(r.current_top), to_ref(r.filesize)});
             }

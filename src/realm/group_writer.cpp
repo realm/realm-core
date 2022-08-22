@@ -325,12 +325,11 @@ auto GroupWriter::map_reachable() -> std::vector<FreeSpaceEntry>
         array.report_memory_usage(collector);
     }
 
-    std::sort(collector.blocks.begin(), collector.blocks.end(),
-              [](const FreeSpaceEntry& a, const FreeSpaceEntry& b) {
-                  if (a.ref == b.ref)
-                      return a.released_at_version < b.released_at_version;
-                  return a.ref < b.ref;
-              });
+    std::sort(collector.blocks.begin(), collector.blocks.end(), [](const FreeSpaceEntry& a, const FreeSpaceEntry& b) {
+        if (a.ref == b.ref)
+            return a.released_at_version < b.released_at_version;
+        return a.ref < b.ref;
+    });
     return collector.blocks;
 }
 
