@@ -1,6 +1,4 @@
 {
-    "name": "realm-core",
-    "version-string": "1.0.0",
     "dependencies": [
         {
             "name": "openssl",
