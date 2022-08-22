@@ -4,8 +4,7 @@
     "dependencies": [
         {
             "name": "openssl",
-            "platform": "android | linux | windows",
-            "version-string": "1.1.1n"
+            "platform": "android | linux | windows"
         },
         {
             "name": "zlib",
@@ -20,5 +19,11 @@
             ]
         }
     },
+    "overrides": [
+        {
+            "name": "openssl",
+            "version-string": "1.1.1n"
+        }
+    ],
     "builtin-baseline": "acc3bcf76b84ae5041c86ab55fe138ae7b8255c7"
 }
