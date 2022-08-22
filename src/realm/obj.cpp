@@ -1443,7 +1443,6 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (type != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
-    auto n = target_table->get_name();
     TableKey target_table_key = target_table->get_key();
     if (target_key) {
         ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
