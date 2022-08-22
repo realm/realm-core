@@ -4,7 +4,8 @@
     "dependencies": [
         {
             "name": "openssl",
-            "platform": "android | linux | windows"
+            "platform": "android | linux | windows",
+            "version-string": "1.1.1n"
         },
         {
             "name": "zlib",
