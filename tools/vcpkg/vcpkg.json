@@ -15,7 +15,9 @@
     "features": {
         "tests": {
             "description": "Build tests",
-            "dependencies": ["libuv"]
+            "dependencies": [
+                "libuv"
+            ]
         }
     }
 }
