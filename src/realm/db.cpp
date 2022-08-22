@@ -228,6 +228,7 @@ struct VersionList {
         // there is always at least one live entry
         auto it = oldest;
         bool looking_for_oldest_live = true;
+        bool have_seen_a_reachable_version = false;
         REALM_ASSERT(oldest != nil);
         while (it != nil) {
             auto& r = get(it);
@@ -239,10 +240,14 @@ struct VersionList {
                 REALM_ASSERT(oldest_v <= oldest_live_v);
             }
             if (r.count_frozen == 0 && r.count_live == 0) {
-                num_unreachable++;
+                // only count in-between versions... this results in fewer runs
+                // of the backdating algorithm in group_writer.
+                if (have_seen_a_reachable_version)
+                    num_unreachable++;
                 r.version = 0;
                 free_entry(index_of(r));
             } else {
+                have_seen_a_reachable_version = true;
                 top_refs.emplace(r.version, VersionInfo{to_ref(r.current_top), to_ref(r.filesize)});
             }
         }
