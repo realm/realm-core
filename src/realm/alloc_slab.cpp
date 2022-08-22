@@ -1210,7 +1210,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
     }
 
     for (auto& e : m_mappings) {
-        e.primary_mapping.get_encrypted_mapping()->mark_for_refresh(0, e.primary_mapping.get_size());
+        if (auto m = e.primary_mapping.get_encrypted_mapping()) {
+            encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());
+        }
+        // e.primary_mapping.get_encrypted_mapping()->mark_for_refresh(0, e.primary_mapping.get_size());
     }
     rebuild_freelists_from_slab();
 

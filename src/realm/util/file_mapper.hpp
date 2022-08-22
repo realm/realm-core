@@ -79,6 +79,7 @@ size_t get_num_decrypted_pages();
 
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept;
+void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end);
 
 SharedFileInfo* get_file_info_for_file(File& file);
 

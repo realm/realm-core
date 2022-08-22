@@ -326,6 +326,11 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
+void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->mark_for_refresh(ref_start, ref_end);
+}
 namespace {
 size_t collect_total_workload() // must be called under lock
 {
