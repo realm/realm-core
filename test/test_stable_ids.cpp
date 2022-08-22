@@ -33,12 +33,10 @@ struct MakeServerHistory {
     private:
         std::mt19937_64 m_random;
     };
-    class WrapServerHistory : public HistoryContext,
-                              public _impl::ServerHistory::DummyCompactionControl,
-                              public _impl::ServerHistory {
+    class WrapServerHistory : public HistoryContext, public _impl::ServerHistory {
     public:
         WrapServerHistory()
-            : _impl::ServerHistory{*this, *this}
+            : _impl::ServerHistory{static_cast<ServerHistory::Context&>(*this)}
         {
         }
     };

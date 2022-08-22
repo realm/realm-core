@@ -323,8 +323,9 @@ namespace {
 
 // replicates the 4 least significant bits each times 8
 // eg: abcd -> aaaaaaaabbbbbbbbccccccccdddddddd
-int32_t replicate_4_lsb_x8(int32_t i) {
-    REALM_ASSERT_DEBUG(0 <= i && i <= 15);
+uint32_t replicate_4_lsb_x8(uint32_t i)
+{
+    REALM_ASSERT_DEBUG(i <= 15);
     i *= 0x204081;
     i &= 0x1010101;
     i *= 0xff;

@@ -25,11 +25,11 @@
 #include <realm/util/any.hpp>
 
 namespace realm {
-using AnyDict = std::map<std::string, util::Any>;
-using AnyVector = std::vector<util::Any>;
+using AnyDict = std::map<std::string, std::any>;
+using AnyVector = std::vector<std::any>;
 
 // An object accessor context which can be used to create and access objects
-// using util::Any as the type-erased value type. In addition, this serves as
+// using std::any as the type-erased value type. In addition, this serves as
 // the reference implementation of an accessor context that must be implemented
 // by each binding.
 class CppContext {
@@ -62,8 +62,8 @@ public:
     // value present. The property is identified both by the name of the
     // property and its index within the ObjectScehma's persisted_properties
     // array.
-    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop,
-                                                 size_t /* property_index */) const
+    util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
+                                                size_t /* property_index */) const
     {
         auto const& v = util::any_cast<AnyDict&>(dict);
         auto it = v.find(prop.name);
@@ -76,139 +76,139 @@ public:
     //
     // This implementation does not support default values; see the default
     // value tests for an example of one which does.
-    util::Optional<util::Any> default_value_for_property(ObjectSchema const&, Property const&) const
+    util::Optional<std::any> default_value_for_property(ObjectSchema const&, Property const&) const
     {
         return util::none;
     }
 
     // Invoke `fn` with each of the values from an enumerable type
     template <typename Func>
-    void enumerate_collection(util::Any& value, Func&& fn)
+    void enumerate_collection(std::any& value, Func&& fn)
     {
         for (auto&& v : util::any_cast<AnyVector&>(value))
             fn(v);
     }
 
     template <typename Func>
-    void enumerate_dictionary(util::Any& value, Func&& fn)
+    void enumerate_dictionary(std::any& value, Func&& fn)
     {
         for (auto&& v : util::any_cast<AnyDict&>(value))
             fn(v.first, v.second);
     }
 
     // Determine if `value` boxes the same Set as `set`
-    bool is_same_set(object_store::Set const& set, util::Any const& value)
+    bool is_same_set(object_store::Set const& set, std::any const& value)
     {
-        if (auto set2 = util::any_cast<object_store::Set>(&value))
+        if (auto set2 = std::any_cast<object_store::Set>(&value))
             return set == *set2;
         return false;
     }
 
     // Determine if `value` boxes the same List as `list`
-    bool is_same_list(List const& list, util::Any const& value)
+    bool is_same_list(List const& list, std::any const& value)
     {
-        if (auto list2 = util::any_cast<List>(&value))
+        if (auto list2 = std::any_cast<List>(&value))
             return list == *list2;
         return false;
     }
 
     // Determine if `value` boxes the same Dictionary as `dict`
-    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
+    bool is_same_dictionary(const object_store::Dictionary& dict, const std::any& value)
     {
-        if (auto dict2 = util::any_cast<object_store::Dictionary>(&value))
+        if (auto dict2 = std::any_cast<object_store::Dictionary>(&value))
             return dict == *dict2;
         return false;
     }
 
     // Convert from core types to the boxed type
-    util::Any box(BinaryData v) const
+    std::any box(BinaryData v) const
     {
         return std::string(v);
     }
-    util::Any box(List v) const
+    std::any box(List v) const
     {
         return v;
     }
-    util::Any box(object_store::Set s) const
+    std::any box(object_store::Set s) const
     {
         return s;
     }
-    util::Any box(object_store::Dictionary v) const
+    std::any box(object_store::Dictionary v) const
     {
         return v;
     }
 
-    util::Any box(Object v) const
+    std::any box(Object v) const
     {
         return v;
     }
-    util::Any box(Results v) const
+    std::any box(Results v) const
     {
         return v;
     }
-    util::Any box(StringData v) const
+    std::any box(StringData v) const
     {
         return std::string(v);
     }
-    util::Any box(Timestamp v) const
+    std::any box(Timestamp v) const
     {
         return v;
     }
-    util::Any box(bool v) const
+    std::any box(bool v) const
     {
         return v;
     }
-    util::Any box(double v) const
+    std::any box(double v) const
     {
         return v;
     }
-    util::Any box(float v) const
+    std::any box(float v) const
     {
         return v;
     }
-    util::Any box(int64_t v) const
+    std::any box(int64_t v) const
     {
         return v;
     }
-    util::Any box(ObjectId v) const
+    std::any box(ObjectId v) const
     {
         return v;
     }
-    util::Any box(Decimal v) const
+    std::any box(Decimal v) const
     {
         return v;
     }
-    util::Any box(UUID v) const
+    std::any box(UUID v) const
     {
         return v;
     }
-    util::Any box(util::Optional<bool> v) const
+    std::any box(util::Optional<bool> v) const
     {
         return v;
     }
-    util::Any box(util::Optional<double> v) const
+    std::any box(util::Optional<double> v) const
     {
         return v;
     }
-    util::Any box(util::Optional<float> v) const
+    std::any box(util::Optional<float> v) const
     {
         return v;
     }
-    util::Any box(util::Optional<int64_t> v) const
+    std::any box(util::Optional<int64_t> v) const
     {
         return v;
     }
-    util::Any box(util::Optional<ObjectId> v) const
+    std::any box(util::Optional<ObjectId> v) const
     {
         return v;
     }
-    util::Any box(util::Optional<UUID> v) const
+    std::any box(util::Optional<UUID> v) const
     {
         return v;
     }
-    util::Any box(Obj) const;
+    std::any box(Obj) const;
 
-    util::Any box(Mixed v) const
+    std::any box(Mixed v) const
     {
         return v;
     }
@@ -228,22 +228,22 @@ public:
     // is true, `current_row` may hold a reference to the object that should
     // be compared against.
     template <typename T>
-    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const
+    T unbox(std::any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const
     {
         return util::any_cast<T>(v);
     }
 
     Obj create_embedded_object();
 
-    bool is_null(util::Any const& v) const noexcept
+    bool is_null(std::any const& v) const noexcept
     {
         return !v.has_value();
     }
-    util::Any null_value() const noexcept
+    std::any null_value() const noexcept
     {
         return {};
     }
-    util::Optional<util::Any> no_value() const noexcept
+    util::Optional<std::any> no_value() const noexcept
     {
         return {};
     }
@@ -254,7 +254,7 @@ public:
     void did_change() {}
 
     // Get a string representation of the given value for use in error messages.
-    std::string print(util::Any const&) const
+    std::string print(std::any const&) const
     {
         return "not implemented";
     }
@@ -262,7 +262,7 @@ public:
     // Cocoa allows supplying fewer values than there are properties when
     // creating objects using an array of values. Other bindings should not
     // mimick this behavior so just return false here.
-    bool allow_missing(util::Any const&) const
+    bool allow_missing(std::any const&) const
     {
         return false;
     }
@@ -274,14 +274,14 @@ private:
     const Property* m_property = nullptr;
 };
 
-inline util::Any CppContext::box(Obj obj) const
+inline std::any CppContext::box(Obj obj) const
 {
     REALM_ASSERT(object_schema);
     return Object(realm, *object_schema, obj);
 }
 
 template <>
-inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline StringData CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return StringData();
@@ -290,7 +290,7 @@ inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 }
 
 template <>
-inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline BinaryData CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return BinaryData();
@@ -299,11 +299,11 @@ inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 }
 
 template <>
-inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_obj) const
+inline Obj CppContext::unbox(std::any& v, CreatePolicy policy, ObjKey current_obj) const
 {
-    if (auto object = util::any_cast<Object>(&v))
+    if (auto object = std::any_cast<Object>(&v))
         return object->obj();
-    if (auto obj = util::any_cast<Obj>(&v))
+    if (auto obj = std::any_cast<Obj>(&v))
         return *obj;
     if (!policy.create)
         return Obj();
@@ -313,43 +313,43 @@ inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_o
 }
 
 template <>
-inline util::Optional<bool> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<bool> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<bool>(v)) : util::none;
 }
 
 template <>
-inline util::Optional<int64_t> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<int64_t> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<int64_t>(v)) : util::none;
 }
 
 template <>
-inline util::Optional<double> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<double> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<double>(v)) : util::none;
 }
 
 template <>
-inline util::Optional<float> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<float> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
 }
 
 template <>
-inline util::Optional<ObjectId> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<ObjectId> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<ObjectId>(v)) : util::none;
 }
 
 template <>
-inline util::Optional<UUID> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline util::Optional<UUID> CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<UUID>(v)) : util::none;
 }
 
 template <>
-inline Mixed CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+inline Mixed CppContext::unbox(std::any& v, CreatePolicy, ObjKey) const
 {
     if (v.has_value()) {
         const std::type_info& this_type{v.type()};

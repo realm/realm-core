@@ -71,7 +71,7 @@ namespace {
 
 void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -85,7 +85,7 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
     CHECK_EQUAL(a.size() - 1, t);
 
     r.clear();
-    a.find_all(&r, 0);
+    ArrayWithFind(a).find_all(&r, 0);
     CHECK_EQUAL(int64_t(a.size() - 1), r.get(0));
 
     // Cleanup
@@ -689,8 +689,9 @@ TEST(Array_LowerUpperBound)
 
 TEST(Array_FindAllInt0)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -703,15 +704,15 @@ TEST(Array_FindAllInt0)
     }
 
     r.clear();
-    a.find_all(&r, 1, 0, 0, 0);
+    f.find_all(&r, 1, 0, 0, 0);
     CHECK_EQUAL(0, r.size());
 
     r.clear();
-    a.find_all(&r, 1, 0, vReps - 1, vReps - 1);
+    f.find_all(&r, 1, 0, vReps - 1, vReps - 1);
     CHECK_EQUAL(0, r.size());
 
     r.clear();
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -729,8 +730,9 @@ TEST(Array_FindAllInt0)
 
 TEST(Array_FindAllInt1)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -745,7 +747,7 @@ TEST(Array_FindAllInt1)
         a.add(0);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -763,8 +765,9 @@ TEST(Array_FindAllInt1)
 
 TEST(Array_FindAllInt2)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -779,7 +782,7 @@ TEST(Array_FindAllInt2)
         a.add(3);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -797,8 +800,9 @@ TEST(Array_FindAllInt2)
 
 TEST(Array_FindAllInt3)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -813,7 +817,7 @@ TEST(Array_FindAllInt3)
         a.add(13);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -831,8 +835,9 @@ TEST(Array_FindAllInt3)
 
 TEST(Array_FindAllInt4)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -848,7 +853,7 @@ TEST(Array_FindAllInt4)
         a.add(23);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -866,8 +871,9 @@ TEST(Array_FindAllInt4)
 
 TEST(Array_FindAllInt5)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -883,7 +889,7 @@ TEST(Array_FindAllInt5)
         a.add(303);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -901,8 +907,9 @@ TEST(Array_FindAllInt5)
 
 TEST(Array_FindAllInt6)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -918,7 +925,7 @@ TEST(Array_FindAllInt6)
         a.add(70003);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -936,8 +943,9 @@ TEST(Array_FindAllInt6)
 
 TEST(Array_FindAllInt7)
 {
-    ArrayWithFind a(Allocator::get_default());
+    Array a(Allocator::get_default());
     a.create(Array::type_Normal);
+    ArrayWithFind f(a);
 
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -953,7 +961,7 @@ TEST(Array_FindAllInt7)
         a.add(4300000003ULL);
     }
 
-    a.find_all(&r, value);
+    f.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;

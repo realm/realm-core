@@ -2278,7 +2278,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
         auto object = Object::create(
             c, r, "source",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
@@ -2287,13 +2287,13 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     };
 
     auto create_one_dest_object = [&](realm::SharedRealm r, util::Optional<int64_t> val) -> ObjLink {
-        util::Any v;
+        std::any v;
         if (val) {
-            v = util::Any(*val);
+            v = std::any(*val);
         }
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
@@ -3704,7 +3704,10 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
             });
             int64_t initial_value = initial.dict_values[existing_key]->int_value;
-            int64_t addition = random_int();
+            std::mt19937_64 engine(std::random_device{}());
+            std::uniform_int_distribution<int64_t> rng(-10'000'000'000, 10'000'000'000);
+
+            int64_t addition = rng(engine);
             SECTION("local add_int to an existing dictionary item") {
                 INFO("adding " << initial_value << " with " << addition);
                 expected_recovered = initial;
@@ -3716,7 +3719,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                     ->run();
             }
             SECTION("local and remote both create the same dictionary item and add to it") {
-                int64_t remote_addition = random_int();
+                int64_t remote_addition = rng(engine);
                 INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
                 expected_recovered = initial;
                 expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);

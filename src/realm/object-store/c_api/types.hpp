@@ -604,6 +604,10 @@ struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
 
 struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
     using SyncConfig::SyncConfig;
+    realm_sync_config(const SyncConfig& c)
+        : SyncConfig(c)
+    {
+    }
 };
 
 struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {

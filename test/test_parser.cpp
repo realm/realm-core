@@ -427,10 +427,10 @@ static Query verify_query(test_util::unit_test::TestContext& test_context, Table
 }
 
 static void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                             const util::Any* arg_list, size_t num_args, size_t num_results)
+                             const std::any* arg_list, size_t num_args, size_t num_results)
 {
     query_parser::AnyContext ctx;
-    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
+    realm::query_parser::ArgumentConverter<std::any, query_parser::AnyContext> args(ctx, arg_list, num_args);
 
     Query q = t->query(query_string, args, {});
 
@@ -1425,8 +1425,8 @@ TEST(Parser_substitution)
     LnkLst list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
     list_1.add(obj_keys[0]);
 
-    util::Any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
-                        bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
+    std::any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
+                       bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
     size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
@@ -2127,7 +2127,7 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
     verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
 
-    util::Any args[] = {Int(1)};
+    std::any args[] = {Int(1)};
     size_t num_args = 1;
     verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
 
@@ -2378,7 +2378,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
         verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
-        util::Any args[] = {value_1};
+        std::any args[] = {value_1};
         size_t num_args = 1;
         size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
         size_t num_not_matching_value_1 = 2;                   // obj1, obj5
@@ -4349,7 +4349,7 @@ TEST(Parser_ObjectId)
     verify_query(test_context, table, "nid == NULL", 1);
 
     // argument substitution checks with an ObjectId
-    util::Any args[] = {oid_1, oid_before_now, oid_after_now, oid_0, realm::null()};
+    std::any args[] = {oid_1, oid_before_now, oid_after_now, oid_0, realm::null()};
     size_t num_args = 5;
 
     verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
@@ -4468,7 +4468,7 @@ TEST(Parser_UUID)
     }
 
     // argument substitution checks
-    util::Any args[] = {u1, u2, u3, realm::null()};
+    std::any args[] = {u1, u2, u3, realm::null()};
     size_t num_args = 4;
     verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
@@ -4566,7 +4566,7 @@ TEST(Parser_Decimal128)
     verify_query(test_context, table, "dec >= -infinity", table->size() - num_nans);
 
     // argument substitution checks
-    util::Any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
+    std::any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
     size_t num_args = 3;
     verify_query_sub(test_context, table, "dec == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "dec == $1", args, num_args, 1);
@@ -4647,10 +4647,10 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
-                        ObjLink(origin->get_key(), origin->begin()->get_key()),
-                        ObjLink(TableKey(), ObjKey()), // null link
-                        realm::null{}};
+    std::any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
+                       ObjLink(origin->get_key(), origin->begin()->get_key()),
+                       ObjLink(TableKey(), ObjKey()), // null link
+                       realm::null{}};
     size_t num_args = 5;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
     verify_query_sub(test_context, origin, "link == $1", args, num_args, 1);
@@ -4902,7 +4902,7 @@ TEST(Parser_Dictionary)
         }
     }
 
-    util::Any args[] = {String("Value")};
+    std::any args[] = {String("Value")};
     size_t num_args = 1;
 
     verify_query(test_context, foo, "dict.@values > 50", 50);
@@ -5082,7 +5082,7 @@ TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128
     verify_query(test_context, table, "set.@size >= 1", 4);
     verify_query(test_context, table, "set.@size == 4", 1);
 
-    util::Any args[] = {item_3};
+    std::any args[] = {item_3};
     size_t num_args = 1;
     verify_query_sub(test_context, table, "set == $0", args, num_args, 2);      // 1, 3
     verify_query_sub(test_context, table, "$0 IN set", args, num_args, 2);      // 1, 3

@@ -178,11 +178,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
 
                    sync::Server::Config config;
                    config.logger = m_logger.get();
-                   config.history_compaction_clock = this;
                    config.token_expiration_clock = this;
-                   config.disable_history_compaction = false;
-                   config.history_ttl = 1s;
-                   config.history_compaction_interval = 1s;
                    config.listen_address = "127.0.0.1";
                    config.disable_sync_to_disk = true;
 

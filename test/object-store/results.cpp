@@ -55,15 +55,15 @@ public:
 
 namespace Catch {
 template <>
-struct StringMaker<realm::util::Any> {
-    static std::string convert(realm::util::Any const& any)
+struct StringMaker<std::any> {
+    static std::string convert(std::any const& any)
     {
         return realm::util::format("Any<%1>", any.type().name());
     }
 };
 template <>
-struct StringMaker<realm::util::Optional<realm::util::Any>> {
-    static std::string convert(realm::util::Optional<realm::util::Any> any)
+struct StringMaker<realm::util::Optional<std::any>> {
+    static std::string convert(realm::util::Optional<std::any> any)
     {
         return any ? realm::util::format("some(Any<%1>)", any->type().name()) : "none";
     }
@@ -75,8 +75,8 @@ using namespace std::string_literals;
 using util::any_cast;
 
 namespace {
-using AnyDict = std::map<std::string, util::Any>;
-using AnyVec = std::vector<util::Any>;
+using AnyDict = std::map<std::string, std::any>;
+using AnyVec = std::vector<std::any>;
 } // namespace
 
 struct TestContext : CppContext {
@@ -91,11 +91,11 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any)
+    std::string print(std::any)
     {
         return "not implemented";
     }
-    bool allow_missing(util::Any)
+    bool allow_missing(std::any)
     {
         return false;
     }
@@ -3025,7 +3025,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3092,7 +3092,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3124,7 +3124,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3164,7 +3164,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -4392,35 +4392,35 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 
     SECTION("get()") {
         for (int i = 0; i < 10; ++i)
-            CHECK(any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
+            CHECK(util::any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
         CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 greater than max 9");
     }
 
     SECTION("first()") {
-        CHECK(any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
+        CHECK(util::any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
     }
 
     SECTION("last()") {
-        CHECK(any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
+        CHECK(util::any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
     }
 
     SECTION("index_of()") {
         SECTION("valid") {
             for (size_t i = 0; i < 10; ++i)
-                REQUIRE(results.index_of(ctx, util::Any(results.get<Obj>(i))) == i);
+                REQUIRE(results.index_of(ctx, std::any(results.get<Obj>(i))) == i);
         }
         SECTION("wrong object type") {
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(other_obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(other_obj)),
                               "Object of type 'different type' does not match Results type 'object'");
         }
         SECTION("wrong realm") {
             auto obj = r2->read_group().get_table("class_object")->get_object(0);
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(obj)),
                               "Object of type 'object' does not match Results type 'object'");
         }
         SECTION("detached object") {
             Obj detached_obj;
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(detached_obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(detached_obj)),
                               "Attempting to access an invalid object");
         }
     }
@@ -4719,20 +4719,20 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("non-existing property name") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)),
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", std::any(false)),
                           Results::InvalidPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("readonly property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), ReadOnlyPropertyException);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", std::any(false)), ReadOnlyPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("primarykey property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), std::logic_error);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", std::any(1)), std::logic_error);
         realm->cancel_transaction();
     }
 
@@ -4740,7 +4740,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
         realm->begin_transaction();
         Results results(realm, table->where().equal(table->get_column_key("int"), 0));
         CHECK(results.size() == 2);
-        r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
+        r.set_property_value(ctx, "int", std::any(INT64_C(42)));
         CHECK(results.size() == 0);
         realm->cancel_transaction();
     }
@@ -4748,70 +4748,70 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     SECTION("set property value") {
         realm->begin_transaction();
 
-        r.set_property_value<util::Any>(ctx, "bool", util::Any(true));
+        r.set_property_value<std::any>(ctx, "bool", std::any(true));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Bool>("bool") == true);
         }
 
-        r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
+        r.set_property_value(ctx, "int", std::any(INT64_C(42)));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Int>("int") == 42);
         }
 
-        r.set_property_value(ctx, "float", util::Any(1.23f));
+        r.set_property_value(ctx, "float", std::any(1.23f));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<float>("float") == 1.23f);
         }
 
-        r.set_property_value(ctx, "double", util::Any(1.234));
+        r.set_property_value(ctx, "double", std::any(1.234));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<double>("double") == 1.234);
         }
 
-        r.set_property_value(ctx, "string", util::Any(std::string("abc")));
+        r.set_property_value(ctx, "string", std::any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<String>("string") == "abc");
         }
 
-        r.set_property_value(ctx, "data", util::Any(std::string("abc")));
+        r.set_property_value(ctx, "data", std::any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Binary>("data") == BinaryData("abc", 3));
         }
 
-        util::Any timestamp = Timestamp(1, 2);
+        std::any timestamp = Timestamp(1, 2);
         r.set_property_value(ctx, "date", timestamp);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Timestamp>("date") == any_cast<Timestamp>(timestamp));
+            CHECK(r.get(i).get<Timestamp>("date") == util::any_cast<Timestamp>(timestamp));
         }
 
-        util::Any object_id = ObjectId("ffffffffffffffffffffffff");
+        std::any object_id = ObjectId("ffffffffffffffffffffffff");
         r.set_property_value(ctx, "object id", object_id);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<ObjectId>("object id") == any_cast<ObjectId>(object_id));
+            CHECK(r.get(i).get<ObjectId>("object id") == util::any_cast<ObjectId>(object_id));
         }
 
-        util::Any decimal = Decimal128("876.54e32");
+        std::any decimal = Decimal128("876.54e32");
         r.set_property_value(ctx, "decimal", decimal);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
+            CHECK(r.get(i).get<Decimal128>("decimal") == util::any_cast<Decimal128>(decimal));
         }
 
-        util::Any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
+        std::any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
         r.set_property_value(ctx, "uuid", uuid);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<UUID>("uuid") == any_cast<UUID>(uuid));
+            CHECK(r.get(i).get<UUID>("uuid") == util::any_cast<UUID>(uuid));
         }
 
         ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
-        r.set_property_value(ctx, "object", util::Any(linked_obj));
+        r.set_property_value(ctx, "object", std::any(linked_obj));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<ObjKey>("object") == object_key);
         }
 
         ObjKey list_object_key = table->create_object_with_primary_key(4).get_key();
         Object list_object(realm, "AllTypes", list_object_key);
-        r.set_property_value(ctx, "list", util::Any(AnyVector{list_object, list_object}));
+        r.set_property_value(ctx, "list", std::any(AnyVector{list_object, list_object}));
         for (size_t i = 0; i < r.size(); i++) {
             auto list = r.get(i).get_linklist("list");
             CHECK(list.size() == 2);
@@ -4836,41 +4836,41 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             }
         };
 
-        r.set_property_value(ctx, "bool array", util::Any(AnyVec{true, false}));
+        r.set_property_value(ctx, "bool array", std::any(AnyVec{true, false}));
         check_array(table->get_column_key("bool array"), true, false);
 
-        r.set_property_value(ctx, "int array", util::Any(AnyVec{INT64_C(5), INT64_C(6)}));
+        r.set_property_value(ctx, "int array", std::any(AnyVec{INT64_C(5), INT64_C(6)}));
         check_array(table->get_column_key("int array"), INT64_C(5), INT64_C(6));
 
-        r.set_property_value(ctx, "float array", util::Any(AnyVec{1.1f, 2.2f}));
+        r.set_property_value(ctx, "float array", std::any(AnyVec{1.1f, 2.2f}));
         check_array(table->get_column_key("float array"), 1.1f, 2.2f);
 
-        r.set_property_value(ctx, "double array", util::Any(AnyVec{3.3, 4.4}));
+        r.set_property_value(ctx, "double array", std::any(AnyVec{3.3, 4.4}));
         check_array(table->get_column_key("double array"), 3.3, 4.4);
 
-        r.set_property_value(ctx, "string array", util::Any(AnyVec{"a"s, "b"s, "c"s}));
+        r.set_property_value(ctx, "string array", std::any(AnyVec{"a"s, "b"s, "c"s}));
         check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
 
-        r.set_property_value(ctx, "data array", util::Any(AnyVec{"d"s, "e"s, "f"s}));
+        r.set_property_value(ctx, "data array", std::any(AnyVec{"d"s, "e"s, "f"s}));
         check_array(table->get_column_key("data array"), BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
 
         r.set_property_value(ctx, "date array",
-                             util::Any(AnyVec{Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40)}));
+                             std::any(AnyVec{Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40)}));
         check_array(table->get_column_key("date array"), Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40));
 
         r.set_property_value(
             ctx, "object id array",
-            util::Any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
+            std::any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
         check_array(table->get_column_key("object id array"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
                     ObjectId("888888888888888888888888"));
 
         r.set_property_value(ctx, "decimal array",
-                             util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
+                             std::any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
         check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
 
         r.set_property_value(ctx, "uuid array",
-                             util::Any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
-                                              UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
+                             std::any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                                             UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
         check_array(table->get_column_key("uuid array"), UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
                     UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
     }
@@ -5095,7 +5095,7 @@ TEST_CASE("notifications: objects with PK recreated") {
     auto table3 = r->read_group().get_table("class_string_pk");
 
     TestContext d(r);
-    auto create = [&](StringData type, util::Any&& value) {
+    auto create = [&](StringData type, std::any&& value) {
         return Object::create(d, r, *r->schema().find(type), value);
     };
 
