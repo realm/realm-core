@@ -848,7 +848,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
             if (object_schema->table_type == ObjectSchema::ObjectType::Embedded) {
                 auto original_object_schema = initial_schema.find(object_schema->name);
                 if (original_object_schema != initial_schema.end() &&
-                    original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel) {
+                    (original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel ||
+                     original_object_schema->table_type == ObjectSchema::ObjectType::TopLevelAsymmetric)) {
                     auto table = table_for_object_schema(group, *original_object_schema);
                     std::vector<Obj> objects_to_erase;
                     std::vector<Obj> objects_to_fix_backlinks;

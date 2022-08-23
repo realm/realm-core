@@ -1950,7 +1950,10 @@ void Obj::assign(const Obj& other)
                 linking_obj_list.set(n, get_key());
             }
             else if (c.get_attrs().test(col_attr_Set)) {
-                REALM_UNREACHABLE();
+                auto linking_obj_set = linking_obj.get_setbase_ptr(c);
+                auto pos = linking_obj_set->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
+                REALM_ASSERT(pos != realm::npos);
+                linking_obj_set->insert_any(ObjLink{m_table->get_key(), get_key()});
             }
             else if (c.get_attrs().test(col_attr_Dictionary)) {
                 auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(c);
@@ -1994,18 +1997,11 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
 
 void Obj::copy(const Obj& other)
 {
-    // To be used carefully since it could potentially duplicate user data.
-    // since Obj::copy is for now basically only used for handling schema migration when there are multiple
-    // incoming links to some embedded table, this method is basically harmless, but if Obj::assign get's exposed,
-    // we will have to have 2 versions of it, one designed for migrations (in which links to embedded objects are
-    // duplicated) and one for handling normal copies (where an expecption is thrown if an outgoing link to an
-    // embedded table is found).
-
     // handle correctly the case in which the value to copy is an outgoing link to an embedded table.
-    auto handle_object_to_copy = [this](Mixed value) -> Mixed {
+    auto handle_object_to_copy = [this](ColKey col, Mixed value) -> Mixed {
         TableRef target_table;
         ObjKey target_obj_key;
-        if (is_outgoing_embedded_link(value, target_table, target_obj_key)) {
+        if (is_outgoing_embedded_link(col, value, target_table, target_obj_key)) {
             auto copy_target_object = target_table->create_linked_object();
             auto target_obj = target_table->get_object(target_obj_key);
             copy_target_object.copy(target_obj);
@@ -2024,7 +2020,7 @@ void Obj::copy(const Obj& other)
             dst_list->clear();
             for (size_t i = 0; i < sz; i++) {
                 Mixed value = src_list->get_any(i);
-                dst_list->insert_any(i, handle_object_to_copy(value));
+                dst_list->insert_any(i, handle_object_to_copy(col, value));
             }
         }
         else if (col.get_attrs().test(col_attr_Set)) {
@@ -2034,7 +2030,7 @@ void Obj::copy(const Obj& other)
             dst_set->clear();
             for (size_t i = 0; i < sz; ++i) {
                 Mixed value = src_set->get_any(i);
-                dst_set->insert_any(handle_object_to_copy(value));
+                dst_set->insert_any(handle_object_to_copy(col, value));
             }
         }
         else if (col.get_attrs().test(col_attr_Dictionary)) {
@@ -2046,7 +2042,7 @@ void Obj::copy(const Obj& other)
                 const auto& [key, value] = src_dictionary->get_pair(i);
                 TableRef target_table;
                 ObjKey target_obj_key;
-                if (is_outgoing_embedded_link(value, target_table, target_obj_key)) {
+                if (is_outgoing_embedded_link(col, value, target_table, target_obj_key)) {
                     auto obj = dst_dictionary->create_and_insert_linked_object(key);
                     obj.copy(target_table->get_object(target_obj_key));
                 }
@@ -2075,7 +2071,7 @@ void Obj::copy(const Obj& other)
                     break;
                 }
                 default:
-                    this->set_any(col, handle_object_to_copy(value));
+                    this->set_any(col, handle_object_to_copy(col, value));
                     break;
             }
         }
@@ -2117,15 +2113,18 @@ void Obj::fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, C
     }
 }
 
-bool Obj::is_outgoing_embedded_link(Mixed value, TableRef& target_table, ObjKey& target_obj_key) const
+bool Obj::is_outgoing_embedded_link(ColKey col_key, Mixed value, TableRef& target_table, ObjKey& target_obj_key) const
 {
-    if (value.is_type(type_Link, type_TypedLink)) {
-        auto link = value.get<ObjLink>();
-        if (auto tk = link.get_table_key()) {
-            target_table = get_table()->get_parent_group()->get_table(tk);
-            target_obj_key = link.get_obj_key();
-            return target_table->is_embedded();
-        }
+    if (value.is_type(type_Link)) {
+        target_table = m_table->get_opposite_table(col_key);
+        target_obj_key = value.get<ObjKey>();
+        return target_table->is_embedded();
+    }
+    if (value.is_type(type_TypedLink)) {
+        target_table = m_table->get_opposite_table(col_key);
+        auto link = value.get_link();
+        target_obj_key = link.get_obj_key();
+        return target_table->is_embedded();
     }
     return false;
 }

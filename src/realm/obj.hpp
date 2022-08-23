@@ -260,6 +260,11 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
+    // Assign the object passed as argument to the this object.
+    // This method performs a deep copy of all the properties of
+    // the other object passed.
+    // So this could potentially create a lot of user data duplication
+    // if not used correctly.
     void assign(const Obj& other);
     void handle_multiple_backlinks_during_schema_migration();
 
@@ -422,9 +427,14 @@ private:
     template <class T>
     inline void set_spec(T&, ColKey);
 
+    // To be used carefully since it could potentially duplicate user data.
+    // since Obj::copy is for now basically only used for handling schema migration when there are multiple
+    // incoming links to some embedded table, this method is basically harmless, but Obj::assign uses it, so
+    // in case of copies outside a migration, probably we should throw an excpetion if we attempt to copy.
+    // an object that contains a link to an embedded table.
     void copy(const Obj& other);
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
-    bool is_outgoing_embedded_link(Mixed value, TableRef& target_table, ObjKey& target_obj_key) const;
+    bool is_outgoing_embedded_link(ColKey col_key, Mixed value, TableRef& target_table, ObjKey& target_obj_key) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

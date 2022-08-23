@@ -1209,8 +1209,8 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42);
                 auto value_dictionary = util::any_cast<object_store::Dictionary>(
                     child_object.get_property_value<util::Any>(context, "value_dict"));
@@ -1292,7 +1292,7 @@ TEST_CASE("migration: Automatic") {
             for (int i = 0; i < 1; i++) {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
-                object_store::Dictionary links_dictionary = any_cast<object_store::Dictionary>(
+                object_store::Dictionary links_dictionary = util::any_cast<object_store::Dictionary>(
                     parent_object.get_property_value<util::Any>(context, "child_property"));
                 REQUIRE(links_dictionary.size() == dict_links.size());
                 for (size_t i = 0; i < 2; ++i) {
@@ -1472,7 +1472,7 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
                 REQUIRE(child_object.obj().get_key() == obj_children[i]);
             }
         }
@@ -1542,7 +1542,7 @@ TEST_CASE("migration: Automatic") {
             for (int i = 0; i < 2; i++) {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
-                object_store::Dictionary dictionary_to_embedded_object = any_cast<object_store::Dictionary>(
+                object_store::Dictionary dictionary_to_embedded_object = util::any_cast<object_store::Dictionary>(
                     parent_object.get_property_value<util::Any>(context, "child_property"));
                 auto child = dictionary_to_embedded_object.get_any("Ref");
                 ObjLink link = child.get_link();
