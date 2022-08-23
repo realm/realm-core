@@ -4999,8 +4999,7 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
     {
         std::string server_path = fixture.map_virtual_to_real_path("/test");
         TestServerHistoryContext context;
-        _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{context, compaction_control};
+        _impl::ServerHistory history{context};
         DBRef db = DB::create(history, server_path);
         {
             ReadTransaction rt{db};
@@ -5026,8 +5025,7 @@ TEST(Sync_ServerSideModify_Randomize)
 
     std::string server_path = fixture.map_virtual_to_real_path("/test");
     TestServerHistoryContext context;
-    _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history_1{context, compaction_control};
+    _impl::ServerHistory history_1{context};
     DBRef db_1 = DB::create(history_1, server_path);
 
     auto server_side_program = [num_server_side_transacts, &db_1, &fixture, &session] {
@@ -5501,8 +5499,7 @@ TEST_IF(Sync_Issue2104, false)
     integratable_changesets[client_file_ident].changesets.push_back(integratable_changeset);
 
     issue2104::ServerHistoryContext history_context;
-    _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history{history_context, compaction_control};
+    _impl::ServerHistory history{history_context};
     DBRef db = DB::create(history, realm_path_copy);
 
     VersionInfo version_info;

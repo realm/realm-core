@@ -149,13 +149,13 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
                 REQUIRE(set().template get<T>(ndx) == T(val));
                 REQUIRE(set().get_any(ndx) == Mixed{T(val)});
                 auto ctx_val = set().get(ctx, ndx);
-                REQUIRE(any_cast<Boxed>(ctx_val) == Boxed(T(val)));
+                REQUIRE(util::any_cast<Boxed>(ctx_val) == Boxed(T(val)));
                 // and through results
                 auto res_ndx = set_as_results().index_of(T(val));
                 REQUIRE(res_ndx == ndx);
                 REQUIRE(set_as_results().template get<T>(res_ndx) == T(val));
                 auto res_ctx_val = set_as_results().get(ctx, res_ndx);
-                REQUIRE(any_cast<Boxed>(res_ctx_val) == Boxed(T(val)));
+                REQUIRE(util::any_cast<Boxed>(res_ctx_val) == Boxed(T(val)));
                 REQUIRE(set_as_results().get_any(res_ndx) == Mixed{T(val)});
             }
             // we do not require any particular ordering

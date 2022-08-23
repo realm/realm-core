@@ -215,88 +215,6 @@ History representation
       4 -> int progress_reference_version_salt
     9 -> tagged_int compacted_until_version
    10 -> tagged_int last_compaction_at
-
-
-History compaction
-------------------
-
-History compaction refers to the act of running log compaction on the server's
-main history periodically. The server considers whether history compaction
-should run after every successfully integrated changeset, local or uploaded from
-a client.
-
-See also `/doc/history_compaction.md` in the `realm-sync` Git repository.
-
-The decision to compact the history depends on a number of variable:
-
-  - The "last seen" timestamp associated with each client, which is updated
-    every time an action is performed related to a client, such as receiving an
-    uploaded changeset or producing a DOWNLOAD message for that client.
-
-  - The `rh_base_version` associated with a client. This indicates the highest
-    known server version that a given client may rely on.
-
-  - The configuration parameter `history_ttl`. Client that are "last seen"
-    within this time interval will have their `rh_base_version` taken into
-    consideration, i.e. the server will not compact history such that it
-    interferes with this client and causes it to be reset.
-
-  - The configuration parameter `history_compaction_interval`. The server will
-    consider compacting the history on average every time this amount of time
-    has passed. A random fuzz factor of `history_compaction_interval/2` is
-    applied in order to avoid cascading effects (meaning it is unlikely that the
-    server decides to compact many files at the same time).
-
-  - The configuration parameter `disable_history_compaction`, which can be used
-    to turn off log compaction altogether.
-
-An expired client is one where the difference between the "last seen" timestamp
-and `now` is higher than `history_ttl`, and its `rh_base_version` is higher than
-`compacted_until_version`. If a client has been offline for longer than
-`history_ttl`, but the server has not decided to run log compaction further than
-its `rh_base_version`, that client is not expired.
-
-A client may also have an `rh_base_version` lower than `compacted_until_version`
-while it is downloading the compacted history. In this case, that client's "last
-seen" timestamp will be recent, and the server will not compact the history any
-further while this download is taking place.
-
-
-History trimming (NOT YET IMPLEMENTED)
-----------------
-
-History trimming refers to the act of removing a prefix of the history for the
-purpose of limiting the size of it. History trimming is not yet supported. Also,
-if the history was trimmed, there would be no way for a new client to get
-started (because of the lack of the initial prefix of the history).
-
-On the other hand, with partial synchronization, it is expected that there will
-be a way to bootstrap a client from the latest server version, rather than by
-sending the entire history to the client. With such a mechanism in place,
-history trimming becomes possible.
-
-Still, if a client has been offline for a long time, and then reconnects, it is
-possible that it refers to an old server version that no longer exists. In such
-a case, the client needs to reset itself before it can continue. However, after
-it does that, it can resume synchronization by being bootstrapped off of the
-last server version as explained above.
-
-The need for a client reset needs to be detectable by the server during session
-initiation (no later than at the time of reception of the IDENT message). There
-are two cases to consider:
-
- - The client wishes to resume download from an expired server version.
-
- - The next changeset uploaded by the client specifies a last integrated server
-   version that has expired. The only feasible way we can check this at session
-   initiation time, is to check whether `recip_hist_base_version` precedes the
-   history base version (alternatively the trimming process would discard any
-   `client_files` entry where `recip_hist_base_version` would become less than
-   `history_base_version`. However, to make this fair for the client, it is
-   necessary that the protocol is expanded to allow for the client to tell the
-   server about integrated server versions even when the client has nothing to
-   upload.
-
 */
 
 
@@ -333,20 +251,6 @@ void ServerHistory::get_status(VersionInfo& version_info, bool& has_upstream_syn
         partial_file_ident = 0;
         partial_progress_reference_version = 0;
     }
-}
-
-
-version_type ServerHistory::get_compacted_until_version() const
-{
-    TransactionRef rt = m_db->start_read(); // Throws
-    version_type realm_version = rt->get_version();
-    const_cast<ServerHistory*>(this)->set_group(rt.get());
-    ensure_updated(realm_version); // Throws
-    if (m_acc && m_acc->root.is_attached()) {
-        auto value = m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int();
-        return version_type(value);
-    }
-    return 0;
 }
 
 
@@ -514,11 +418,6 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
             }
 
             if (dirty) {
-                bool force = false;
-                bool dirty_2 = do_compact_history(logger, force); // Throws
-                if (dirty_2)
-                    backup_whole_realm_2 = true;
-
                 auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
                 version_info.realm_version = tr->commit(); // Throws
                 version_info.sync_version = get_salted_server_version();
@@ -746,12 +645,7 @@ void ServerHistory::add_client_file(salt_type file_ident_salt, file_ident_type p
     std::int_fast64_t last_seen_timestamp = 0;
     std::int_fast64_t locked_server_version = 0;
     if (is_direct_client(client_type)) {
-        auto now_1 = m_context.get_compaction_clock_now();
-        auto now_2 = std::chrono::duration_cast<std::chrono::seconds>(now_1.time_since_epoch());
-        last_seen_timestamp = std::int_fast64_t(now_2.count());
-        // Make sure we never assign zero, as that means "expired"
-        if (REALM_UNLIKELY(last_seen_timestamp <= 0))
-            last_seen_timestamp = 1;
+        last_seen_timestamp = 1;
     }
     m_acc->cf_ident_salts.insert(realm::npos, std::int_fast64_t(file_ident_salt));  // Throws
     m_acc->cf_client_versions.insert(realm::npos, client_version);                  // Throws
@@ -1041,16 +935,6 @@ void ServerHistory::add_upstream_sync_status()
     tr->commit();                           // Throws
 }
 
-bool ServerHistory::compact_history(const TransactionRef& wt, Logger& logger)
-{
-    version_type realm_version = wt->get_version();
-    ensure_updated(realm_version); // Throws
-    prepare_for_write();           // Throws
-    bool force = true;
-    return do_compact_history(logger, force); // Throws
-}
-
-
 std::vector<sync::Changeset> ServerHistory::get_parsed_changesets(version_type begin, version_type end) const
 {
     TransactionRef rt = m_db->start_read(); // Throws
@@ -1082,319 +966,6 @@ std::vector<sync::Changeset> ServerHistory::get_parsed_changesets(version_type b
         changesets.emplace_back(std::move(changeset));
     }
     return changesets;
-}
-
-
-bool ServerHistory::do_compact_history(Logger& logger, bool force)
-{
-    // NOTE: For an overview of the in-place history compaction mechanism, see
-    // `/doc/history_compaction.md` in the `realm-sync` Git repository.
-
-    // Must be in write transaction!
-
-    static const std::size_t compaction_input_soft_limit = 1024 * 1024 * 1024; // 1 GB
-    namespace chrono = std::chrono;
-
-    if (!m_enable_compaction)
-        return false;
-
-    bool dirty = false;
-
-    // Flush "last seen" cache.
-    std::size_t num_client_files = m_acc->cf_rh_base_versions.size();
-    REALM_ASSERT(m_acc->cf_last_seen_timestamps.size() == num_client_files);
-    {
-        using Entry = CompactionControl::LastClientAccessesEntry;
-        using Range = CompactionControl::LastClientAccessesRange;
-        Range range = m_compaction_control.get_last_client_accesses(); // Throws
-        const Entry* begin = range.first;
-        const Entry* end = range.second;
-        for (auto i = begin; i != end; ++i) {
-            std::size_t client_file_index = std::size_t(i->client_file_ident);
-            REALM_ASSERT_RELEASE(client_file_index < num_client_files);
-            auto client_type = ClientType(m_acc->cf_client_types.get(client_file_index));
-            REALM_ASSERT(is_direct_client(client_type));
-            // Take the opportunity to upgrade legacy entries when their type
-            // gets discovered
-            if (client_type == ClientType::legacy) {
-                client_type = ClientType::regular;
-                m_acc->cf_client_types.set(client_file_index, std::int_fast64_t(client_type)); // Throws
-            }
-            // Take care to never de-expire a client file entry
-            std::int_fast64_t last_seen_timestamp = m_acc->cf_last_seen_timestamps.get(client_file_index);
-            bool expired = (last_seen_timestamp == 0);
-            if (REALM_UNLIKELY(expired))
-                continue;
-            last_seen_timestamp = std::int_fast64_t(i->last_seen_timestamp);
-            // Make sure we never assign zero, as that means "expired"
-            if (REALM_UNLIKELY(last_seen_timestamp <= 0))
-                last_seen_timestamp = 1;
-            m_acc->cf_last_seen_timestamps.set(client_file_index, last_seen_timestamp); // Throws
-            dirty = true;
-        }
-    }
-
-    REALM_ASSERT(m_compaction_ttl.count() != 0);
-
-    // Decide whether we should compact the history now, based on the average
-    // history compaction interval plus/minus a fuzz factor (currently half the
-    // interval).
-    auto now = m_context.get_compaction_clock_now();
-    chrono::seconds last_compaction_time_from_epoch{
-        m_acc->root.get_as_ref_or_tagged(s_last_compaction_timestamp_iip).get_as_int()};
-    chrono::system_clock::time_point last_compaction_time{last_compaction_time_from_epoch};
-    auto duration_since_last_compaction = chrono::duration_cast<chrono::seconds>(now - last_compaction_time);
-    auto& random = m_context.server_history_get_random();
-    auto duration_fuzz =
-        std::uniform_int_distribution<std::int_fast64_t>(0, m_compaction_interval.count() / 2)(random);
-    auto minimum_duration_until_compact =
-        chrono::duration_cast<chrono::seconds>(m_compaction_interval) + chrono::seconds{duration_fuzz};
-    if (!force && duration_since_last_compaction.count() < minimum_duration_until_compact.count()) {
-        logger.trace("History compaction: Skipping because we are still within the compaction interval (%1 < %2)",
-                     duration_since_last_compaction.count(), minimum_duration_until_compact.count()); // Throws
-        return dirty;
-    }
-
-    version_type compacted_until_version =
-        version_type(m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int());
-
-    version_type current_version = get_server_version();
-    if (current_version <= compacted_until_version) {
-        logger.trace("History compaction: Everything is already compacted (%1 <= %2)", current_version,
-                     compacted_until_version); // Throws
-        return dirty;
-    }
-
-    version_type limit_due_to_state_realms = m_compaction_control.get_max_compactable_server_version(); // Throws
-    if (limit_due_to_state_realms <= compacted_until_version) {
-        logger.debug("History compaction: Further progress blocked by state Realms (%1 <= %2)",
-                     limit_due_to_state_realms, compacted_until_version); // Throws
-        return dirty;
-    }
-
-    version_type can_compact_until_version = current_version;
-    bool has_upstream_sync_status = m_acc->upstream_status.is_attached();
-    if (has_upstream_sync_status) {
-        // This is a subtier server, so the upstream entry must be taken into
-        // account, and it can never be allowed to expire.
-        std::size_t client_file_index = 0;
-        auto rh_base_version = version_type(m_acc->cf_rh_base_versions.get(client_file_index));
-        auto locked_version = rh_base_version;
-        if (locked_version <= compacted_until_version) {
-            logger.debug("History compaction: Further progress blocked by upstream server, which "
-                         "has not progressed far enough in terms of synchronization (%1 <= %2)",
-                         locked_version, compacted_until_version); // Throws
-            return dirty;
-        }
-        if (locked_version < can_compact_until_version)
-            can_compact_until_version = locked_version;
-    }
-    auto expire_client_file = [&](std::size_t client_file_index) {
-        // Mark as expired
-        m_acc->cf_last_seen_timestamps.set(client_file_index, 0); // Throws
-        // Discard reciprocal history
-        ref_type recip_hist_ref = to_ref(m_acc->cf_recip_hist_refs.get(client_file_index));
-        if (recip_hist_ref != 0) {
-            Allocator& alloc = m_acc->cf_recip_hist_refs.get_alloc();
-            BinaryColumn recip_hist{alloc};
-            recip_hist.init_from_ref(recip_hist_ref);
-            recip_hist.destroy();                                // Throws
-            m_acc->cf_recip_hist_refs.set(client_file_index, 0); // Throws
-        }
-        dirty = true;
-    };
-    if (REALM_LIKELY(!m_compaction_ignore_clients)) {
-        for (std::size_t i = 1; i < num_client_files; ++i) {
-            auto client_type = ClientType(m_acc->cf_client_types.get(i));
-            if (REALM_LIKELY(!is_direct_client(client_type)))
-                continue;
-            REALM_ASSERT(m_acc->cf_ident_salts.get(i) != 0);
-            REALM_ASSERT(m_acc->cf_proxy_files.get(i) == 0);
-            file_ident_type file_ident = file_ident_type(i);
-            REALM_ASSERT(file_ident != g_root_node_file_ident);
-            REALM_ASSERT(file_ident != m_local_file_ident);
-            std::int_fast64_t last_seen_timestamp = m_acc->cf_last_seen_timestamps.get(i);
-            bool previously_expired = (last_seen_timestamp == 0);
-            if (REALM_LIKELY(previously_expired))
-                continue;
-            std::int_fast64_t age = 0;
-            auto max_time_to_live = std::int_fast64_t(m_compaction_ttl.count());
-            auto now_2 = chrono::duration_cast<chrono::seconds>(now.time_since_epoch());
-            auto now_3 = std::int_fast64_t(now_2.count());
-            if (REALM_LIKELY(last_seen_timestamp <= now_3)) {
-                age = now_3 - last_seen_timestamp;
-                bool expire_now = (age > max_time_to_live);
-                if (REALM_UNLIKELY(expire_now)) {
-                    logger.debug("History compaction: Expiring client file %1 due to age (%2 > "
-                                 "%3)",
-                                 file_ident, age, max_time_to_live); // Throws
-                    expire_client_file(i);                           // Throws
-                    continue;
-                }
-            }
-            auto rh_base_version = version_type(m_acc->cf_rh_base_versions.get(i));
-            auto locked_server_version = version_type(m_acc->cf_locked_server_versions.get(i));
-            auto locked_version = std::min(rh_base_version, locked_server_version);
-            if (locked_version <= compacted_until_version) {
-                logger.debug("History compaction: Further progress blocked by client file %1, "
-                             "that has not progressed far enough in terms of synchronization (%2 "
-                             "<= min(%3, %4)), and has also not yet expired (%5 <= %6)",
-                             file_ident, rh_base_version, locked_server_version, compacted_until_version, age,
-                             max_time_to_live); // Throws
-                return dirty;
-            }
-            if (locked_version < can_compact_until_version)
-                can_compact_until_version = locked_version;
-        }
-    }
-    else {
-        auto now_2 = chrono::duration_cast<chrono::seconds>(now.time_since_epoch());
-        auto now_3 = std::time_t(now_2.count());
-        auto max_time_to_live = std::time_t(m_compaction_ttl.count());
-        REALM_ASSERT(can_compact_until_version >= compacted_until_version);
-        auto num_entries = size_t(can_compact_until_version - compacted_until_version);
-        auto offset = size_t(compacted_until_version - m_history_base_version);
-        for (std::size_t i = 0; i < num_entries; ++i) {
-            std::size_t history_entry_index = offset + i;
-            auto timestamp = timestamp_type(m_acc->sh_timestamps.get(history_entry_index));
-            std::time_t seconds_since_epoch = 0;
-            long nanoseconds = 0; // Dummy
-            map_changeset_timestamp(timestamp, seconds_since_epoch, nanoseconds);
-            std::time_t age = now_3 - seconds_since_epoch;
-            if (age <= max_time_to_live) {
-                if (i == 0) {
-                    logger.debug("History compaction: Further progress blocked because first "
-                                 "uncompacted history entry (%1) is too young (%2 <= %3)",
-                                 compacted_until_version + 1, age, max_time_to_live); // Throws
-                    return dirty;
-                }
-                can_compact_until_version = version_type(m_history_base_version + history_entry_index);
-                break;
-            }
-        }
-        // Expire all client file entries that have not yet cleared
-        // `can_compact_until_version`
-        std::size_t num_expirations = 0;
-        for (std::size_t i = 1; i < num_client_files; ++i) {
-            auto client_type = ClientType(m_acc->cf_client_types.get(i));
-            if (REALM_LIKELY(!is_direct_client(client_type)))
-                continue;
-            REALM_ASSERT(m_acc->cf_ident_salts.get(i) != 0);
-            REALM_ASSERT(m_acc->cf_proxy_files.get(i) == 0);
-            file_ident_type file_ident = file_ident_type(i);
-            REALM_ASSERT(file_ident != g_root_node_file_ident);
-            REALM_ASSERT(file_ident != m_local_file_ident);
-            std::int_fast64_t last_seen_timestamp = m_acc->cf_last_seen_timestamps.get(i);
-            bool previously_expired = (last_seen_timestamp == 0);
-            if (REALM_LIKELY(previously_expired))
-                continue;
-            auto rh_base_version = version_type(m_acc->cf_rh_base_versions.get(i));
-            auto locked_server_version = version_type(m_acc->cf_locked_server_versions.get(i));
-            auto locked_version = std::min(rh_base_version, locked_server_version);
-            if (locked_version < can_compact_until_version) {
-                logger.debug("History compaction: Expiring client file %1 due to lack of progress "
-                             "(min(%2, %3) < %4)",
-                             file_ident, rh_base_version, locked_server_version, can_compact_until_version); // Throws
-                expire_client_file(i);                                                                       // Throws
-                ++num_expirations;
-            }
-        }
-        if (num_expirations > 0) {
-            logger.info("History compaction: Increase in number of expired client files: %1",
-                        num_expirations); // Throws
-        }
-    }
-
-    REALM_ASSERT(can_compact_until_version > compacted_until_version);
-    logger.debug("History compaction: Compacting until version %1 (was previously compacted "
-                 "until version %2) (latest version is %3)",
-                 can_compact_until_version, compacted_until_version, current_version); // Throws
-
-    dirty = true;
-
-    std::size_t num_compactable_changesets = std::size_t(can_compact_until_version - m_history_base_version);
-    version_type compaction_begin_version = m_history_base_version; // always 0 for now
-    std::size_t before_size = 0;
-    std::size_t after_size = 0;
-
-    // Chunk compactions to limit memory usage.
-    while (compaction_begin_version < can_compact_until_version) {
-        auto num_compactable_changesets_this_iteration =
-            size_t(num_compactable_changesets - (compaction_begin_version - m_history_base_version));
-        std::vector<Changeset> compact_bootstrap_changesets;
-        compact_bootstrap_changesets.resize(num_compactable_changesets_this_iteration); // Throws
-        version_type begin_version = compaction_begin_version;
-        version_type end_version = compaction_begin_version;
-        std::size_t compaction_input_size = 0;
-        for (std::size_t i = 0; i < num_compactable_changesets_this_iteration; ++i) {
-            Changeset& changeset = compact_bootstrap_changesets[i];
-            version_type server_version = begin_version + i + 1;
-
-            // Get attributes for the changeset
-            changeset.version = server_version;
-            changeset.last_integrated_remote_version =
-                version_type(m_acc->sh_client_versions.get(size_t(server_version - 1 - m_history_base_version)));
-            changeset.origin_timestamp =
-                timestamp_type(m_acc->sh_timestamps.get(size_t(server_version - 1 - m_history_base_version)));
-            changeset.origin_file_ident =
-                file_ident_type(m_acc->sh_origin_files.get(size_t(server_version - 1 - m_history_base_version)));
-
-            // Get the changeset itself
-            ChunkedBinaryData data = get_changeset(server_version);
-            before_size += data.size();
-            compaction_input_size += data.size();
-            ChunkedBinaryInputStream stream{data};
-            parse_changeset(stream, compact_bootstrap_changesets[i]); // Throws
-            end_version = server_version;
-            if (compaction_input_size >= compaction_input_soft_limit)
-                break;
-        }
-
-        compact_changesets(compact_bootstrap_changesets.data(),
-                           compact_bootstrap_changesets.size()); // Throws
-
-
-        ChangesetEncoder::Buffer buffer;
-        for (std::size_t i = 0; i < num_compactable_changesets_this_iteration; ++i) {
-            buffer.clear();
-            encode_changeset(compact_bootstrap_changesets[i], buffer);
-            after_size += buffer.size();
-            version_type server_version = begin_version + i + 1;
-            m_acc->sh_changesets.set(size_t(server_version - 1), BinaryData{buffer.data(), buffer.size()}); // Throws
-        }
-        compaction_begin_version = end_version;
-    }
-
-    // Recalculate the cumulative byte sizes.
-    {
-        size_t num_history_entries = m_acc->sh_changesets.size();
-        REALM_ASSERT(m_acc->sh_cumul_byte_sizes.size() == num_history_entries);
-        size_t history_byte_size = 0;
-        for (size_t i = 0; i < num_history_entries; ++i) {
-            size_t changeset_size = ChunkedBinaryData(m_acc->sh_changesets, i).size();
-            history_byte_size += changeset_size;
-            m_acc->sh_cumul_byte_sizes.set(i, history_byte_size);
-        }
-    }
-
-    // Get new 'now' because compaction can potentially take a long time, and
-    // if it takes longer than the server's average history compaction
-    // interval, the server could end up spending all its time doing compaction.
-    auto new_now = m_context.get_compaction_clock_now();
-    auto new_now_2 = chrono::duration_cast<chrono::seconds>(new_now.time_since_epoch());
-    auto new_now_3 = std::int_fast64_t(new_now_2.count());
-    m_acc->root.set(s_last_compaction_timestamp_iip, RefOrTagged::make_tagged(new_now_3)); // Throws
-
-    REALM_ASSERT(can_compact_until_version >
-                 version_type(m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int()));
-    m_acc->root.set(s_compacted_until_version_iip,
-                    RefOrTagged::make_tagged(can_compact_until_version)); // Throws
-
-    logger.detail("History compaction: Processed %1 changesets (saved %2 bytes in %3 "
-                  "milliseconds)",
-                  num_compactable_changesets, before_size - after_size,
-                  chrono::duration_cast<chrono::milliseconds>(new_now - now).count()); // Throws
-    return dirty;
 }
 
 
@@ -1670,13 +1241,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
     }
 
     if (from_downstream && dirty) {
-        auto now_1 = m_context.get_compaction_clock_now();
-        auto now_2 = std::chrono::duration_cast<std::chrono::seconds>(now_1.time_since_epoch());
-        auto last_seen_timestamp = std::int_fast64_t(now_2.count());
-        // Make sure we never assign zero, as that means "expired"
-        if (REALM_UNLIKELY(last_seen_timestamp <= 0))
-            last_seen_timestamp = 1;
-        m_acc->cf_last_seen_timestamps.set(remote_file_index, last_seen_timestamp);
+        m_acc->cf_last_seen_timestamps.set(remote_file_index, 1);
     }
 
     return dirty;
@@ -1769,8 +1334,7 @@ _impl::History* ServerHistory::_get_history_write()
 // Overriding member in Replication
 std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
-    _impl::ServerHistory::DummyCompactionControl compaction_control;
-    auto server_hist = std::make_unique<ServerHistory>(m_context, compaction_control); // Throws
+    auto server_hist = std::make_unique<ServerHistory>(m_context);                     // Throws
     server_hist->initialize(*m_db);                                                    // Throws
     return std::unique_ptr<_impl::History>(server_hist.release());
 }
@@ -2683,18 +2247,6 @@ void ServerHistory::record_current_schema_version(Array& schema_versions, versio
         std::time_t timestamp = std::time(nullptr);
         sv_timestamps.add(std::int_fast64_t(timestamp)); // Throws
     }
-}
-
-
-bool ServerHistory::Context::get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept
-{
-    return false;
-}
-
-
-Clock::time_point ServerHistory::Context::get_compaction_clock_now() const noexcept
-{
-    return Clock::clock::now();
 }
 
 

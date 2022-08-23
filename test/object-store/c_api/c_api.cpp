@@ -4390,6 +4390,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
+    local_config.sync_config = std::make_shared<realm_sync_config_t>(*local_config.sync_config);
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
 
     struct ResetRealmFiles {
@@ -4710,11 +4711,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
 
     harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
+        Object::create(
+            c, realm, "Obj",
+            std::any(AnyDict{{"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
-                           {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
-        Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
+                       std::any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
     });
 
