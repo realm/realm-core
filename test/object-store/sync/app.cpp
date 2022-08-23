@@ -1918,7 +1918,6 @@ static void set_app_config_defaults(app::App::Config& app_config,
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
-
     auto logger = std::make_unique<util::StderrLogger>();
 #if TEST_ENABLE_SYNC_LOGGING
     logger->set_level_threshold(util::Logger::Level::all);
