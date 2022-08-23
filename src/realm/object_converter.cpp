@@ -370,8 +370,21 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
             }
         }
         else {
-            Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-            Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+            Obj dst_link;
+            if (m_opposite_of_src->get_primary_key_column()) {
+                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+                dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+            }
+            else {
+                if (m_opposite_of_dst == m_opposite_of_src) {
+                    // if this is the same Realm, we can use the ObjKey
+                    dst_link = m_opposite_of_dst->get_object(src_link_key);
+                }
+                else {
+                    // in different Realms we create a new object
+                    dst_link = m_opposite_of_dst->create_object();
+                }
+            }
             converted_src = dst_link.get_key();
             if (dst.is_type(type_TypedLink)) {
                 cmp = converted_src.compare(dst.get<ObjKey>());
