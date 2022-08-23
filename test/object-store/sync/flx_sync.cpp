@@ -34,7 +34,6 @@
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 #include "realm/sync/noinst/pending_bootstrap_store.hpp"
-#include "realm/sync/noinst/pending_error_store.hpp"
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/util/future.hpp"
@@ -763,7 +762,7 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
     });
 }
 
-TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx][app]") {
+TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app]") {
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
     role.read = true;
@@ -799,7 +798,6 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
                 REQUIRE(error_code == sync::ProtocolError::compensating_write);
                 promise->emplace_value();
-                std::this_thread::sleep_for(std::chrono::seconds{2});
                 return false;
             };
 
@@ -837,27 +835,6 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
     _impl::RealmCoordinator::clear_all_caches();
 
-    {
-        auto realm = DB::create(sync::make_client_replication(), config.path);
-        TestLogger logger;
-        auto error_store = sync::PendingErrorStore(realm, &logger);
-        auto tr = realm->start_read();
-        auto pending_errors =
-            error_store.peek_pending_errors(tr, static_cast<sync::version_type>(std::numeric_limits<int64_t>::max()));
-
-        REQUIRE(pending_errors.size() == 1);
-        const auto& sync_error = pending_errors[0];
-        CHECK(sync::is_session_level_error(sync::ProtocolError(sync_error.raw_error_code)));
-        CHECK(sync::ProtocolError(sync_error.raw_error_code) == sync::ProtocolError::compensating_write);
-        CHECK(sync_error.compensating_writes.size() == 1);
-        auto write_info = sync_error.compensating_writes[0];
-        CHECK(write_info.primary_key.is_type(type_ObjectId));
-        CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
-        CHECK(write_info.object_name == "TopLevel");
-        CHECK_THAT(write_info.reason,
-                   Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
-    }
-
     std::atomic<int> error_messages_received = 0;
     config.sync_config->on_error_message_received_hook =
         [&error_messages_received](std::weak_ptr<SyncSession>, const sync::ProtocolErrorInfo&) mutable {
@@ -868,25 +845,19 @@ TEST_CASE("flx: compensating write errors persist across sessions", "[sync][flx]
 
     std::mutex errors_mutex;
     std::vector<SyncError> errors;
-    std::condition_variable error_cond;
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::lock_guard<std::mutex> lk(errors_mutex);
         errors.push_back(std::move(error));
-        error_cond.notify_one();
     };
 
     auto realm = Realm::get_shared_realm(config);
 
-    {
-        std::unique_lock<std::mutex> lk(errors_mutex);
-        error_cond.wait_for(lk, std::chrono::minutes{5}, [&] {
-            return errors.size() == 2;
-        });
-    }
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
 
     {
-        REQUIRE(error_messages_received.load() == 1);
+        REQUIRE(error_messages_received.load() == 2);
         std::lock_guard<std::mutex> lk(errors_mutex);
 
         REQUIRE(errors.size() == 2);

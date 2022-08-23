@@ -6,7 +6,6 @@
 
 #include "realm/db.hpp"
 #include "realm/sync/client_base.hpp"
-#include "realm/sync/noinst/pending_error_store.hpp"
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/transform.hpp"
 #include "realm/util/functional.hpp"
@@ -21,6 +20,7 @@
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/circular_buffer.hpp>
 #include <realm/util/platform_info.hpp>
+#include <realm/util/overload.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/value_reset_guard.hpp>
@@ -214,7 +214,8 @@ public:
     void finalize_before_actualization() noexcept;
 
     // Overriding member function in SyncTransactReporter
-    void report_sync_transact(VersionID, VersionID) override;
+    void report_sync_transact(VersionID, VersionID)
+    override;
 
     void on_new_flx_subscription_set(int64_t new_version);
 
@@ -259,7 +260,15 @@ private:
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
-    std::unique_ptr<PendingErrorStore> m_flx_pending_error_store;
+
+    struct PendingErrorSetCompare {
+        bool operator()(const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) const noexcept
+        {
+            return lhs.pending_until_server_version < rhs.pending_until_server_version;
+        }
+    };
+
+    std::set<ProtocolErrorInfo, PendingErrorSetCompare> m_pending_errors;
 
     bool m_initiated = false;
 
@@ -697,7 +706,6 @@ struct ChangesetProtocolErrorComparator {
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const ReceivedChangesets& changesets)
 {
-    std::vector<ProtocolErrorInfo> pending_errors;
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
         if (simulate_integration_error) {
@@ -706,18 +714,16 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         version_type client_version;
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
-            util::UniqueFunction<void(const TransactionRef& tr)> run_in_tr_hook;
-            if (m_is_flx_sync_session) {
-                REALM_ASSERT(m_wrapper.m_flx_pending_error_store);
-                run_in_tr_hook = [&](const TransactionRef& tr) {
-                    pending_errors = m_wrapper.m_flx_pending_error_store->peek_pending_errors(
-                        tr, changesets.back().remote_version);
-                };
-            }
-
             ClientReplication& repl = access_realm(); // Throws
             integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info, batch_state,
-                                 std::move(run_in_tr_hook)); // Throws
+                                 [&](const TransactionRef&) {
+                                     for (auto&& error_info : get_pending_errors_for_download_msg(changesets)) {
+                                         auto protocol_error = static_cast<ProtocolError>(error_info.raw_error_code);
+                                         REALM_ASSERT(!session_level_error_requires_suspend(protocol_error));
+                                         SessionErrorInfo sess_err_info(error_info, make_error_code(protocol_error));
+                                         on_server_error(sess_err_info);
+                                     }
+                                 }); // Throws
             client_version = version_info.realm_version;
         }
         else {
@@ -730,27 +736,6 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         on_integration_failure(e, batch_state);
     }
     m_wrapper.on_sync_progress(); // Throws
-    if (!pending_errors.empty()) {
-        std::vector<ProtocolErrorInfo> observed_pending_errors;
-        std::set_intersection(pending_errors.begin(), pending_errors.end(), changesets.begin(), changesets.end(),
-                              std::back_inserter(observed_pending_errors), ChangesetProtocolErrorComparator{});
-
-        for (const auto& error_info : observed_pending_errors) {
-            SessionErrorInfo sess_err_info(error_info,
-                                           make_error_code(static_cast<ProtocolError>(error_info.raw_error_code)));
-            // If we've already processed an error, then we just need to surface it to the user here without changing
-            // any of the connection state.
-            if (m_suspended && m_error_message_received) {
-                on_connection_state_changed(m_conn.get_state(), sess_err_info);
-            }
-            else {
-                on_server_error(sess_err_info);
-            }
-        }
-
-        m_wrapper.m_flx_pending_error_store->remove_pending_errors(
-            *pending_errors.back().pending_until_server_version);
-    }
 }
 
 
@@ -883,11 +868,39 @@ void SessionImpl::process_pending_flx_bootstrap()
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 }
 
-void SessionImpl::enqueue_pending_error_message(const ProtocolErrorInfo& error_info)
+void SessionImpl::cache_pending_error_message(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(m_is_flx_sync_session);
-    REALM_ASSERT(m_wrapper.m_flx_pending_error_store);
-    m_wrapper.m_flx_pending_error_store->add_pending_error(error_info);
+    if (auto&& [it, inserted] = m_wrapper.m_pending_errors.insert(error_info); !inserted) {
+        m_wrapper.m_pending_errors.erase(error_info);
+        std::tie(std::ignore, inserted) = m_wrapper.m_pending_errors.insert(error_info);
+        REALM_ASSERT(inserted);
+    }
+}
+
+std::vector<ProtocolErrorInfo> SessionImpl::get_pending_errors_for_download_msg(const ReceivedChangesets& changesets)
+{
+    REALM_ASSERT(m_is_flx_sync_session);
+    std::vector<ProtocolErrorInfo> ret;
+    auto& pending_errors = m_wrapper.m_pending_errors;
+
+    auto pending_error_it = pending_errors.begin();
+    auto changeset_it = changesets.begin();
+
+    while (pending_error_it != pending_errors.end() && changeset_it != changesets.end()) {
+        if (pending_error_it->pending_until_server_version < changeset_it->remote_version) {
+            ++pending_error_it;
+        }
+        else {
+            if (changeset_it->remote_version >= pending_error_it->pending_until_server_version) {
+                ret.push_back(std::move(*pending_error_it));
+                pending_error_it = pending_errors.erase(pending_error_it);
+            }
+            ++changeset_it;
+        }
+    }
+
+    return ret;
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
@@ -1322,7 +1335,6 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         SessionImpl& sess = *sess_2;
         if (sync_mode == SyncServerMode::FLX) {
             m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, &sess.logger);
-            m_flx_pending_error_store = std::make_unique<PendingErrorStore>(m_db, &sess.logger);
         }
 
         sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws

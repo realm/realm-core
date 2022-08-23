@@ -215,6 +215,7 @@ struct ProtocolErrorInfo {
         , should_client_reset(util::none)
     {
     }
+
     int raw_error_code = 0;
     std::string message;
     bool try_again = false;

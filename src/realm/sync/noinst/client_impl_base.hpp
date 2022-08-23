@@ -879,7 +879,8 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
-    void enqueue_pending_error_message(const ProtocolErrorInfo& error_info);
+    void cache_pending_error_message(const ProtocolErrorInfo& error_info);
+    std::vector<ProtocolErrorInfo> get_pending_errors_for_download_msg(const ReceivedChangesets& changesets);
 
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
