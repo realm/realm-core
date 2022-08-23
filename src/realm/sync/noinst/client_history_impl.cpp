@@ -391,8 +391,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 std::size_t num_changesets, VersionInfo& version_info,
                                                 DownloadBatchState batch_state, util::Logger& logger,
                                                 util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
-                                                SyncTransactReporter* transact_reporter,
-                                                bool split_changesets)
+                                                SyncTransactReporter* transact_reporter, bool split_changesets)
 {
     REALM_ASSERT(num_changesets != 0);
 
@@ -484,9 +483,9 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
                 if (m_replication.apply_server_changes()) {
                     Transformer& transformer = get_transformer(); // Throws
-                    transformer.transform_remote_changesets(
-                        *this, transact->get_sync_file_id(), local_version, changesets.data() + changeset_ndx,
-                        changeset_ndx_end - changeset_ndx, &logger); // Throws
+                    transformer.transform_remote_changesets(*this, transact->get_sync_file_id(), local_version,
+                                                            changesets.data() + changeset_ndx,
+                                                            changeset_ndx_end - changeset_ndx, &logger); // Throws
 
                     while (changeset_ndx < changeset_ndx_end) {
                         InstructionApplier applier{*transact};

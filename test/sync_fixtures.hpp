@@ -1176,4 +1176,4 @@ inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, Stri
     return result_set.get_key();
 }
 
-} // namespace fixtures
+} // namespace realm::fixtures
