@@ -231,7 +231,6 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
         auto realm = existing_query->weak_realm.lock();
         auto table = existing_query->query.get_table();
         Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-
         Query combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = existing_query->get_ordering();
@@ -276,13 +275,31 @@ RLM_API bool realm_query_count(const realm_query_t* query, size_t* out_count)
 RLM_API bool realm_query_find_first(realm_query_t* query, realm_value_t* out_value, bool* out_found)
 {
     return wrap_err([&]() {
-        auto key = query->query.find();
-        if (out_found)
-            *out_found = bool(key);
-        if (key && out_value) {
-            ObjLink link{query->query.get_table()->get_key(), key};
-            out_value->type = RLM_TYPE_LINK;
-            out_value->link = to_capi(link);
+        const auto& realm_query_ordering = query->get_ordering();
+        if (realm_query_ordering.size() > 0) {
+            auto orderding = util::make_bind<DescriptorOrdering>();
+            orderding->append(realm_query_ordering);
+            query->query.set_ordering(orderding);
+        }
+        if (realm_query_ordering.will_apply_sort()) {
+            auto table = query->query.find_all();
+            *out_found = (bool)false;
+            if (table.size() > 0) {
+                ObjLink link{table.get_target_table()->get_key(), table.get_key(0)};
+                out_value->type = RLM_TYPE_LINK;
+                out_value->link = to_capi(link);
+                *out_found = (bool)true;
+            }
+        }
+        else {
+            auto key = query->query.find();
+            if (out_found)
+                *out_found = bool(key);
+            if (key && out_value) {
+                ObjLink link{query->query.get_table()->get_key(), key};
+                out_value->type = RLM_TYPE_LINK;
+                out_value->link = to_capi(link);
+            }
         }
         return true;
     });
