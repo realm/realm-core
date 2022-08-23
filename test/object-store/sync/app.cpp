@@ -41,6 +41,7 @@
 #include <external/mpark/variant.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
@@ -1899,7 +1900,32 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
+static void set_app_config_defaults(app::App::Config& app_config,
+                            const std::shared_ptr<app::GenericNetworkTransport>& transport)
+{
+    if (!app_config.transport)
+        app_config.transport = transport;
+    if (app_config.platform.empty())
+        app_config.platform = "Object Store Test Platform";
+    if (app_config.platform_version.empty())
+        app_config.platform_version = "Object Store Test Platform Version";
+    if (app_config.sdk_version.empty())
+        app_config.sdk_version = "SDK Version";
+    if (app_config.app_id.empty())
+        app_config.app_id = "app_id";
+    if (!app_config.local_app_version)
+        app_config.local_app_version.emplace("A Local App Version");
+}
+
 TEST_CASE("app: sync integration", "[sync][app]") {
+
+    auto logger = std::make_unique<util::StderrLogger>();
+#if TEST_ENABLE_SYNC_LOGGING
+    logger->set_level_threshold(util::Logger::Level::all);
+#else
+    logger->set_level_threshold(util::Logger::Level::off);
+#endif
+
     const auto schema = default_app_config("").schema;
 
     auto get_dogs = [](SharedRealm r) -> Results {
@@ -1977,18 +2003,160 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             if (request_hook) {
                 request_hook(request);
             }
+            if (simulated_response) {
+                return completion_block(std::move(request), *simulated_response);
+            }
             SynchronousTestTransport::send_request_to_server(
                 std::move(request), [&](const Request& request, const Response& response) {
                     if (response_hook) {
                         response_hook(const_cast<Request&>(request), const_cast<Response&>(response));
                     }
-                    completion_block(request, response);
+                    completion_block(std::move(request), std::move(response));
                 });
         }
+        // Optional handler for the request and response before it is returned to completion
         util::UniqueFunction<void(Request&, Response&)> response_hook;
+        // Optional handler for the request before it is sent to the server
         util::UniqueFunction<void(Request&)> request_hook;
+        // Optional Response object to return immediately instead of communicating with the server
+        util::Optional<Response> simulated_response;
     };
 
+    {
+        std::unique_ptr<realm::AppSession> app_session;
+        std::string base_file_path = util::make_temp_dir() + random_string(10);
+        auto redir_transport = std::make_shared<HookedTransport>();
+        AutoVerifiedEmailCredentials creds;
+
+        auto app_config = get_config(redir_transport, session.app_session());
+        set_app_config_defaults(app_config, redir_transport);
+
+        util::try_make_dir(base_file_path);
+        SyncClientConfig sc_config;
+        sc_config.base_file_path = base_file_path;
+        sc_config.log_level = TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off;
+        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+
+        // initialize app and sync client
+        std::shared_ptr<realm::app::App> redir_app = app::App::get_uncached_app(app_config, sc_config);
+
+        SECTION("Test invalid redirect response") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](Request& request) {
+                if (request_count == 0) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+            };
+
+            // This will fail due to no Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+
+            // This will fail due to empty Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+        }
+
+        SECTION("Test redirect response") {
+            int request_count = 0;
+            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string redirect_scheme = "http://";
+            std::string redirect_host = "localhost:9090";
+            std::string redirect_url = "http://localhost:9090";
+            redir_transport->request_hook = [&](Request& request) {
+                if (request_count == 0) {
+                    if (request.url.find("https://") != std::string::npos) {
+                        redirect_scheme = "https://";
+                    }
+                    if (request.url.find("localhost:9090") != std::string::npos) {
+                        redirect_host = "127.0.0.1:9090";
+                    }
+                    redirect_url = redirect_scheme + redirect_host;
+                    logger->trace("redirect_url (%1): %2", request_count, redirect_url);
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.max_redirects);
+                    redir_transport->simulated_response = {301, 0, {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 2) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find("somehost:9090") != std::string::npos);
+                    redir_transport->simulated_response = {301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 3) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    // Let the init_app_metadata request go through
+                    redir_transport->simulated_response = util::none;
+                    request_count++;
+                }
+                else if (request_count == 4) {
+                    // This is the original request after the init app metadata
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    auto sync_manager = redir_app->sync_manager();
+                    REQUIRE(sync_manager);
+                    auto app_metadata = sync_manager->app_metadata();
+                    REQUIRE(app_metadata);
+                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
+                    logger->trace("Location: %1", app_metadata->location);
+                    logger->trace("Hostname: %1", app_metadata->hostname);
+                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
+                    REQUIRE(app_metadata->hostname.find(redirect_url) != std::string::npos);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    redir_transport->simulated_response = util::none;
+                    // Validate the retry count tracked in the original message
+                    REQUIRE(request.max_redirects);
+                    REQUIRE(*(request.max_redirects) == 2);
+                    request_count++;
+                }
+            };
+
+            // This will be successful after a couple of retries due to the redirect response
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                });
+        }
+        SECTION("Test too many redirects") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request_count <= 21);
+                redir_transport->simulated_response = {301, 0, {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}}, "Some body data"};
+                request_count++;
+            };
+
+            redir_app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                        [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                            REQUIRE(!user);
+                                            REQUIRE(error);
+                                            REQUIRE(error->is_client_error());
+                                            REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
+                                            REQUIRE(error->message == "number of redirections exceeded 20");
+                                        });
+        }
+    }
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
@@ -2013,7 +2181,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](Request&) {
+        transport->request_hook = [&](Request&) -> bool {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto& session : user->all_sessions()) {
@@ -2024,6 +2192,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     seen_waiting_for_access_token = true;
                 }
             }
+            return true;
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
@@ -2790,7 +2959,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
         {
             completion_block(std::move(request),
-                             Response{0, m_code, std::map<std::string, std::string>(), m_message});
+                             Response{0, m_code, http_headers_t(), m_message});
         }
 
     private:
@@ -3406,7 +3575,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                                 {"device_id", "Panda Bear"}})
                                     .dump();
 
-    Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
+    Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
 
     TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
     auto app = tsm.app();
@@ -3450,6 +3619,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("session error code") {
+        response.headers = http_headers_t{{"Content-Type", "application/json"}};
         response.http_status_code = 400;
         response.body = nlohmann::json({{"error_code", "MongoDBError"},
                                         {"error", "a fake MongoDB error message!"},

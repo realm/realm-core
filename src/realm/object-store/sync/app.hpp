@@ -393,8 +393,19 @@ private:
     /// @param hostname The hostname to generate a new app route
     std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const;
 
+    /// Request the app metadata information from the server if it has not been processed yet. If
+    /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
+    /// @param completion The server response if an error was encountered during the update
+    /// @param new_hostname If provided, the metadata will be requested from this hostname
     void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
                            const util::Optional<std::string>& new_hostname = util::none);
+
+    /// Update the app metadata and resend the request with the updated metadata
+    /// @param request The original request object that needs to be sent after the update
+    /// @param completion The original completion object that will be called with the response to the request
+    /// @param new_hostname If provided, the metadata will be requested from this hostname
+    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                                    const util::Optional<std::string>& new_hostname = util::none);
 
     void basic_request(std::string&& route, std::string&& body,
                        util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
@@ -404,15 +415,13 @@ private:
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
-    /// @param new_hostname The optional hostname to use for the request
-    void do_request(const Request& request, util::UniqueFunction<void(const Response&)>&& completion,
-                    const util::Optional<std::string>& new_hostname = util::none);
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
 
-    /// Process the response received from send_request_to_server to handle the redirection response
+    /// Process the redirect response received from the last request that was sent to the server
     /// @param request The request to be performed (in case it needs to be sent again)
-    /// @param error The response from the send_request_to_server operation
+    /// @param response The response from the send_request_to_server operation
     /// @param completion Returns the response from the server if not a redirect
-    void handle_redirect_response(const Request& request, const Response& error,
+    void handle_redirect_response(Request&& request, const Response& response,
                                   util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state

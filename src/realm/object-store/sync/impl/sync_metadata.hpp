@@ -257,8 +257,15 @@ public:
     void set_current_user_identity(const std::string& identity);
 
     util::Optional<SyncAppMetadata> get_app_metadata();
-    void set_app_metadata(const std::string& deployment_model, const std::string& location,
-                          const std::string& hostname, const std::string& ws_hostname) const;
+    /// Set or update the cached app server metadata. The metadata will not be updated if it has already been
+    /// set and the provided values are not different than the cached information. Returns true if the metadata
+    /// was updated.
+    /// @param deployment_model The deployment model reported by the app server
+    /// @param location The location name where the app server is located
+    /// @param hostname The hostname to use for the app server admin api
+    /// @param ws_hostname The hostname to use for the app server websocket connections
+    bool set_app_metadata(const std::string& deployment_model, const std::string& location,
+                          const std::string& hostname, const std::string& ws_hostname);
 
     /// Construct the metadata manager.
     ///

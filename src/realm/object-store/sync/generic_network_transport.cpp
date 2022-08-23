@@ -172,6 +172,24 @@ struct CustomErrorCategory : public std::error_category {
 
 CustomErrorCategory g_custom_error_category;
 
+static const std::map<std::string, ClientErrorCode> client_error_map = {
+    {"user_not_found", ClientErrorCode::user_not_found},
+    {"user_not_logged_in", ClientErrorCode::user_not_logged_in},
+    {"app_deallocated", ClientErrorCode::app_deallocated},
+    {"redirect_error", ClientErrorCode::redirect_error},
+    {"too_many_redirects", ClientErrorCode::too_many_redirects}
+};
+
+std::string get_error_message(ClientErrorCode error)
+{
+    for (auto it : client_error_map) {
+        if (it.second == error) {
+            return it.first;
+        }
+    }
+    return "unknown";
+}
+
 struct ClientErrorCategory : public std::error_category {
     const char* name() const noexcept final override
     {
@@ -180,7 +198,7 @@ struct ClientErrorCategory : public std::error_category {
 
     std::string message(int code) const override final
     {
-        return util::format("code %1", code);
+        return get_error_message(ClientErrorCode(code));
     }
 };
 

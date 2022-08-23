@@ -21,6 +21,7 @@
 
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/http.hpp>
 
 #include <iosfwd>
 #include <map>
@@ -31,7 +32,13 @@
 
 namespace realm::app {
 
-enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2, app_deallocated = 3 };
+enum class ClientErrorCode {
+    user_not_found = 1,
+    user_not_logged_in = 2,
+    app_deallocated = 3,
+    redirect_error = 4,
+    too_many_redirects = 5
+};
 
 enum class JSONErrorCode { bad_token = 1, malformed_json = 2, missing_json_key = 3, bad_bson_parse = 4 };
 
@@ -157,6 +164,7 @@ std::ostream& operator<<(std::ostream& os, AppError error);
  */
 enum class HttpMethod { get, post, patch, put, del };
 
+using http_headers_t = std::map<std::string, std::string, realm::util::HeterogeneousCaseInsensitiveCompare>;
 /**
  * An HTTP request that can be made to an arbitrary server.
  */
@@ -178,9 +186,9 @@ struct Request {
     uint64_t timeout_ms = 0;
 
     /**
-     * The HTTP headers of this request.
+     * The HTTP headers of this request - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    http_headers_t headers;
 
     /**
      * The body of the request.
@@ -206,19 +214,24 @@ struct Response {
     int http_status_code;
 
     /**
-     * A custom status code provided by the language binding.
+     * A custom status code provided by the language binding (SDK).
      */
     int custom_status_code;
 
     /**
-     * The headers of the HTTP response.
+     * The headers of the HTTP response - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    http_headers_t headers;
 
     /**
      * The body of the HTTP response.
      */
     std::string body;
+
+    /**
+     * An error code used by the client to report http processing errors.
+     */
+    util::Optional<ClientErrorCode> client_error_code;
 };
 
 using http_completion_t = realm::util::UniqueFunction<void(const Request&, const Response&)>;

@@ -157,7 +157,7 @@ public:
     void wait_for_sessions_to_terminate() REQUIRES(!m_mutex);
 
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
-    bool perform_metadata_update(util::FunctionRef<void(const SyncMetadataManager&)> update_function) const
+    bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const
         REQUIRES(!m_file_system_mutex);
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
