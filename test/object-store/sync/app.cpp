@@ -1901,7 +1901,7 @@ constexpr size_t minus_25_percent(size_t val)
 }
 
 static void set_app_config_defaults(app::App::Config& app_config,
-                            const std::shared_ptr<app::GenericNetworkTransport>& transport)
+                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
 {
     if (!app_config.transport)
         app_config.transport = transport;
@@ -2045,12 +2045,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             redir_transport->request_hook = [&](Request& request) {
                 if (request_count == 0) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    redir_transport->simulated_response = {301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 1) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    redir_transport->simulated_response = {301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
             };
@@ -2095,13 +2097,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 else if (request_count == 1) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(!request.max_redirects);
-                    redir_transport->simulated_response = {301, 0, {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}}, "Some body data"};
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                        "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 2) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
-                    redir_transport->simulated_response = {301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 3) {
@@ -2143,18 +2150,23 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             redir_transport->request_hook = [&](Request& request) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
-                redir_transport->simulated_response = {301, 0, {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}}, "Some body data"};
+                redir_transport->simulated_response = {
+                    301,
+                    0,
+                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                    "Some body data"};
                 request_count++;
             };
 
-            redir_app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
-                                        [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                            REQUIRE(!user);
-                                            REQUIRE(error);
-                                            REQUIRE(error->is_client_error());
-                                            REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
-                                            REQUIRE(error->message == "number of redirections exceeded 20");
-                                        });
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
+                    REQUIRE(error->message == "number of redirections exceeded 20");
+                });
         }
     }
     SECTION("Fast clock on client") {
@@ -2958,8 +2970,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
 
         void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
         {
-            completion_block(std::move(request),
-                             Response{0, m_code, http_headers_t(), m_message});
+            completion_block(std::move(request), Response{0, m_code, http_headers_t(), m_message});
         }
 
     private:

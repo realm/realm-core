@@ -177,8 +177,7 @@ static const std::map<std::string, ClientErrorCode> client_error_map = {
     {"user_not_logged_in", ClientErrorCode::user_not_logged_in},
     {"app_deallocated", ClientErrorCode::app_deallocated},
     {"redirect_error", ClientErrorCode::redirect_error},
-    {"too_many_redirects", ClientErrorCode::too_many_redirects}
-};
+    {"too_many_redirects", ClientErrorCode::too_many_redirects}};
 
 std::string get_error_message(ClientErrorCode error)
 {

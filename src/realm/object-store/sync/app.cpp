@@ -135,7 +135,7 @@ enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 // generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is
 // passed
 http_headers_t get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
-                                  RequestTokenType token_type = RequestTokenType::RefreshToken)
+                                   RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
     http_headers_t headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
 
@@ -801,8 +801,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     });
 }
 
-void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion,
-               const BsonDocument& body)
+void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion, const BsonDocument& body)
 {
     do_request(Request{HttpMethod::post, std::move(route), m_request_timeout_ms, get_request_headers(),
                        Bson(body).to_string()},
@@ -850,7 +849,8 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
                         completion(std::move(response));
                     }
                 });
-        }, new_hostname);
+        },
+        new_hostname);
 }
 
 void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion)
@@ -861,7 +861,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     if (m_sync_manager->app_metadata()) {
         m_config.transport->send_request_to_server(
             std::move(request), [completion = std::move(completion), anchor = shared_from_this()](
-                                      const Request& request, const Response& response) mutable {
+                                    const Request& request, const Response& response) mutable {
                 // If the response contains a redirection, then process it
                 if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
                     anchor->handle_redirect_response(std::move(const_cast<Request&>(request)), response,
