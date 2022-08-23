@@ -519,10 +519,6 @@ public:
             config_2.connection_reaper_interval = config.server_connection_reaper_interval;
             config_2.max_download_size = config.max_download_size;
             config_2.disable_download_compaction = config.disable_download_compaction;
-            config_2.disable_history_compaction = config.disable_history_compaction;
-            config_2.history_compaction_clock = config.history_compaction_clock;
-            config_2.history_ttl = config.history_ttl;
-            config_2.history_compaction_interval = config.history_compaction_interval;
             config_2.tcp_no_delay = true;
             config_2.authorization_header_name = config.authorization_header_name;
             config_2.encryption_key = make_crypt_key(config.server_encryption_key);

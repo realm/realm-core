@@ -1145,29 +1145,29 @@ TEST_CASE("list") {
         r->begin_transaction();
 
         SECTION("adds boxed RowExpr") {
-            list.add(ctx, util::Any(target->get_object(target_keys[5])));
+            list.add(ctx, std::any(target->get_object(target_keys[5])));
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(10).get_key().value == 5);
         }
 
         SECTION("adds boxed realm::Object") {
             realm::Object obj(r, list.get_object_schema(), target->get_object(target_keys[5]));
-            list.add(ctx, util::Any(obj));
+            list.add(ctx, std::any(obj));
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(10).get_key() == target_keys[5]);
         }
 
         SECTION("creates new object for dictionary") {
-            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}, {"value2", INT64_C(20)}}));
+            list.add(ctx, std::any(AnyDict{{"value", INT64_C(20)}, {"value2", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == 11);
             REQUIRE(list.get(10).get<Int>(col_target_value) == 20);
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.add(ctx, util::Any(origin->get_object(0))));
+            REQUIRE_THROWS(list.add(ctx, std::any(origin->get_object(0))));
             realm::Object object(r, *r->schema().find("origin"), origin->get_object(0));
-            REQUIRE_THROWS(list.add(ctx, util::Any(object)));
+            REQUIRE_THROWS(list.add(ctx, std::any(object)));
         }
 
         r->cancel_transaction();
@@ -1178,21 +1178,21 @@ TEST_CASE("list") {
         CppContext ctx(r, &list.get_object_schema());
 
         SECTION("returns index in list for boxed RowExpr") {
-            REQUIRE(list.find(ctx, util::Any(target->get_object(target_keys[5]))) == 5);
+            REQUIRE(list.find(ctx, std::any(target->get_object(target_keys[5]))) == 5);
         }
 
         SECTION("returns index in list for boxed Object") {
             realm::Object obj(r, *r->schema().find("origin"), target->get_object(target_keys[5]));
-            REQUIRE(list.find(ctx, util::Any(obj)) == 5);
+            REQUIRE(list.find(ctx, std::any(obj)) == 5);
         }
 
         SECTION("does not insert new objects for dictionaries") {
-            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
+            REQUIRE(list.find(ctx, std::any(AnyDict{{"value", INT64_C(20)}})) == npos);
             REQUIRE(target->size() == 10);
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.find(ctx, util::Any(obj)));
+            REQUIRE_THROWS(list.find(ctx, std::any(obj)));
         }
     }
 
@@ -1201,7 +1201,7 @@ TEST_CASE("list") {
         CppContext ctx(r, &list.get_object_schema());
 
         Object obj;
-        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get_key() == target_keys[1]);
     }
@@ -1553,14 +1553,14 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.add(ctx, util::Any(target->get_object(5))),
+            REQUIRE_THROWS_AS(list.add(ctx, std::any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.add(ctx, util::Any(Object(r, target->get_object(5)))),
+            REQUIRE_THROWS_AS(list.add(ctx, std::any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
         SECTION("creates new object for dictionary") {
-            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
+            list.add(ctx, std::any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(list.get(10).get<Int>(col_value) == 20);
@@ -1576,15 +1576,15 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(target->get_object(5))),
+            REQUIRE_THROWS_AS(list.set(ctx, 0, std::any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(Object(r, target->get_object(5)))),
+            REQUIRE_THROWS_AS(list.set(ctx, 0, std::any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
         SECTION("creates new object for update mode All") {
             auto old_object = list.get<Obj>(0);
-            list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}));
+            list.set(ctx, 0, std::any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 10);
             REQUIRE(target->size() == initial_target_size);
             REQUIRE(list.get(0).get<Int>(col_value) == 20);
@@ -1593,7 +1593,7 @@ TEST_CASE("embedded List") {
 
         SECTION("mutates the existing object for update mode Modified") {
             auto old_object = list.get<Obj>(0);
-            list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
+            list.set(ctx, 0, std::any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
             REQUIRE(list.size() == 10);
             REQUIRE(target->size() == initial_target_size);
             REQUIRE(list.get(0).get<Int>(col_value) == 20);
@@ -1609,22 +1609,22 @@ TEST_CASE("embedded List") {
         CppContext ctx(r, &list.get_object_schema());
 
         SECTION("returns index in list for boxed Obj") {
-            REQUIRE(list.find(ctx, util::Any(list.get(5))) == 5);
+            REQUIRE(list.find(ctx, std::any(list.get(5))) == 5);
         }
 
         SECTION("returns index in list for boxed Object") {
             realm::Object obj(r, *r->schema().find("origin"), list.get(5));
-            REQUIRE(list.find(ctx, util::Any(obj)) == 5);
+            REQUIRE(list.find(ctx, std::any(obj)) == 5);
         }
 
         SECTION("does not insert new objects for dictionaries") {
             auto initial_target_size = target->size();
-            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
+            REQUIRE(list.find(ctx, std::any(AnyDict{{"value", INT64_C(20)}})) == npos);
             REQUIRE(target->size() == initial_target_size);
         }
 
         SECTION("throws for object in wrong table") {
-            REQUIRE_THROWS(list.find(ctx, util::Any(obj)));
+            REQUIRE_THROWS(list.find(ctx, std::any(obj)));
         }
     }
 
@@ -1633,7 +1633,7 @@ TEST_CASE("embedded List") {
         CppContext ctx(r, &list.get_object_schema());
 
         Object obj;
-        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
     }

@@ -55,8 +55,7 @@ TEST(ServerHistory_Verify)
 {
     SHARED_GROUP_TEST_PATH(path);
     HistoryContext context;
-    ServerHistory::DummyCompactionControl compaction_control;
-    ServerHistory history{context, compaction_control};
+    ServerHistory history{context};
     DBRef sg = DB::create(history, path);
     {
         ReadTransaction rt{sg};

@@ -49,11 +49,11 @@ struct InvalidQueryArgError : std::invalid_argument {
 
 struct AnyContext {
     template <typename T>
-    T unbox(const util::Any& wrapper)
+    T unbox(const std::any& wrapper)
     {
         return util::any_cast<T>(wrapper);
     }
-    bool is_null(const util::Any& wrapper)
+    bool is_null(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return true;
@@ -63,7 +63,7 @@ struct AnyContext {
         }
         return false;
     }
-    bool is_list(const util::Any& wrapper)
+    bool is_list(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return false;
@@ -73,7 +73,7 @@ struct AnyContext {
         }
         return false;
     }
-    DataType get_type_of(const util::Any& wrapper)
+    DataType get_type_of(const std::any& wrapper)
     {
         const std::type_info& type{wrapper.type()};
         if (type == typeid(int64_t)) {

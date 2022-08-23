@@ -5,7 +5,6 @@ set(SERVER_SOURCES
     server_dir.cpp
     server_file_access_cache.cpp
     server_history.cpp
-    vacuum.cpp
 )
 
 set(SERVER_HEADERS
@@ -19,7 +18,6 @@ set(SERVER_HEADERS
     server_file_access_cache.hpp
     server_history.hpp
     server_impl_base.hpp
-    vacuum.hpp
 )
 
 

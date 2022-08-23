@@ -1492,9 +1492,9 @@ void Session::activate()
     m_download_progress = m_progress.download;
     REALM_ASSERT(m_last_version_available >= m_progress.upload.client_version);
 
-    logger.trace("last_version_available  = %1", m_last_version_available);           // Throws
-    logger.trace("progress_server_version = %1", m_progress.download.server_version); // Throws
-    logger.trace("progress_client_version = %1",
+    logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
+    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_client_version = %1",
                  m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
@@ -1783,7 +1783,7 @@ void Session::send_upload_message()
         protocol.make_upload_message_builder(logger); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
-        logger.trace("Fetching changeset for upload (client_version=%1, server_version=%2, "
+        logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
