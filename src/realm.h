@@ -1448,6 +1448,15 @@ RLM_API bool realm_object_delete(realm_object_t*);
 RLM_API bool realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm,
                                      realm_object_t** resolved);
 
+/**
+ * Increment atomically property specified as parameter by value, for the object passed as argument.
+ * @param object valid ptr to an object store in the database
+ * @param property_key id of the property to change
+ * @param value increment for the property passed as argument
+ * @return True if not exception occurred.
+ */
+RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t property_key, int64_t value);
+
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);

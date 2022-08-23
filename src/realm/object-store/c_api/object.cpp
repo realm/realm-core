@@ -202,6 +202,16 @@ RLM_API bool realm_object_resolve_in(const realm_object_t* from_object, const re
     });
 }
 
+RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t property_key, int64_t value)
+{
+    REALM_ASSERT(object);
+    return wrap_err([&]() {
+        object->obj().add_int(ColKey(property_key), value);
+        return true;
+    });
+}
+
+
 RLM_API bool realm_object_is_valid(const realm_object_t* obj)
 {
     return obj->is_valid();
