@@ -1,5 +1,5 @@
 if(REALM_ENABLE_SYNC)
     add_executable(realm-benchmark-sync bench_transform.cpp ../test_all.cpp)
     add_dependencies(benchmarks realm-benchmark-sync)
-    target_link_libraries(realm-benchmark-sync TestUtils Sync SyncServer)
+    target_link_libraries(realm-benchmark-sync TestUtil Sync SyncServer)
 endif()

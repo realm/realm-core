@@ -1389,7 +1389,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
-                                        download_batch_state, logger, get_transact_reporter(),
+                                        download_batch_state, logger, {}, get_transact_reporter(),
                                         split_changesets); // Throws
     if (num_changesets == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
@@ -2089,9 +2089,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     update_progress(progress);                                                           // Throws
-    on_download_message_integration_started(received_changesets.size(), batch_state);
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    on_download_message_integration_completed(received_changesets.size(), batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.

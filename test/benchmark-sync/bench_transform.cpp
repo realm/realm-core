@@ -164,7 +164,7 @@ void interrupt_transform_transactions(TestContext& test_context)
                 t.reset();
                 WriteTransaction wt(db_1);
                 TableRef table = wt.get_table("class_t");
-                auto obj = table->create_object();
+                table->create_object();
                 wt.commit();
                 results->submit(ident.c_str(), t.get_elapsed_time());
             }
