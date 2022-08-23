@@ -342,8 +342,7 @@ void GroupWriter::backdate()
         ref_type top_ref;
         ref_type logical_file_size;
         uint64_t version;
-        bool resolved = false;
-        bool present = false;
+        bool initialized = false;
         FreeList(Allocator& alloc, ref_type top, ref_type logical_file_size, uint64_t version)
             : positions(alloc)
             , lengths(alloc)
@@ -386,27 +385,26 @@ void GroupWriter::backdate()
 
     // find youngest time stamp in any block which (partially) overlaps a given one.
     // if no such block exists, return the current version of the given block.
-    auto find_cover_for = [&](FreeSpaceEntry& entry, FreeList* it) -> uint64_t {
-        if (!it->resolved) {
+    auto find_cover_for = [&](FreeSpaceEntry& entry, FreeList& free_list) -> uint64_t {
+        if (!free_list.initialized) {
             // setup arrays
-            it->resolved = true;
-            if (it->top_ref) {
+            free_list.initialized = true;
+            if (free_list.top_ref) {
                 Array top_array(m_alloc);
-                top_array.init_from_ref(it->top_ref);
+                top_array.init_from_ref(free_list.top_ref);
                 if (top_array.size() > Group::s_free_version_ndx) {
                     // we have a freelist with versioning info
-                    it->present = true;
-                    it->positions.init_from_ref(top_array.get_as_ref(Group::s_free_pos_ndx));
-                    it->lengths.init_from_ref(top_array.get_as_ref(Group::s_free_size_ndx));
-                    it->versions.init_from_ref(top_array.get_as_ref(Group::s_free_version_ndx));
+                    free_list.positions.init_from_ref(top_array.get_as_ref(Group::s_free_pos_ndx));
+                    free_list.lengths.init_from_ref(top_array.get_as_ref(Group::s_free_size_ndx));
+                    free_list.versions.init_from_ref(top_array.get_as_ref(Group::s_free_version_ndx));
                 }
             }
         }
         size_t index = 0, limit = 0;
-        if (it->present) {
+        if (free_list.positions.is_attached()) {
             // find block to allow for possible backdating
-            index = it->positions.upper_bound_int(entry.ref);
-            limit = it->positions.size();
+            index = free_list.positions.upper_bound_int(entry.ref);
+            limit = free_list.positions.size();
             if (index > 0) {
                 --index;
             }
@@ -414,31 +412,31 @@ void GroupWriter::backdate()
         ref_type start_pos = 0, end_pos = 0;
         uint64_t found_version = 0;
         if (index < limit) {
-            start_pos = static_cast<ref_type>(it->positions.get(index));
-            end_pos = start_pos + static_cast<ref_type>(it->lengths.get(index));
-            if (end_pos <= entry.ref) {
+            start_pos = static_cast<ref_type>(free_list.positions.get(index));
+            end_pos = start_pos + static_cast<ref_type>(free_list.lengths.get(index));
+            if (start_pos > entry.ref || end_pos <= entry.ref) {
                 index = limit; // discard entry
             }
         }
         if (index < limit) {
-            // coallesce any subsequent contiguous entries
+            // coalesce any subsequent contiguous entries
             auto next = index + 1;
-            found_version = it->versions.get(index);
+            found_version = free_list.versions.get(index);
             auto entry_end = entry.ref + entry.size;
-            while (next < limit && it->positions.get(next) == (int64_t)end_pos && end_pos < entry_end) {
-                end_pos += static_cast<ref_type>(it->lengths.get(next));
+            while (next < limit && free_list.positions.get(next) == (int64_t)end_pos && end_pos < entry_end) {
+                end_pos += static_cast<ref_type>(free_list.lengths.get(next));
                 // pick youngest (highest) version of blocks
-                uint64_t tmp_version = it->versions.get(next);
+                uint64_t tmp_version = free_list.versions.get(next);
                 if (tmp_version > found_version)
                     found_version = tmp_version;
                 ++next;
             }
         }
         else {
-            start_pos = end_pos = it->logical_file_size;
+            start_pos = end_pos = free_list.logical_file_size;
         }
         // consider additional free space beyond logical end of file
-        if (end_pos == it->logical_file_size) {
+        if (end_pos == free_list.logical_file_size) {
             end_pos = entry.ref + entry.size;
         }
         // is the block fully covered by range established above?
@@ -462,6 +460,7 @@ void GroupWriter::backdate()
 
 
     auto backdate_single_entry = [&](FreeSpaceEntry& entry, bool referenced) -> void {
+        static_cast<void>(referenced);
         while (entry.released_at_version) {
             // early out for references before oldest freelist:
             if (entry.released_at_version <= this->m_oldest_reachable_version) {
@@ -486,7 +485,7 @@ void GroupWriter::backdate()
 #if REALM_ALLOC_DEBUG
             std::cout << " - earlier freelist: " << earlier_it->version;
 #endif
-            auto covering_blocks_released_at = find_cover_for(entry, earlier_it);
+            auto covering_blocks_released_at = find_cover_for(entry, *earlier_it);
             if (covering_blocks_released_at == entry.released_at_version) {
 #ifdef REALM_DEBUG
                 REALM_ASSERT(referenced);
@@ -521,6 +520,7 @@ void GroupWriter::backdate()
     size_t limit = m_not_free_in_file.size();
     for (size_t index = 0; index < limit; ++index) {
         auto& entry = m_not_free_in_file[index];
+        bool referenced = false;
 #ifdef REALM_DEBUG
 #if REALM_ALLOC_DEBUG
         std::cout << std::endl
@@ -532,7 +532,6 @@ void GroupWriter::backdate()
             if (reachables[k].ref + reachables[k].size > entry.ref)
                 break;
         }
-        bool referenced = false;
         while (k < reachables.size() && reachables[k].ref + reachables[k].size > entry.ref &&
                reachables[k].ref < entry.ref + entry.size) {
 #if REALM_ALLOC_DEBUG
