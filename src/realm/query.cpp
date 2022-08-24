@@ -1398,7 +1398,7 @@ ObjKey Query::find() const
         if (table.size() > 0) {
             // we just need to find the first.
             return table.get_key(0);
-        } 
+        }
         else {
             return null_key;
         }
