@@ -434,7 +434,8 @@ private:
     // an object that contains a link to an embedded table.
     void copy(const Obj& other);
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
-    bool is_outgoing_embedded_link(ColKey col_key, Mixed value, TableRef& target_table, ObjKey& target_obj_key) const;
+    bool is_outgoing_embedded_link(ConstTableRef source_table, ColKey col_key, Mixed value, TableRef& target_table,
+                                   ObjKey& target_obj_key) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
