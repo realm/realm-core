@@ -359,6 +359,14 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.deletions, 0);
         }
 
+        SECTION("unregistering prior to deleting the object sends no notification") {
+            auto token = require_no_change(object);
+            token.unregister();
+            write([&] {
+                obj.remove();
+            });
+        }
+
         SECTION("deleting object before first run of notifier") {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c) {

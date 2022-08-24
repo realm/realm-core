@@ -19,6 +19,7 @@
 #include <realm/object-store/collection_notifications.hpp>
 
 #include <realm/object-store/impl/collection_notifier.hpp>
+#include <utility>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -31,6 +32,22 @@ NotificationToken::NotificationToken(std::shared_ptr<_impl::CollectionNotifier> 
 
 NotificationToken::~NotificationToken()
 {
+    unregister();
+}
+
+NotificationToken::NotificationToken(NotificationToken&&) = default;
+
+NotificationToken& NotificationToken::operator=(realm::NotificationToken&& rgt)
+{
+    if (this != &rgt) {
+        unregister();
+        m_notifier = std::move(rgt.m_notifier);
+        m_token = rgt.m_token;
+    }
+    return *this;
+}
+
+void NotificationToken::unregister() {
     // m_notifier itself (and not just the pointed-to thing) needs to be accessed
     // atomically to ensure that there are no data races when the token is
     // destroyed after being modified on a different thread.
@@ -40,20 +57,6 @@ NotificationToken::~NotificationToken()
     if (auto notifier = m_notifier.exchange({})) {
         notifier->remove_callback(m_token);
     }
-}
-
-NotificationToken::NotificationToken(NotificationToken&&) = default;
-
-NotificationToken& NotificationToken::operator=(realm::NotificationToken&& rgt)
-{
-    if (this != &rgt) {
-        if (auto notifier = m_notifier.exchange({})) {
-            notifier->remove_callback(m_token);
-        }
-        m_notifier = std::move(rgt.m_notifier);
-        m_token = rgt.m_token;
-    }
-    return *this;
 }
 
 void NotificationToken::suppress_next()
