@@ -47,7 +47,8 @@ NotificationToken& NotificationToken::operator=(realm::NotificationToken&& rgt)
     return *this;
 }
 
-void NotificationToken::unregister() {
+void NotificationToken::unregister()
+{
     // m_notifier itself (and not just the pointed-to thing) needs to be accessed
     // atomically to ensure that there are no data races when the token is
     // destroyed after being modified on a different thread.
