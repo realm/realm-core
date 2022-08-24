@@ -37,7 +37,7 @@
 * Parsing a constant list of strings from RealmJS SDK to QueryParser would result in a "use after free situation". ([#5735](https://github.com/realm/realm-core/issues/5735))
 
 ### Breaking changes
-* None.
+* Notification callbacks no longer take an `exception_ptr` argument because errors haven't been possible for a few years. (PR [#5741](https://github.com/realm/realm-core/pull/5741))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
