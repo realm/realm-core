@@ -266,6 +266,12 @@ public:
     // So this could potentially create a lot of user data duplication
     // if not used correctly.
     void assign(const Obj& other);
+    // The main algorithm for handling schema migrations if we try to convert
+    // from TopLevel* to Embedded, in this case all the orphan objects are deleted
+    // and all the objects with multiple backlinks are cloned in order to avoid to
+    // get schema violations during the migration.
+    // By default this alogirithm is disabled. RealmConfig contains a boolean flag
+    // to enable it.
     void handle_multiple_backlinks_during_schema_migration();
 
     Obj get_linked_object(ColKey link_col_key) const
@@ -432,10 +438,13 @@ private:
     // incoming links to some embedded table, this method is basically harmless, but Obj::assign uses it, so
     // in case of copies outside a migration, probably we should throw an excpetion if we attempt to copy.
     // an object that contains a link to an embedded table.
-    void copy(const Obj& other);
+    using CopyEmbeddedLinkTracker = std::vector<std::tuple<TableRef, ColKey, Obj, Obj, std::size_t>>;
+    void copy(const Obj& other, CopyEmbeddedLinkTracker&);
+
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
     bool is_outgoing_embedded_link(ConstTableRef source_table, ColKey col_key, Mixed value, TableRef& target_table,
                                    ObjKey& target_obj_key) const;
+    void handle_copy_for_embedded_links(CopyEmbeddedLinkTracker&) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

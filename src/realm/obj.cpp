@@ -1936,7 +1936,9 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
 
 void Obj::assign(const Obj& other)
 {
-    copy(other);
+    Obj::CopyEmbeddedLinkTracker tracker;
+    copy(other, tracker);
+
     auto copy_links = [this, &other](ColKey col) {
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
@@ -1985,8 +1987,14 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
         auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
         for (auto backlink : backlinks) {
+            // create a new obj
             auto obj = m_table->create_object();
-            obj.copy(*this);
+            // try to deep copy all the properties in the new object
+            Obj::CopyEmbeddedLinkTracker tracker;
+            obj.copy(*this, tracker);
+            // if there are embedded links, then copy them separately
+            handle_copy_for_embedded_links(tracker);
+            // fix all the backlinks
             auto linking_obj = opposite_table->get_object(backlink);
             fix_linking_object_during_schema_migration(linking_obj, obj, opposite_column);
         }
@@ -1995,24 +2003,16 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
     m_table->for_each_backlink_column(copy_links);
 }
 
-void Obj::copy(const Obj& other)
+void Obj::copy(const Obj& other, Obj::CopyEmbeddedLinkTracker& embedded_links)
 {
     // handle correctly the case in which the value to copy is an outgoing link to an embedded table.
-    auto handle_object_to_copy = [this](ConstTableRef table, ColKey col, Mixed value) -> Mixed {
-        TableRef target_table;
-        ObjKey target_obj_key;
-        if (is_outgoing_embedded_link(table, col, value, target_table, target_obj_key)) {
-            auto copy_target_object = target_table->create_linked_object();
-            auto target_obj = target_table->get_object(target_obj_key);
-            copy_target_object.copy(target_obj);
-            return ObjLink{target_table->get_key(), copy_target_object.get_key()};
-        }
-        return value;
-    };
-
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
     for (auto col : cols) {
+
+        TableRef target_table;
+        ObjKey target_obj_key;
+
         if (col.get_attrs().test(col_attr_List)) {
             auto src_list = other.get_listbase_ptr(col);
             auto dst_list = get_listbase_ptr(col);
@@ -2020,7 +2020,14 @@ void Obj::copy(const Obj& other)
             dst_list->clear();
             for (size_t i = 0; i < sz; i++) {
                 Mixed value = src_list->get_any(i);
-                dst_list->insert_any(i, handle_object_to_copy(m_table, col, value));
+                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
+                    dst_list->insert_any(i, value);
+                }
+                else {
+                    auto target = target_table->create_linked_object();
+                    auto src = target_table->get_object(target_obj_key);
+                    embedded_links.push_back({target_table, col, target, src, i});
+                }
             }
         }
         else if (col.get_attrs().test(col_attr_Set)) {
@@ -2030,7 +2037,14 @@ void Obj::copy(const Obj& other)
             dst_set->clear();
             for (size_t i = 0; i < sz; ++i) {
                 Mixed value = src_set->get_any(i);
-                dst_set->insert_any(handle_object_to_copy(m_table, col, value));
+                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
+                    dst_set->insert_any(value);
+                }
+                else {
+                    auto target = target_table->create_linked_object();
+                    auto src = target_table->get_object(target_obj_key);
+                    embedded_links.push_back({target_table, col, target, src, 0});
+                }
             }
         }
         else if (col.get_attrs().test(col_attr_Dictionary)) {
@@ -2040,14 +2054,12 @@ void Obj::copy(const Obj& other)
             dst_dictionary->clear();
             for (size_t i = 0; i < sz; ++i) {
                 const auto& [key, value] = src_dictionary->get_pair(i);
-                TableRef target_table;
-                ObjKey target_obj_key;
-                if (is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
-                    auto obj = dst_dictionary->create_and_insert_linked_object(key);
-                    obj.copy(target_table->get_object(target_obj_key));
-                }
-                else {
+                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key))
                     dst_dictionary->insert(key, value);
+                else {
+                    auto target = dst_dictionary->create_and_insert_linked_object(key);
+                    auto src = target_table->get_object(target_obj_key);
+                    embedded_links.push_back({target_table, col, target, src, 0});
                 }
             }
         }
@@ -2070,9 +2082,17 @@ void Obj::copy(const Obj& other)
                     this->set(col, BinaryData(str));
                     break;
                 }
-                default:
-                    this->set_any(col, handle_object_to_copy(other.get_table(), col, value));
+                default: {
+                    if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
+                        this->set_any(col, value);
+                    }
+                    else {
+                        auto target = target_table->create_linked_object();
+                        auto src = target_table->get_object(target_obj_key);
+                        embedded_links.push_back({target_table, col, target, src, 0});
+                    }
                     break;
+                }
             }
         }
     }
@@ -2138,6 +2158,47 @@ bool Obj::is_outgoing_embedded_link(ConstTableRef source_table, ColKey col_key, 
         }
     }
     return false;
+}
+
+void Obj::handle_copy_for_embedded_links(CopyEmbeddedLinkTracker& tracker) const
+{
+    for (size_t i = 0; i < tracker.size(); ++i) {
+        auto [table, col, target, src, pos] = tracker[i];
+        Obj::CopyEmbeddedLinkTracker local_tracker;
+        if (col.get_attrs().test(col_attr_List)) {
+            target.copy(src, local_tracker);
+            if (local_tracker.empty()) {
+                src.get_listbase_ptr(col)->set_any(pos, ObjLink{table->get_key(), target.get_key()});
+            }
+            else {
+                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
+            }
+        }
+        else if (col.get_attrs().test(col_attr_Set)) {
+            target.copy(src, local_tracker);
+            if (local_tracker.empty()) {
+                src.get_setbase_ptr(col)->insert_any(ObjLink{table->get_key(), target.get_key()});
+            }
+            else {
+                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
+            }
+        }
+        else if (col.get_attrs().test(col_attr_Dictionary)) {
+            target.copy(src, local_tracker);
+            if (!local_tracker.empty()) {
+                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
+            }
+        }
+        else {
+            target.copy(src, local_tracker);
+            if (local_tracker.empty()) {
+                src.set_any(col, ObjLink{table->get_key(), target.get_key()});
+            }
+            else {
+                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
+            }
+        }
+    }
 }
 
 Dictionary Obj::get_dictionary(ColKey col_key) const
