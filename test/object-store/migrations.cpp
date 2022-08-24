@@ -1153,7 +1153,7 @@ TEST_CASE("migration: Automatic") {
             List list(realm, child_object, col_mixed_array);
             list.insert(0, Mixed{10});
             list.insert(1, Mixed{10.10});
-            list.insert(2, Mixed{ObjLink{target_table->get_key(),target_object.get_key()}});\
+            list.insert(2, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
             list.insert(3, Mixed{target_object.get_key()});
 
             auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
@@ -1185,17 +1185,19 @@ TEST_CASE("migration: Automatic") {
                 CppContext context(realm);
                 Object child_object =
                     util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                auto mixed_array = util::any_cast<List>(
-                    child_object.get_property_value<util::Any>(context, "mixed_array"));
+                auto mixed_array =
+                    util::any_cast<List>(child_object.get_property_value<util::Any>(context, "mixed_array"));
                 REQUIRE(mixed_array.size() == 4);
                 REQUIRE(mixed_array.get_any(0).get<Int>() == 10);
                 REQUIRE(mixed_array.get_any(1).get<Double>() == 10.10);
-                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_table_key() == target_object.get_table()->get_key());
+                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_table_key() ==
+                        target_object.get_table()->get_key());
                 REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_obj_key() == target_object.get_key());
                 REQUIRE(mixed_array.get_any(3).get<ObjKey>() == target_object.get_key());
             }
         }
-        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary, any array "
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary, "
+                "any array "
                 "verification") {
             InMemoryTestFile config;
             config.automatic_handle_backlicks_in_migrations = true;
