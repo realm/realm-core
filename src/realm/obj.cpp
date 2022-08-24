@@ -2010,9 +2010,15 @@ void Obj::fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, C
         REALM_ASSERT(n != realm::npos);
         linking_obj_list.set(n, obj.get_key());
     }
+    else if (opposite_col_key.get_attrs().test(col_attr_List)) {
+        auto linking_obj_list = linking_obj.get_listbase_ptr(opposite_col_key);
+        auto n = linking_obj_list->find_any(ObjLink{m_table->get_key(), get_key()});
+        REALM_ASSERT(n != realm::npos);
+        linking_obj_list->insert_any(n, ObjLink{m_table->get_key(), obj.get_key()});
+    }
     else if (opposite_col_key.get_attrs().test(col_attr_Set)) {
         // this SHOULD NEVER HAPPEN, since SET sematincs forbids to have a backlink to the same object store
-        // multiple times. update_schema should throw longer before to perform this copy.
+        // multiple times. update_schema would have thrown way before to reach this point.
         REALM_UNREACHABLE();
     }
     else if (opposite_col_key.get_attrs().test(col_attr_Dictionary)) {

@@ -259,13 +259,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             auto obj = results.get<Obj>(0);
             REQUIRE(obj.get<Int>("value") == 4);
             object = Object(realm, obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };
@@ -741,6 +739,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
             realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
                                        "A fake client reset error", true);
+            synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, synthetic);
 
             session->revive_if_needed();
@@ -1639,13 +1638,11 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
         if (results.size() >= 1) {
             auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "test type")->begin();
             object = Object(realm, obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };
@@ -2332,13 +2329,11 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
         results = Results(realm, source_table->where().equal(id_col, source_pk));
         if (auto obj = results.first()) {
             object = Object(realm, *obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };

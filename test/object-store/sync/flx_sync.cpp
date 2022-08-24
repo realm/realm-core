@@ -578,6 +578,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
             config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
                 REALM_ASSERT_EX(!err.is_fatal, err.message);
+                CHECK(err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
@@ -718,6 +719,7 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
         auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
         config.sync_config->error_handler = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>,
                                                                                         SyncError err) {
+            CHECK(err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
             error_promise->emplace_value(std::move(err));
         };
 
@@ -795,6 +797,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK(sync_error.is_session_level_protocol_error());
         CHECK(!sync_error.is_client_reset_requested());
         CHECK(sync_error.compensating_writes_info.size() == 1);
+        CHECK(sync_error.server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
         auto write_info = sync_error.compensating_writes_info[0];
         CHECK(write_info.primary_key.is_type(type_ObjectId));
         CHECK(write_info.primary_key.get_object_id() == invalid_obj);
@@ -1326,6 +1329,7 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
     });
 
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_flx_sync));
+    CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
 TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][app]") {
@@ -1366,6 +1370,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     });
 
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
+    CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {

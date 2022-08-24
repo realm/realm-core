@@ -817,8 +817,7 @@ void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> not
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
-        if (!self.m_async_error)
-            notifier->attach_to(notifier->get_realm()->duplicate());
+        notifier->attach_to(notifier->get_realm()->duplicate());
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -987,13 +986,6 @@ void RealmCoordinator::run_async_notifiers()
         m_notifier_sg = m_db->start_read();
     }
 
-    if (m_async_error) {
-        std::move(m_new_notifiers.begin(), m_new_notifiers.end(), std::back_inserter(m_notifiers));
-        m_new_notifiers.clear();
-        m_notifier_cv.notify_all();
-        return;
-    }
-
     // We need to pick the final version to advance to while the lock is held
     // as otherwise if a commit is made while new notifiers are being advanced
     // we could end up advancing over the skip version.
@@ -1136,7 +1128,7 @@ bool RealmCoordinator::can_advance(Realm& realm)
 void RealmCoordinator::advance_to_ready(Realm& realm)
 {
     util::CheckedUniqueLock lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
+    _impl::NotifierPackage notifiers(notifiers_for_realm(realm), this);
     lock.unlock();
     notifiers.package_and_wait(util::none);
 
@@ -1187,7 +1179,7 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
     auto self = shared_from_this();
     auto sg = Realm::Internal::get_transaction_ref(realm);
     util::CheckedUniqueLock lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
+    _impl::NotifierPackage notifiers(notifiers_for_realm(realm), this);
     lock.unlock();
     notifiers.package_and_wait(sg->get_version_of_latest_snapshot());
 
@@ -1206,7 +1198,7 @@ void RealmCoordinator::promote_to_write(Realm& realm)
     REALM_ASSERT(!realm.is_in_transaction());
 
     util::CheckedUniqueLock lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
+    _impl::NotifierPackage notifiers(notifiers_for_realm(realm), this);
     lock.unlock();
 
     // FIXME: we probably won't actually want a strong pointer here
@@ -1222,17 +1214,6 @@ void RealmCoordinator::process_available_async(Realm& realm)
     auto notifiers = notifiers_for_realm(realm);
     if (notifiers.empty())
         return;
-
-    if (auto error = m_async_error) {
-        lock.unlock();
-        if (realm.m_binding_context)
-            realm.m_binding_context->will_send_notifications();
-        for (auto& notifier : notifiers)
-            notifier->deliver_error(m_async_error);
-        if (realm.m_binding_context)
-            realm.m_binding_context->did_send_notifications();
-        return;
-    }
 
     bool in_read = realm.is_in_read_transaction();
     auto& sg = Realm::Internal::get_transaction(realm);

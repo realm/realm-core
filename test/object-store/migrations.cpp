@@ -1121,7 +1121,83 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE(parent_table->size() == 1);
         }
-        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary "
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy array of mixed "
+                "verification") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {
+                        {"mixed_array", PropertyType::Mixed | PropertyType::Array | PropertyType::Nullable},
+                    },
+                },
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            ColKey col_mixed_array = child_table->get_column_key("mixed_array");
+            auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
+            Obj target_object = target_table->create_object();
+            target_object.set("value", 10);
+            List list(realm, child_object, col_mixed_array);
+            list.insert(0, Mixed{10});
+            list.insert(1, Mixed{10.10});
+            list.insert(2, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
+            list.insert(3, Mixed{target_object.get_key()});
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto o1 = parent_table->create_object();
+            auto o2 = parent_table->create_object();
+            o1.set_all(child_object_key);
+            o2.set_all(child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                auto mixed_array =
+                    util::any_cast<List>(child_object.get_property_value<util::Any>(context, "mixed_array"));
+                REQUIRE(mixed_array.size() == 4);
+                REQUIRE(mixed_array.get_any(0).get<Int>() == 10);
+                REQUIRE(mixed_array.get_any(1).get<Double>() == 10.10);
+                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_table_key() ==
+                        target_object.get_table()->get_key());
+                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_obj_key() == target_object.get_key());
+                REQUIRE(mixed_array.get_any(3).get<ObjKey>() == target_object.get_key());
+            }
+        }
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary, "
+                "any array "
                 "verification") {
             InMemoryTestFile config;
             config.automatic_handle_backlicks_in_migrations = true;
