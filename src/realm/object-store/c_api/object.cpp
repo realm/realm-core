@@ -206,6 +206,7 @@ RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t p
 {
     REALM_ASSERT(object);
     return wrap_err([&]() {
+        object->verify_attached();
         object->obj().add_int(ColKey(property_key), value);
         return true;
     });
