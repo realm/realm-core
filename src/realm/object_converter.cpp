@@ -408,9 +408,21 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
             // embedded tables should always be covered by the m_opposite_of_src case above.
             REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
             // regular table, convert by pk
-            Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-            Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-            converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+            if (src_link_table->get_primary_key_column()) {
+                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+            }
+            else if (src_link_table == dst_link_table) {
+                // no pk, but this is the same Realm, so convert by ObjKey
+                Obj dst_link = dst_link_table->get_object(src_link.get_obj_key());
+                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+            }
+            else {
+                // no pk, and different Realm, create an object
+                Obj dst_link = dst_link_table->create_object();
+                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+            }
             cmp = converted_src.compare(dst);
         }
     }

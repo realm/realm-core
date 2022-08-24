@@ -1154,7 +1154,7 @@ TEST_CASE("migration: Automatic") {
             list.insert(0, Mixed{10});
             list.insert(1, Mixed{10.10});
             list.insert(2, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
-            list.insert(3, Mixed{target_object.get_key()});
+            list.insert(3, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
 
             auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
