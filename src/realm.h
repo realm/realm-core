@@ -3360,6 +3360,17 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE = 231,
 } realm_sync_errno_session_e;
 
+typedef enum realm_sync_error_action {
+    RLM_SYNC_ERROR_ACTION_NO_ACTION,
+    RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
+    RLM_SYNC_ERROR_ACTION_APPLICATION_BUG,
+    RLM_SYNC_ERROR_ACTION_WARNING,
+    RLM_SYNC_ERROR_ACTION_TRANSIENT,
+    RLM_SYNC_ERROR_ACTION_DELETE_REALM,
+    RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
+    RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+} realm_sync_error_action_e;
+
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
 
@@ -3390,6 +3401,7 @@ typedef struct realm_sync_error {
     bool is_fatal;
     bool is_unrecognized_by_client;
     bool is_client_reset_requested;
+    realm_sync_error_action_e server_requests_action;
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
