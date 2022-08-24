@@ -266,6 +266,12 @@ public:
     // So this could potentially create a lot of user data duplication
     // if not used correctly.
     void assign(const Obj& other);
+    // The main algorithm for handling schema migrations if we try to convert
+    // from TopLevel* to Embedded, in this case all the orphan objects are deleted
+    // and all the objects with multiple backlinks are cloned in order to avoid to
+    // get schema violations during the migration.
+    // By default this alogirithm is disabled. RealmConfig contains a boolean flag
+    // to enable it.
     void handle_multiple_backlinks_during_schema_migration();
 
     Obj get_linked_object(ColKey link_col_key) const

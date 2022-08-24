@@ -1990,6 +1990,7 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
         auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
         for (auto backlink : backlinks) {
+            // create a new obj
             auto obj = m_table->create_object();
             embedded_obj_tracker->track(*this, obj);
             auto linking_obj = opposite_table->get_object(backlink);
