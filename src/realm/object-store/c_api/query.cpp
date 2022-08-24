@@ -281,25 +281,13 @@ RLM_API bool realm_query_find_first(realm_query_t* query, realm_value_t* out_val
             orderding->append(realm_query_ordering);
             query->query.set_ordering(orderding);
         }
-        if (realm_query_ordering.will_apply_sort()) {
-            auto table = query->query.find_all();
-            *out_found = (bool)false;
-            if (table.size() > 0) {
-                ObjLink link{table.get_target_table()->get_key(), table.get_key(0)};
-                out_value->type = RLM_TYPE_LINK;
-                out_value->link = to_capi(link);
-                *out_found = (bool)true;
-            }
-        }
-        else {
-            auto key = query->query.find();
-            if (out_found)
-                *out_found = bool(key);
-            if (key && out_value) {
-                ObjLink link{query->query.get_table()->get_key(), key};
-                out_value->type = RLM_TYPE_LINK;
-                out_value->link = to_capi(link);
-            }
+        auto key = query->query.find();
+        if (out_found)
+            *out_found = bool(key);
+        if (key && out_value) {
+            ObjLink link{query->query.get_table()->get_key(), key};
+            out_value->type = RLM_TYPE_LINK;
+            out_value->link = to_capi(link);
         }
         return true;
     });
