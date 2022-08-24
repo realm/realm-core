@@ -37,7 +37,7 @@ struct Section {
     std::vector<size_t> indices;
 };
 
-using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
+using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet)>;
 
 /**
  * An instance of ResultsSection gives access to elements in the underlying collection that belong to a given section
