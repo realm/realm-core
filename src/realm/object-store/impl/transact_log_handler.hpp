@@ -40,13 +40,13 @@ struct UnsupportedSchemaChange : std::logic_error {
 namespace transaction {
 // Advance the read transaction version, with change notifications sent to delegate
 // Must not be called from within a write transaction.
-void advance(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&);
+void advance(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&&);
 void advance(Transaction& sg, BindingContext* binding_context, VersionID);
 
 // Begin a write transaction
 // If the read transaction version is not up to date, will first advance to the
 // most recent read transaction and sent notifications to delegate
-void begin(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&);
+void begin(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&&);
 
 // Cancel a write transaction and roll back all changes, with change notifications
 // for reverting to the old values sent to delegate
