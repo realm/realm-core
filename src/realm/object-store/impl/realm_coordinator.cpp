@@ -852,13 +852,6 @@ void RealmCoordinator::clean_up_dead_notifiers()
 
 void RealmCoordinator::on_change()
 {
-    run_async_notifiers();
-
-    util::CheckedLockGuard lock(m_realm_mutex);
-    for (auto& realm : m_weak_realm_notifiers) {
-        realm.notify();
-    }
-
 #if REALM_ENABLE_SYNC
     // Invoke realm sync if another process has notified for a change
     if (m_sync_session) {
@@ -866,6 +859,13 @@ void RealmCoordinator::on_change()
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
 #endif
+
+    run_async_notifiers();
+
+    util::CheckedLockGuard lock(m_realm_mutex);
+    for (auto& realm : m_weak_realm_notifiers) {
+        realm.notify();
+    }
 }
 
 namespace {
