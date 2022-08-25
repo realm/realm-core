@@ -1716,6 +1716,18 @@ TEST_CASE("C API", "[c_api]") {
             });
         }
 
+        SECTION("realm_object_add_int errors") {
+            SECTION("SUCCESS") {
+                realm_begin_write(realm);
+                CHECK(realm_object_add_int(obj1.get(), foo_int_key, 10));
+                realm_commit(realm);
+            }
+            SECTION("ERROR") {
+                CHECK(!realm_object_add_int(obj1.get(), foo_int_key, 10));
+                CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            }
+        }
+
         SECTION("get/set all property types") {
             realm_value_t null = rlm_null();
             realm_value_t integer = rlm_int_val(987);
