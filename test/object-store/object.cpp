@@ -331,7 +331,7 @@ TEST_CASE("object") {
 
         auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             auto token = object.add_notification_callback(
-                [&](CollectionChangeSet c, std::exception_ptr) {
+                [&](CollectionChangeSet c) {
                     change = c;
                 },
                 key_path_array);
@@ -342,7 +342,7 @@ TEST_CASE("object") {
         auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             bool first = true;
             auto token = object.add_notification_callback(
-                [&](CollectionChangeSet, std::exception_ptr) {
+                [&](CollectionChangeSet) {
                     REQUIRE(first);
                     first = false;
                 },
@@ -359,9 +359,17 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.deletions, 0);
         }
 
+        SECTION("unregistering prior to deleting the object sends no notification") {
+            auto token = require_no_change(object);
+            token.unregister();
+            write([&] {
+                obj.remove();
+            });
+        }
+
         SECTION("deleting object before first run of notifier") {
             auto token = object.add_notification_callback(
-                [&](CollectionChangeSet c, std::exception_ptr) {
+                [&](CollectionChangeSet c) {
                     change = std::move(c);
                 },
                 {});
@@ -462,7 +470,7 @@ TEST_CASE("object") {
 
         SECTION("add notification callback, remove it, then add another notification callback") {
             {
-                auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                auto token = object.add_notification_callback([&](CollectionChangeSet) {
                     FAIL("This should never happen");
                 });
             }
@@ -1180,7 +1188,7 @@ TEST_CASE("object") {
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-1234-5678-9012-4136c566a962")}}});
 
-        auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = obj.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             callback_called = true;
         });
@@ -1245,7 +1253,7 @@ TEST_CASE("object") {
         REQUIRE(table->size() == 5);
         Results result(r, table);
         result = result.sort({{"_id", false}});
-        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             callback_called = true;
         });
@@ -1314,13 +1322,13 @@ TEST_CASE("object") {
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
-        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token1 = obj.add_notification_callback([&](CollectionChangeSet) {
             callback_called = true;
         });
-        auto token2 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token2 = result.add_notification_callback([&](CollectionChangeSet) {
             results_callback_called = true;
         });
-        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet) {
             sub_callback_called = true;
         });
         advance_and_notify(*r);
@@ -1403,7 +1411,7 @@ TEST_CASE("object") {
 
         auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet) {
             callback_called = true;
         });
         advance_and_notify(*r);
@@ -1811,7 +1819,7 @@ TEST_CASE("object") {
             r->commit_transaction();
 
             CollectionChangeSet change;
-            auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = obj.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -2096,11 +2104,11 @@ TEST_CASE("Embedded Object") {
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
-        auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = obj.add_notification_callback([&](CollectionChangeSet) {
             obj_callback_called = true;
         });
         bool list_callback_called = false;
-        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet) {
             list_callback_called = true;
         });
         advance_and_notify(*realm);
@@ -2145,7 +2153,7 @@ TEST_CASE("Embedded Object") {
         auto child = util::any_cast<Object>(parent.get_property_value<std::any>(ctx, "object"));
 
         int calls = 0;
-        auto token = child.add_notification_callback([&](CollectionChangeSet const& c, std::exception_ptr) {
+        auto token = child.add_notification_callback([&](CollectionChangeSet const& c) {
             if (++calls == 2) {
                 REQUIRE_INDICES(c.deletions, 0);
             }

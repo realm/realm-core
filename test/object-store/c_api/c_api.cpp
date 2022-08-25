@@ -2636,11 +2636,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->called = true;
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_list_t> strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
 
                 auto str1 = rlm_str_val("a");
@@ -2648,8 +2643,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_list_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                   nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_list_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2660,7 +2655,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -2705,8 +2700,8 @@ TEST_CASE("C API", "[c_api]") {
                     realm_key_path_elem_t bar_strings[] = {{class_bar.key, bar_doubles_key}};
                     realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
                     realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
-                    auto token = cptr_checked(realm_list_add_notification_callback(
-                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error));
+                    auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                   &key_path_array, on_change));
                     checked(realm_refresh(realm));
 
                     state.called = false;
@@ -3143,11 +3138,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_set_t> strings =
                     cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
 
@@ -3156,8 +3146,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                  nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_set_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3168,7 +3158,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3665,11 +3655,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_dictionary_t> strings =
                     cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_string_dict"]));
 
@@ -3679,7 +3664,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error));
+                        strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3690,7 +3675,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3744,14 +3729,9 @@ TEST_CASE("C API", "[c_api]") {
                 state->called = true;
             };
 
-            auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                auto state = static_cast<State*>(userdata);
-                state->error = clone_cptr(err);
-            };
-
             auto require_change = [&]() {
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr,
-                                                                         on_change, on_error));
+                auto token =
+                    cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr, on_change));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -3795,8 +3775,8 @@ TEST_CASE("C API", "[c_api]") {
                 realm_key_path_elem_t origin_value[] = {{class_foo.key, foo_int_key}};
                 realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
                 realm_key_path_array_t key_path_array = {1, key_path_origin_value};
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array,
-                                                                         on_change, on_error));
+                auto token = cptr(
+                    realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array, on_change));
                 checked(realm_refresh(realm));
                 state.called = false;
                 write([&]() {
