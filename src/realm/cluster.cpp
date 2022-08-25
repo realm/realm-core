@@ -1353,7 +1353,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                             std::cout << ", null";
                         }
                         else {
-                            std::cout << ", " << arr_int_null.get(i).value();
+                            std::cout << ", " << *arr_int_null.get(i);
                         }
                     }
                     else {

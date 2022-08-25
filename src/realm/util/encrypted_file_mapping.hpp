@@ -53,16 +53,28 @@ public:
     void sync() noexcept;
 
     // Make sure that memory in the specified range is synchronized with any
-    // changes made globally visible through call to write_barrier
+    // changes made globally visible through call to write_barrier or mark_for_refresh
     void read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
     void write_barrier(const void* addr, size_t size) noexcept;
 
+    // Marks pages in the given range as having been changed on disk (by another process)
+    // this applies to ALL mappings for the same file. The range is specified as offsets
+    // into the file and is not constrained by the specific mapping on which the method is
+    // invoked.
+    // The pages specified can not be in the Dirty state.
+    // The pages specified will be refetched and re-decrypted by calls to read_barrier.
+    void mark_for_refresh(size_t ref_start, size_t ref_end);
+
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
+
+    // Extend the size of this mapping. Memory holding decrypted pages must
+    // have been allocated earlier
+    void extend_to(size_t offset, size_t new_size);
 
     size_t collect_decryption_count()
     {
@@ -96,10 +108,11 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-        Touched = 1,           // a ref->ptr translation has taken place
-        UpToDate = 2,          // the page is fully up to date
-        PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8              // the page has been modified with respect to what's on file.
+        Clean = 0,
+        Touched = 1,         // a ref->ptr translation has taken place
+        UpToDate = 2,        // the page is fully up to date
+        RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new
+        Dirty = 8            // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -135,7 +148,6 @@ private:
     void mark_outdated(size_t local_page_ndx) noexcept;
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
     void refresh_page(size_t local_page_ndx);
-    void write_page(size_t local_page_ndx) noexcept;
     void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
@@ -146,7 +158,8 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 {
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
-    size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
+    size_t local_ndx =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
     REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     return local_ndx;
 }
@@ -159,8 +172,8 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 }
 
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ENABLE_ENCRYPTION
 
@@ -175,7 +188,7 @@ struct DecryptionFailed : util::File::AccessError {
     {
     }
 };
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

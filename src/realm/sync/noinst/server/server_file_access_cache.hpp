@@ -13,8 +13,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 
-#include <realm/sync/noinst/server/metrics.hpp>
-
 namespace realm {
 namespace _impl {
 
@@ -32,7 +30,7 @@ public:
     /// cache object before the first invocation of Slot::access() on an
     /// associated file file slot.
     ServerFileAccessCache(long max_open_files, util::Logger&, ServerHistory::Context&,
-                          util::Optional<std::array<char, 64>> encryption_key, sync::Metrics* metrics);
+                          util::Optional<std::array<char, 64>> encryption_key);
 
     ~ServerFileAccessCache() noexcept;
 
@@ -53,12 +51,10 @@ private:
     const util::Optional<std::array<char, 64>> m_encryption_key;
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
-    sync::Metrics* m_metrics;
 
     void access(Slot&);
     void remove(Slot&) noexcept;
     void insert(Slot&) noexcept;
-    void poll_core_metrics();
 };
 
 
@@ -71,8 +67,8 @@ public:
     const std::string realm_path;
     const std::string virt_path;
 
-    Slot(ServerFileAccessCache&, std::string realm_path, std::string virt_path, ServerHistory::CompactionControl&,
-         bool claim_sync_agent, bool disable_sync_to_disk) noexcept;
+    Slot(ServerFileAccessCache&, std::string realm_path, std::string virt_path, bool claim_sync_agent,
+         bool disable_sync_to_disk) noexcept;
 
     Slot(Slot&&) = default;
 
@@ -103,7 +99,6 @@ public:
 
 private:
     ServerFileAccessCache& m_cache;
-    ServerHistory::CompactionControl& m_compaction_control;
     const bool m_disable_sync_to_disk;
     const bool m_claim_sync_agent;
 
@@ -135,13 +130,11 @@ private:
 
 inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
                                                     ServerHistory::Context& history_context,
-                                                    util::Optional<std::array<char, 64>> encryption_key,
-                                                    sync::Metrics* metrics)
+                                                    util::Optional<std::array<char, 64>> encryption_key)
     : m_max_open_files{max_open_files}
     , m_encryption_key{encryption_key}
     , m_logger{logger}
     , m_history_context{history_context}
-    , m_metrics{metrics}
 {
     REALM_ASSERT(m_max_open_files >= 1);
 }
@@ -189,12 +182,10 @@ inline void ServerFileAccessCache::insert(Slot& slot) noexcept
 }
 
 inline ServerFileAccessCache::Slot::Slot(ServerFileAccessCache& cache, std::string rp, std::string vp,
-                                         ServerHistory::CompactionControl& cc, bool claim_sync_agent,
-                                         bool dstd) noexcept
+                                         bool claim_sync_agent, bool dstd) noexcept
     : realm_path{std::move(rp)}
     , virt_path{std::move(vp)}
     , m_cache{cache}
-    , m_compaction_control{cc}
     , m_disable_sync_to_disk{dstd}
     , m_claim_sync_agent{claim_sync_agent}
 {
@@ -237,13 +228,6 @@ inline DBOptions ServerFileAccessCache::Slot::make_shared_group_options() const 
         options.encryption_key = m_cache.m_encryption_key->data();
     if (m_disable_sync_to_disk)
         options.durability = DBOptions::Durability::Unsafe;
-
-    // Core's metrics can be a bit memory intensive, only turn them on
-    // if the sync metrics are going somewhere and they are not explicitly
-    // excluded from the user defined blacklist.
-    if (m_cache.m_metrics && !m_cache.m_metrics->will_exclude(sync::MetricsOptions::Core_All))
-        options.enable_metrics = true;
-
     return options;
 }
 
@@ -256,7 +240,7 @@ inline void ServerFileAccessCache::Slot::do_close() noexcept
 }
 
 inline ServerFileAccessCache::File::File(const Slot& slot)
-    : history{slot.m_cache.m_history_context, slot.m_compaction_control}                   // Throws
+    : history{slot.m_cache.m_history_context}                                              // Throws
     , shared_group{DB::create(history, slot.realm_path, slot.make_shared_group_options())} // Throws
 {
     if (slot.m_claim_sync_agent) {

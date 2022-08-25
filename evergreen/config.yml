@@ -81,6 +81,10 @@ functions:
               set_cmake_var realm_vars REALM_TSAN BOOL On
           fi
 
+          if [ -n "${enable_ubsan|}" ]; then
+              set_cmake_var realm_vars REALM_USAN BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -104,9 +108,8 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          if [ -n "${enable_logging|}" ]; then
-              set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
-          fi
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING_LEVEL STRING "debug"
 
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
@@ -153,7 +156,7 @@ functions:
           mkdir benchmark_results
           cd benchmark_results
 
-          $BENCHMARK
+          $BENCHMARK "$(pwd)/"
     - command: perf.send
       params:
         file: './realm-core/benchmark_results/results.latest.json'
@@ -171,7 +174,14 @@ functions:
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
-          TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
+
+          if [[ -n "${verbose_test_output}" ]]; then
+              TEST_FLAGS="$TEST_FLAGS -VV"
+          else
+              TEST_FLAGS="$TEST_FLAGS -V"
+          fi
+
+          TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_PROGRESS=1
@@ -184,7 +194,7 @@ functions:
           fi
 
           cd build
-          $CTEST -C ${cmake_build_type|Debug} -V $TEST_FLAGS
+          $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
 
   "upload test results":
   - command: attach.results
@@ -380,7 +390,7 @@ tasks:
         BLOATY=$(pwd)/bin/bloaty
         cd ..
 
-        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/librealm-ffi.so"
+        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/${cmake_build_type|Debug}/librealm-ffi.so"
 
         mkdir bloaty-results
         for input_path in $FILES_TO_ANALYZE; do
@@ -467,7 +477,7 @@ tasks:
     # hours to complete
     timeout_secs: 14400
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
       report_test_progress: On
 
 - name: core-tests
@@ -477,7 +487,7 @@ tasks:
   - func: "compile"
   - func: "run tests"
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
 
 - name: benchmark-common-tasks
   exec_timeout_secs: 1800
@@ -506,7 +516,7 @@ tasks:
 
 - name: object-store-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 2100
   commands:
   - func: "compile"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
@@ -535,12 +545,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            INSTALL_BAAS_BRANCH=""
-            if [ -n "${baas_branch}" ]; then
-                INSTALL_BAAS_BRANCH="-b ${baas_branch}"
-            fi
-
-            ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b master 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -570,6 +575,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: ObjectStoreTests
+      verbose_test_output: true
 
 - name: lint
   tags: [ "for_pull_requests" ]
@@ -784,6 +790,23 @@ buildvariants:
     fetch_missing_dependencies: On
     run_tests_against_baas: On
     enable_tsan: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
+  - name: compile_test
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-ubsan
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 UBSAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_ubsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:

@@ -14,7 +14,6 @@ endif()
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
-include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
@@ -23,8 +22,11 @@ include(CheckCXXSourceRuns)
 
 include(CodeCoverage)
 
-# Get accurate git-describe version
-git_describe(REALM_VERSION)
+if(NOT DEFINED REALM_VERSION)
+    # Get accurate git-describe version
+    include(GetGitRevisionDescription)
+    git_describe(REALM_VERSION)
+endif()
 set(PROJECT_VERSION ${DEP_VERSION})
 
 # Project-wide build flags
@@ -198,7 +200,6 @@ endif()
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
-option(REALM_BUILD_DOGLESS "Build server with support for emitting statsd" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
@@ -312,11 +313,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 
 add_subdirectory(src)
 
-if (REALM_BUILD_DOGLESS)
-    set(REALM_HAVE_DOGLESS ON)
-    add_subdirectory(src/dogless)
-endif()
-
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
@@ -334,17 +330,9 @@ endif()
 
 add_subdirectory(external/catch EXCLUDE_FROM_ALL)
 
-# This disables a c++17 feature that Apple doesn't support yet and Catch2 uses
-# The following define could be removed if we drop support for MacOS 10.12
-target_compile_definitions(Catch2 PRIVATE
-    CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
-    _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
-)
-if (NOT MSVC)
-    target_compile_options(Catch2 PRIVATE
-        -Wno-deprecated-declarations
-    )
-endif()
+# Cmake does not let us easily set the deployment target per-target, but Catch2
+# can use modern features because we only run tests on recent OS versions.
+target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 
 # Enable CTest and include unit tests
 enable_testing()

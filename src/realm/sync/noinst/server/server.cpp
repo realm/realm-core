@@ -9,11 +9,9 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
-#include <realm/sync/noinst/server/vacuum.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -86,18 +84,12 @@ using ExtendedIntegrationError = ServerHistory::ExtendedIntegrationError;
 using ClientType = ServerHistory::ClientType;
 using FileIdentAllocSlot = ServerHistory::FileIdentAllocSlot;
 using FileIdentAllocSlots = ServerHistory::FileIdentAllocSlots;
-using CompactionControl = ServerHistory::CompactionControl;
 
 using UploadChangeset = ServerProtocol::UploadChangeset;
-using LastClientAccessesEntry = CompactionControl::LastClientAccessesEntry;
-using LastClientAccessesRange = CompactionControl::LastClientAccessesRange;
 // clang-format on
 
 
 using UploadChangesets = std::vector<UploadChangeset>;
-
-using ClientFileBlacklist = Server::ClientFileBlacklist;
-using ClientFileBlacklists = Server::ClientFileBlacklists;
 
 using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
@@ -113,7 +105,6 @@ namespace {
 enum class SchedStatus { done = 0, pending, in_progress };
 
 
-NullMetrics g_null_metrics;
 util::StderrLogger g_fallback_logger;
 
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
@@ -224,30 +215,6 @@ public:
 };
 
 
-struct Gauges {
-    double connection_online = 0;
-    double connection_total = 0;
-    double session_online = 0;
-    double session_total = 0;
-    double realms_open = 0;
-    std::map<std::string, double> user_sessions;
-};
-
-
-struct ChangesetGroupStats {
-    // Number of changesets in this group.
-    std::size_t num_changesets = 0;
-
-    // If `num_changesets` is not zero, total size in bytes of changesets in
-    // this group.
-    std::size_t num_bytes = 0;
-
-    // If `num_changesets` is not zero, time of reception of first changeset in
-    // group.
-    SteadyTimePoint start_time;
-};
-
-
 struct DownloadCache {
     std::unique_ptr<char[]> body;
     std::size_t uncompressed_body_size;
@@ -271,13 +238,8 @@ public:
     // deletion.
     bool has_primary_work = false;
 
-    bool request_compaction = false;
-    bool request_deletion = false;
-
     // Only for reference files
     bool might_produce_new_sync_version = false;
-    bool group_has_compaction_requests = false;
-    bool group_has_deletion_requests = false;
 
     bool produced_new_realm_version = false;
     bool produced_new_sync_version = false;
@@ -295,18 +257,12 @@ public:
 
     // Result of integration of changesets from downstream clients
     IntegrationResult integration_result;
-    milliseconds_type integration_duration = 0;
 
     void reset() noexcept
     {
         has_primary_work = false;
 
-        request_compaction = false;
-        request_deletion = false;
-
         might_produce_new_sync_version = false;
-        group_has_compaction_requests = false;
-        group_has_deletion_requests = false;
 
         produced_new_realm_version = false;
         produced_new_sync_version = false;
@@ -323,10 +279,6 @@ public:
 };
 
 
-const AllocationMetricName g_worker_scratch_metric{"worker_scratch"};
-const AllocationMetricName g_worker_queue_metric{"worker_queue"};
-
-
 class WorkerState {
 public:
     FileIdentAllocSlots file_ident_alloc_slots;
@@ -334,42 +286,7 @@ public:
     bool use_file_cache = true;
     std::unique_ptr<ServerHistory> reference_hist;
     DBRef reference_sg;
-
-    WorkerState()
-        : scratch_memory{AllocationMetricsContext::get_current().get_metric(g_worker_scratch_metric)}
-    {
-    }
 };
-
-
-// ============================ IntegrationReporterImpl ============================
-
-class IntegrationReporterImpl : public ServerHistory::IntegrationReporter {
-public:
-    IntegrationReporterImpl(ServerImpl& server) noexcept;
-
-    SteadyTimePoint get_session_start_time() const noexcept;
-
-    // Overriding members in ServerHistory::IntegrationReporter
-    void on_changesets_merged(long) override final;
-    void on_integration_session_begin() override final;
-    void on_changeset_integrated(std::size_t) override final;
-
-private:
-    ServerImpl& m_server;
-    SteadyTimePoint m_session_start_time;
-};
-
-
-inline IntegrationReporterImpl::IntegrationReporterImpl(ServerImpl& server) noexcept
-    : m_server{server}
-{
-}
-
-inline SteadyTimePoint IntegrationReporterImpl::get_session_start_time() const noexcept
-{
-    return m_session_start_time;
-}
 
 
 // ============================ SessionQueue ============================
@@ -410,13 +327,9 @@ public:
             run_a_job(lock, state, job);
         }
         else {
-            // Inherit AllocationMetricsContext
-            AllocationMetricsContext& tenant = AllocationMetricsContext::get_current();
-
             // Create worker threads on demand (if all existing threads are active):
             if (m_threads.size() < m_max_num_threads && m_active >= m_threads.size()) {
-                m_threads.emplace_back([this, &tenant]() {
-                    AllocationMetricsContextScope context_scope{tenant};
+                m_threads.emplace_back([this]() {
                     WorkerState state;
                     state.use_file_cache = false;
                     JobType the_job;
@@ -508,7 +421,7 @@ private:
 
 // ============================ ServerFile ============================
 
-class ServerFile : public util::RefCountBase, private CompactionControl {
+class ServerFile : public util::RefCountBase {
 public:
     util::PrefixLogger logger;
 
@@ -535,11 +448,6 @@ public:
     const std::string& get_virt_path() const noexcept
     {
         return m_file.virt_path;
-    }
-
-    const ClientFileBlacklist& get_client_file_blacklist() const noexcept
-    {
-        return m_client_file_blacklist;
     }
 
     ServerFileAccessCache::File& access()
@@ -624,16 +532,9 @@ public:
 
     void recognize_external_change();
 
-    void initiate_compaction();
-
-    void initiate_deletion(std::int_fast64_t conn_id);
-
-    bool realm_deletion_is_ongoing() const;
-
 private:
     ServerImpl& m_server;
     ServerFileAccessCache::Slot m_file;
-    const ClientFileBlacklist m_client_file_blacklist; // Sorted ascendingly
 
     // In general, `m_version_info` refers to the last snapshot of the Realm
     // file that is supposed to be visible to remote peers engaging in regular
@@ -699,19 +600,6 @@ private:
     // currently unblocked work unit.
     std::size_t m_unblocked_changesets_from_downstream_byte_size = 0;
 
-    // If this file is the leader of a work unit (not a partial file), this is
-    // the statistics for those changesets, that were received from clients, and
-    // are currently part of the blocked work unit.
-    //
-    // Together with `m_group_unblocked_changesets_from_downstream_stats`, its
-    // purpose is to enable work unit metrics `workunit.uploaded.changesets`,
-    // `workunit.uploaded.bytes`, and `upload.processing`.
-    ChangesetGroupStats m_group_blocked_changesets_from_downstream_stats;
-
-    // Same as `m_group_blocked_changesets_from_downstream`, but for the
-    // currently unblocked work unit.
-    ChangesetGroupStats m_group_unblocked_changesets_from_downstream_stats;
-
     // When nonempty, it counts towards outstanding blocked work (see
     // `m_has_blocked_work`).
     std::vector<std::string> m_permission_changes;
@@ -721,14 +609,6 @@ private:
     // held back from being passed to the worker thread because a previously
     // accumulated chunk of work related to this file is currently in progress.
     bool m_has_blocked_work = false;
-
-    // A value of true counts towards outstanding blocked work (see
-    // `m_has_blocked_work`).
-    bool m_request_compaction = false;
-
-    // A value of true counts towards outstanding blocked work (see
-    // `m_has_blocked_work`).
-    bool m_request_deletion = false;
 
     // A file, that is not a partial file, is considered *exposed to the worker
     // thread* from the point in time where it is submitted to the worker
@@ -763,34 +643,10 @@ private:
     // before the destruction of the server object itself.
     ServerFileAccessCache::Slot m_worker_file;
 
-    struct LastClientAccess {
-        std::time_t last_seen_timestamp;
-    };
-
-    // FIXME: Use a more memory efficient map implementation here. For instance,
-    // a compact (single allocation) hash map. Unfortunately, std::unordered_map
-    // is generally less memory efficient than std::map.
-    //
-    // Protected by `m_server.last_client_accesses_mutex`
-    std::map<file_ident_type, LastClientAccess> m_last_client_accesses;
-
-    // Protected by `m_server.last_client_accesses_mutex`
-    std::vector<LastClientAccessesEntry> m_last_client_accesses_buffer;
-
     std::vector<std::int_fast64_t> m_deleting_connections;
-
-    // The network thread performs Realm deletion. However, the state Realm threads
-    // must finish using the Realms before it can be deleted. This leaves a
-    // time period where Realm deletion is ongoing. During that period, new sessions
-    // must be rejected at receipt of the BIND message.
-    bool m_realm_deletion_is_ongoing = false;
 
     DownloadCache m_download_cache;
 
-    static ClientFileBlacklist make_client_file_blacklist(const ServerImpl&, const std::string& virt_path);
-
-    void changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes) noexcept;
-    void changesets_from_downstream_removed(std::size_t num_changesets, std::size_t num_bytes) noexcept;
     void on_changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes);
     void on_work_added();
     void group_unblock_work();
@@ -813,40 +669,12 @@ private:
     void group_finalize_work_stage_2();
     void finalize_work_stage_1();
     void finalize_work_stage_2();
-
-    void perform_compaction();
-
-    bool group_perform_file_deletions();
-    void perform_file_deletion();
-    void perform_file_deletion_after_state_realm_deletion();
-
-    // Overriding member functions in CompactionControl
-    LastClientAccessesRange get_last_client_accesses() override final;
-    version_type get_max_compactable_server_version() override final;
 };
 
 
 inline DownloadCache& ServerFile::get_download_cache() noexcept
 {
     return m_download_cache;
-}
-
-inline void ServerFile::changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes) noexcept
-{
-    bool first_changeset = (m_group_blocked_changesets_from_downstream_stats.num_changesets == 0);
-    m_group_blocked_changesets_from_downstream_stats.num_changesets += num_changesets;
-    m_group_blocked_changesets_from_downstream_stats.num_bytes += num_bytes;
-    if (!first_changeset)
-        return;
-    m_group_blocked_changesets_from_downstream_stats.start_time = steady_clock_now();
-}
-
-inline void ServerFile::changesets_from_downstream_removed(std::size_t num_changesets, std::size_t num_bytes) noexcept
-{
-    REALM_ASSERT(m_group_blocked_changesets_from_downstream_stats.num_changesets >= num_changesets);
-    m_group_blocked_changesets_from_downstream_stats.num_changesets -= num_changesets;
-    REALM_ASSERT(m_group_blocked_changesets_from_downstream_stats.num_bytes >= num_bytes);
-    m_group_blocked_changesets_from_downstream_stats.num_bytes -= num_bytes;
 }
 
 inline void ServerFile::group_finalize_work_stage_1()
@@ -877,26 +705,20 @@ public:
     explicit Worker(ServerImpl&);
 
     ServerFileAccessCache& get_file_access_cache() noexcept;
-    SteadyTimePoint get_integration_session_start_time() const noexcept;
 
     void enqueue(ServerFile*);
 
     // Overriding members of ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
-    Clock::time_point get_compaction_clock_now() const noexcept override final;
     sync::Transformer& get_transformer() override final;
     util::Buffer<char>& get_transform_buffer() override final;
-    IntegrationReporterImpl& get_integration_reporter() override final;
 
 private:
     ServerImpl& m_server;
     std::mt19937_64 m_random;
     const std::unique_ptr<Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
-    IntegrationReporterImpl m_integration_reporter;
     ServerFileAccessCache m_file_access_cache;
-    AllocationMetricsContext& m_allocation_metrics_context;
 
     util::Mutex m_mutex;
     util::CondVar m_cond; // Protected by `m_mutex`
@@ -917,11 +739,6 @@ private:
 inline ServerFileAccessCache& Worker::get_file_access_cache() noexcept
 {
     return m_file_access_cache;
-}
-
-inline SteadyTimePoint Worker::get_integration_session_start_time() const noexcept
-{
-    return m_integration_reporter.get_session_start_time();
 }
 
 
@@ -1003,16 +820,6 @@ public:
         return m_current_server_session_ident;
     }
 
-    Metrics& metrics() noexcept
-    {
-        return m_metrics;
-    }
-
-    Gauges& gauges() noexcept
-    {
-        return m_gauges;
-    }
-
     util::ScratchMemory& get_scratch_memory() noexcept
     {
         return m_scratch_memory;
@@ -1051,10 +858,6 @@ public:
     void run();
     void stop() noexcept;
 
-    void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler>);
-
-    HTTPConnection* get_http_connection(std::int_fast64_t conn_id) noexcept;
-
     void remove_http_connection(std::int_fast64_t conn_id) noexcept;
 
     void add_sync_connection(int_fast64_t connection_id, std::unique_ptr<SyncConnection>&& sync_conn);
@@ -1092,16 +895,9 @@ public:
         REALM_ASSERT(virt_path_components.is_valid);
 
         _impl::make_dirs(m_root_dir, virt_path);  // Throws
-        auto p = m_realm_names.insert(virt_path); // Throws
-        bool was_inserted = p.second;
-        if (was_inserted)
-            metrics().gauge("realms.all", double(m_realm_names.size())); // Throws
+        m_realm_names.insert(virt_path);          // Throws
         {
             bool disable_sync_to_disk = m_config.disable_sync_to_disk;
-            // Set metrics scope when constructing the ServerFile object to
-            // ensure that all metered members of ServerFile get initialized
-            // with the correct metric name.
-            AllocationMetricNameScope scope{g_worker_queue_metric};
             file.reset(new ServerFile(*this, m_file_access_cache, virt_path, virt_path_components.real_realm_path,
                                       disable_sync_to_disk)); // Throws
         }
@@ -1112,9 +908,9 @@ public:
         return file;
     }
 
-    std::unique_ptr<ServerHistory> make_history_for_path(CompactionControl& cc)
+    std::unique_ptr<ServerHistory> make_history_for_path()
     {
-        return std::make_unique<ServerHistory>(*this, cc);
+        return std::make_unique<ServerHistory>(*this);
     }
 
     util::bind_ptr<ServerFile> get_file(const std::string& virt_path) noexcept
@@ -1124,8 +920,6 @@ public:
             return i->second;
         return {};
     }
-
-    void remove_file(const std::string& virt_path);
 
     // Returns the number of seconds since the Epoch of
     // std::chrono::system_clock.
@@ -1145,8 +939,6 @@ public:
 
     void stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_backup)> completion_handler,
                                                   milliseconds_type timeout);
-
-    void initiate_compact_realm(std::int_fast64_t conn_id, StringData virt_path);
 
     // Server global outputbuffers that can be reused.
     // The server is single threaded, so there are no
@@ -1177,16 +969,10 @@ public:
     void inc_byte_size_for_pending_downstream_changesets(std::size_t byte_size);
     void dec_byte_size_for_pending_downstream_changesets(std::size_t byte_size);
 
-    void inc_num_outstanding_compaction_processes() noexcept;
-    void dec_num_outstanding_compaction_processes();
-
     // Overriding member functions in _impl::ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
-    Clock::time_point get_compaction_clock_now() const noexcept override final;
     Transformer& get_transformer() noexcept override final;
     util::Buffer<char>& get_transform_buffer() noexcept override final;
-    IntegrationReporterImpl& get_integration_reporter() noexcept override final;
 
 private:
     Server::Config m_config;
@@ -1212,7 +998,6 @@ private:
 
     std::unique_ptr<util::network::ssl::Context> m_ssl_context;
     ServerFileAccessCache m_file_access_cache;
-    Metrics& m_metrics;
     Worker m_worker;
     std::map<std::string, util::bind_ptr<ServerFile>> m_files; // Key is virtual path
     util::network::Acceptor m_acceptor;
@@ -1226,7 +1011,6 @@ private:
     MiscBuffers m_misc_buffers;
     std::unique_ptr<Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
-    IntegrationReporterImpl m_integration_reporter;
     int_fast64_t m_current_server_session_ident;
     Optional<util::network::DeadlineTimer> m_connection_reaper_timer;
     bool m_allow_load_balancing = false;
@@ -1243,17 +1027,9 @@ private:
 
     std::size_t m_pending_changesets_from_downstream_byte_size = 0;
 
-    std::size_t m_num_outstanding_compaction_processes = 0;
-
     util::CondVar m_wait_or_service_stopped_cond; // Protected by `m_mutex`
 
-    Gauges m_gauges;
-
     util::ScratchMemory m_scratch_memory;
-
-    util::network::DeadlineTimer m_allocation_metrics_timer;
-
-    std::int_fast64_t m_compacting_connection = 0;
 
     void listen();
     void initiate_accept();
@@ -1287,101 +1063,9 @@ private:
 
     void do_recognize_external_change(const std::string& virt_path);
 
-    void initiate_allocation_metrics_wait();
-    void handle_allocation_metrics_wait();
-
     void do_stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_complete)> completion_handler,
                                                      milliseconds_type timeout);
 };
-
-inline void ServerImpl::inc_num_outstanding_compaction_processes() noexcept
-{
-    ++m_num_outstanding_compaction_processes;
-}
-
-
-enum class ConnectionTerminationReason {
-    end_of_input,
-    connection_reset_error,
-    broken_pipe_error,
-    system_error,
-    network_error,
-    ssl_error,
-    http_error,
-    websocket_error,
-    sync_protocol_error,
-    error_of_unexpected_category,
-    superseded_session,
-    heartbeat_timeout,
-    http_response_written
-};
-
-ConnectionTerminationReason map_error_to_connection_termination_reason(std::error_code ec)
-{
-    const std::error_category& category = ec.category();
-    if (category == util::misc_ext_error_category) {
-        if (ec == util::MiscExtErrors::end_of_input)
-            return ConnectionTerminationReason::end_of_input;
-        return ConnectionTerminationReason::network_error;
-    }
-    const char* category_name = category.name();
-    if (std::strcmp(category_name, "realm.basic_system") == 0) {
-        if (ec == util::error::connection_reset)
-            return ConnectionTerminationReason::connection_reset_error;
-        if (ec == util::error::broken_pipe)
-            return ConnectionTerminationReason::broken_pipe_error;
-        return ConnectionTerminationReason::system_error;
-    }
-    if (category == util::network::resolve_error_category)
-        return ConnectionTerminationReason::network_error;
-    bool is_ssl_related =
-        (category == util::network::ssl::error_category || category == util::network::openssl_error_category ||
-         category == util::network::secure_transport_error_category);
-    if (is_ssl_related)
-        return ConnectionTerminationReason::ssl_error;
-    if (std::strcmp(category_name, "HTTP Parser Error") == 0)
-        return ConnectionTerminationReason::http_error;
-    if (std::strcmp(category_name, "realm::util::websocket::Error") == 0)
-        return ConnectionTerminationReason::websocket_error;
-    if (std::strcmp(category_name, "realm::sync::ProtocolError") == 0) {
-        return ConnectionTerminationReason::sync_protocol_error;
-    }
-    return ConnectionTerminationReason::error_of_unexpected_category;
-}
-
-const char* get_connection_termination_reason_metric(ConnectionTerminationReason reason)
-{
-    switch (reason) {
-        case ConnectionTerminationReason::end_of_input:
-            return "connection.term.end_of_input";
-        case ConnectionTerminationReason::connection_reset_error:
-            return "connection.term.connection_reset_error";
-        case ConnectionTerminationReason::broken_pipe_error:
-            return "connection.term.broken_pipe_error";
-        case ConnectionTerminationReason::system_error:
-            return "connection.term.system_error";
-        case ConnectionTerminationReason::network_error:
-            return "connection.term.network_error";
-        case ConnectionTerminationReason::ssl_error:
-            return "connection.term.ssl_error";
-        case ConnectionTerminationReason::http_error:
-            return "connection.term.http_error";
-        case ConnectionTerminationReason::websocket_error:
-            return "connection.term.websocket_error";
-        case ConnectionTerminationReason::sync_protocol_error:
-            return "connection.term.sync_protocol_error";
-        case ConnectionTerminationReason::error_of_unexpected_category:
-            return "connection.term.error_of_unexpected_category";
-        case ConnectionTerminationReason::superseded_session:
-            return "connection.term.superseded_session";
-        case ConnectionTerminationReason::heartbeat_timeout:
-            return "connection.term.heartbeat_timeout";
-        case ConnectionTerminationReason::http_response_written:
-            return "connection.term.http_response_written";
-    }
-    return nullptr;
-}
-
 
 // ============================ SyncConnection ============================
 
@@ -1554,21 +1238,11 @@ public:
         return *m_socket;
     }
 
-    Metrics& metrics() noexcept
-    {
-        return get_server().metrics();
-    }
-
-    Gauges& gauges() noexcept
-    {
-        return get_server().gauges();
-    }
-
     void initiate();
 
     // Commits suicide
     template <class... Params>
-    void terminate(ConnectionTerminationReason, Logger::Level, const char* log_message, Params... log_params);
+    void terminate(Logger::Level, const char* log_message, Params... log_params);
 
     // Commits suicide
     void terminate_if_dead(SteadyTimePoint now);
@@ -1659,7 +1333,6 @@ private:
 
     bool m_send_pong = false;
     bool m_sending_pong = false;
-    bool m_ping_messages_seen = false;
 
     util::network::Trigger m_send_trigger;
 
@@ -1839,10 +1512,7 @@ public:
         m_last_activity_at = steady_clock_now();
         m_remote_endpoint = std::move(remote_endpoint);
 
-        logger.detail("Connection from %1", m_remote_endpoint);             // Throws
-        metrics().increment("connection.started");                          // Throws
-        metrics().gauge("connection.online", ++gauges().connection_online); // Throws
-        metrics().gauge("connection.total", ++gauges().connection_total);   // Throws
+        logger.detail("Connection from %1", m_remote_endpoint); // Throws
 
         if (m_ssl_stream) {
             initiate_ssl_handshake(); // Throws
@@ -1869,13 +1539,9 @@ public:
 
     // Commits suicide
     template <class... Params>
-    void terminate(ConnectionTerminationReason reason, Logger::Level log_level, const char* log_message,
-                   Params... log_params)
+    void terminate(Logger::Level log_level, const char* log_message, Params... log_params)
     {
         logger.log(log_level, log_message, log_params...); // Throws
-        metrics().increment("connection.terminated");      // Throws
-        metrics().increment(get_connection_termination_reason_metric(reason));
-        metrics().gauge("connection.online", --gauges().connection_online); // Throws
         m_ssl_stream.reset();
         m_socket.reset();
         m_server.remove_http_connection(m_id); // Suicide
@@ -1884,20 +1550,19 @@ public:
     // Commits suicide
     void terminate_if_dead(SteadyTimePoint now)
     {
-        auto termination_reason = ConnectionTerminationReason::heartbeat_timeout;
         milliseconds_type time = steady_duration(m_last_activity_at, now);
         const Server::Config& config = m_server.get_config();
         if (m_is_sending) {
             if (time >= config.http_response_timeout) {
                 // Suicide
-                terminate(termination_reason, Logger::Level::detail,
+                terminate(Logger::Level::detail,
                           "HTTP connection closed (request timeout)"); // Throws
             }
         }
         else {
             if (time >= config.http_request_timeout) {
                 // Suicide
-                terminate(termination_reason, Logger::Level::detail,
+                terminate(Logger::Level::detail,
                           "HTTP connection closed (response timeout)"); // Throws
             }
         }
@@ -1978,9 +1643,6 @@ private:
         if (path == "/realm-sync" || path.begins_with("/realm-sync?") || path.begins_with("/realm-sync/%2F")) {
             handle_request_for_sync(request); // Throws
         }
-        else if (path.begins_with("/api/")) {
-            handle_request_for_api(request); // Throws
-        }
         else {
             handle_404_not_found(request); // Throws
         }
@@ -2044,8 +1706,7 @@ private:
                     }
                     logger.error("Protocol version negotiation failed: Client sent malformed "
                                  "specification of supported protocol versions: '%1'",
-                                 elem);                       // Throws
-                    metrics().increment("protocol.bad_spec"); // Throws
+                                 elem); // Throws
                     handle_400_bad_request("Protocol version negotiation failed: Malformed "
                                            "specification of supported protocol "
                                            "versions\n"); // Throws
@@ -2058,7 +1719,6 @@ private:
             if (protocol_version_ranges.empty()) {
                 logger.error("Protocol version negotiation failed: Client did not send a "
                              "specification of supported protocol versions"); // Throws
-                metrics().increment("protocol.no_spec");                      // Throws
                 handle_400_bad_request("Protocol version negotiation failed: Missing specification "
                                        "of supported protocol versions\n"); // Throws
                 return;
@@ -2089,18 +1749,15 @@ private:
             Formatter& formatter = misc_buffers.formatter;
             if (REALM_UNLIKELY(best_match == 0)) {
                 const char* elaboration = "No version supported by both client and server";
-                const char* extra_metrics_key = nullptr;
                 const char* identifier_hint = nullptr;
                 if (overall_client_max < server_min) {
                     // Client is too old
                     elaboration = "Client is too old for server";
-                    extra_metrics_key = "protocol.client_too_old";
                     identifier_hint = "CLIENT_TOO_OLD";
                 }
                 else if (overall_client_min > server_max) {
                     // Client is too new
                     elaboration = "Client is too new for server";
-                    extra_metrics_key = "protocol.client_too_new";
                     identifier_hint = "CLIENT_TOO_NEW";
                 }
                 auto format_ranges = [&](const auto& list) {
@@ -2121,9 +1778,6 @@ private:
                 logger.error("Protocol version negotiation failed: %1 "
                              "(client supports: %2)",
                              elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
-                metrics().increment("protocol.mismatch");                                        // Throws
-                if (extra_metrics_key)
-                    metrics().increment(extra_metrics_key); // Throws
                 formatter.reset();
                 formatter << "Protocol version negotiation failed: "
                              ""
@@ -2146,13 +1800,6 @@ private:
             logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
                          negotiated_protocol_version); // Throws
             formatter.reset();
-            // FIXME: Simplify this when Metrics::increment() is changed to
-            // take a std::string_view argument (no need to add a null byte).
-            formatter << "protocol.used,"
-                         "version="
-                      << negotiated_protocol_version << '\0'; // Throws
-            const char* metrics_key = formatter.data();
-            metrics().increment(metrics_key); // Throws
         }
 
         std::string sec_websocket_protocol_2;
@@ -2239,123 +1886,9 @@ private:
                 write_error(ec);
                 return;
             }
-            terminate(ConnectionTerminationReason::http_response_written, Logger::Level::detail,
-                      "HTTP connection closed"); // Throws
+            terminate(Logger::Level::detail, "HTTP connection closed"); // Throws
         };
         m_http_server.async_send_response(response, std::move(handler));
-    }
-
-    void handle_request_for_info(const HTTPRequest&)
-    {
-        logger.detail("Request for /api/info");
-        size_t number_of_http_connections = m_server.get_number_of_http_connections();
-        size_t number_of_sync_connections = m_server.get_number_of_sync_connections();
-        const std::set<std::string>& realm_names = m_server.get_realm_names();
-
-        std::string body = "Realm sync server\n\n";
-        body += "Number of open HTTP connections: " + util::to_string(number_of_http_connections) + "\n";
-        body += "Number of open Sync connections: " + util::to_string(number_of_sync_connections) + "\n";
-        body += "Realm names:\n";
-        for (const std::string& name : realm_names) {
-            body += "   " + name + "\n";
-        }
-
-        handle_text_response(HTTPStatus::Ok, body); // Throws
-    }
-
-    void handle_request_for_api(const HTTPRequest& request)
-    {
-        logger.detail("Request for /api");
-        StringData request_path = request.path;
-
-        // The healt check "/api/ok" is allowed without authorization.
-        if (request_path == "/api/ok") {
-            handle_text_response(HTTPStatus::Ok, ""); // Throws
-            return;
-        }
-
-        // All other api endpoints require authorization
-        AccessToken::ParseError error;
-        const Server::Config& config = m_server.get_config();
-        const std::string& authorization_header_name = config.authorization_header_name;
-        auto authorization_header = request.headers.find(authorization_header_name);
-        if (authorization_header == request.headers.end()) {
-            handle_text_response(HTTPStatus::Forbidden, "no access token"); // Throws
-            return;
-        }
-
-        util::Optional<StringData> signed_user_token =
-            _impl::parse_authorization_header(authorization_header->second);
-
-        if (!signed_user_token) {
-            handle_text_response(HTTPStatus::Forbidden, "no access token"); // Throws
-            return;
-        }
-
-        util::Optional<AccessToken> access_token =
-            get_server().get_access_control().verify_access_token(*signed_user_token, &error);
-
-        if (error != AccessToken::ParseError::none) {
-            handle_text_response(HTTPStatus::Forbidden, "invalid token"); // Throws
-            return;
-        }
-
-        bool is_admin = get_server().get_access_control().is_admin(*access_token);
-
-        if (request_path == "/api/info") {
-            if (is_admin) {
-                handle_request_for_info(request);
-                return;
-            }
-            handle_text_response(HTTPStatus::Forbidden, "must be admin"); // Throws
-            return;
-        }
-
-        StringData compact_prefix = "/api/compact/";
-        bool is_compact = (request_path == compact_prefix.substr(0, compact_prefix.size() - 1) ||
-                           request_path.begins_with(compact_prefix));
-        if (is_compact) {
-            if (is_admin) {
-                StringData virt_path = request_path.substr(compact_prefix.size() - 1);
-                logger.detail("Request for /api/compact");        // Throws
-                m_server.initiate_compact_realm(m_id, virt_path); // Throws
-                return;
-            }
-            handle_text_response(HTTPStatus::Forbidden, "must be admin"); // Throws
-            return;
-        }
-
-        StringData api_realm_prefix = "/api/realm/";
-        if (request_path.begins_with(api_realm_prefix)) {
-            std::string realm_path = request_path.substr(api_realm_prefix.size() - 1);
-
-            if (!is_admin && access_token->path != realm_path) {
-                handle_text_response(HTTPStatus::Forbidden,
-                                     "no rights to access the realm"); // Throws
-                return;
-            }
-
-            // Realm deletion
-            if (request.method == HTTPMethod::Delete) {
-                if (!get_server().get_access_control().can(*access_token, Privilege::DeleteRealm, realm_path)) {
-                    handle_text_response(HTTPStatus::Forbidden,
-                                         "access token has no delete rights"); // Throws
-                    return;
-                }
-                const std::set<std::string>& realm_names = m_server.get_realm_names();
-                if (realm_names.find(realm_path) != realm_names.end()) {
-                    util::bind_ptr<ServerFile> file = m_server.get_or_create_file(realm_path);
-                    file->initiate_deletion(m_id); // Throws
-                    return;
-                }
-                handle_text_response(HTTPStatus::NotFound, "Realm not found"); // Throws
-                return;
-            }
-            handle_text_response(HTTPStatus::MethodNotAllowed, "Unsupported"); // Throws
-            return;
-        }
-
-        handle_404_not_found(request); // Throws
     }
 
     void handle_400_bad_request(std::string_view body)
@@ -2418,28 +1951,16 @@ private:
 
     void close_due_to_close_by_client(std::error_code ec)
     {
-        auto termination_reason = map_error_to_connection_termination_reason(ec);
         auto log_level = (ec == util::MiscExtErrors::end_of_input ? Logger::Level::detail : Logger::Level::info);
         // Suicide
-        terminate(termination_reason, log_level, "HTTP connection closed by client: %1", ec.message()); // Throws
+        terminate(log_level, "HTTP connection closed by client: %1", ec.message()); // Throws
     }
 
     void close_due_to_error(std::error_code ec)
     {
-        auto termination_reason = map_error_to_connection_termination_reason(ec);
         // Suicide
-        terminate(termination_reason, Logger::Level::error, "HTTP connection closed due to error: %1",
+        terminate(Logger::Level::error, "HTTP connection closed due to error: %1",
                   ec.message()); // Throws
-    }
-
-    Metrics& metrics() noexcept
-    {
-        return get_server().metrics();
-    }
-
-    Gauges& gauges() noexcept
-    {
-        return get_server().gauges();
     }
 
     static std::string make_logger_prefix(int_fast64_t id)
@@ -2546,16 +2067,6 @@ public:
         return m_connection.get_server().get_config().encryption_key;
     }
 
-    Metrics& metrics() noexcept
-    {
-        return m_connection.metrics();
-    }
-
-    Gauges& gauges() noexcept
-    {
-        return m_connection.gauges();
-    }
-
     session_ident_type get_session_ident() const noexcept
     {
         return m_session_ident;
@@ -2605,17 +2116,12 @@ public:
 
     void initiate()
     {
-        logger.detail("Session initiated", m_session_ident);          // Throws
-        metrics().increment("session.started");                       // Throws
-        metrics().gauge("session.online", ++gauges().session_online); // Throws
-        metrics().gauge("session.total", ++gauges().session_total);   // Throws
+        logger.detail("Session initiated", m_session_ident); // Throws
     }
 
     void terminate()
     {
-        logger.detail("Session terminated", m_session_ident);         // Throws
-        metrics().increment("session.terminated");                    // Throws
-        metrics().gauge("session.online", --gauges().session_online); // Throws
+        logger.detail("Session terminated", m_session_ident); // Throws
     }
 
     // Initiate the deactivation process, if it has not been initiated already
@@ -2746,7 +2252,6 @@ public:
                          "signed_user_token='%2')",
                          path,
                          short_token_fmt(signed_user_token)); // Throws
-            metrics().increment("protocol.violated");         // Throws
             error = ProtocolError::illegal_realm_path;
             return false;
         }
@@ -2754,19 +2259,6 @@ public:
         // The user has proper permissions at this stage.
 
         m_server_file = server.get_or_create_file(path); // Throws
-
-        {
-            bool realm_deletion_is_ongoing = false;
-            if (m_server_file->realm_deletion_is_ongoing()) {
-                logger.debug("BIND message received for Realm that is being deleted"); // Throws
-                realm_deletion_is_ongoing = true;
-            }
-
-            if (realm_deletion_is_ongoing) {
-                error = ProtocolError::server_file_deleted;
-                return false;
-            }
-        }
 
         m_server_file->add_unidentified_session(this); // Throws
 
@@ -2803,24 +2295,12 @@ public:
         REALM_ASSERT(!unbind_message_received());
         REALM_ASSERT(!error_occurred());
         REALM_ASSERT(!m_error_message_sent);
-        REALM_ASSERT(!m_server_file->realm_deletion_is_ongoing());
 
         logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
                      "latest_server_version_salt=%6)",
                      client_file_ident, client_file_ident_salt, scan_server_version, scan_client_version,
                      latest_server_version, latest_server_version_salt); // Throws
-
-        {
-            const ClientFileBlacklist& list = m_server_file->get_client_file_blacklist();
-            if (std::binary_search(list.begin(), list.end(), client_file_ident)) {
-                logger.error("Rejecting blacklisted client file (client_file_ident=%1)",
-                             client_file_ident);    // Throws
-                metrics().increment("blacklisted"); // Throws
-                error = ProtocolError::client_file_blacklisted;
-                return false;
-            }
-        }
 
         SaltedFileIdent client_file_ident_2 = {client_file_ident, client_file_ident_salt};
         DownloadCursor download_progress = {scan_server_version, scan_client_version};
@@ -2837,44 +2317,36 @@ public:
                 break;
             case BootstrapError::client_file_expired:
                 logger.warn("Client (%1) expired", client_file_ident); // Throws
-                metrics().increment("client.expired");
                 error = ProtocolError::client_file_expired;
                 return false;
             case BootstrapError::bad_client_file_ident:
                 logger.error("Bad client file ident (%1) in IDENT message",
-                             client_file_ident);          // Throws
-                metrics().increment("client.unsyncable"); // Throws
+                             client_file_ident); // Throws
                 error = ProtocolError::bad_client_file_ident;
                 return false;
             case BootstrapError::bad_client_file_ident_salt:
                 logger.error("Bad client file identifier salt (%1) in IDENT message",
-                             client_file_ident_salt);     // Throws
-                metrics().increment("client.unsyncable"); // Throws
+                             client_file_ident_salt); // Throws
                 error = ProtocolError::diverging_histories;
                 return false;
             case BootstrapError::bad_download_server_version:
                 logger.error("Bad download progress server version in IDENT message"); // Throws
-                metrics().increment("client.unsyncable");                              // Throws
                 error = ProtocolError::bad_server_version;
                 return false;
             case BootstrapError::bad_download_client_version:
                 logger.error("Bad download progress client version in IDENT message"); // Throws
-                metrics().increment("client.unsyncable");                              // Throws
                 error = ProtocolError::bad_client_version;
                 return false;
             case BootstrapError::bad_server_version:
                 logger.error("Bad server version (message_type='ident')"); // Throws
-                metrics().increment("client.unsyncable");                  // Throws
                 error = ProtocolError::bad_server_version;
                 return false;
             case BootstrapError::bad_server_version_salt:
                 logger.error("Bad server version salt in IDENT message"); // Throws
-                metrics().increment("client.unsyncable");                 // Throws
                 error = ProtocolError::diverging_histories;
                 return false;
             case BootstrapError::bad_client_type:
                 logger.error("Bad client type (%1) in IDENT message", int(client_type)); // Throws
-                metrics().increment("client.unsyncable");                                // Throws
                 error = ProtocolError::bad_client_file_ident; // FIXME: Introduce new protocol-level error
                                                               // `bad_client_type`.
                 return false;
@@ -2888,8 +2360,7 @@ public:
             // with the same connection
             if (&other_conn == &m_connection) {
                 logger.error("Client file already bound in other session associated with "
-                             "the same connection");      // Throws
-                metrics().increment("protocol.violated"); // Throws
+                             "the same connection"); // Throws
                 error = ProtocolError::bound_in_other_session;
                 return false;
             }
@@ -2902,9 +2373,8 @@ public:
             // connection is always due to that other connection being a
             // zombie. And when such a situation is detected, we want to close
             // the zombie connection immediately.
-            auto termination_reason = ConnectionTerminationReason::superseded_session;
             auto log_level = Logger::Level::detail;
-            other_conn.terminate(termination_reason, log_level,
+            other_conn.terminate(log_level,
                                  "Sync connection closed (superseded session)"); // Throws
         }
 
@@ -3004,7 +2474,6 @@ public:
         if (REALM_UNLIKELY(!good_1)) {
             logger.error("Decreasing client version in upload progress (%1 < %2)", upload_progress.client_version,
                          m_upload_progress.client_version); // Throws
-            metrics().increment("protocol.violated");       // Throws
             error = ProtocolError::bad_client_version;
             return false;
         }
@@ -3015,7 +2484,6 @@ public:
             logger.error("Bad last integrated server version in upload progress (%1 > %2)",
                          upload_progress.last_integrated_server_version,
                          m_download_progress.server_version); // Throws
-            metrics().increment("protocol.violated");         // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3024,7 +2492,6 @@ public:
         if (REALM_UNLIKELY(!is_consistent(upload_progress))) {
             logger.error("Upload progress is inconsistent (%1, %2)", upload_progress.client_version,
                          upload_progress.last_integrated_server_version); // Throws
-            metrics().increment("protocol.violated");                     // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3036,7 +2503,6 @@ public:
                          upload_progress.client_version, upload_progress.last_integrated_server_version,
                          m_upload_threshold.client_version,
                          m_upload_threshold.last_integrated_server_version); // Throws
-            metrics().increment("protocol.violated");                        // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3048,7 +2514,6 @@ public:
                          upload_progress.client_version, upload_progress.last_integrated_server_version,
                          m_upload_progress.client_version,
                          m_upload_progress.last_integrated_server_version); // Throws
-            metrics().increment("protocol.violated");                       // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3059,8 +2524,7 @@ public:
         // the client-side file.
         if (REALM_UNLIKELY(locked_server_version_2 < m_locked_server_version)) {
             logger.error("Decreasing locked server version (%1 < %2)", locked_server_version_2,
-                         m_locked_server_version);    // Throws
-            metrics().increment("protocol.violated"); // Throws
+                         m_locked_server_version); // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3069,7 +2533,6 @@ public:
         if (REALM_UNLIKELY(locked_server_version_2 > m_download_progress.server_version)) {
             logger.error("Bad locked server version (%1 > %2)", locked_server_version_2,
                          m_download_progress.server_version); // Throws
-            metrics().increment("protocol.violated");         // Throws
             error = ProtocolError::bad_server_version;
             return false;
         }
@@ -3086,8 +2549,7 @@ public:
                     logger.error("Nonincreasing client version in upload cursor of uploaded "
                                  "changeset (%1 <= %2)",
                                  uc.upload_cursor.client_version,
-                                 up.client_version);          // Throws
-                    metrics().increment("protocol.violated"); // Throws
+                                 up.client_version); // Throws
                     error = ProtocolError::bad_client_version;
                     return false;
                 }
@@ -3096,7 +2558,6 @@ public:
                     logger.error("Upload cursor of uploaded changeset is inconsistent (%1, %2)",
                                  uc.upload_cursor.client_version,
                                  uc.upload_cursor.last_integrated_server_version); // Throws
-                    metrics().increment("protocol.violated");                      // Throws
                     error = ProtocolError::bad_server_version;
                     return false;
                 }
@@ -3107,7 +2568,6 @@ public:
                                  "inconsistent with previous upload cursor (%3, %4)",
                                  uc.upload_cursor.client_version, uc.upload_cursor.last_integrated_server_version,
                                  up.client_version, up.last_integrated_server_version); // Throws
-                    metrics().increment("protocol.violated");                           // Throws
                     error = ProtocolError::bad_server_version;
                     return false;
                 }
@@ -3123,7 +2583,6 @@ public:
                                  uc.upload_cursor.client_version, uc.upload_cursor.last_integrated_server_version,
                                  m_upload_threshold.client_version,
                                  m_upload_threshold.last_integrated_server_version); // Throws
-                    metrics().increment("protocol.violated");                        // Throws
                     error = ProtocolError::bad_server_version;
                     return false;
                 }
@@ -3140,7 +2599,6 @@ public:
                              "changeset (%1 > %2)",
                              up.client_version,
                              upload_progress.client_version); // Throws
-                metrics().increment("protocol.violated");     // Throws
                 error = ProtocolError::bad_client_version;
                 return false;
             }
@@ -3151,7 +2609,6 @@ public:
                              "inconsistent with upload progress (%3, %4)",
                              up.client_version, up.last_integrated_server_version, upload_progress.client_version,
                              upload_progress.last_integrated_server_version); // Throws
-                metrics().increment("protocol.violated");                     // Throws
                 error = ProtocolError::bad_server_version;
                 return false;
             }
@@ -3469,17 +2926,12 @@ private:
             }
 
             OutputBuffer& out = m_connection.get_output_buffer();
-            SteadyTimePoint start_time = steady_clock_now();
             protocol.make_download_message(
                 m_connection.get_client_protocol_version(), out, m_session_ident, download_progress.server_version,
                 download_progress.last_integrated_client_version, last_server_version.version,
                 last_server_version.salt, upload_progress.client_version,
                 upload_progress.last_integrated_server_version, downloadable_bytes, num_changesets, body,
                 uncompressed_body_size, compressed_body_size, body_is_compressed, logger); // Throws
-            milliseconds_type elapsed = steady_duration(start_time);
-            metrics().increment("download.constructed");                                   // Throws
-            metrics().timing("download.constructed", double(elapsed));                     // Throws
-            metrics().timing("download.constructed.size", double(uncompressed_body_size)); // Throws
 
             if (!disable_download_compaction) {
                 std::size_t saved = accum_original_size - accum_compacted_size;
@@ -3641,24 +3093,6 @@ private:
 };
 
 
-// ============================ IntegrationReporterImpl implementation ============================
-
-void IntegrationReporterImpl::on_changesets_merged(long num_merges)
-{
-    REALM_ASSERT_RELEASE(num_merges <= std::numeric_limits<int>::max());
-    m_server.metrics().increment("merges.performed", int(num_merges)); // Throws
-}
-
-
-void IntegrationReporterImpl::on_integration_session_begin()
-{
-    m_session_start_time = steady_clock_now();
-}
-
-
-void IntegrationReporterImpl::on_changeset_integrated(std::size_t) {}
-
-
 // ============================ SessionQueue implementation ============================
 
 void SessionQueue::push_back(Session* sess) noexcept
@@ -3715,12 +3149,9 @@ ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const s
     : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
-    , m_file{cache, real_path, virt_path, *this, false, disable_sync_to_disk} // Throws
-    , m_client_file_blacklist{make_client_file_blacklist(server, virt_path)}  // Throws
-    , m_worker_file{
-          server.get_worker().get_file_access_cache(), real_path, virt_path, *this, true, disable_sync_to_disk}
+    , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
+    , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, true, disable_sync_to_disk}
 {
-    m_server.metrics().gauge("realms.open", ++m_server.gauges().realms_open); // Throws
 }
 
 
@@ -3728,17 +3159,7 @@ ServerFile::~ServerFile() noexcept
 {
     REALM_ASSERT(m_unidentified_sessions.empty());
     REALM_ASSERT(m_identified_sessions.empty());
-
     REALM_ASSERT(m_file_ident_request == 0);
-
-    // FIXME: Muffling an exception is not ideal. A better approach is to move
-    // the metrics operation out of the destructor.
-    try {
-        m_server.metrics().gauge("realms.open", --m_server.gauges().realms_open); // Throws
-    }
-    catch (...) {
-        // Throwing in destructor is not allowed, so we catch here
-    }
 }
 
 
@@ -3761,16 +3182,7 @@ void ServerFile::activate() {}
 // This function must be called only after a completed invocation of
 // initialize(). Both functinos must only ever be called by the network event
 // loop thread.
-void ServerFile::register_client_access(file_ident_type client_file_ident)
-{
-    const Server::Config& config = m_server.get_config();
-    if (!config.disable_history_compaction) {
-        Clock::time_point now = m_server.get_worker().get_compaction_clock_now();
-        std::time_t now_2 = Clock::clock::to_time_t(now);
-        util::LockGuard lock{m_server.last_client_accesses_mutex};
-        m_last_client_accesses[client_file_ident] = {now_2}; // Throws
-    }
-}
+void ServerFile::register_client_access(file_ident_type) {}
 
 
 auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file, ClientType client_type)
@@ -3843,7 +3255,6 @@ void ServerFile::add_changesets_from_downstream(file_ident_type client_file_iden
                                                 version_type locked_server_version, const UploadChangeset* changesets,
                                                 std::size_t num_changesets)
 {
-    AllocationMetricNameScope scope{g_worker_queue_metric};
     register_client_access(client_file_ident); // Throws
 
     bool dirty = false;
@@ -3941,11 +3352,6 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     wlogger.debug("Work unit execution started"); // Throws
 
     if (work.has_primary_work) {
-        if (REALM_UNLIKELY(work.request_deletion)) {
-            m_worker_file.proper_close(); // Throws
-            goto done;
-        }
-
         if (REALM_UNLIKELY(!m_work.file_ident_alloc_slots.empty()))
             worker_allocate_file_identifiers(); // Throws
 
@@ -3953,20 +3359,12 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
             worker_integrate_changes_from_downstream(state); // Throws
     }
 
-    // Compaction
-    if (REALM_UNLIKELY(work.group_has_compaction_requests)) {
-        if (work.request_compaction)
-            m_worker_file.proper_close(); // Throws
-    }
-
-done:
     wlogger.debug("Work unit execution completed"); // Throws
 
     milliseconds_type time = steady_duration(start_time);
     milliseconds_type seq_time = time - parallel_time;
     m_server.m_seq_time.fetch_add(seq_time, std::memory_order_relaxed);
     m_server.m_par_time.fetch_add(parallel_time, std::memory_order_relaxed);
-    m_server.metrics().timing("workunit.time", double(time)); // Throws
 
     // Pass control back to the network event loop thread
     auto handler = [this] {
@@ -3981,24 +3379,9 @@ done:
 }
 
 
-ClientFileBlacklist ServerFile::make_client_file_blacklist(const ServerImpl& server, const std::string& virt_path)
-{
-    ClientFileBlacklist list;
-    const ClientFileBlacklists& lists = server.get_config().client_file_blacklists;
-    auto i = lists.find(virt_path);
-    if (i != lists.end()) {
-        list = i->second; // Throws
-        std::sort(list.begin(), list.end());
-    }
-    return list;
-}
-
-
 void ServerFile::on_changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes)
 {
     m_num_changesets_from_downstream += num_changesets;
-
-    changesets_from_downstream_added(num_changesets, num_bytes);
 
     if (num_bytes > 0) {
         m_blocked_changesets_from_downstream_byte_size += num_bytes;
@@ -4027,21 +3410,11 @@ void ServerFile::group_unblock_work()
     if (REALM_LIKELY(!m_server.is_sync_stopped())) {
         unblock_work(); // Throws
         const Work& work = m_work;
-        bool pass_to_worker = (work.has_primary_work || work.group_has_compaction_requests);
-        bool work_was_unblocked = pass_to_worker;
-        if (REALM_LIKELY(work_was_unblocked)) {
+        if (REALM_LIKELY(work.has_primary_work)) {
             logger.trace("Work unit unblocked"); // Throws
             m_has_work_in_progress = true;
-            if (pass_to_worker) {
-                Worker& worker = m_server.get_worker();
-                worker.enqueue(this); // Throws
-            }
-            else {
-                // Note: Suicide is not possible here, because if
-                // `m_work.request_deletion` was true, `m_work.has_primary_work`
-                // would have become true too.
-                group_postprocess_stage_1(); // Throws
-            }
+            Worker& worker = m_server.get_worker();
+            worker.enqueue(this); // Throws
         }
     }
 }
@@ -4052,15 +3425,6 @@ void ServerFile::unblock_work()
     REALM_ASSERT(m_has_blocked_work);
 
     m_work.reset();
-
-    if (REALM_UNLIKELY(m_request_deletion)) {
-        // When deletion is requested, take care to not unblock any other type
-        // of work.
-        m_work.has_primary_work = true;
-        m_work.request_deletion = true;
-        m_work.group_has_deletion_requests = true;
-        return;
-    }
 
     // Discard requests for file identifiers whose receiver is no longer
     // waiting.
@@ -4105,15 +3469,6 @@ void ServerFile::unblock_work()
     m_unblocked_changesets_from_downstream_byte_size = m_blocked_changesets_from_downstream_byte_size;
     m_blocked_changesets_from_downstream_byte_size = 0;
 
-    m_group_unblocked_changesets_from_downstream_stats = m_group_blocked_changesets_from_downstream_stats;
-    m_group_blocked_changesets_from_downstream_stats.num_changesets = 0;
-
-    if (REALM_UNLIKELY(m_request_compaction)) {
-        m_request_compaction = false;
-        m_work.request_compaction = true;
-        m_work.group_has_compaction_requests = true;
-    }
-
     m_num_changesets_from_downstream = 0;
     m_has_blocked_work = false;
 }
@@ -4143,28 +3498,6 @@ void ServerFile::recognize_external_change()
     if (m_version_info.sync_version.version > prev_version_info.sync_version.version) {
         REALM_ASSERT(m_version_info.realm_version > prev_version_info.realm_version);
         resume_download();
-    }
-}
-
-
-void ServerFile::initiate_compaction()
-{
-    REALM_ASSERT(!m_request_compaction);
-    m_request_compaction = true;
-    on_work_added(); // Throws
-}
-
-
-void ServerFile::initiate_deletion(std::int_fast64_t conn_id)
-{
-    // Note: Actual deletion takes place in
-    // perform_file_deletion_after_state_realm_deletion(), which is also where
-    // the HTTP response is sent from.
-
-    m_deleting_connections.push_back(conn_id); // Throws
-    if (!m_request_deletion) {
-        m_request_deletion = true;
-        on_work_added(); // Throws
     }
 }
 
@@ -4203,46 +3536,6 @@ bool ServerFile::worker_integrate_changes_from_downstream(WorkerState& state)
             m_work.produced_new_sync_version = true;
         }
     }
-    // NOTE: `m_work.changesets_from_downstream` must be left unmodified here,
-    // such that it can be accessed safely by
-    // ServerFile::bootstrap_client_session().
-    if (produced_new_sync_version) {
-        std::size_t num_changesets = m_work.integration_result.integrated_changesets.size();
-        std::size_t num_parts = num_changesets;
-        const Worker& worker = m_server.get_worker();
-        m_work.integration_duration = steady_duration(worker.get_integration_session_start_time());
-        const milliseconds_type duration_limit = 10000; // 10 seconds
-        if (m_work.integration_duration < duration_limit) {
-            // Normal case
-            wlogger.debug("Integration of %1 changesets took %2ms", num_parts,
-                          m_work.integration_duration); // Throws
-        }
-        else {
-            // Slow case
-            wlogger.warn("An internal computation in the Realm Server was slow. It is not "
-                         "necessarily a problem. Contact Realm if this warning appears multiple "
-                         "times. Integration of %1 changesets took %2ms.",
-                         num_parts,
-                         m_work.integration_duration); // Throws
-            const std::size_t max_size = 20000;
-            std::size_t changeset_ndx = 0;
-            for (std::size_t i = 0; i < num_parts; ++i) {
-                // Regular changeset
-                const IntegratableChangeset& ic = *m_work.integration_result.integrated_changesets[changeset_ndx];
-                std::string hex_dump = _impl::clamped_hex_dump({ic.changeset.data(), ic.changeset.size()},
-                                                               max_size); // Throws
-                wlogger.debug("Details of potential slow computation (part %1/%2): Changeset "
-                              "(client_file_ident=%3, origin_timestamp=%4, "
-                              "origin_file_ident=%5, client_version=%6, "
-                              "last_integrated_server_version=%7): %8",
-                              (i + 1), num_parts, ic.client_file_ident, ic.origin_timestamp, ic.origin_file_ident,
-                              ic.upload_cursor.client_version, ic.upload_cursor.last_integrated_server_version,
-                              hex_dump); // Throws
-                ++changeset_ndx;
-                continue;
-            }
-        }
-    }
     return produced_new_sync_version;
 }
 
@@ -4252,7 +3545,7 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
     if (state.use_file_cache)
         return worker_access().history; // Throws
     const std::string& path = m_worker_file.realm_path;
-    hist_ptr = m_server.make_history_for_path(*this);              // Throws
+    hist_ptr = m_server.make_history_for_path();                   // Throws
     DBOptions options = m_worker_file.make_shared_group_options(); // Throws
     sg_ptr = DB::create(*hist_ptr, path, options);                 // Throws
     sg_ptr->claim_sync_agent();                                    // Throws
@@ -4261,10 +3554,6 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
 
 
 // When worker thread finishes work unit.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_1()
 {
     REALM_ASSERT(m_has_work_in_progress);
@@ -4272,13 +3561,9 @@ void ServerFile::group_postprocess_stage_1()
     group_finalize_work_stage_1(); // Throws
     group_finalize_work_stage_2(); // Throws
     group_postprocess_stage_2();   // Throws
-    // Suicide may have happened at this point
 }
 
 
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_2()
 {
     REALM_ASSERT(m_has_work_in_progress);
@@ -4288,22 +3573,9 @@ void ServerFile::group_postprocess_stage_2()
 
 
 // When all files, including the reference file, have been backed up.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_3()
 {
     REALM_ASSERT(m_has_work_in_progress);
-
-    Work& work = m_work;
-    if (REALM_UNLIKELY(work.group_has_deletion_requests)) {
-        if (group_perform_file_deletions()) { // Throws
-            // Suicide may have happened at this point
-            return;
-        }
-    }
-
     m_has_work_in_progress = false;
 
     logger.trace("Work unit postprocessing complete"); // Throws
@@ -4320,26 +3592,6 @@ void ServerFile::finalize_work_stage_1()
         get_server().dec_byte_size_for_pending_downstream_changesets(byte_size); // Throws
         m_unblocked_changesets_from_downstream_byte_size = 0;
     }
-
-    // Compaction
-    //
-    // FIXME: This ought to happen on the worker thread, but this is currently
-    // impossible, because compaction requires that the file is not open through
-    // any SharedGroup object other that the one used for the purpose of
-    // compaction, and it would be problematic to prevent the network event loop
-    // thread from opening the file while compaction was running on the worker
-    // thread.
-    if (REALM_UNLIKELY(m_work.request_compaction)) {
-        if (REALM_LIKELY(!m_work.request_deletion)) {
-            // `m_worker_file` must have been closed by the worker thread at this
-            // point.
-            perform_compaction(); // Throws
-        }
-        m_server.dec_num_outstanding_compaction_processes(); // Throws
-    }
-
-    if (REALM_UNLIKELY(m_work.request_deletion))
-        return;
 
     // Deal with errors (bad changesets) pertaining to downstream clients
     std::size_t num_changesets_removed = 0;
@@ -4365,7 +3617,6 @@ void ServerFile::finalize_work_stage_1()
         if (i != m_identified_sessions.end()) {
             Session& sess = *i->second;
             SyncConnection& conn = sess.get_connection();
-            conn.metrics().increment("protocol.violated"); // Throws
             conn.protocol_error(error_2, &sess);           // Throws
         }
         const IntegratableChangesetList& list = m_changesets_from_downstream[client_file_ident];
@@ -4388,8 +3639,6 @@ void ServerFile::finalize_work_stage_1()
 
     m_num_changesets_from_downstream -= num_changesets_removed;
 
-    changesets_from_downstream_removed(num_changesets_removed, num_bytes_removed);
-
     // The byte size of the blocked changesets must be decremented.
     if (num_bytes_removed > 0) {
         m_blocked_changesets_from_downstream_byte_size -= num_bytes_removed;
@@ -4400,9 +3649,6 @@ void ServerFile::finalize_work_stage_1()
 
 void ServerFile::finalize_work_stage_2()
 {
-    if (REALM_UNLIKELY(m_work.request_deletion))
-        return;
-
     // Expose new snapshot to remote peers
     REALM_ASSERT(m_work.produced_new_realm_version || m_work.version_info.realm_version == 0);
     if (m_work.version_info.realm_version > m_version_info.realm_version) {
@@ -4432,194 +3678,7 @@ void ServerFile::finalize_work_stage_2()
     if (resume_download_and_upload) {
         resume_download();
     }
-
-    if (m_group_unblocked_changesets_from_downstream_stats.num_changesets > 0) {
-        std::size_t num_changesets = m_group_unblocked_changesets_from_downstream_stats.num_changesets;
-        std::size_t num_bytes = m_group_unblocked_changesets_from_downstream_stats.num_bytes;
-        milliseconds_type processing_time =
-            steady_duration(m_group_unblocked_changesets_from_downstream_stats.start_time);
-        logger.debug("Time to process %1 uploaded changesets (%2 bytes): %3 ms", num_changesets, num_bytes,
-                     processing_time); // Throws
-        Metrics& metrics = get_server().metrics();
-        metrics.histogram("workunit.uploaded.changesets", double(num_changesets)); // Throws
-        metrics.histogram("workunit.uploaded.bytes", double(num_bytes));           // Throws
-        metrics.timing("upload.processing", double(processing_time));              // Throws
-    }
 }
-
-
-void ServerFile::perform_compaction()
-{
-    REALM_ASSERT(m_work.request_compaction);
-
-    m_file.proper_close(); // Throws
-
-    using _impl::Vacuum;
-    Vacuum::Options options;
-    options.history_type = Replication::hist_SyncServer;
-    // NOTE: The backup mechanism requires that the snapshot number is
-    // incremented whenever the Realm file changes at all.
-    options.bump_realm_version = true;
-    options.encryption_key = m_server.get_config().encryption_key;
-    Vacuum vacuum{logger, std::move(options)};
-
-    logger.detail("Starting compaction");
-
-    const std::string& real_path = get_real_path();
-    Vacuum::Results res = vacuum.vacuum(real_path);
-
-    logger.detail("Compaction completed: before_size = %1, after_size = %2, time = %3 ms", res.before_size,
-                  res.after_size, res.time.count() / 1000);
-
-    const ServerHistory& history = access().history;       // Throws
-    bool has_upstream_status;                              // Dummy
-    sync::file_ident_type partial_file_ident;              // Dummy
-    sync::version_type partial_progress_reference_version; // Dummy
-    history.get_status(m_work.version_info, has_upstream_status, partial_file_ident,
-                       partial_progress_reference_version); // Throws
-    m_work.produced_new_realm_version = true;
-}
-
-
-// Returns true iff `m_work.request_deletion` was true, i.e., iff
-// the file was deleted.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
-bool ServerFile::group_perform_file_deletions()
-{
-
-    REALM_ASSERT(m_work.group_has_deletion_requests);
-
-    if (m_work.request_deletion) {
-        perform_file_deletion(); // Throws
-        // Suicide may have happened at this point
-        return true;
-    }
-
-    return false;
-}
-
-void ServerFile::perform_file_deletion()
-{
-    if (m_realm_deletion_is_ongoing)
-        return;
-    m_realm_deletion_is_ongoing = true;
-
-    // The use of ProtocolError::bad_server_file_ident here (when protocol
-    // version < 26) was due to a temporary hack of using an otherwise obsolete
-    // error code to ensure that the client reset process was properly triggered
-    // on the client side when the server-side file is deleted.
-    while (!m_unidentified_sessions.empty()) {
-        Session* sess = *m_unidentified_sessions.begin();
-        SyncConnection& conn = sess->get_connection();
-        ProtocolError error = ProtocolError::server_file_deleted;
-        // Calling protocol_error() is guaranteed to detatch the session object
-        // from this ServerFile object, and therefore remove it from
-        // m_unidentified_sessions.
-        conn.protocol_error(error, sess);
-        REALM_ASSERT(m_unidentified_sessions.count(sess) == 0);
-    }
-    while (!m_identified_sessions.empty()) {
-        const auto& entry = *m_identified_sessions.begin();
-        Session* sess = entry.second;
-        SyncConnection& conn = sess->get_connection();
-        ProtocolError error = ProtocolError::server_file_deleted;
-        // Calling protocol_error() is guaranteed to detatch the session object
-        // from this ServerFile object, and therefore remove it from
-        // m_identified_sessions.
-        conn.protocol_error(error, sess);
-        REALM_ASSERT(m_identified_sessions.count(sess->get_client_file_ident()) == 0);
-    }
-
-    m_file.proper_close(); // Throws
-
-    perform_file_deletion_after_state_realm_deletion();
-}
-
-// May commit suicide, but not if the caller holds a counted reference.
-void ServerFile::perform_file_deletion_after_state_realm_deletion()
-{
-    REALM_ASSERT(m_realm_deletion_is_ongoing);
-
-    // Remove the Realm file and its associates
-    bool delete_lockfile = true;
-    DB::delete_files(m_file.realm_path, nullptr, delete_lockfile); // Throws
-    logger.info("Realm file deleted");                             // Throws
-
-    // Remove the directories that would otherwise be left empty
-    {
-        std::string vpath = m_file.virt_path;  // Throws (copy)
-        std::string rpath = m_file.realm_path; // Throws (copy)
-        REALM_ASSERT(!vpath.empty() && vpath.front() == '/');
-        for (;;) {
-            std::size_t i = vpath.rfind('/');
-            if (i == 0)
-                break;
-            bool nonempty_dir = false;
-            StringData vpath_prefix{&vpath.front(), i + 1};
-            for (const std::string& x : m_server.get_realm_names()) {
-                if (REALM_UNLIKELY(StringData{x}.begins_with(vpath_prefix) && x != m_file.virt_path)) {
-                    nonempty_dir = true;
-                    break;
-                }
-            }
-            if (nonempty_dir)
-                break;
-            rpath = util::parent_dir(rpath); // Throws
-            REALM_ASSERT(!rpath.empty());
-            if (!util::try_remove_dir(rpath)) // Throws
-                break;
-            vpath = vpath.erase(i);
-            m_server.logger.detail("Realm directory '%1' deleted", vpath); // Throws
-        }
-    }
-
-    {
-        std::vector<std::int_fast64_t> connections;
-        using std::swap;
-        swap(connections, m_deleting_connections);
-        for (std::int_fast64_t conn_id : connections) {
-            if (HTTPConnection* conn = m_server.get_http_connection(conn_id))
-                conn->respond_200_ok(); // Throws
-        }
-    }
-
-    if (m_request_compaction)
-        m_server.dec_num_outstanding_compaction_processes(); // Throws
-
-    std::string virt_path = get_virt_path(); // Throws (copy)
-    m_server.remove_file(virt_path);         // Throws
-    // Suicide may have happened at this point
-}
-
-auto ServerFile::get_last_client_accesses() -> LastClientAccessesRange
-{
-    m_last_client_accesses_buffer.clear();
-    util::LockGuard lock{m_server.last_client_accesses_mutex};
-    for (const auto& entry_1 : m_last_client_accesses) {
-        file_ident_type client_file_ident = entry_1.first;
-        LastClientAccessesEntry entry_2 = {client_file_ident, entry_1.second.last_seen_timestamp};
-        m_last_client_accesses_buffer.push_back(entry_2); // Throws
-    }
-    m_last_client_accesses.clear();
-    auto begin = m_last_client_accesses_buffer.data();
-    auto end = begin + m_last_client_accesses_buffer.size();
-    return {begin, end};
-}
-
-
-version_type ServerFile::get_max_compactable_server_version()
-{
-    return std::numeric_limits<version_type>::max();
-}
-
-bool ServerFile::realm_deletion_is_ongoing() const
-{
-    return m_realm_deletion_is_ongoing;
-}
-
 
 // ============================ Worker implementation ============================
 
@@ -4627,10 +3686,7 @@ Worker::Worker(ServerImpl& server)
     : logger{"Worker: ", server.logger} // Throws
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
-    , m_integration_reporter{server}
-    , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key,
-                          server.get_config().metrics}
-    , m_allocation_metrics_context{AllocationMetricsContext::get_current()}
+    , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
 {
     util::seed_prng_nondeterministically(m_random); // Throws
 }
@@ -4650,29 +3706,6 @@ std::mt19937_64& Worker::server_history_get_random() noexcept
 }
 
 
-bool Worker::get_compaction_params(bool& ignore_clients, std::chrono::seconds& time_to_live,
-                                   std::chrono::seconds& compaction_interval) noexcept
-{
-    const Server::Config& config = m_server.get_config();
-    if (!config.disable_history_compaction) {
-        ignore_clients = config.history_compaction_ignore_clients;
-        time_to_live = config.history_ttl;
-        compaction_interval = config.history_compaction_interval;
-        return true;
-    }
-    return false;
-}
-
-
-Clock::time_point Worker::get_compaction_clock_now() const noexcept
-{
-    const Server::Config& config = m_server.get_config();
-    if (REALM_LIKELY(!config.history_compaction_clock))
-        return Clock::clock::now();
-    return config.history_compaction_clock->now();
-}
-
-
 sync::Transformer& Worker::get_transformer()
 {
     return *m_transformer;
@@ -4684,21 +3717,8 @@ util::Buffer<char>& Worker::get_transform_buffer()
     return m_transform_buffer;
 }
 
-
-IntegrationReporterImpl& Worker::get_integration_reporter()
-{
-    return m_integration_reporter;
-}
-
-
 void Worker::run()
 {
-    // Inherit the metrics tenant from the point when the Worker was
-    // constructed.
-    // FIXME: It would be better to inherit at the time when the thread is
-    // started, but this is a little cumbersome with ThreadExecGuard.
-    AllocationMetricsContextScope tenant_scope{m_allocation_metrics_context};
-
     for (;;) {
         ServerFile* file = nullptr;
         {
@@ -4736,15 +3756,12 @@ ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> p
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
     , m_root_dir{root_dir} // Throws
     , m_access_control{std::move(pkey)}
-    , m_protocol_version_range{determine_protocol_version_range(config)}                                   // Throws
-    , m_file_access_cache{m_config.max_open_files, logger, *this, config.encryption_key, m_config.metrics} // Throws
-    , m_metrics{m_config.metrics ? *m_config.metrics : g_null_metrics}
-    , m_worker{*this} // Throws
+    , m_protocol_version_range{determine_protocol_version_range(config)}                 // Throws
+    , m_file_access_cache{m_config.max_open_files, logger, *this, config.encryption_key} // Throws
+    , m_worker{*this}                                                                    // Throws
     , m_acceptor{get_service()}
     , m_server_protocol{}       // Throws
     , m_compress_memory_arena{} // Throws
-    , m_integration_reporter{*this}
-    , m_allocation_metrics_timer{get_service()}
 {
     if (m_config.ssl) {
         m_ssl_context = std::make_unique<util::network::ssl::Context>();          // Throws
@@ -4791,8 +3808,7 @@ void ServerImpl::start()
     {
         const char* lead_text = "Encryption";
         if (m_config.encryption_key) {
-            std::string fingerprint = encrypt::calculate_fingerprint(m_config.encryption_key); // Throws
-            logger.info("%1: Yes (fingerprint = %2)", lead_text, fingerprint);                 // Throws
+            logger.info("%1: Yes", lead_text); // Throws
         }
         else {
             logger.info("%1: No", lead_text); // Throws
@@ -4823,82 +3839,15 @@ void ServerImpl::start()
     logger.info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
     logger.info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
     logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
-    {
-        const char* lead_text = "In-place history compaction";
-        if (m_config.disable_history_compaction) {
-            logger.info("%1: Disabled", lead_text); // Throws
-        }
-        else {
-            std::chrono::seconds interval = m_config.history_compaction_interval;
-            std::chrono::seconds time_to_live = m_config.history_ttl;
-            bool ignore_clients = m_config.history_compaction_ignore_clients;
-            logger.info("%1: Enabled (interval=%2s, time_to_live=%3s, ignore_clients=%4)", lead_text,
-                        interval.count(), time_to_live.count(),
-                        (ignore_clients ? "yes" : "no")); // Throws
-            if (ignore_clients) {
-                logger.warn("In-place history compaction option 'ignore clients' enabled. Do not "
-                            "enable this unless you know that you have to!"); // Throws
-            }
-        }
-    }
-
-    {
-        std::size_t n = 0;
-        for (const auto& entry : m_config.client_file_blacklists)
-            n += entry.second.size();
-        logger.info("Number of client file blacklists: %1 (%2 client files in total)",
-                    m_config.client_file_blacklists.size(), n); // Throws
-    }
     logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
 
     m_transformer = make_transformer(); // Throws
 
     m_realm_names = _impl::find_realm_files(m_root_dir); // Throws
 
-    // set the initial gauge values so we can use relative values against them
-    metrics().gauge("connection.online", 0);                     // Throws
-    metrics().gauge("connection.total", 0);                      // Throws
-    metrics().gauge("session.online", 0);                        // Throws
-    metrics().gauge("session.total", 0);                         // Throws
-    metrics().gauge("realms.all", double(m_realm_names.size())); // Throws
-    metrics().gauge("realms.open", 0);                           // Throws
-
-    // FIXME: `upload.pending.bytes` is currently undocumented
-    metrics().gauge("upload.pending.bytes", 0); // Throws
-
     initiate_connection_reaper_timer(m_config.connection_reaper_interval); // Throws
 
-    initiate_allocation_metrics_wait(); // Throws
-
-
-    if (!m_config.disable_history_compaction) {
-        if (m_config.history_ttl.count() == 0)
-            throw std::runtime_error("History TTL is zero. All clients will immediately expire, "
-                                     "and this is very likely a configuration error.");
-        if (m_config.history_ttl != std::chrono::seconds::max()) {
-            // std::chrono::days is only defined since C++20.
-            using days_t = std::chrono::duration<int64_t, std::ratio<86400>>;
-            auto days = std::chrono::duration_cast<days_t>(m_config.history_ttl);
-            logger.info("History compaction with expiration enabled. Clients offline for longer "
-                        "than %1 days (%2 seconds) may lose local modifications.",
-                        days.count(), m_config.history_ttl.count());
-        }
-        if (m_config.history_ttl < std::chrono::hours{1}) {
-            logger.warn("History TTL is very low (< 1 hour). Clients will expire very often.");
-        }
-    }
-
     listen(); // Throws
-
-    // Event loop metrics are reported only if enabled at compile time
-    // (REALM_UTIL_NETWORK_EVENT_LOOP_METRICS).
-    auto event_loop_metrics_handler = [this](double saturation, double inefficiency) {
-        metrics().gauge("event_loop.saturation", saturation);     // Throws
-        metrics().gauge("event_loop.inefficiency", inefficiency); // Throws
-        logger.debug("Event loop metrics: saturation = %1%, inefficiency = %2%", int(saturation * 100 + 0.5),
-                     int(inefficiency * 100 + 0.5)); // Throws
-    };
-    report_event_loop_metrics(std::move(event_loop_metrics_handler)); // Throws
 }
 
 
@@ -4936,21 +3885,6 @@ void ServerImpl::stop() noexcept
     m_service.stop();
 }
 
-void ServerImpl::report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
-{
-    m_service.report_event_loop_metrics(std::move(handler)); // Throws
-}
-
-
-void ServerImpl::dec_num_outstanding_compaction_processes()
-{
-    REALM_ASSERT(m_num_outstanding_compaction_processes > 0);
-    if (REALM_LIKELY(--m_num_outstanding_compaction_processes > 0))
-        return;
-    if (HTTPConnection* conn = get_http_connection(m_compacting_connection))
-        conn->respond_200_ok(); // Throws
-}
-
 
 void ServerImpl::inc_byte_size_for_pending_downstream_changesets(std::size_t byte_size)
 {
@@ -4959,8 +3893,6 @@ void ServerImpl::inc_byte_size_for_pending_downstream_changesets(std::size_t byt
                  "%1 to reach a total of %2",
                  byte_size,
                  m_pending_changesets_from_downstream_byte_size); // Throws
-    metrics().gauge("upload.pending.bytes",
-                    double(m_pending_changesets_from_downstream_byte_size)); // Throws
 }
 
 
@@ -4972,35 +3904,12 @@ void ServerImpl::dec_byte_size_for_pending_downstream_changesets(std::size_t byt
                  "%1 to reach a total of %2",
                  byte_size,
                  m_pending_changesets_from_downstream_byte_size); // Throws
-    metrics().gauge("upload.pending.bytes",
-                    double(m_pending_changesets_from_downstream_byte_size)); // Throws
 }
 
 
 std::mt19937_64& ServerImpl::server_history_get_random() noexcept
 {
     return get_random();
-}
-
-
-bool ServerImpl::get_compaction_params(bool& ignore_clients, std::chrono::seconds& time_to_live,
-                                       std::chrono::seconds& compaction_interval) noexcept
-{
-    if (!m_config.disable_history_compaction) {
-        ignore_clients = m_config.history_compaction_ignore_clients;
-        time_to_live = m_config.history_ttl;
-        compaction_interval = m_config.history_compaction_interval;
-        return true;
-    }
-    return false;
-}
-
-
-Clock::time_point ServerImpl::get_compaction_clock_now() const noexcept
-{
-    if (REALM_LIKELY(!m_config.history_compaction_clock))
-        return Clock::clock::now();
-    return m_config.history_compaction_clock->now();
 }
 
 
@@ -5013,12 +3922,6 @@ Transformer& ServerImpl::get_transformer() noexcept
 util::Buffer<char>& ServerImpl::get_transform_buffer() noexcept
 {
     return m_transform_buffer;
-}
-
-
-IntegrationReporterImpl& ServerImpl::get_integration_reporter() noexcept
-{
-    return m_integration_reporter;
 }
 
 
@@ -5105,7 +4008,6 @@ void ServerImpl::handle_accept(std::error_code ec)
             }
         }
         logger.debug("Skipping aborted connection"); // Throws
-        metrics().increment("connection.failed");    // Throws
     }
     else {
         HTTPConnection& conn = *m_next_http_conn;
@@ -5119,15 +4021,6 @@ void ServerImpl::handle_accept(std::error_code ec)
         conn.initiate(std::move(remote_endpoint));                                                           // Throws
     }
     initiate_accept(); // Throws
-}
-
-
-HTTPConnection* ServerImpl::get_http_connection(std::int_fast64_t conn_id) noexcept
-{
-    auto i = m_http_connections.find(conn_id);
-    if (i == m_http_connections.end())
-        return nullptr;
-    return i->second.get();
 }
 
 
@@ -5146,14 +4039,6 @@ void ServerImpl::add_sync_connection(int_fast64_t connection_id, std::unique_ptr
 void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 {
     m_sync_connections.erase(connection_id);
-}
-
-
-void ServerImpl::remove_file(const std::string& virt_path)
-{
-    m_files.erase(virt_path);
-    m_realm_names.erase(virt_path);
-    metrics().gauge("realms.all", double(m_realm_names.size())); // Throws
 }
 
 
@@ -5256,39 +4141,6 @@ void ServerImpl::do_close_connections()
 }
 
 
-void ServerImpl::initiate_compact_realm(std::int_fast64_t conn_id, StringData virt_path)
-{
-    if (m_num_outstanding_compaction_processes == 0) {
-        m_compacting_connection = conn_id;
-        if (virt_path.size() > 0) {
-            auto i = m_realm_names.find(virt_path);
-            if (i != m_realm_names.end()) {
-                logger.detail("Scheduling compaction of '%1'", virt_path); // Throws
-                inc_num_outstanding_compaction_processes();
-                util::bind_ptr<ServerFile> file = get_or_create_file(virt_path); // Throws
-                file->initiate_compaction();                                     // Throws
-                return;
-            }
-            if (HTTPConnection* conn = get_http_connection(conn_id))
-                conn->respond_404_not_found(); // Throws
-            return;
-        }
-        logger.detail("Scheduling compaction of all %1 Realm files",
-                      m_realm_names.size()); // Throws
-        inc_num_outstanding_compaction_processes();
-        for (const std::string& virt_path : m_realm_names) {
-            inc_num_outstanding_compaction_processes();
-            util::bind_ptr<ServerFile> file = get_or_create_file(virt_path); // Throws
-            file->initiate_compaction();                                     // Throws
-        }
-        dec_num_outstanding_compaction_processes(); // Throws
-        return;
-    }
-    if (HTTPConnection* conn = get_http_connection(conn_id))
-        conn->respond_503_service_unavailable(); // Throws
-}
-
-
 void ServerImpl::do_recognize_external_change(const std::string& virt_path)
 {
     auto i = m_files.find(virt_path);
@@ -5298,36 +4150,6 @@ void ServerImpl::do_recognize_external_change(const std::string& virt_path)
     file.recognize_external_change();
 }
 
-
-void ServerImpl::initiate_allocation_metrics_wait()
-{
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted) {
-            REALM_ASSERT(!ec);
-            handle_allocation_metrics_wait();
-        }
-    };
-    m_allocation_metrics_timer.async_wait(std::chrono::seconds(1), std::move(handler)); // Throws
-}
-
-
-void ServerImpl::handle_allocation_metrics_wait()
-{
-    auto& reporter = metrics();
-    const AllocationMetricName* metric = AllocationMetricName::get_top();
-    auto& tenant = AllocationMetricsContext::get_current();
-    for (; metric != nullptr; metric = metric->next()) {
-        std::string metric_name = std::string{"memory,subsystem="} + Metrics::percent_encode(metric->name());
-        auto& m = tenant.get_metric(*metric);
-        reporter.gauge(metric_name.c_str(), double(m.get_currently_allocated_bytes())); // Throws
-    }
-    util::decrypted_memory_stats_t decr_mem = util::get_decrypted_memory_stats();
-    reporter.gauge("memory,subsystem=decrypted", double(decr_mem.memory_size));
-    reporter.gauge("memory,subsystem=reclaimer_workload", double(decr_mem.reclaimer_workload));
-    reporter.gauge("memory,subsystem=reclaimer_target", double(decr_mem.reclaimer_target));
-    reporter.gauge("memory,subsystem=core-slab", double(SlabAlloc::get_total_slab_size()));
-    initiate_allocation_metrics_wait();
-}
 
 void ServerImpl::do_stop_sync_and_wait_for_backup_completion(
     util::UniqueFunction<void(bool did_complete)> completion_handler, milliseconds_type timeout)
@@ -5360,14 +4182,10 @@ void SyncConnection::initiate()
 
 
 template <class... Params>
-void SyncConnection::terminate(ConnectionTerminationReason reason, Logger::Level log_level, const char* log_message,
-                               Params... log_params)
+void SyncConnection::terminate(Logger::Level log_level, const char* log_message, Params... log_params)
 {
     terminate_sessions();                              // Throws
     logger.log(log_level, log_message, log_params...); // Throws
-    metrics().increment("connection.terminated");      // Throws
-    metrics().increment(get_connection_termination_reason_metric(reason));
-    metrics().gauge("connection.online", --gauges().connection_online); // Throws
     m_websocket.stop();
     m_ssl_stream.reset();
     m_socket.reset();
@@ -5378,20 +4196,19 @@ void SyncConnection::terminate(ConnectionTerminationReason reason, Logger::Level
 
 void SyncConnection::terminate_if_dead(SteadyTimePoint now)
 {
-    auto termination_reason = ConnectionTerminationReason::heartbeat_timeout;
     milliseconds_type time = steady_duration(m_last_activity_at, now);
     const Server::Config& config = m_server.get_config();
     if (m_is_closing) {
         if (time >= config.soft_close_timeout) {
             // Suicide
-            terminate(termination_reason, Logger::Level::detail,
+            terminate(Logger::Level::detail,
                       "Sync connection closed (timeout during soft close)"); // Throws
         }
     }
     else {
         if (time >= config.connection_reaper_timeout) {
             // Suicide
-            terminate(termination_reason, Logger::Level::detail,
+            terminate(Logger::Level::detail,
                       "Sync connection closed (no heartbeat)"); // Throws
         }
     }
@@ -5412,27 +4229,21 @@ void SyncConnection::handle_protocol_error(ServerProtocol::Error error)
     switch (error) {
         case ServerProtocol::Error::unknown_message:
             protocol_error(ProtocolError::unknown_message); // Throws
-            metrics().increment("protocol.violated");       // Throws
             break;
         case ServerProtocol::Error::bad_syntax:
             protocol_error(ProtocolError::bad_syntax); // Throws
-            metrics().increment("protocol.violated");  // Throws
             break;
         case ServerProtocol::Error::limits_exceeded:
             protocol_error(ProtocolError::limits_exceeded); // Throws
-            metrics().increment("protocol.violated");       // Throws
             break;
         case ServerProtocol::Error::bad_decompression:
             protocol_error(ProtocolError::bad_decompression); // Throws
-            metrics().increment("protocol.violated");         // Throws
             break;
         case ServerProtocol::Error::bad_changeset_header_syntax:
             protocol_error(ProtocolError::bad_changeset_header_syntax); // Throws
-            metrics().increment("protocol.violated");                   // Throws
             break;
         case ServerProtocol::Error::bad_changeset_size:
             protocol_error(ProtocolError::bad_changeset_size); // Throws
-            metrics().increment("protocol.violated");          // Throws
             break;
     }
 }
@@ -5447,7 +4258,6 @@ void SyncConnection::receive_bind_message(session_ident_type session_ident, std:
     if (REALM_UNLIKELY(!was_inserted)) {
         logger.error("Overlapping reuse of session identifier %1 in BIND message",
                      session_ident);                           // Throws
-        metrics().increment("protocol.violated");              // Throws
         protocol_error(ProtocolError::reuse_of_session_ident); // Throws
         return;
     }
@@ -5493,13 +4303,11 @@ void SyncConnection::receive_ident_message(session_ident_type session_ident, fil
     if (REALM_UNLIKELY(sess.must_send_ident_message())) {
         logger.error("Received IDENT message before IDENT message was sent"); // Throws
         protocol_error(ProtocolError::bad_message_order);                     // Throws
-        metrics().increment("protocol.violated");                             // Throws
         return;
     }
     if (REALM_UNLIKELY(sess.ident_message_received())) {
         logger.error("Received second IDENT message for session"); // Throws
         protocol_error(ProtocolError::bad_message_order);          // Throws
-        metrics().increment("protocol.violated");                  // Throws
         return;
     }
 
@@ -5593,12 +4401,6 @@ void SyncConnection::receive_unbind_message(session_ident_type session_ident)
 void SyncConnection::receive_ping(milliseconds_type timestamp, milliseconds_type rtt)
 {
     logger.debug("Received: PING(timestamp=%1, rtt=%2)", timestamp, rtt); // Throws
-    if (m_ping_messages_seen) {
-        metrics().timing("ping.rtt", double(rtt)); // Throws
-    }
-    else {
-        m_ping_messages_seen = true;
-    }
     m_send_pong = true;
     m_last_ping_timestamp = timestamp;
     if (!m_is_sending)
@@ -5610,7 +4412,6 @@ void SyncConnection::bad_session_ident(const char* message_type, session_ident_t
 {
     logger.error("Bad session identifier in %1 message, session_ident = %2", message_type, session_ident); // Throws
     protocol_error(ProtocolError::bad_session_ident);                                                      // Throws
-    metrics().increment("protocol.violated");                                                              // Throws
 }
 
 
@@ -5619,7 +4420,6 @@ void SyncConnection::message_after_unbind(const char* message_type, session_iden
     logger.error("Received %1 message after UNBIND message, session_ident = %2", message_type,
                  session_ident);                      // Throws
     protocol_error(ProtocolError::bad_message_order); // Throws
-    metrics().increment("protocol.violated");         // Throws
 }
 
 
@@ -5628,7 +4428,6 @@ void SyncConnection::message_before_ident(const char* message_type, session_iden
     logger.error("Received %1 message before IDENT message, session_ident = %2", message_type,
                  session_ident);                      // Throws
     protocol_error(ProtocolError::bad_message_order); // Throws
-    metrics().increment("protocol.violated");         // Throws
 }
 
 
@@ -5637,7 +4436,6 @@ void SyncConnection::handle_message_received(const char* data, size_t size)
     // parse_message_received() parses the message and calls the
     // proper handler on the SyncConnection object (this).
     get_server_protocol().parse_message_received<SyncConnection>(*this, std::string_view(data, size));
-    metrics().increment("protocol.bytes.received", int(size)); // Throws
     return;
 }
 
@@ -5647,7 +4445,6 @@ void SyncConnection::handle_ping_received(const char* data, size_t size)
     // parse_message_received() parses the message and calls the
     // proper handler on the SyncConnection object (this).
     get_server_protocol().parse_ping_received<SyncConnection>(*this, std::string_view(data, size));
-    metrics().increment("protocol.bytes.received", int(size)); // Throws
     return;
 }
 
@@ -5692,8 +4489,7 @@ void SyncConnection::initiate_write_output_buffer()
     };
 
     m_websocket.async_write_binary(m_output_buffer.data(), m_output_buffer.size(),
-                                   std::move(handler));                      // Throws
-    metrics().increment("protocol.bytes.sent", int(m_output_buffer.size())); // Throws
+                                   std::move(handler)); // Throws
     m_is_sending = true;
 }
 
@@ -5707,8 +4503,7 @@ void SyncConnection::initiate_pong_output_buffer()
     REALM_ASSERT(!m_is_sending);
     REALM_ASSERT(!m_sending_pong);
     m_websocket.async_write_binary(m_output_buffer.data(), m_output_buffer.size(),
-                                   std::move(handler));                      // Throws
-    metrics().increment("protocol.bytes.sent", int(m_output_buffer.size())); // Throws
+                                   std::move(handler)); // Throws
 
     m_is_sending = true;
     m_sending_pong = true;
@@ -5808,12 +4603,8 @@ void SyncConnection::protocol_error(ProtocolError error_code, Session* sess)
     }
     session_ident_type session_ident = (session_level ? sess->get_session_ident() : 0);
     if (session_level) {
-        metrics().increment("session.failed");   // Throws
         sess->initiate_deactivation(error_code); // Throws
         return;
-    }
-    else {
-        metrics().increment("connection.failed"); // Throws
     }
     do_initiate_soft_close(error_code, session_ident); // Throws
 }
@@ -5851,18 +4642,16 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
 void SyncConnection::close_due_to_close_by_client(std::error_code ec)
 {
-    auto termination_reason = map_error_to_connection_termination_reason(ec);
     auto log_level = (ec == util::MiscExtErrors::end_of_input ? Logger::Level::detail : Logger::Level::info);
     // Suicide
-    terminate(termination_reason, log_level, "Sync connection closed by client: %1", ec.message()); // Throws
+    terminate(log_level, "Sync connection closed by client: %1", ec.message()); // Throws
 }
 
 
 void SyncConnection::close_due_to_error(std::error_code ec)
 {
-    auto termination_reason = map_error_to_connection_termination_reason(ec);
     // Suicide
-    terminate(termination_reason, Logger::Level::error, "Sync connection closed due to error: %1",
+    terminate(Logger::Level::error, "Sync connection closed due to error: %1",
               ec.message()); // Throws
 }
 

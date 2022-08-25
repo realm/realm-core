@@ -314,10 +314,13 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
+    using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     // Create a valid session.
-    std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) {};
+    std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, SyncError err) {
+        REQUIRE(err.server_requests_action == ProtocolErrorInfo::Action::Transient);
+    };
     const std::string user_id = "user1d";
     std::string on_disk_path;
     auto user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -336,7 +339,9 @@ TEST_CASE("sync: error handling", "[sync]") {
 
     SECTION("Doesn't treat unknown system errors as being fatal") {
         std::error_code code = std::error_code{EBADF, std::generic_category()};
-        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+        SyncError err{code, "Not a real error message", false};
+        err.server_requests_action = ProtocolErrorInfo::Action::Transient;
+        SyncSession::OnlyForTesting::handle_error(*session, err);
         CHECK(!sessions_are_inactive(*session));
     }
 
@@ -365,6 +370,7 @@ TEST_CASE("sync: error handling", "[sync]") {
 
         SyncError initial_error{std::error_code{code, realm::sync::protocol_error_category()},
                                 "Something bad happened", false};
+        initial_error.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
         REQUIRE(session->state() == SyncSession::State::Inactive);
@@ -374,6 +380,7 @@ TEST_CASE("sync: error handling", "[sync]") {
         // At this point final_error should be populated.
         CHECK(bool(final_error));
         CHECK(final_error->is_client_reset_requested());
+        CHECK(final_error->server_requests_action == ProtocolErrorInfo::Action::ClientReset);
         // The original file path should be present.
         CHECK(final_error->user_info[SyncError::c_original_file_path_key] == on_disk_path);
         // The path to the recovery file should be present, and should contain all necessary components.
@@ -484,7 +491,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         SECTION("transitions to Inactive if a fatal error occurs") {
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
+            SyncError err{code, "Not a real error message", true};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             CHECK(sessions_are_inactive(*session));
             // The session shouldn't report fatal errors when in the dying state.
             CHECK(!error_handler_invoked);
@@ -494,7 +503,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             // Fire a simulated *non-fatal* error.
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+            SyncError err{code, "Not a real error message", false};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);
         }
@@ -580,70 +591,3 @@ TEST_CASE("sync: stable IDs", "[sync]") {
         REQUIRE(object_schema == *config.schema->find("object"));
     }
 }
-
-#if 0 // Not possible to open core-5 format realms in read-only mode
-TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
-    if (!EventLoop::has_implementation())
-        return;
-
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-
-
-    SyncTestFile config(init_sync_manager.sync_server(), "migration-test");
-    config.schema_version = 1;
-
-    {
-        std::ifstream src("sync-1.x.realm", std::ios::binary);
-        REQUIRE(src.good());
-        std::ofstream dst(config.path, std::ios::binary);
-
-        dst << src.rdbuf();
-    }
-
-    auto check = [&](auto f) {
-        bool exception_thrown = false;
-        try {
-            f();
-        } catch (RealmFileException const& ex) {
-            REQUIRE(ex.kind() == RealmFileException::Kind::IncompatibleSyncedRealm);
-            exception_thrown = true;
-
-            SECTION("We should be able to open and read from the recovered Realm file") {
-                Realm::Config config;
-                config.path = ex.path();
-                config.schema_mode = SchemaMode::Immutable;
-                auto recovered_realm = Realm::get_shared_realm(config);
-
-                TableRef table = ObjectStore::table_for_object_type(recovered_realm->read_group(), "object");
-                REQUIRE(table);
-                REQUIRE(table->size() == 2);
-            }
-
-            SECTION("We should be able to successfully open the Realm after the recovery") {
-                auto result = f();
-                REQUIRE(result);
-            }
-        }
-        REQUIRE(exception_thrown);
-    };
-
-    SECTION("Realm::get_shared_realm allows recovery from Sync 1.x to Sync 2.x migration") {
-        check([&]{
-            return Realm::get_shared_realm(config);
-        });
-    }
-
-    SECTION("SyncManager::get_session allows recovery from Sync 1.x to Sync 2.x migration") {
-        check([&]{
-            return SyncManager::shared().get_session(config.path, *config.sync_config);
-        });
-    }
-
-    SECTION("Realm::get_synchronized_realm allows recovery from Sync 1.x to Sync 2.x migration") {
-        check([&]{
-            return Realm::get_synchronized_realm(config);
-        });
-    }
-}
-#endif

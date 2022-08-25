@@ -552,7 +552,7 @@ struct Update : PathInstruction {
     bool operator==(const Update& rhs) const noexcept
     {
         return PathInstruction::operator==(rhs) && value == rhs.value &&
-               (is_array_update() ? is_default == rhs.is_default : prior_size == rhs.prior_size);
+               (is_array_update() ? prior_size == rhs.prior_size : is_default == rhs.is_default);
     }
 };
 

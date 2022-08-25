@@ -1,13 +1,15 @@
 
-#include "realm/global_key.hpp"
-#include "realm/mixed.hpp"
-#include "realm/sync/changeset.hpp"
-#include "realm/sync/instructions.hpp"
-#include "realm/util/base64.hpp"
 #include <realm/sync/changeset_parser.hpp>
+
+#include <realm/global_key.hpp>
+#include <realm/mixed.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/instructions.hpp>
 #include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/table.hpp>
-#include <realm/util/metered/set.hpp>
+#include <realm/util/base64.hpp>
+
+#include <set>
 
 using namespace realm;
 using namespace realm::sync;
@@ -34,10 +36,10 @@ struct State {
     const char* m_input_end = nullptr;
 
     std::string m_buffer;
-    util::metered::set<uint32_t> m_valid_interned_strings;
+    std::set<uint32_t> m_valid_interned_strings;
     // Cannot use StringData as key type since m_input_begin may start pointing
     // to a new chunk of memory.
-    util::metered::set<std::string> m_intern_strings;
+    std::set<std::string, std::less<>> m_intern_strings;
 
 
     void parse_one(); // Throws

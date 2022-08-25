@@ -76,7 +76,7 @@ TEST(LinkList_Basic1)
     auto c2 = table1->add_column(type_Binary, "bin1", true /*nullable*/);
 
     // add some rows
-    auto o0 = table1->create_object().set_all(100, "foo", BinaryData("foo"));
+    table1->create_object().set_all(100, "foo", BinaryData("foo"));
     auto o1 = table1->create_object().set_all(200, "!", BinaryData("", 0));
     auto o2 = table1->create_object().set_all(300, "bar", BinaryData());
 
@@ -142,13 +142,13 @@ TEST(LinkList_MissingDeepCopy)
     auto c1 = table1->add_column(type_String, "str1");
 
     // add some rows
-    auto o1 = table1->create_object().set_all(100, "foo");
+    table1->create_object().set_all(100, "foo");
     auto o2 = table1->create_object().set_all(200, "!");
     auto o3 = table1->create_object().set_all(300, "bar");
 
     auto col_link2 = table2->add_column(*table1, "link");
     auto o20 = table2->create_object().set_all(o2.get_key());
-    auto o21 = table2->create_object().set_all(o3.get_key());
+    table2->create_object().set_all(o3.get_key());
 
     char* c = new char[10000000];
     c[10000000 - 1] = '!';
@@ -178,7 +178,7 @@ TEST(LinkList_Basic2)
     auto o10 = table1->create_object().set_all(100, "foo");
     auto o11 = table1->create_object().set_all(200, "!");
     table1->create_object().set_all(300, "bar");
-    auto o20 = table2->create_object().set_all(400, "hello");
+    table2->create_object().set_all(400, "hello");
     auto o21 = table2->create_object().set_all(500, "world");
     auto o22 = table2->create_object().set_all(600, "!");
 
@@ -487,7 +487,7 @@ TEST(LinkList_MultiLinkQuery)
     lvr = o21.get_linklist(col_linklist3);
     lvr.add(ObjKey(2));
 
-    auto o22 = table2->create_object(ObjKey(2));
+    table2->create_object(ObjKey(2));
 
     auto o10 = table1->create_object();
     o10.set(col_link2, ObjKey(1));

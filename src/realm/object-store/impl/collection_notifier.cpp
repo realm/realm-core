@@ -228,13 +228,13 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
 
 std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(uint64_t token)
 {
-    REALM_ASSERT(m_error || m_callbacks.size() > 0);
+    REALM_ASSERT(m_callbacks.size() > 0);
 
     auto it = std::find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
         return c.token == token;
     });
     // We should only fail to find the callback if it was removed due to an error
-    REALM_ASSERT(m_error || it != end(m_callbacks));
+    REALM_ASSERT(it != end(m_callbacks));
     return it;
 }
 
@@ -328,31 +328,6 @@ void CollectionNotifier::after_advance()
     });
 }
 
-void CollectionNotifier::deliver_error(std::exception_ptr error)
-{
-    // Don't complain about double-unregistering callbacks if we sent an error
-    // because we're going to remove all the callbacks immediately.
-    m_error = true;
-
-    {
-        // In the non-error codepath this is done as part of package_for_delivery()
-        // but that's skipped for errors
-        util::CheckedLockGuard lock(m_callback_mutex);
-        m_callback_count = m_callbacks.size();
-    }
-    for_each_callback([this, &error](auto& lock, auto& callback) {
-        // acquire a local reference to the callback so that removing the
-        // callback from within it can't result in a dangling pointer
-        auto cb = std::move(callback.fn);
-        auto token = callback.token;
-        lock.unlock_unchecked();
-        cb.error(error);
-
-        // We never want to call the callback again after this, so just remove it
-        this->remove_callback(token);
-    });
-}
-
 bool CollectionNotifier::is_for_realm(Realm& realm) const noexcept
 {
     std::lock_guard<std::mutex> lock(m_realm_mutex);
@@ -430,11 +405,10 @@ void CollectionNotifier::add_changes(CollectionChangeBuilder change)
     }
 }
 
-NotifierPackage::NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                                  RealmCoordinator* coordinator)
     : m_notifiers(std::move(notifiers))
     , m_coordinator(coordinator)
-    , m_error(std::move(error))
 {
 }
 
@@ -442,7 +416,7 @@ NotifierPackage::NotifierPackage(std::exception_ptr error, std::vector<std::shar
 void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
     NO_THREAD_SAFETY_ANALYSIS
 {
-    if (!m_coordinator || m_error || !*this)
+    if (!m_coordinator || !*this)
         return;
 
     auto lock = m_coordinator->wait_for_notifiers([&] {
@@ -473,19 +447,12 @@ void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> t
 
 void NotifierPackage::before_advance()
 {
-    if (m_error)
-        return;
     for (auto& notifier : m_notifiers)
         notifier->before_advance();
 }
 
 void NotifierPackage::after_advance()
 {
-    if (m_error) {
-        for (auto& notifier : m_notifiers)
-            notifier->deliver_error(m_error);
-        return;
-    }
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
 }

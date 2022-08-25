@@ -751,6 +751,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
+    size_t expected_size = size_t(-1);
     try {
         note_reader_start(this);
         // we'll read header and (potentially) footer
@@ -806,6 +807,21 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
             }
         }
+        if (top_ref) {
+            // Get the expected file size by looking up logical file size stored in top array
+            constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
+            constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
+            size_t top_page_base = top_ref & ~(page_size() - 1);
+            size_t top_offset = top_ref - top_page_base;
+            size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
+            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0);
+            realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
+            auto top_header = map_top.get_addr() + top_offset;
+            auto top_data = NodeHeader::get_data_from_header(top_header);
+            auto w = NodeHeader::get_width_from_header(top_header);
+            auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
+            expected_size = round_up_to_page_size(logical_size);
+        }
     }
     catch (const DecryptionFailed&) {
         note_reader_end(this);
@@ -832,6 +848,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
 
+    // Check if we can shrink the file
+    if (cfg.session_initiator && expected_size < size) {
+        m_file.resize(expected_size);
+        size = expected_size;
+    }
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
     if (size != round_up_to_page_size(size)) {
@@ -945,12 +966,12 @@ void SlabAlloc::attach_empty()
 void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
 {
     char buf[256];
-    sprintf(buf,
-            ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
-            "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
-            header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
-            header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
-            header.m_flags);
+    snprintf(buf, sizeof(buf),
+             ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+             "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
+             header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
+             header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
+             header.m_flags);
     msg += buf;
     throw InvalidDatabase(msg, path);
 }
@@ -1122,8 +1143,14 @@ void SlabAlloc::update_reader_view(size_t file_size)
         if (old_baseline < old_slab_base) {
             // old_slab_base should be 0 if we had no mappings previously
             REALM_ASSERT(old_num_mappings > 0);
-            replace_last_mapping = true;
-            --old_num_mappings;
+            // try to extend the old mapping in-place instead of replacing it.
+            MapEntry& cur_entry = m_mappings.back();
+            const size_t section_start_offset = get_section_base(old_num_mappings - 1);
+            const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
+            if (!cur_entry.primary_mapping.try_extend_to(section_size)) {
+                replace_last_mapping = true;
+                --old_num_mappings;
+            }
         }
 
         // Create new mappings covering from the end of the last complete
@@ -1134,8 +1161,25 @@ void SlabAlloc::update_reader_view(size_t file_size)
         for (size_t k = old_num_mappings; k < num_mappings; ++k) {
             const size_t section_start_offset = get_section_base(k);
             const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
-            new_mappings.push_back(
-                {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
+            if (section_size == (1 << section_shift)) {
+                new_mappings.push_back(
+                    {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
+            }
+            else {
+                new_mappings.push_back({util::File::Map<char>()});
+                auto& mapping = new_mappings.back().primary_mapping;
+                bool reserved =
+                    mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
+                if (reserved) {
+                    // if reservation is supported, first attempt at extending must succeed
+                    if (!mapping.try_extend_to(section_size))
+                        throw std::bad_alloc();
+                }
+                else {
+                    new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
+                                                            section_start_offset);
+                }
+            }
         }
     }
 
@@ -1169,7 +1213,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
 
     // Build the fast path mapping
 
-    // The fast path mapping is an array which will is used from multiple threads
+    // The fast path mapping is an array which is used from multiple threads
     // without locking - see translate().
 
     // Addition of a new mapping may require a completely new fast mapping table.

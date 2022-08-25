@@ -24,6 +24,7 @@
 #include <realm/array.hpp>
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
+#include <realm/table.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -268,8 +269,7 @@ public:
             }
             if (size() > 12) {
                 auto flags = get_val(12);
-                m_is_embedded = (flags & 0x3) == 1;
-                m_is_asymmetric = (flags & 0x3) == 2;
+                m_table_type = static_cast<realm::Table::Type>(flags & 0x3);
             }
         }
     }
@@ -301,8 +301,7 @@ private:
     Array m_column_colkeys;
     Array m_opposite_table;
     realm::ColKey m_pk_col;
-    bool m_is_embedded = false;
-    bool m_is_asymmetric = false;
+    realm::Table::Type m_table_type = realm::Table::Type::TopLevel;
 };
 
 class Group : public Array {
@@ -455,10 +454,7 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
 
 void Table::print_columns(const Group& group) const
 {
-    if (m_is_embedded)
-        std::cout << "        <embedded>" << std::endl;
-    if (m_is_asymmetric)
-        std::cout << "        <asymmetric>" << std::endl;
+    std::cout << "        <" << m_table_type << ">" << std::endl;
     for (unsigned i = 0; i < m_column_names.size(); i++) {
         auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));

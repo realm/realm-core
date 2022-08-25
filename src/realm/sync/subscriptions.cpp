@@ -105,7 +105,7 @@ std::string_view Subscription::name() const
     if (!m_name) {
         return std::string_view{};
     }
-    return m_name.value();
+    return *m_name;
 }
 
 std::string_view Subscription::object_class_name() const
@@ -160,6 +160,11 @@ std::shared_ptr<const SubscriptionStore> SubscriptionSet::get_flx_subscription_s
 int64_t SubscriptionSet::version() const
 {
     return m_version;
+}
+
+DB::version_type SubscriptionSet::snapshot_version() const
+{
+    return m_snapshot_version;
 }
 
 SubscriptionSet::State SubscriptionSet::state() const
@@ -296,6 +301,14 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
 }
 
+void MutableSubscriptionSet::import(const SubscriptionSet& src_subs)
+{
+    clear();
+    for (const Subscription& sub : src_subs) {
+        insert_sub(sub);
+    }
+}
+
 void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
 {
     check_is_mutable();
@@ -305,7 +318,7 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             throw std::logic_error("cannot set subscription set state to uncommitted");
 
         case State::Error:
-            if (old_state != State::Bootstrapping && old_state != State::Pending) {
+            if (old_state != State::Bootstrapping && old_state != State::Pending && old_state != State::Uncommitted) {
                 throw std::logic_error(
                     "subscription set must be in Bootstrapping or Pending to update state to error");
             }
@@ -351,11 +364,9 @@ MutableSubscriptionSet SubscriptionSet::make_mutable_copy() const
 void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
-    auto refreshed_self = mgr->get_by_version(version());
-    m_state = refreshed_self.m_state;
-    m_error_str = refreshed_self.m_error_str;
-    m_cur_version = refreshed_self.m_cur_version;
-    *this = mgr->get_by_version(version());
+    if (mgr->would_refresh(m_cur_version)) {
+        *this = mgr->get_by_version(version());
+    }
 }
 
 util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
@@ -698,6 +709,25 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
     return PendingSubscription{query_version, static_cast<DB::version_type>(snapshot_version)};
 }
 
+std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() const
+{
+    std::vector<SubscriptionSet> subscriptions_to_recover;
+    auto active_sub = get_active();
+    auto cur_query_version = active_sub.version();
+    DB::version_type db_version = 0;
+    if (active_sub.state() == SubscriptionSet::State::Complete) {
+        db_version = active_sub.snapshot_version();
+    }
+    REALM_ASSERT_EX(db_version != DB::version_type(-1), active_sub.state());
+    // get a copy of the pending subscription sets since the active version
+    while (auto next_pending = get_next_pending_version(cur_query_version, db_version)) {
+        cur_query_version = next_pending->query_version;
+        db_version = next_pending->snapshot_version;
+        subscriptions_to_recover.push_back(get_by_version(cur_query_version));
+    }
+    return subscriptions_to_recover;
+}
+
 MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
@@ -755,6 +785,35 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     remove_query.remove();
 }
 
+void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
+{
+    auto version_to_keep = mut_sub.version();
+    supercede_prior_to(mut_sub.m_tr, version_to_keep);
+
+    std::list<SubscriptionStore::NotificationRequest> to_finish;
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    m_pending_notifications_cv.wait(lk, [&] {
+        return m_outstanding_requests == 0;
+    });
+    for (auto it = m_pending_notifications.begin(); it != m_pending_notifications.end();) {
+        if (it->version != version_to_keep) {
+            to_finish.splice(to_finish.end(), m_pending_notifications, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+
+    REALM_ASSERT_EX(version_to_keep >= m_min_outstanding_version, version_to_keep, m_min_outstanding_version);
+    m_min_outstanding_version = version_to_keep;
+
+    lk.unlock();
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(SubscriptionSet::State::Superseded);
+    }
+}
+
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const
 {
     auto new_tr = m_db->start_write();
@@ -769,6 +828,11 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     }
 
     return new_set_obj;
+}
+
+bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
+{
+    return version < m_db->get_version_of_latest_snapshot();
 }
 
 } // namespace realm::sync

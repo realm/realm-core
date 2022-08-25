@@ -260,6 +260,12 @@ private:
     friend class bind_ptr;
 };
 
+// Deduction guides
+template <class T>
+bind_ptr(T*) -> bind_ptr<T>;
+template <class T>
+bind_ptr(T*, bind_ptr_base::adopt_tag) -> bind_ptr<T>;
+
 template <class T, typename... Args>
 bind_ptr<T> make_bind(Args&&... __args)
 {

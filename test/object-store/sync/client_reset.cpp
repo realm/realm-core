@@ -30,7 +30,10 @@
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
@@ -227,8 +230,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->config().path == local_config.path);
         REQUIRE(util::File::exists(local_config.path));
     };
-    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after, bool) {
+    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                              bool) {
         std::lock_guard<std::mutex> lock(mtx);
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
         ++after_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
@@ -254,13 +259,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             auto obj = results.get<Obj>(0);
             REQUIRE(obj.get<Int>("value") == 4);
             object = Object(realm, obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };
@@ -675,6 +678,31 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(after_callback_invocations == 0);
         }
 
+        SECTION("callbacks are seeded with Realm instances even if the coordinator dies") {
+            auto client_reset_harness = make_reset(local_config, remote_config);
+            client_reset_harness->disable_wait_for_reset_completion();
+            std::shared_ptr<SyncSession> session;
+            client_reset_harness
+                ->on_post_local_changes([&](SharedRealm local) {
+                    // retain a reference so the sync session completes, even though the Realm is cleaned up
+                    session = local->sync_session();
+                })
+                ->run();
+            auto local_coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(local_config.path);
+            REQUIRE(!local_coordinator);
+            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(after_callback_invocations == 0);
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return after_callback_invocations > 0;
+                },
+                std::chrono::seconds(60));
+            // this test also relies on the test config above to verify the Realm instances in the callbacks
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+
         SECTION("notifiers work if the session instance changes") {
             // run this test with ASAN to check for use after free
             size_t before_callback_invoctions_2 = 0;
@@ -690,7 +718,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions_2;
                 };
-                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm, bool) {
+                config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++after_callback_invocations_2;
                 };
@@ -711,6 +739,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
             realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
                                        "A fake client reset error", true);
+            synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, synthetic);
 
             session->revive_if_needed();
@@ -1374,8 +1403,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 ++before_callback_invoctions;
             };
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, SharedRealm realm,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
                                                                       bool did_recover) {
+                SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_default());
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
@@ -1441,8 +1471,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // discarded insert due to fallback to DiscardLocal mode
@@ -1467,8 +1500,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // not recovered
@@ -1602,13 +1638,11 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
         if (results.size() >= 1) {
             auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "test type")->begin();
             object = Object(realm, obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };
@@ -2241,7 +2275,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
         auto object = Object::create(
             c, r, "source",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
@@ -2250,13 +2284,13 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     };
 
     auto create_one_dest_object = [&](realm::SharedRealm r, util::Optional<int64_t> val) -> ObjLink {
-        util::Any v;
+        std::any v;
         if (val) {
-            v = util::Any(*val);
+            v = std::any(*val);
         }
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
@@ -2295,13 +2329,11 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
         results = Results(realm, source_table->where().equal(id_col, source_pk));
         if (auto obj = results.first()) {
             object = Object(realm, *obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes) {
                 object_changes = std::move(changes);
             });
         }
-        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes) {
             results_changes = std::move(changes);
         });
     };
@@ -2532,8 +2564,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     if (test_mode == ClientResyncMode::Recover) {
-        SECTION("local removes source object, remote modifies list") {
+        SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
+                                                    {Add{dest_pk_5}});
+        }
+        SECTION("local erases list item then removes source object, remote modifies list") {
+            reset_collection_removing_source_object({Remove{dest_pk_1}, RemoveObject{"source", source_pk}},
                                                     {Add{dest_pk_5}});
         }
         SECTION("remote removes source object, recover local modifications") {
@@ -2646,7 +2682,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
               "EmbeddedObject"},
          }},
         {"EmbeddedObject",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
@@ -2655,7 +2691,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
              {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::ObjectType::Embedded,
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
              {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},
@@ -2862,7 +2898,11 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
         using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
-        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        DictType dict_values = DictType::container_type{
+            {"foo", EmbeddedContent()},
+            {"bar", EmbeddedContent()},
+            {"baz", EmbeddedContent()},
+        };
         void apply_recovery_from(const TopLevelContent& other)
         {
             combine_array_values(array_values, other.array_values);
@@ -3659,7 +3699,10 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
             });
             int64_t initial_value = initial.dict_values[existing_key]->int_value;
-            int64_t addition = random_int();
+            std::mt19937_64 engine(std::random_device{}());
+            std::uniform_int_distribution<int64_t> rng(-10'000'000'000, 10'000'000'000);
+
+            int64_t addition = rng(engine);
             SECTION("local add_int to an existing dictionary item") {
                 INFO("adding " << initial_value << " with " << addition);
                 expected_recovered = initial;
@@ -3671,7 +3714,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                     ->run();
             }
             SECTION("local and remote both create the same dictionary item and add to it") {
-                int64_t remote_addition = random_int();
+                int64_t remote_addition = rng(engine);
                 INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
                 expected_recovered = initial;
                 expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);

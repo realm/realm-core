@@ -208,7 +208,7 @@ TEST(Set_Links)
 
     auto cab1 = cabs->create_object();
     auto cab2 = cabs->create_object();
-    auto cab3 = cabs->create_object();
+    cabs->create_object();
 
     auto set_links = foo.get_set<ObjKey>(col_links);
     auto lnkset_links = foo.get_setbase_ptr(col_links);

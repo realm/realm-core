@@ -155,7 +155,7 @@ public:
 
     /// Construct empty view, ready for addition of row indices.
     explicit TableView(ConstTableRef parent);
-    TableView(Query& query, size_t limit);
+    TableView(const Query& query, size_t limit);
     TableView(ConstTableRef parent, ColKey column, const Obj& obj);
     TableView(LinkCollectionPtr&& collection);
 
@@ -339,6 +339,10 @@ public:
         return ret;
     }
 
+    bool has_changed() const
+    {
+        return m_last_seen_versions != get_dependency_versions();
+    }
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
@@ -461,7 +465,7 @@ inline TableView::TableView(ConstTableRef parent)
     }
 }
 
-inline TableView::TableView(Query& query, size_t lim)
+inline TableView::TableView(const Query& query, size_t lim)
     : m_table(query.get_table())
     , m_query(query)
     , m_limit(lim)

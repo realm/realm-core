@@ -1142,7 +1142,7 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
             auto started = steady_clock::now();
             int ret = 0;
 
-            do {
+            for (;;) {
                 if (m_pollfd_slots.size() > 1) {
                     // Poll all network sockets
                     ret = WSAPoll(LPWSAPOLLFD(&m_pollfd_slots[1]), ULONG(m_pollfd_slots.size() - 1),
@@ -1155,8 +1155,15 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                     ret++;
                 }
 
-            } while (ret == 0 &&
-                     (duration_cast<milliseconds>(steady_clock::now() - started).count() < max_wait_millis));
+                if (ret != 0 ||
+                    (duration_cast<milliseconds>(steady_clock::now() - started).count() >= max_wait_millis)) {
+                    break;
+                }
+
+                // If we don't have any sockets to poll for (m_pollfd_slots is less than 2) and no one signals
+                // the wakeup pipe, we'd be stuck busy waiting for either condition to become true.
+                std::this_thread::sleep_for(std::chrono::milliseconds(socket_poll_timeout));
+            }
 
 #else // !defined _WIN32
             int ret = ::poll(fds, nfds, max_wait_millis);

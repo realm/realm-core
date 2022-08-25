@@ -664,6 +664,9 @@ bool TableView::is_in_table_order() const
     else if (m_source_column_key) {
         return false;
     }
+    else if (!m_query.m_table) {
+        return false;
+    }
     else {
         m_query.m_table.check();
         return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();

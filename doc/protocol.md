@@ -991,6 +991,8 @@ The body of the message will be in JSON format with the following keys currently
     - `tryAgain` is boolean indicating the fatality of the error and is identical to the
       <try again> field in the ERROR message header.
     - `shouldClientReset` is a boolean indicating if the error requires a client reset.
+    - `action` is a string indicating the action the client should take as result of the
+      error.
 If a client received an [JSON_ERROR](#json_error) message, it must send an [UNBIND](#unbind)
 and no other messages back.
 

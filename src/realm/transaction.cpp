@@ -213,61 +213,67 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // we know for certain that the read lock we will grab WILL refer to our own newly
     // completed commit.
 
-    DB::ReadLockInfo new_read_lock;
-    VersionID version_id = VersionID(); // Latest available snapshot
-    // Grabbing the new lock before releasing the old one prevents m_transaction_count
-    // from going shortly to zero
-    db->grab_read_lock(new_read_lock, version_id); // Throws
+    try {
+        DB::ReadLockInfo new_read_lock;
+        VersionID version_id = VersionID(); // Latest available snapshot
+        // Grabbing the new lock before releasing the old one prevents m_transaction_count
+        // from going shortly to zero
+        db->grab_read_lock(new_read_lock, version_id); // Throws
 
-    if (commit_to_disk || m_oldest_version_not_persisted) {
-        // Here we are either committing to disk or we are already
-        // holding on to an older version. In either case there is
-        // no need to hold onto this now historic version.
-        db->release_read_lock(m_read_lock);
-    }
-    else {
-        // We are not commiting to disk and there is no older
-        // version not persisted, so hold onto this one
-        m_oldest_version_not_persisted = m_read_lock;
-    }
+        m_history = nullptr;
+        set_transact_stage(DB::transact_Reading);
 
-    if (commit_to_disk && m_oldest_version_not_persisted) {
-        // We are committing to disk so we can release the
-        // version we are holding on to
-        db->release_read_lock(*m_oldest_version_not_persisted);
-        m_oldest_version_not_persisted.reset();
-    }
-    m_read_lock = new_read_lock;
-    // We can be sure that m_read_lock != m_oldest_version_not_persisted
-    // because m_oldest_version_not_persisted is either equal to former m_read_lock
-    // or older and former m_read_lock is older than current m_read_lock
-    REALM_ASSERT(!m_oldest_version_not_persisted ||
-                 m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
-
-    {
-        util::CheckedLockGuard lock(m_async_mutex);
-        REALM_ASSERT(m_async_stage != AsyncState::Syncing);
-        if (commit_to_disk) {
-            if (m_async_stage == AsyncState::Requesting) {
-                m_async_stage = AsyncState::HasLock;
-            }
-            else {
-                db->end_write_on_correct_thread();
-                m_async_stage = AsyncState::Idle;
-            }
+        if (commit_to_disk || m_oldest_version_not_persisted) {
+            // Here we are either committing to disk or we are already
+            // holding on to an older version. In either case there is
+            // no need to hold onto this now historic version.
+            db->release_read_lock(m_read_lock);
         }
         else {
-            m_async_stage = AsyncState::HasCommits;
+            // We are not commiting to disk and there is no older
+            // version not persisted, so hold onto this one
+            m_oldest_version_not_persisted = m_read_lock;
         }
+
+        if (commit_to_disk && m_oldest_version_not_persisted) {
+            // We are committing to disk so we can release the
+            // version we are holding on to
+            db->release_read_lock(*m_oldest_version_not_persisted);
+            m_oldest_version_not_persisted.reset();
+        }
+        m_read_lock = new_read_lock;
+        // We can be sure that m_read_lock != m_oldest_version_not_persisted
+        // because m_oldest_version_not_persisted is either equal to former m_read_lock
+        // or older and former m_read_lock is older than current m_read_lock
+        REALM_ASSERT(!m_oldest_version_not_persisted ||
+                     m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
+
+        {
+            util::CheckedLockGuard lock(m_async_mutex);
+            REALM_ASSERT(m_async_stage != AsyncState::Syncing);
+            if (commit_to_disk) {
+                if (m_async_stage == AsyncState::Requesting) {
+                    m_async_stage = AsyncState::HasLock;
+                }
+                else {
+                    db->end_write_on_correct_thread();
+                    m_async_stage = AsyncState::Idle;
+                }
+            }
+            else {
+                m_async_stage = AsyncState::HasCommits;
+            }
+        }
+
+        // Remap file if it has grown, and update refs in underlying node structure
+        remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
+        return VersionID{version, new_read_lock.m_reader_idx};
     }
-
-    // Remap file if it has grown, and update refs in underlying node structure
-    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
-
-    m_history = nullptr;
-    set_transact_stage(DB::transact_Reading);
-
-    return VersionID{version, new_read_lock.m_reader_idx};
+    catch (...) {
+        // In case of failure, further use of the transaction for reading is unsafe
+        set_transact_stage(DB::transact_Ready);
+        throw;
+    }
 }
 
 void Transaction::commit_and_continue_writing()

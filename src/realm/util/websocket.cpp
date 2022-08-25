@@ -683,6 +683,7 @@ public:
             }
 
             auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
+                                         ec == util::error::make_error_code(util::error::broken_pipe) ||
                                          ec == util::make_error_code(util::MiscExtErrors::end_of_input));
             // If the socket has been closed then we should continue to read from it until we've drained
             // the receive buffer. Eventually we will either receive an in-band error message from the
@@ -937,7 +938,7 @@ private:
             // Otherwise, the error code is the first two bytes of the body as a uint16_t in
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
-            error_code = ntohs((data[1] << 8) | data[0]);
+            error_code = ntohs((uint8_t(data[1]) << 8) | uint8_t(data[0]));
             error_message = StringData(data + 2, size - 2);
         }
 

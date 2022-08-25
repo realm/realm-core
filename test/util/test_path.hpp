@@ -57,14 +57,9 @@ std::string get_test_path_prefix();
 /// of set_test_path_prefix().
 std::string get_test_path(const std::string& path, const std::string& suffix);
 
-/// By default, test files are placed in the current working
-/// directory. Use this function to set a path prefix. The specified
-/// prefix must contain a final `/`.
-///
-/// This function is **not** thread-safe. If you call it, be sure to call it
-/// prior to any invocation of get_test_path_prefix() or get_test_path(), and
-/// prior to any execution of the TEST_PATH or TEST_DIR family of macros.
-void set_test_path_prefix(const std::string&);
+/// Initialize the test path prefix, resource path, and working directory. This function is not thread-safe and should
+/// be called exactly once on startup.
+bool initialize_test_path(int argc, const char* argv[]);
 
 /// Check if get_test_path_prefix() will give a path located on an exFAT
 /// filesystem, which does not support all of the features a typical unix
@@ -76,22 +71,9 @@ bool test_dir_is_exfat();
 /// of set_test_resource_path().
 std::string get_test_resource_path();
 
-
-/// Set the path to be returned by get_test_resource_path().
-///
-/// This function is **not** thread-safe. If you call it, be sure to call it
-/// prior to any invocation of get_test_resource_path().
-void set_test_resource_path(const std::string&);
-
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_libexec_path().
 std::string get_test_libexec_path();
-
-/// Set the path to be returned by get_test_libexec_path().
-///
-/// This function is **not** thread-safe. If you call it, be sure to call it
-/// prior to any invocation of get_test_libexec_path().
-void set_test_libexec_path(const std::string&);
 
 // This is an adapter class which replaces dragging in the whole test framework
 // by implementing the `get_test_name()` method from the TestContext class.

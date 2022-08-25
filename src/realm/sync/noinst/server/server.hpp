@@ -13,7 +13,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/time.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
-#include <realm/sync/noinst/server/metrics.hpp>
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/client.hpp>
 
@@ -53,15 +52,6 @@ private:
 /// sync server is running.
 class Server {
 public:
-    /// A list of client file identifiers. See ClientFileBlacklists.
-    using ClientFileBlacklist = std::vector<file_ident_type>;
-
-    /// A collection of client-side Realms that should be rejected by the
-    /// server. Each entry in this map associates a virtual path of a
-    /// server-side Realm with the set of client-side Realms that should be
-    /// rejected for that server-side Realm.
-    using ClientFileBlacklists = std::map<std::string, ClientFileBlacklist>;
-
     using SessionBootstrapCallback = void(std::string_view virt_path, file_ident_type client_file_ident);
 
     // FIXME: The default values for `http_request_timeout`,
@@ -95,12 +85,6 @@ public:
         /// util::StderrLogger with the log level threshold set to
         /// util::Logger::Level::info.
         util::Logger* logger = nullptr;
-
-        /// An optional sink for recording metrics about the internal operation
-        /// of the server. For the list of counters and gauges see
-        /// "doc/monitoring.md". When no metrics sink is specified, no metrics
-        /// will be recorded.
-        Metrics* metrics = nullptr;
 
         /// A unique id of this server. Used in the backup protocol to tell
         /// slaves apart.
@@ -212,51 +196,8 @@ public:
         /// sure to research the subject before you enable this option.
         bool tcp_no_delay = false;
 
-        /// Unless disabled, the server will periodically run log compaction on
-        /// history that it knows that no currently known client relies on for
-        /// operational transformation. Only clients seen within `history_ttl`
-        /// will keep history uncompacted. See also
-        /// `history_compaction_interval` for how to control how often the
-        /// server considers performing compaction.
-        bool disable_history_compaction = true;
-
-        /// Clients that haven't been seen for this amount may experience a
-        /// client reset, due to the server having compacted history that they
-        /// rely on for operational transformation.
-        /// Default is infinity.
-        std::chrono::seconds history_ttl = std::chrono::seconds::max();
-
-        /// The average amount of time that must pass between running history
-        /// log compaction. The actual time that log compaction will run is
-        /// `time_of_last_compaction + interval +/- rand(0, interval / 2)`,
-        /// meaning that at least `interval / 2` seconds will elapse, but no
-        /// more than `interval * 1.5` seconds.
-        /// The default value is 1 hour.
-        std::chrono::seconds history_compaction_interval = std::chrono::seconds{3600};
-
-        /// If set to true, the determination of how far in-place history
-        /// compaction can proceed will be based entirely on the history
-        /// itself. The 'last access' timestamps of client file entries will be
-        /// completely ignored. This should only be done in emergency
-        /// situations. Expect it to cause expiration of client files even when
-        /// they have seen acitivity within the specified 'time to live' (\ref
-        /// history_ttl).
-        ///
-        /// CAUTION: Do **not** enable this unless you know what you are doing,
-        /// and it is absolutely necessary. When enabled, a warning will be
-        /// logged.
-        bool history_compaction_ignore_clients = false;
-
-        /// An optional custom clock to be used for in-place history compaction
-        /// checks. If no clock is specified, the server will use the system
-        /// clock.
-        const Clock* history_compaction_clock = nullptr;
-
         /// An optional 64 byte key to encrypt all files with.
         util::Optional<std::array<char, 64>> encryption_key;
-
-        /// Make the server reject sessions associated with these client files.
-        ClientFileBlacklists client_file_blacklists;
 
         /// Sets a limit on the allowed accumulated size in bytes of buffered
         /// incoming changesets waiting to be processed. If left at zero, an

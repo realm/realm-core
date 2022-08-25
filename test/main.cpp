@@ -16,70 +16,12 @@
  *
  **************************************************************************/
 
-#include <realm/util/features.h>
 #include "test_all.hpp"
 #include "util/test_path.hpp"
-#ifdef _WIN32
-#include <Windows.h>
 
-// PathCchRemoveFileSpec()
-#include <pathcch.h>
-#pragma comment(lib, "Pathcch.lib")
-#elif REALM_PLATFORM_APPLE && (REALM_APPLE_DEVICE || TARGET_OS_SIMULATOR)
-#include <CoreFoundation/CoreFoundation.h>
-#include <realm/util/cf_ptr.hpp>
-using namespace realm::util;
-
-static std::string url_to_path(CFURLRef url)
+int main(int argc, const char* argv[])
 {
-    auto path = adoptCF(CFURLCopyPath(url));
-    auto length = CFStringGetLength(path.get());
-    std::string ret;
-    ret.resize(CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8));
-    CFIndex bytes_written;
-    CFStringGetBytes(path.get(), {0, length}, kCFStringEncodingUTF8, 0, false, reinterpret_cast<uint8_t*>(ret.data()),
-                     ret.size(), &bytes_written);
-    REALM_ASSERT(bytes_written);
-    ret.resize(bytes_written);
-    return ret;
-}
-#else
-#include <unistd.h>
-#include <libgen.h>
-#endif
-
-int main(int argc, char* argv[])
-{
-#ifdef _MSC_VER
-    wchar_t path[MAX_PATH];
-    if (GetModuleFileName(NULL, path, MAX_PATH) == 0) {
-        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+    if (!realm::test_util::initialize_test_path(argc, argv))
         return 1;
-    }
-    PathCchRemoveFileSpec(path, MAX_PATH);
-    SetCurrentDirectory(path);
-#elif REALM_PLATFORM_APPLE && (REALM_APPLE_DEVICE || TARGET_OS_SIMULATOR)
-    auto home = adoptCF(CFCopyHomeDirectoryURL());
-    realm::test_util::set_test_path_prefix(url_to_path(home.get()) + "Documents/");
-
-    auto resources_url = adoptCF(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
-    realm::test_util::set_test_resource_path(url_to_path(resources_url.get()));
-#else
-    char executable[PATH_MAX];
-    if (realpath(argv[0], executable) == nullptr) {
-        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
-        return 1;
-    }
-    const char* directory = dirname(executable);
-    if (chdir(directory) < 0) {
-        fprintf(stderr, "Failed to change directory.\n");
-        return 1;
-    }
-#endif
-
-    if (argc > 1) {
-        realm::test_util::set_test_path_prefix(argv[1]);
-    }
-
     return test_all();
 }
