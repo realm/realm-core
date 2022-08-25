@@ -45,6 +45,10 @@ struct NotificationToken {
     NotificationToken(NotificationToken const&) = delete;
     NotificationToken& operator=(NotificationToken const&) = delete;
 
+    // Stop sending notifications for the callback associated with this token.
+    // This is equivalent to (*this) = {};
+    void unregister();
+
     void suppress_next();
 
 private:
