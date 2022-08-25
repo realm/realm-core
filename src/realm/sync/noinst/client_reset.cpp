@@ -31,7 +31,6 @@
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
-#include <realm/util/flat_map.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -63,7 +62,6 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
 }
 
 } // namespace realm
-
 
 namespace realm::_impl::client_reset {
 
