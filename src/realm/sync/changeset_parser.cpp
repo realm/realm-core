@@ -332,10 +332,10 @@ void State::parse_one()
 
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
-        StringData str = read_string();
         if (index != m_intern_strings.size()) {
             parser_error("Unexpected intern index");
         }
+        StringData str = read_string();
         if (!m_intern_strings.insert(str).second) {
             parser_error("Unexpected intern string");
         }

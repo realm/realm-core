@@ -913,6 +913,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_String, "a");
         },
+        "'foo' has primary key 'a', which is of type Int on one side and type String on the other.",
         "'foo' has primary key 'a', which is of type String on one side and type Int on the other.");
 }
 
@@ -6600,9 +6601,37 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     util::StderrLogger logger;
-    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded.data(),
-                                        server_changesets_encoded.size(), version_info,
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
                                         DownloadBatchState::LastInBatch, logger);
+}
+
+TEST(Sync_InvalidChangesetFromServer)
+{
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+
+    instr::CreateObject bad_instr;
+    bad_instr.object = InternString{1};
+    bad_instr.table = InternString{2};
+
+    Changeset changeset;
+    changeset.push_back(bad_instr);
+
+    ChangesetEncoder::Buffer encoded;
+    encode_changeset(changeset, encoded);
+    Transformer::RemoteChangeset server_changeset;
+    server_changeset.origin_file_ident = 1;
+    server_changeset.remote_version = 1;
+    server_changeset.data = BinaryData(encoded.data(), encoded.size());
+
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
+                                                       DownloadBatchState::LastInBatch, logger),
+                   sync::IntegrationException,
+                   StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }
 
 } // unnamed namespace

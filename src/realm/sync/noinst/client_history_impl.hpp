@@ -246,14 +246,12 @@ public:
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
     ///
-    /// \param num_changesets The number of passed changesets. Must be non-zero.
-    ///
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
     void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                     const RemoteChangeset* changesets, std::size_t num_changesets,
-                                     VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
+                                     util::Span<const RemoteChangeset> changesets, VersionInfo& new_version,
+                                     DownloadBatchState download_type, util::Logger&,
                                      util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr = nullptr,
                                      SyncTransactReporter* transact_reporter = nullptr);
 

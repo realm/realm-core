@@ -378,27 +378,27 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 
 void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 const std::uint_fast64_t* downloadable_bytes,
-                                                const RemoteChangeset* incoming_changesets,
-                                                std::size_t num_changesets, VersionInfo& version_info,
-                                                DownloadBatchState batch_state, util::Logger& logger,
+                                                util::Span<const RemoteChangeset> incoming_changesets,
+                                                VersionInfo& version_info, DownloadBatchState batch_state,
+                                                util::Logger& logger,
                                                 util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
                                                 SyncTransactReporter* transact_reporter)
 {
-    REALM_ASSERT(num_changesets != 0);
+    REALM_ASSERT(incoming_changesets.size() != 0);
 
     std::uint_fast64_t downloaded_bytes_in_message = 0;
     std::vector<Changeset> changesets;
-    changesets.resize(num_changesets); // Throws
+    changesets.resize(incoming_changesets.size()); // Throws
 
     try {
-        for (std::size_t i = 0; i < num_changesets; ++i) {
+        for (std::size_t i = 0; i < incoming_changesets.size(); ++i) {
             const RemoteChangeset& changeset = incoming_changesets[i];
             downloaded_bytes_in_message += changeset.original_changeset_size;
             parse_remote_changeset(changeset, changesets[i]); // Throws
             changesets[i].transform_sequence = i;
         }
     }
-    catch (BadChangesetError& e) {
+    catch (const TransformError& e) {
         throw IntegrationException(ClientError::bad_changeset,
                                    util::format("Failed to parse received changeset: %1", e.what()));
     }
@@ -420,7 +420,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
     ChangesetEncoder::Buffer transformed_changeset;
     try {
-        for (std::size_t i = 0; i < num_changesets; ++i) {
+        for (std::size_t i = 0; i < incoming_changesets.size(); ++i) {
             const RemoteChangeset& changeset = incoming_changesets[i];
             REALM_ASSERT(changeset.last_integrated_local_version <= local_version);
             REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != sync_file_id);
@@ -446,7 +446,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
             TempShortCircuitReplication tscr{m_replication};
             InstructionApplier applier{*transact};
-            for (std::size_t i = 0; i < num_changesets; ++i) {
+            for (std::size_t i = 0; i < incoming_changesets.size(); ++i) {
                 encode_changeset(changesets[i], transformed_changeset);
                 applier.apply(changesets[i], &logger); // Throws
             }

@@ -809,8 +809,7 @@ void SessionImpl::process_pending_flx_bootstrap()
 
 
         history.integrate_server_changesets(
-            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-            pending_batch.changesets.size(), new_version, batch_state, logger,
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
             [&](const TransactionRef& tr) {
                 bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
             },

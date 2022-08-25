@@ -1394,17 +1394,15 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    const Transformer::RemoteChangeset* changesets = received_changesets.data();
-    std::size_t num_changesets = received_changesets.size();
-    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
                                         download_batch_state, logger, {}, get_transact_reporter()); // Throws
-    if (num_changesets == 1) {
+    if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
     }
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
-                     version_info.sync_version.version, num_changesets); // Throws
+                     version_info.sync_version.version, received_changesets.size()); // Throws
     }
 }
 
