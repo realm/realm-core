@@ -1953,6 +1953,12 @@ void Obj::assign(const Obj& other)
                 REALM_ASSERT(n != realm::npos);
                 linking_obj_list.set(n, get_key());
             }
+            else if (c.get_attrs().test(col_attr_List)) {
+                auto linking_obj_list = linking_obj.get_listbase_ptr(c);
+                auto pos = linking_obj_list->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
+                REALM_ASSERT(pos != realm::npos);
+                linking_obj_list->set_any(pos, ObjLink{m_table->get_key(), get_key()});
+            }
             else if (c.get_attrs().test(col_attr_Set)) {
                 auto linking_obj_set = linking_obj.get_setbase_ptr(c);
                 auto pos = linking_obj_set->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
