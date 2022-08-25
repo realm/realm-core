@@ -3962,7 +3962,6 @@ private:
 
 } // namespace
 
-#if 0
 TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
@@ -4097,7 +4096,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
-#endif
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";
