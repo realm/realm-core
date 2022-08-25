@@ -448,9 +448,9 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
     void read_or_write_error(std::error_code);
-    void close_due_to_protocol_error(std::error_code);
+    void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_missing_protocol_feature();
-    void close_due_to_client_side_error(std::error_code, bool is_fatal);
+    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
     void involuntary_disconnect(const SessionErrorInfo& info);

@@ -400,7 +400,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     }
     catch (BadChangesetError& e) {
         throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to parse, or apply received changeset: %1", e.what()));
+                                   util::format("Failed to parse received changeset: %1", e.what()));
     }
 
     // Changesets are applied to the Realm with replication temporarily
@@ -452,11 +452,11 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
             }
         }
     }
-    catch (BadChangesetError& e) {
+    catch (const BadChangesetError& e) {
         throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to parse, or apply received changeset: %1", e.what()));
+                                   util::format("Failed to apply received changeset: %1", e.what()));
     }
-    catch (TransformError& e) {
+    catch (const TransformError& e) {
         throw IntegrationException(ClientError::bad_changeset,
                                    util::format("Failed to transform received changeset: %1", e.what()));
     }

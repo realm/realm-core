@@ -1391,9 +1391,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_pk_name != right_pk_name) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "' on one side,"
-                          "but primary key '"
-                       << right_pk_name << "' on the other.";
+                       << "' on one side, but primary key '" << right_pk_name << "' on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1408,7 +1406,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_spec->pk_nullable != right_spec->pk_nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is nullable on one side, but not the other";
+                       << "', which is nullable on one side, but not the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1427,7 +1425,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
                 std::stringstream ss;
-                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other";
+                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other.";
                 throw SchemaMismatchError(ss.str());
             }
         }

@@ -334,7 +334,7 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
     }
     m_reconnect_info.m_reason = ConnectionTerminationReason::bad_headers_in_http_response;
     bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, is_fatal); // Throws
+    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -385,7 +385,7 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
         }
     }
 
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -393,7 +393,7 @@ void Connection::websocket_protocol_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
     bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -824,7 +824,7 @@ void Connection::handle_pong_timeout()
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
     m_reconnect_info.m_reason = ConnectionTerminationReason::pong_timeout;
-    close_due_to_client_side_error(ClientError::pong_timeout, false);
+    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
 }
 
 
@@ -1005,7 +1005,7 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
         ec2 = ec;
         is_fatal = false;
     }
-    close_due_to_client_side_error(ec2, is_fatal); // Throws
+    close_due_to_client_side_error(ec2, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -1013,15 +1013,15 @@ void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
-void Connection::close_due_to_protocol_error(std::error_code ec)
+void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                         // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    bool is_fatal = true;                              // A sync protocol violation is a fatal error
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
@@ -1030,16 +1030,22 @@ void Connection::close_due_to_missing_protocol_feature()
     m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
     std::error_code ec = ClientError::missing_protocol_feature;
     bool is_fatal = true;                         // A missing protocol feature is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
 // Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal)
+void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
+                                                bool is_fatal)
 {
     logger.info("Connection closed due to error"); // Throws
     const bool try_again = !is_fatal;
-    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
+    std::string message = ec.message();
+    if (msg) {
+        message += ": ";
+        message += *msg;
+    }
+    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
 }
 
 
@@ -1407,7 +1413,7 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    m_conn.close_due_to_protocol_error(error.code());
+    m_conn.close_due_to_protocol_error(error.code(), error.what());
 }
 
 void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
