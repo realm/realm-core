@@ -249,7 +249,7 @@ public:
 
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
-    using TransportCallback = struct transport_callback {
+    struct TransportCallback {
         realm::app::Request request;
         realm::app::http_completion_t completion_block;
 
