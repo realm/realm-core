@@ -433,18 +433,7 @@ private:
     template <class T>
     inline void set_spec(T&, ColKey);
 
-    // To be used carefully since it could potentially duplicate user data.
-    // since Obj::copy is for now basically only used for handling schema migration when there are multiple
-    // incoming links to some embedded table, this method is basically harmless, but Obj::assign uses it, so
-    // in case of copies outside a migration, probably we should throw an excpetion if we attempt to copy.
-    // an object that contains a link to an embedded table.
-    using CopyEmbeddedLinkTracker = std::vector<std::tuple<TableRef, ColKey, Obj, Obj, std::size_t>>;
-    void copy(const Obj& other, CopyEmbeddedLinkTracker&);
-
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
-    bool is_outgoing_embedded_link(ConstTableRef source_table, ColKey col_key, Mixed value, TableRef& target_table,
-                                   ObjKey& target_obj_key) const;
-    void handle_copy_for_embedded_links(CopyEmbeddedLinkTracker&) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

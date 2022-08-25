@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/obj.hpp"
-#include "realm/cluster_tree.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_bool.hpp"
@@ -30,14 +29,15 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
-#include "realm/column_type_traits.hpp"
-#include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
-#include "realm/spec.hpp"
-#include "realm/set.hpp"
+#include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
-#include "realm/table_view.hpp"
+#include "realm/index_string.hpp"
+#include "realm/object_converter.hpp"
 #include "realm/replication.hpp"
+#include "realm/set.hpp"
+#include "realm/spec.hpp"
+#include "realm/table_view.hpp"
 #include "realm/util/base64.hpp"
 
 namespace realm {
@@ -1936,8 +1936,10 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
 
 void Obj::assign(const Obj& other)
 {
-    Obj::CopyEmbeddedLinkTracker tracker;
-    copy(other, tracker);
+    auto embedded_obj_tracker = std::make_shared<converters::EmbeddedObjectConverter>();
+    converters::InterRealmObjectConverter converter(this->get_table(), this->get_table(), embedded_obj_tracker);
+    converter.copy(other, *this, nullptr);
+    embedded_obj_tracker->process_pending();
 
     auto copy_links = [this, &other](ColKey col) {
         auto t = m_table->get_opposite_table(col);
@@ -1983,119 +1985,21 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
 {
     REALM_ASSERT(!m_table->get_primary_key_column());
     auto copy_links = [this](ColKey col) {
+        auto embedded_obj_tracker = std::make_shared<converters::EmbeddedObjectConverter>();
         auto opposite_table = m_table->get_opposite_table(col);
         auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
         for (auto backlink : backlinks) {
             // create a new obj
             auto obj = m_table->create_object();
-            // try to deep copy all the properties in the new object
-            Obj::CopyEmbeddedLinkTracker tracker;
-            obj.copy(*this, tracker);
-            // if there are embedded links, then copy them separately
-            handle_copy_for_embedded_links(tracker);
-            // fix all the backlinks
+            embedded_obj_tracker->track(*this, obj);
             auto linking_obj = opposite_table->get_object(backlink);
             fix_linking_object_during_schema_migration(linking_obj, obj, opposite_column);
         }
+        embedded_obj_tracker->process_pending();
         return false;
     };
     m_table->for_each_backlink_column(copy_links);
-}
-
-void Obj::copy(const Obj& other, Obj::CopyEmbeddedLinkTracker& embedded_links)
-{
-    // handle correctly the case in which the value to copy is an outgoing link to an embedded table.
-    REALM_ASSERT(get_table() == other.get_table());
-    auto cols = m_table->get_column_keys();
-    for (auto col : cols) {
-
-        TableRef target_table;
-        ObjKey target_obj_key;
-
-        if (col.get_attrs().test(col_attr_List)) {
-            auto src_list = other.get_listbase_ptr(col);
-            auto dst_list = get_listbase_ptr(col);
-            auto sz = src_list->size();
-            dst_list->clear();
-            for (size_t i = 0; i < sz; i++) {
-                Mixed value = src_list->get_any(i);
-                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
-                    dst_list->insert_any(i, value);
-                }
-                else {
-                    auto target = target_table->create_linked_object();
-                    auto src = target_table->get_object(target_obj_key);
-                    embedded_links.push_back({target_table, col, target, src, i});
-                }
-            }
-        }
-        else if (col.get_attrs().test(col_attr_Set)) {
-            auto src_set = other.get_setbase_ptr(col);
-            auto dst_set = get_setbase_ptr(col);
-            auto sz = src_set->size();
-            dst_set->clear();
-            for (size_t i = 0; i < sz; ++i) {
-                Mixed value = src_set->get_any(i);
-                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
-                    dst_set->insert_any(value);
-                }
-                else {
-                    auto target = target_table->create_linked_object();
-                    auto src = target_table->get_object(target_obj_key);
-                    embedded_links.push_back({target_table, col, target, src, 0});
-                }
-            }
-        }
-        else if (col.get_attrs().test(col_attr_Dictionary)) {
-            auto src_dictionary = other.get_dictionary_ptr(col);
-            auto dst_dictionary = get_dictionary_ptr(col);
-            auto sz = src_dictionary->size();
-            dst_dictionary->clear();
-            for (size_t i = 0; i < sz; ++i) {
-                const auto& [key, value] = src_dictionary->get_pair(i);
-                if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key))
-                    dst_dictionary->insert(key, value);
-                else {
-                    auto target = dst_dictionary->create_and_insert_linked_object(key);
-                    auto src = target_table->get_object(target_obj_key);
-                    embedded_links.push_back({target_table, col, target, src, 0});
-                }
-            }
-        }
-        else {
-            Mixed value = other.get_any(col);
-            if (value.is_null()) {
-                this->set_null(col);
-                continue;
-            }
-            switch (value.get_type()) {
-                case type_String: {
-                    // Need to take copy. Values might be in same cluster
-                    std::string str{value.get_string()};
-                    this->set(col, str);
-                    break;
-                }
-                case type_Binary: {
-                    // Need to take copy. Values might be in same cluster
-                    std::string str{value.get_binary()};
-                    this->set(col, BinaryData(str));
-                    break;
-                }
-                default: {
-                    if (!is_outgoing_embedded_link(m_table, col, value, target_table, target_obj_key)) {
-                        this->set_any(col, value);
-                    }
-                    else {
-                        auto target = target_table->create_linked_object();
-                        auto src = target_table->get_object(target_obj_key);
-                        embedded_links.push_back({target_table, col, target, src, 0});
-                    }
-                    break;
-                }
-            }
-        }
-    }
 }
 
 void Obj::fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const
@@ -2136,68 +2040,6 @@ void Obj::fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, C
         REALM_ASSERT(!linking_obj.get<ObjKey>(opposite_col_key) ||
                      linking_obj.get<ObjKey>(opposite_col_key) == get_key());
         linking_obj.set(opposite_col_key, obj.get_key());
-    }
-}
-
-bool Obj::is_outgoing_embedded_link(ConstTableRef source_table, ColKey col_key, Mixed value, TableRef& target_table,
-                                    ObjKey& target_obj_key) const
-{
-    if (value.is_type(type_Link)) {
-        target_table = source_table->get_opposite_table(col_key);
-        if (target_table) {
-            target_obj_key = value.get<ObjKey>();
-            return target_table->is_embedded();
-        }
-    }
-    if (value.is_type(type_TypedLink)) {
-        target_table = source_table->get_opposite_table(col_key);
-        if (target_table) {
-            auto link = value.get_link();
-            target_obj_key = link.get_obj_key();
-            return target_table->is_embedded();
-        }
-    }
-    return false;
-}
-
-void Obj::handle_copy_for_embedded_links(CopyEmbeddedLinkTracker& tracker) const
-{
-    for (size_t i = 0; i < tracker.size(); ++i) {
-        auto [table, col, target, src, pos] = tracker[i];
-        Obj::CopyEmbeddedLinkTracker local_tracker;
-        if (col.get_attrs().test(col_attr_List)) {
-            target.copy(src, local_tracker);
-            if (local_tracker.empty()) {
-                src.get_listbase_ptr(col)->set_any(pos, ObjLink{table->get_key(), target.get_key()});
-            }
-            else {
-                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
-            }
-        }
-        else if (col.get_attrs().test(col_attr_Set)) {
-            target.copy(src, local_tracker);
-            if (local_tracker.empty()) {
-                src.get_setbase_ptr(col)->insert_any(ObjLink{table->get_key(), target.get_key()});
-            }
-            else {
-                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
-            }
-        }
-        else if (col.get_attrs().test(col_attr_Dictionary)) {
-            target.copy(src, local_tracker);
-            if (!local_tracker.empty()) {
-                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
-            }
-        }
-        else {
-            target.copy(src, local_tracker);
-            if (local_tracker.empty()) {
-                src.set_any(col, ObjLink{table->get_key(), target.get_key()});
-            }
-            else {
-                tracker.insert(tracker.end(), local_tracker.begin(), local_tracker.end());
-            }
-        }
     }
 }
 
