@@ -1083,31 +1083,43 @@ TEST_CASE("C API", "[c_api]") {
     }
 
     SECTION("realm refresh async pending") {
-        bool realm_refresh_callback_called = false;
-        // bool on_transaction_completed = false;
-        bool done = false;
+        struct TestingObj {
+            static TestingObj& get()
+            {
+                static TestingObj obj;
+                return obj;
+            }
+            bool done{false};
+            bool realm_refresh_callback_called{false};
+        };
+
         auto wait_for_done = [&]() {
             util::EventLoop::main().run_until([&] {
-                return done;
+                return TestingObj::get().done;
             });
-            REQUIRE(done);
+            REQUIRE(TestingObj::get().done);
         };
-        (*realm)->async_begin_transaction([&]() {
-            auto token = cptr(realm_add_realm_refresh_callback(
-                realm,
-                [](void* userdata) {
-                    *reinterpret_cast<bool*>(userdata) = true;
-                },
-                &realm_refresh_callback_called, [](void*) {}));
+        auto token_begin = cptr(realm_async_begin_transaction(
+            realm,
+            [](realm_t* realm, void*) {
+                auto token_refresh = cptr(realm_add_realm_refresh_callback(
+                    realm,
+                    [](void* userdata) {
+                        *reinterpret_cast<bool*>(userdata) = true;
+                    },
+                    &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
 
-            (*realm)->async_commit_transaction([&](std::exception_ptr) {
-                done = true;
-            });
-        });
-
+                auto token_commit = cptr(realm_async_commit_transaction(
+                    realm,
+                    [](realm_t*, void*, bool, const char*) {
+                        TestingObj::get().done = true;
+                    },
+                    nullptr, nullptr, nullptr));
+            },
+            nullptr, nullptr, nullptr));
 
         wait_for_done();
-        CHECK(realm_refresh_callback_called);
+        CHECK(TestingObj::get().realm_refresh_callback_called);
     }
 
     SECTION("realm async refresh - main use case") {
