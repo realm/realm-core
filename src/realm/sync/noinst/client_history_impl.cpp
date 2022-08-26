@@ -799,31 +799,25 @@ void ClientHistory::trim_ct_history()
 {
     version_type begin = m_ct_history_base_version;
     version_type end = m_version_of_oldest_bound_snapshot;
+    REALM_ASSERT(end >= begin);
 
-    // Because `m_version_of_oldest_bound_snapshot` in this history object is
-    // only updated by those transactions that occur on behalf of SharedGroup
-    // object that is associated with this history object, it can happen that
-    // `m_version_of_oldest_bound_snapshot` precedes the beginning of the
-    // history, even though that seems nonsensical. In such a case, no trimming
-    // can be done yet.
-    if (end > begin) {
-        std::size_t n = std::size_t(end - begin);
+    std::size_t n = std::size_t(end - begin);
+    if (n == 0)
+        return;
 
-        // The new changeset is always added before set_oldest_bound_version()
-        // is called. Therefore, the trimming operation can never leave the
-        // history empty.
-        REALM_ASSERT(n < ct_history_size());
+    // The new changeset is always added before set_oldest_bound_version()
+    // is called. Therefore, the trimming operation can never leave the
+    // history empty.
+    REALM_ASSERT(n < ct_history_size());
 
-        for (std::size_t i = 0; i < n; ++i) {
-            std::size_t j = (n - 1) - i;
-            m_arrays->ct_history.erase(j);
-        }
-
-        m_ct_history_base_version += n;
-
-        REALM_ASSERT(m_ct_history_base_version + ct_history_size() ==
-                     m_sync_history_base_version + sync_history_size());
+    for (std::size_t i = 0; i < n; ++i) {
+        std::size_t j = (n - 1) - i;
+        m_arrays->ct_history.erase(j);
     }
+
+    m_ct_history_base_version += n;
+
+    REALM_ASSERT(m_ct_history_base_version + ct_history_size() == m_sync_history_base_version + sync_history_size());
 }
 
 
