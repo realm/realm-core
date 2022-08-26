@@ -22,12 +22,6 @@ struct Changeset {
     using file_ident_type = uint_fast64_t;
     using version_type = uint_fast64_t; // FIXME: Get from `History`.
 
-    Changeset() = default;
-    Changeset(Changeset&&) = default;
-    Changeset& operator=(Changeset&&) = default;
-    Changeset(const Changeset&) = delete;
-    Changeset& operator=(const Changeset&) = delete;
-
     InternString intern_string(StringData);              // Slow!
     InternString find_string(StringData) const noexcept; // Slow!
     StringData string_data() const noexcept;
