@@ -379,7 +379,15 @@ private:
     // ServerHistory object.
     mutable util::Optional<Arrays> m_arrays;
 
-    mutable const HistoryEntry* m_changeset_from_server = nullptr;
+    // When applying server changesets, we create a history entry with the data
+    // from the server instead of using the one generated from applying the
+    // instructions to the local data. integrate_server_changesets() sets this
+    // to true to indicate to add_changeset() that it should skip creating a
+    // history entry.
+    //
+    // This field is guarded by the DB's write lock and should only be accessed
+    // while that is held.
+    mutable bool m_applying_server_changeset = false;
 
     util::Optional<BinaryData> m_client_reset_changeset;
 

@@ -403,12 +403,6 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                    util::format("Failed to parse received changeset: %1", e.what()));
     }
 
-    // Changesets are applied to the Realm with replication temporarily
-    // disabled. The main reason for disabling replication and manually adding
-    // the transformed changesets to the history, is that the replication system
-    // (due to technical debt) is unable in some cases to produce a correct
-    // changeset while applying another one (i.e., it cannot carbon copy).
-
     TransactionRef transact = m_db->start_write(); // Throws
     VersionID old_version = transact->get_version_of_current_transaction();
     version_type local_version = old_version.version;
@@ -444,6 +438,11 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
             transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets,
                                                     &logger); // Throws
 
+            // Changesets are applied to the Realm with replication temporarily
+            // disabled. The main reason for disabling replication and manually adding
+            // the transformed changesets to the history, is that the replication system
+            // (due to technical debt) is unable in some cases to produce a correct
+            // changeset while applying another one (i.e., it cannot carbon copy).
             TempShortCircuitReplication tscr{m_replication};
             InstructionApplier applier{*transact};
             for (std::size_t i = 0; i < incoming_changesets.size(); ++i) {
@@ -471,6 +470,15 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     downloaded_bytes += downloaded_bytes_in_message;
     root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
 
+    // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
+    // synthetic server version that represents synthetic changesets generated from state on the server.
+    if (batch_state == DownloadBatchState::LastInBatch) {
+        update_sync_progress(progress, downloadable_bytes, transact); // Throws
+    }
+    if (run_in_write_tr) {
+        run_in_write_tr(transact);
+    }
+
     // The reason we can use the `origin_timestamp`, and the `origin_file_ident`
     // from the last incoming changeset, and ignore all the other changesets, is
     // that these values are actually irrelevant for changesets of remote origin
@@ -483,25 +491,13 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     entry.origin_file_ident = last_changeset.origin_file_ident;
     entry.remote_version = last_changeset.version;
     entry.changeset = BinaryData(transformed_changeset.data(), transformed_changeset.size());
+    add_sync_history_entry(entry); // Throws
 
-    // m_changeset_from_server is picked up by prepare_changeset(), which then
-    // calls add_sync_history_entry(). prepare_changeset() is called as a result
-    // of committing the current transaction even in the "short-circuited" mode,
-    // because replication isn't disabled.
-    REALM_ASSERT(!m_changeset_from_server);
-    m_changeset_from_server = &entry;
-
-    // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
-    // synthetic server version that represents synthetic changesets generated from state on the server.
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        update_sync_progress(progress, downloadable_bytes, transact); // Throws
-    }
-    if (run_in_write_tr) {
-        run_in_write_tr(transact);
-    }
-
+    // Tell prepare_commit()/add_changeset() not to write a history entry for
+    // this transaction as we already did it.
+    REALM_ASSERT(!m_applying_server_changeset);
+    m_applying_server_changeset = true;
     auto new_version = transact->commit_and_continue_as_read(); // Throws
-    REALM_ASSERT(!m_changeset_from_server);
 
     if (transact_reporter) {
         transact_reporter->report_sync_transact(old_version, new_version); // Throws
@@ -660,12 +656,17 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
         ct_changeset = BinaryData("", 0);
     m_arrays->ct_history.add(ct_changeset); // Throws
 
-    REALM_ASSERT(!m_changeset_from_server || !m_client_reset_changeset);
+    REALM_ASSERT(!m_applying_server_changeset || !m_client_reset_changeset);
 
-    if (m_changeset_from_server) {
+    // If we're applying a changeset from the server then we should have already
+    // added the history entry and don't need to do so here
+    if (m_applying_server_changeset) {
+        // We need to unset this before committing the write, as it's guarded
+        // by the write lock
+        m_applying_server_changeset = false;
+        REALM_ASSERT(m_ct_history_base_version + ct_history_size() ==
+                     m_sync_history_base_version + sync_history_size());
         REALM_ASSERT(sync_changeset.size() == 0);
-        add_sync_history_entry(*m_changeset_from_server); // Throws
-        m_changeset_from_server = nullptr;
         return m_ct_history_base_version + ct_history_size();
     }
 
