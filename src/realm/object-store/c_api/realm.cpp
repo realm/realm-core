@@ -167,26 +167,21 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
-RLM_API realm_async_transaction_token_t*
-realm_async_begin_transaction(realm_t* realm, realm_on_realm_async_begin_transaction_func_t callback,
-                              realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, bool* notify_only)
+RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
+                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                             bool notify_only)
 {
-    const auto notify_only_value = notify_only ? *notify_only : false;
     auto cb = [realm, callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(realm, userdata.get());
     };
     return wrap_err([&]() {
-        auto handle = (*realm)->async_begin_transaction(std::move(cb), notify_only_value);
-        return new realm_async_transaction_token_t{handle};
+        return (*realm)->async_begin_transaction(std::move(cb), notify_only);
     });
 }
 
-RLM_API realm_async_transaction_token_t*
-realm_async_commit_transaction(realm_t* realm, realm_on_realm_async_commit_transaction_funct_t callback,
-                               realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                               bool* allow_grouping)
+RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
+                                        realm_free_userdata_func_t userdata_free, bool allow_grouping)
 {
-    const auto allowing_grouping_value = allow_grouping ? *allow_grouping : false;
     auto cb = [realm, callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
         if (err) {
             try {
@@ -201,15 +196,14 @@ realm_async_commit_transaction(realm_t* realm, realm_on_realm_async_commit_trans
         }
     };
     return wrap_err([&]() {
-        auto handle = (*realm)->async_commit_transaction(std::move(cb), allowing_grouping_value);
-        return new realm_async_transaction_token_t{handle};
+        return (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
     });
 }
 
-RLM_API bool realm_async_cancel_transaction(realm_t* realm, realm_async_transaction_token_t* token, bool* cancelled)
+RLM_API bool realm_async_cancel(realm_t* realm, unsigned int token, bool* cancelled)
 {
     return wrap_err([&]() {
-        auto res = (*realm)->async_cancel_transaction(token->token());
+        auto res = (*realm)->async_cancel_transaction(token);
         if (cancelled)
             *cancelled = res;
         return true;

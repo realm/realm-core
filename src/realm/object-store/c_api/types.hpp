@@ -501,21 +501,6 @@ struct realm_refresh_callback_token : realm_callback_token {
     ~realm_refresh_callback_token() override;
 };
 
-struct realm_async_transaction_token : realm::c_api::WrapC {
-    realm_async_transaction_token(unsigned token)
-        : m_token(token)
-    {
-    }
-    ~realm_async_transaction_token() override = default;
-    unsigned token() const
-    {
-        return m_token;
-    }
-
-private:
-    unsigned m_token;
-};
-
 struct realm_query : realm::c_api::WrapC {
     realm::Query query;
     std::weak_ptr<realm::Realm> weak_realm;

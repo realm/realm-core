@@ -366,15 +366,14 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
-typedef struct realm_async_transaction_token realm_async_transaction_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
 typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
-typedef void (*realm_on_realm_async_begin_transaction_func_t)(realm_t*, realm_userdata_t userdata);
-typedef void (*realm_on_realm_async_commit_transaction_funct_t)(realm_t*, realm_userdata_t userdata, bool error,
+typedef void (*realm_async_begin_write_func_t)(realm_t*, realm_userdata_t userdata);
+typedef void (*realm_async_commit_func_t)(realm_t*, realm_userdata_t userdata, bool error,
                                                                 const char* desc);
 
 /**
@@ -1067,23 +1066,23 @@ RLM_API bool realm_rollback(realm_t*);
 /**
  * start a new write transaction asynchronously for the realm passed as argument.
  */
-RLM_API realm_async_transaction_token_t*
-realm_async_begin_transaction(realm_t* realm, realm_on_realm_async_begin_transaction_func_t,
-                              realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, bool* notify_only);
+RLM_API unsigned int
+realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t,
+                              realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, bool notify_only);
 
 /**
  * commit a transaction asynchronously for the realm passed as argument.
  */
-RLM_API realm_async_transaction_token_t*
-realm_async_commit_transaction(realm_t* realm, realm_on_realm_async_commit_transaction_funct_t,
+RLM_API unsigned int
+realm_async_commit(realm_t* realm, realm_async_commit_func_t,
                                realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                               bool* allow_grouping);
+                               bool allow_grouping);
 
 /**
  * Cancel the transaction referenced by the token passed as argument and set the optional boolean flag in order to
  * inform the caller if the transaction was cancelled.
  */
-RLM_API bool realm_async_cancel_transaction(realm_t* realm, realm_async_transaction_token_t* token, bool* cancelled);
+RLM_API bool realm_async_cancel(realm_t* realm, unsigned int token, bool* cancelled);
 
 /**
  * Add a callback that will be invoked every time the view of this file is updated.

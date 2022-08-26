@@ -1099,7 +1099,8 @@ TEST_CASE("C API", "[c_api]") {
             });
             REQUIRE(TestingObj::get().done);
         };
-        auto token_begin = cptr(realm_async_begin_transaction(
+
+        realm_async_begin_write(
             realm,
             [](realm_t* realm, void*) {
                 auto token_refresh = cptr(realm_add_realm_refresh_callback(
@@ -1109,14 +1110,14 @@ TEST_CASE("C API", "[c_api]") {
                     },
                     &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
 
-                auto token_commit = cptr(realm_async_commit_transaction(
+                realm_async_commit(
                     realm,
                     [](realm_t*, void*, bool, const char*) {
                         TestingObj::get().done = true;
                     },
-                    nullptr, nullptr, nullptr));
+                    nullptr, nullptr, false);
             },
-            nullptr, nullptr, nullptr));
+            nullptr, nullptr, false);
 
         wait_for_done();
         CHECK(TestingObj::get().realm_refresh_callback_called);
