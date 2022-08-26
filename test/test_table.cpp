@@ -5904,39 +5904,4 @@ TEST(Table_AsymmetricObjects)
     tr->commit();
 }
 
-TEST(Table_Assign)
-{
-    Timestamp now{std::chrono::system_clock::now()};
-    Group g;
-
-    auto test_table = g.add_table("test");
-    auto other_table = g.add_table("other");
-
-    auto col_test_int = test_table->add_column(type_Int, "int");
-    auto col_test_string = test_table->add_column(type_String, "string");
-    auto col_test_double = test_table->add_column(type_Double, "double");
-    auto col_test_mixed = test_table->add_column(type_Mixed, "any");
-    auto col_test_link = test_table->add_column(*other_table, "link");
-
-    auto col_other_int = other_table->add_column(type_Int, "other_int");
-
-    auto other_obj = other_table->create_object();
-    other_obj.set(col_other_int, 5);
-
-    auto test_obj1 = test_table->create_object();
-    test_obj1.set(col_test_int, 10);
-    test_obj1.set(col_test_string, "string");
-    test_obj1.set(col_test_double, 10.10);
-    test_obj1.set(col_test_mixed, Mixed("Hello"));
-    test_obj1.set(col_test_link, other_obj.get_key());
-    CHECK(other_obj.get_backlink_count() == 1);
-
-    auto test_obj2 = test_table->create_object();
-    test_obj2.assign(test_obj1);
-    CHECK(other_obj.get_backlink_count() == 2);
-    for (auto col : test_table->get_column_keys()) {
-        CHECK(test_obj2.get_any(col) == test_obj1.get_any(col));
-    }
-}
-
 #endif // TEST_TABLE

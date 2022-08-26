@@ -260,12 +260,6 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
-    // Assign the object passed as argument to the this object.
-    // This method performs a deep copy of all the properties of
-    // the other object passed.
-    // So this could potentially create a lot of user data duplication
-    // if not used correctly.
-    void assign(const Obj& other);
     // The main algorithm for handling schema migrations if we try to convert
     // from TopLevel* to Embedded, in this case all the orphan objects are deleted
     // and all the objects with multiple backlinks are cloned in order to avoid to

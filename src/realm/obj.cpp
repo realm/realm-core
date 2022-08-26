@@ -1934,59 +1934,6 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     return false;
 }
 
-void Obj::assign(const Obj& other)
-{
-    auto embedded_obj_tracker = std::make_shared<converters::EmbeddedObjectConverter>();
-    converters::InterRealmObjectConverter converter(this->get_table(), this->get_table(), embedded_obj_tracker);
-    converter.copy(other, *this, nullptr);
-    embedded_obj_tracker->process_pending();
-
-    auto copy_links = [this, &other](ColKey col) {
-        auto t = m_table->get_opposite_table(col);
-        auto c = m_table->get_opposite_column(col);
-        auto backlinks = other.get_all_backlinks(col);
-        for (auto bl : backlinks) {
-            auto linking_obj = t->get_object(bl);
-            if (c.get_type() == col_type_LinkList) {
-                auto linking_obj_list = linking_obj.get_linklist(c);
-                auto n = linking_obj_list.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                linking_obj_list.set(n, get_key());
-            }
-            else if (c.get_attrs().test(col_attr_List)) {
-                auto linking_obj_list = linking_obj.get_listbase_ptr(c);
-                auto pos = linking_obj_list->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
-                REALM_ASSERT(pos != realm::npos);
-                linking_obj_list->set_any(pos, ObjLink{m_table->get_key(), get_key()});
-            }
-            else if (c.get_attrs().test(col_attr_Set)) {
-                auto linking_obj_set = linking_obj.get_setbase_ptr(c);
-                auto pos = linking_obj_set->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
-                REALM_ASSERT(pos != realm::npos);
-                linking_obj_set->insert_any(ObjLink{m_table->get_key(), get_key()});
-            }
-            else if (c.get_attrs().test(col_attr_Dictionary)) {
-                auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(c);
-                auto pos = linking_obj_dictionary->find_any(ObjLink{other.get_table()->get_key(), other.get_key()});
-                REALM_ASSERT(pos != realm::npos);
-                Mixed key = linking_obj_dictionary->get_key(pos);
-                linking_obj_dictionary->insert(key, ObjLink{m_table->get_key(), get_key()});
-            }
-            else if (c.get_type() == col_type_Mixed && linking_obj.get_any(c).get_type() == type_TypedLink) {
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set_any(c, ObjLink{m_table->get_key(), get_key()});
-            }
-            else if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set(c, get_key());
-            }
-        }
-        return false;
-    };
-    m_table->for_each_backlink_column(copy_links);
-}
-
 void Obj::handle_multiple_backlinks_during_schema_migration()
 {
     REALM_ASSERT(!m_table->get_primary_key_column());
