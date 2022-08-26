@@ -355,13 +355,20 @@ void Schema::copy_keys_from(realm::Schema const& other) noexcept
         if (!existing || !other)
             return;
 
+        std::vector<Property> unmatched_properties;
         existing->table_key = other->table_key;
         for (auto& current_prop : other->persisted_properties) {
             auto target_prop = existing->property_for_name(current_prop.name);
             if (target_prop) {
                 target_prop->column_key = current_prop.column_key;
             }
+            else {
+                unmatched_properties.push_back(current_prop);
+            }
         }
+
+        existing->persisted_properties.insert(existing->computed_properties.end(), unmatched_properties.begin(),
+                                              unmatched_properties.end());
     });
 }
 
