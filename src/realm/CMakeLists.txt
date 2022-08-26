@@ -170,7 +170,6 @@ set(REALM_INSTALL_HEADERS
     null.hpp
     obj.hpp
     obj_list.hpp
-    object_converter.hpp
     object_id.hpp
     owned_data.hpp
     query.hpp
