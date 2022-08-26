@@ -131,24 +131,24 @@ jobWrapper {
         ]
 
         parallelExecutors = [
-            buildLinuxRelease       : doBuildLinux('Release'),
-            checkLinuxDebug         : doCheckInDocker(buildOptions),
-            checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
+            //buildLinuxRelease       : doBuildLinux('Release'),
+            //checkLinuxDebug         : doCheckInDocker(buildOptions),
+            //checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
+            //checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
+            //checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
+            //checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
+            //checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
-            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
-            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
-            buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
-            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
-            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
+            //buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+            //buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
+            //buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
+            //checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
+            //buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
+            //buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
+            //buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
+            //threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
+            //addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -641,7 +641,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             }
             if (runTests && !isUWP) {
                 def prefix = "Windows-${platform}-${buildType}";
-                def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
+                def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1', "UNITTEST_THREADS=1" ]
                 withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\core-results.xml", "UNITTEST_SUITE_NAME=${prefix}-core"]) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
