@@ -367,7 +367,7 @@ void Schema::copy_keys_from(realm::Schema const& other) noexcept
             }
         }
 
-        existing->persisted_properties.insert(existing->computed_properties.end(), unmatched_properties.begin(),
+        existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
                                               unmatched_properties.end());
     });
 }
