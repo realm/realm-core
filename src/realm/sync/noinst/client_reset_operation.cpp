@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
@@ -52,7 +52,8 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
     return path + fresh_suffix;
 }
 
-bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
+bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, sync::SubscriptionStore* sub_store,
+                                    util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {
     m_salted_file_ident = salted_file_ident;
     // only do the reset if there is data to reset
@@ -80,9 +81,9 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
             previous_state = m_db->start_frozen();
         }
         bool did_recover_out = false;
-        local_version_ids =
-            client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger, m_mode,
-                                                    m_recovery_is_allowed, &did_recover_out); // throws
+        local_version_ids = client_reset::perform_client_reset_diff(
+            m_db, m_db_fresh, m_salted_file_ident, m_logger, m_mode, m_recovery_is_allowed, &did_recover_out,
+            sub_store, std::move(on_flx_version_complete)); // throws
 
         if (m_notify_after) {
             m_notify_after(local_path, previous_state->get_version_of_current_transaction(), did_recover_out);

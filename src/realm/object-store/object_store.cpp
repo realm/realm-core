@@ -162,16 +162,20 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         return table;
 
     if (auto* pk_property = object_schema.primary_key_property()) {
-        auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+        auto table_type = object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric
+                              ? Table::Type::TopLevelAsymmetric
+                              : Table::Type::TopLevel;
         table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
                                                  is_nullable(pk_property->type), table_type);
     }
     else {
-        if (object_schema.is_embedded) {
+        if (object_schema.table_type == ObjectSchema::ObjectType::Embedded) {
             table = group.add_table(name, Table::Type::Embedded);
         }
         else {
-            auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+            auto table_type = object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric
+                                  ? Table::Type::TopLevelAsymmetric
+                                  : Table::Type::TopLevel;
             table = group.get_or_add_table(name, table_type);
         }
     }
@@ -276,10 +280,8 @@ struct SchemaDifferenceExplainer {
 
     void operator()(schema_change::ChangeTableType op)
     {
-        if (op.object->is_embedded)
-            errors.emplace_back("Class '%1' has been changed from top-level to embedded.", op.object->name);
-        else
-            errors.emplace_back("Class '%1' has been changed from embedded to top-level.", op.object->name);
+        errors.emplace_back("Class '%1' has been changed from %2 to %3.", op.object->name, *op.old_table_type,
+                            *op.new_table_type);
     }
 
     void operator()(schema_change::AddInitialProperties)
@@ -603,15 +605,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            if (op.object->is_embedded) {
-                table(op.object).set_table_type(Table::Type::Embedded);
-            }
-            else if (op.object->is_asymmetric) {
-                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
-            }
-            else {
-                table(op.object).set_table_type(Table::Type::TopLevel);
-            }
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(AddProperty op)
         {
@@ -768,23 +762,28 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 }
 
 enum class DidRereadSchema { Yes, No };
+enum class HandleBackLinksAutomatically { Yes, No };
 
 static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes,
-                                         Schema const& initial_schema, DidRereadSchema did_reread_schema)
+                                         Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                                         HandleBackLinksAutomatically handle_backlinks_automatically)
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema)
+        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                HandleBackLinksAutomatically handle_backlinks_automatically)
             : group{group}
             , initial_schema(initial_schema)
             , table(group)
             , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
+            , handle_backlinks_automatically(handle_backlinks_automatically == HandleBackLinksAutomatically::Yes)
         {
         }
         Group& group;
         Schema const& initial_schema;
         TableHelper table;
         bool did_reread_schema;
+        bool handle_backlinks_automatically;
 
         void operator()(RemoveProperty op)
         {
@@ -827,22 +826,52 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            if (op.object->is_embedded) {
-                table(op.object).set_table_type(Table::Type::Embedded);
-            }
-            else if (op.object->is_asymmetric) {
-                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
-            }
-            else {
-                table(op.object).set_table_type(Table::Type::TopLevel);
-            }
+            if (handle_backlinks_automatically)
+                post_migration_embedded_objects_backlinks_handling(op.object);
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
-    } applier{group, initial_schema, did_reread_schema};
+
+        void post_migration_embedded_objects_backlinks_handling(const ObjectSchema* object_schema)
+        {
+            // check if we are doing a migration from TopLevel Object to Embedded.
+            // check back link count.
+            //  1. if object is an orphan (no backlicks, then delete it if instructed to do so)
+            //  2. if object has multiple backlicks, then just clone N times the object (for each backlick) and assign
+            //  to each a different parent
+            // object_schema->handle_automatically_backlinks_for_embedded_object = true;
+
+            if (object_schema->table_type == ObjectSchema::ObjectType::Embedded) {
+                auto original_object_schema = initial_schema.find(object_schema->name);
+                if (original_object_schema != initial_schema.end() &&
+                    (original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel ||
+                     original_object_schema->table_type == ObjectSchema::ObjectType::TopLevelAsymmetric)) {
+                    auto table = table_for_object_schema(group, *original_object_schema);
+                    std::vector<Obj> objects_to_erase;
+                    std::vector<Obj> objects_to_fix_backlinks;
+                    for (auto& object : *table) {
+                        size_t backlink_count = object.get_backlink_count();
+                        if (backlink_count == 0)
+                            objects_to_erase.push_back(object);
+                        else if (backlink_count > 1)
+                            objects_to_fix_backlinks.push_back(object);
+                    }
+
+                    for (auto& object : objects_to_erase)
+                        object.remove();
+
+                    for (auto& object : objects_to_fix_backlinks) {
+                        object.handle_multiple_backlinks_during_schema_migration();
+                        object.remove();
+                    }
+                }
+            }
+        }
+    } applier{group, initial_schema, did_reread_schema, handle_backlinks_automatically};
 
     for (auto& change : changes) {
         change.visit(applier);
@@ -852,7 +881,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
-                                       std::vector<SchemaChange> const& changes,
+                                       std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
@@ -873,7 +902,9 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     }
 
     if (schema_version == ObjectStore::NotVersioned) {
-        create_initial_tables(group, changes);
+        if (mode != SchemaMode::ReadOnly) {
+            create_initial_tables(group, changes);
+        }
         set_schema_version(group, target_schema_version);
         set_schema_keys(group, target_schema);
         return;
@@ -900,17 +931,20 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 
     auto old_schema = schema_from_group(group);
     apply_pre_migration_changes(group, changes);
+    HandleBackLinksAutomatically handle_backlinks =
+        handle_automatically_backlinks ? HandleBackLinksAutomatically::Yes : HandleBackLinksAutomatically::No;
     if (migration_function) {
         set_schema_keys(group, target_schema);
         migration_function();
 
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
-        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes);
+        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes,
+                                     handle_backlinks);
         group.validate_primary_columns();
     }
     else {
-        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
+        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No, handle_backlinks);
     }
 
     set_schema_version(group, target_schema_version);

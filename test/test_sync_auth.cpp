@@ -21,7 +21,7 @@ TEST(Sync_Auth_JWTAccessToken)
     AccessToken tok;
     AccessToken::ParseError error = AccessToken::ParseError::none;
 
-    PKey pk1 = PKey::load_public("test_pubkey2.pem");
+    PKey pk1 = PKey::load_public(test_util::get_test_resource_path() + "test_pubkey2.pem");
     AccessControl ctrl(std::move(pk1));
 
     AccessToken::Verifier& verifier = ctrl.verifier();
@@ -51,7 +51,7 @@ TEST(Sync_Auth_JWTAccessTokenStitchFields)
     AccessToken tok;
     AccessToken::ParseError error = AccessToken::ParseError::none;
 
-    PKey pk1 = PKey::load_public("stitch_public.pem");
+    PKey pk1 = PKey::load_public(test_util::get_test_resource_path() + "stitch_public.pem");
     AccessControl ctrl(std::move(pk1));
 
     AccessToken::Verifier& verifier = ctrl.verifier();

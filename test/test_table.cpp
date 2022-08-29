@@ -31,7 +31,6 @@
 using namespace std::chrono;
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/base64.hpp>
@@ -99,9 +98,7 @@ namespace {
 // both non-nullable:
 template <typename T1, typename T2>
 struct value_copier {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     T2 operator()(T1 from_value, bool = false)
     {
         return from_value;
@@ -133,7 +130,7 @@ struct value_copier<Optional<T1>, T2> {
     T2 operator()(Optional<T1> from_value, bool)
     {
         if (bool(from_value))
-            return from_value.value();
+            return *from_value;
         else {
             if (m_throw_on_null)
                 throw realm::LogicError(realm::LogicError::column_not_nullable);
@@ -146,9 +143,7 @@ struct value_copier<Optional<T1>, T2> {
 // identical to non-specialized case, but specialization needed to avoid capture by 2 previous decls
 template <typename T1, typename T2>
 struct value_copier<Optional<T1>, Optional<T2>> {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     Optional<T2> operator()(Optional<T1> from_value, bool)
     {
         return from_value;
@@ -241,7 +236,7 @@ struct value_copier<Timestamp, Timestamp> {
         return from_value;
     }
 };
-}
+} // namespace
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -432,9 +427,9 @@ TEST(Table_DateTimeMinMax)
 
     auto col = table->add_column(type_Timestamp, "time", true);
 
-    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
-    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
-    // permutations in total.
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best
+    // candidate", then non-null first. For each case we then try both a substitution of best candidate, then
+    // non-substitution. 4 permutations in total.
 
     std::vector<Obj> objs(3);
     objs[0] = table->create_object();
@@ -518,8 +513,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->maximum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().maximum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->maximum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().maximum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -550,8 +545,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->minimum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().minimum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->minimum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().minimum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -650,8 +645,7 @@ TEST(TableView_AggregateBugs)
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
-    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
-    {
+    for (int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++) {
         Group g;
         TableRef table = g.add_table("test_table");
 
@@ -830,7 +824,6 @@ TEST(Table_AggregateFuzz)
 
             i = table->where().find_all().sum_int(int_col);
             CHECK_EQUAL(i, sum);
-
         }
 
         // Test methods on Query
@@ -2272,8 +2265,8 @@ TEST(Table_NullableChecks)
 
     Obj obj = t.create_object();
     StringData sd; // construct a null reference
-    Timestamp ts; // null
-    BinaryData bd;; // null
+    Timestamp ts;  // null
+    BinaryData bd; // null
     obj.set(str_col, sd);
     obj.set(int_col, realm::null());
     obj.set(bool_col, realm::null());
@@ -3000,7 +2993,6 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal>, P
     ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
-    Obj obj1 = obj;
     Lst<type> list = obj.get_list<type>(col);
     list.add(gen.convert_for_test<underlying_type>(1));
     list.add(gen.convert_for_test<underlying_type>(2));
@@ -3497,7 +3489,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(i));
+                table->get_object(ObjKey(i));
             }
         }
 
@@ -3597,7 +3589,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
     size_t rows = 1'000'000;
-    int runs = 100;     // runs for building scenario
+    int runs = 100; // runs for building scenario
 #else
     size_t rows = 100'000;
     int runs = 100;
@@ -3658,7 +3650,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(key_values[i]));
+                table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3780,7 +3772,7 @@ NONCONCURRENT_TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(key_values[i]));
+                table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -4532,7 +4524,7 @@ struct Tester {
 
 template <class T, bool nullable>
 ColKey Tester<T, nullable>::col;
-}
+} // namespace
 
 // The run() method will first add lots of objects, and then remove them. This will test
 // both node splits and empty leaf destruction and get good search index code coverage
@@ -4613,10 +4605,26 @@ std::string generate_value()
     return str;
 }
 
-template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
-template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
-template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
-template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+template <>
+bool generate_value()
+{
+    return test_util::random_int<int>() & 0x1;
+}
+template <>
+float generate_value()
+{
+    return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)));
+}
+template <>
+double generate_value()
+{
+    return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000));
+}
+template <>
+Timestamp generate_value()
+{
+    return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000));
+}
 template <>
 Decimal128 generate_value()
 {
@@ -5035,19 +5043,19 @@ void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type
     // insert elements 0 - 999
     for (int j = 0; j < 1000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     // insert elements 10000 - 10999
     for (int j = 10000; j < 11000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     // insert in between previous groups
     for (int j = 4000; j < 7000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     check_table_values(test_context, table, col, reference);
@@ -5058,8 +5066,7 @@ void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type
         if (it == reference.end()) // skip over holes in the key range
             continue;
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->get_object(ObjKey(j));
-        o.set<T>(col, value.value);
+        table->get_object(ObjKey(j)).set<T>(col, value.value);
         it->second = value;
     }
     check_table_values(test_context, table, col, reference);
@@ -5121,8 +5128,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
     value_copier<TFrom, TTo> copier(false);
     for (int j = 0; j < 10; ++j) {
         managed<TFrom> value = generator<TFrom>::get(from_nullable);
-        Obj o =
-            table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
+        table->create_object(ObjKey(j)).set_all(value.value);
         TTo conv_value = copier(
             value.value, to_nullable); // one may argue that using the same converter for ref and dut is.. mmmh...
         reference[j] = managed<TTo>{conv_value};
@@ -5286,7 +5292,8 @@ TEST(Table_ChangePKNullability)
     table->set_nullability(pk_col, false, true);
 }
 
-TEST(Table_MultipleObjs) {
+TEST(Table_MultipleObjs)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -5454,7 +5461,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
     Obj o3 = parent_ll.create_and_insert_linked_object(1);
-    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    parent_ll.create_and_insert_linked_object(0);
     auto o2_ll = o2.get_linklist(col_recurse);
     auto o3_ll = o3.get_linklist(col_recurse);
     o2_ll.create_and_insert_linked_object(0);
@@ -5502,7 +5509,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
 
     Obj o3 = parent_dict.create_and_insert_linked_object("two");
-    Obj o4 = parent_dict.create_and_insert_linked_object("three");
+    parent_dict.create_and_insert_linked_object("three");
 
     CHECK_EQUAL(parent_dict.get_object("one").get_key(), o2.get_key());
 

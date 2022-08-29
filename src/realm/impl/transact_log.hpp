@@ -718,8 +718,10 @@ inline bool TransactLogEncoder::set_clear(size_t set_size)
 
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
-    REALM_ASSERT(from_link_ndx != to_link_ndx);
-    append_simple_instr(instr_ListMove, from_link_ndx, to_link_ndx); // Throws
+    // This test is to prevent some fuzzy testing on the server to crash
+    if (from_link_ndx != to_link_ndx) {
+        append_simple_instr(instr_ListMove, from_link_ndx, to_link_ndx); // Throws
+    }
     return true;
 }
 

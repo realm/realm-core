@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "12.1.0"
+let versionStr = "12.5.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -80,6 +80,7 @@ let notSyncServerSources: [String] = [
     "realm/node.cpp",
     "realm/obj.cpp",
     "realm/obj_list.cpp",
+    "realm/object_converter.cpp",
     "realm/object_id.cpp",
     "realm/query.cpp",
     "realm/query_engine.cpp",
@@ -337,14 +338,25 @@ let bidExcludes: [String] = [
     "wcstod64.c",
 ]
 
+#if swift(>=5.7)
+let platforms: [SupportedPlatform] = [
+    .macOS(.v10_13),
+    .iOS(.v11),
+    .tvOS(.v11),
+    .watchOS(.v4)
+]
+#else
+let platforms: [SupportedPlatform] = [
+    .macOS(.v10_10),
+    .iOS(.v11),
+    .tvOS(.v9),
+    .watchOS(.v2)
+]
+#endif
+
 let package = Package(
     name: "RealmDatabase",
-    platforms: [
-        .macOS(.v10_10),
-        .iOS(.v11),
-        .tvOS(.v9),
-        .watchOS(.v2)
-    ],
+    platforms: platforms,
     products: [
         .library(
             name: "RealmCore",
@@ -372,7 +384,6 @@ let package = Package(
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
-                "dogless",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
@@ -404,13 +415,8 @@ let package = Package(
             path: "src/realm/parser",
             exclude: [
                 "CMakeLists.txt",
-                "driver.hpp",
-                "generated/query_bison.hpp",
-                "generated/query_flex.hpp",
-                "keypath_mapping.hpp",
                 "query_bison.yy",
                 "query_flex.ll",
-                "query_parser.hpp",
             ],
             publicHeadersPath: ".",
             cxxSettings: [
@@ -422,7 +428,6 @@ let package = Package(
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
-                "dogless",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
@@ -446,13 +451,7 @@ let package = Package(
             path: "src/realm/object-store/c_api",
             exclude: [
                 "CMakeLists.txt",
-                "conversion.hpp",
-                "error.hpp",
-                "realm.hpp",
-                "logging.hpp",
                 "realm.c",
-                "types.hpp",
-                "util.hpp",
             ],
             publicHeadersPath: ".",
             cxxSettings: (cxxSettings) as [CXXSetting]),
@@ -494,13 +493,6 @@ let package = Package(
             name: "ObjectStoreTestUtils",
             dependencies: ["RealmCore", "SyncServer", "Catch2", "CoreTestUtils"],
             path: "test/object-store/util",
-            exclude: [
-                "baas_admin_api.hpp",
-                "event_loop.hpp",
-                "index_helpers.hpp",
-                "test_file.hpp",
-                "test_utils.hpp",
-            ],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
@@ -508,28 +500,24 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
             name: "ObjectStoreTests",
-            dependencies: ["RealmCore", "RealmQueryParser", "ObjectStoreTestUtils"],
+            dependencies: ["RealmQueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "CMakeLists.txt",
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
-                "collection_fixtures.hpp",
                 "mongodb",
                 "notifications-fuzzer",
                 "query.json",
-                "sync-1.x.realm",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
-                "sync/flx_sync_harness.hpp",
-                "sync/session/session_util.hpp",
-                "sync/sync_test_utils.hpp",
                 "test_backup-olden-and-golden.realm",
                 "util",
             ],
             cxxSettings: ([
                 .headerSearchPath("."),
+                .headerSearchPath(".."),
                 .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(

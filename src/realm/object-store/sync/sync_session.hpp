@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_SESSION_HPP
 
 #include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/subscriptions.hpp>
@@ -219,14 +220,16 @@ public:
     std::shared_ptr<SyncUser> user() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
-        return m_config.user;
+        REALM_ASSERT(m_config.sync_config);
+        return m_config.sync_config->user;
     }
 
     // A copy of the configuration object describing the Realm this `SyncSession` represents.
     SyncConfig config() const REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
-        return m_config;
+        REALM_ASSERT(m_config.sync_config);
+        return *m_config.sync_config;
     }
 
     // If the `SyncSession` has been configured, the full remote URL of the Realm
@@ -311,17 +314,18 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
-                                               SyncManager* sync_manager)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<DB> db,
+                                               const RealmConfig& config, SyncManager* sync_manager)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
+            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                               SyncManager* sync_manager)
-                : SyncSession(client, std::move(db), std::move(config), sync_manager)
+                : SyncSession(client, std::move(db), config, sync_manager)
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config), std::move(sync_manager));
+        REALM_ASSERT(config.sync_config);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(db), config, std::move(sync_manager));
     }
     // }
 
@@ -330,12 +334,12 @@ private:
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&);
 
-    SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
+    SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
-    void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+    void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
     void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
-                                       util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+                                       sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
@@ -370,7 +374,7 @@ private:
     auto config(Field f) REQUIRES(!m_config_mutex)
     {
         util::CheckedLockGuard lock(m_config_mutex);
-        return m_config.*f;
+        return m_config.sync_config.get()->*f;
     }
 
     void assert_mutex_unlocked() ASSERT_CAPABILITY(!m_state_mutex) ASSERT_CAPABILITY(!m_config_mutex) {}
@@ -387,10 +391,11 @@ private:
     size_t m_death_count GUARDED_BY(m_state_mutex) = 0;
 
     mutable util::CheckedMutex m_config_mutex;
-    SyncConfig m_config GUARDED_BY(m_config_mutex);
+    RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
-    util::Optional<SyncError::ClientResetModeAllowed> m_force_client_reset GUARDED_BY(m_state_mutex) = util::none;
+    sync::ProtocolErrorInfo::Action
+        m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;

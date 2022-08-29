@@ -35,8 +35,12 @@
 #include <Windows.h>
 #endif
 
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/flx_sync_harness.hpp"
+#endif // REALM_ENABLE_AUTH_TESTS
+
 using namespace realm;
-using IsEmbedded = ObjectSchema::IsEmbedded;
+using ObjectType = ObjectSchema::ObjectType;
 using util::any_cast;
 
 #define VERIFY_SCHEMA(r, m) verify_schema((r), __LINE__, m)
@@ -172,9 +176,9 @@ Schema set_primary_key(Schema schema, StringData object_name, StringData new_pri
     return schema;
 }
 
-Schema set_embedded(Schema schema, StringData object_name, IsEmbedded embedded)
+Schema set_table_type(Schema schema, StringData object_name, ObjectType table_type)
 {
-    schema.find(object_name)->is_embedded = embedded;
+    schema.find(object_name)->table_type = table_type;
     return schema;
 }
 
@@ -208,10 +212,10 @@ TEST_CASE("migration: Automatic") {
             Schema schema1 = {};
             Schema schema2 = add_table(
                 schema1, {"object1", {{"link", PropertyType::Object | PropertyType::Nullable, "embedded1"}}});
-            schema2 = add_table(schema2, {"embedded1", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            schema2 = add_table(schema2, {"embedded1", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             Schema schema3 =
                 add_table(schema2, {"object2", {{"link", PropertyType::Object | PropertyType::Array, "embedded2"}}});
-            schema3 = add_table(schema3, {"embedded2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+            schema3 = add_table(schema3, {"embedded2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
@@ -429,7 +433,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto schema2 = add_table(
                 add_property(schema1, "object", {"link", PropertyType::Object | PropertyType::Nullable, "object2"}),
-                {"object2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
+                {"object2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
         }
@@ -440,12 +444,12 @@ TEST_CASE("migration: Automatic") {
             Schema schema = {
                 {"top", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
                 {"object",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
             };
-            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", false));
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_table_type(schema, "object", ObjectType::TopLevel));
         }
 
         SECTION("change table from top-level to embedded without version bump") {
@@ -458,7 +462,7 @@ TEST_CASE("migration: Automatic") {
                      {"value", PropertyType::Int},
                  }},
             };
-            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", true));
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, set_table_type(schema, "object", ObjectType::Embedded));
         }
     }
 
@@ -593,7 +597,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_THROWS(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - no migration block") {
@@ -608,7 +613,7 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - table has no backlinks") {
@@ -623,7 +628,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, [](auto, auto, auto&) {}));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded), 2,
+                                                [](auto, auto, auto&) {}));
         }
 
         SECTION("change table to embedded - multiple incoming link per object") {
@@ -652,7 +658,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_THROWS(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
         }
 
         SECTION("change table to embedded - adding more links in migration block") {
@@ -679,14 +686,14 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(
-                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
+            REQUIRE_THROWS(realm->update_schema(
+                set_table_type(schema, "child_table", ObjectType::Embedded), 2, [](auto, auto new_realm, auto&) {
                     Object child_object(new_realm, "child_table", 0);
                     auto parent_table = ObjectStore::table_for_object_type(new_realm->read_group(), "parent_table");
                     Obj parent_obj = parent_table->create_object();
                     Object parent_object(new_realm, parent_obj);
                     CppContext context(new_realm);
-                    parent_object.set_property_value(context, "child_property", util::Any(child_object));
+                    parent_object.set_property_value(context, "child_property", std::any(child_object));
                 }));
         }
     }
@@ -829,7 +836,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(child_table->is_embedded());
@@ -838,7 +846,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("change empty table from embedded to top-level") {
             Schema schema = {
                 {"child_table",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -852,7 +860,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::TopLevel), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE_FALSE(child_table->is_embedded());
@@ -861,7 +870,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("re-apply embedded flag to table") {
             Schema schema = {
                 {"child_table",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -875,7 +884,8 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(child_table->is_embedded());
@@ -910,7 +920,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 2);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(parent_table->size() == 2);
@@ -920,8 +931,8 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<std::any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<std::any>(context, "value"));
                 REQUIRE(value == 42 + i);
             }
         }
@@ -940,7 +951,7 @@ TEST_CASE("migration: Automatic") {
             };
             Schema schema2 = {
                 {"child_table",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -978,8 +989,8 @@ TEST_CASE("migration: Automatic") {
             for (int i = 0; i < 2; i++) {
                 Object parent_object(realm, "parent_table", i);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<std::any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<std::any>(context, "value"));
                 REQUIRE(value == 42 + i);
             }
         }
@@ -1010,20 +1021,20 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(
-                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
+            REQUIRE_NOTHROW(realm->update_schema(
+                set_table_type(schema, "child_table", ObjectType::Embedded), 2, [](auto, auto new_realm, auto&) {
                     Object parent_object1(new_realm, "parent_table", 0);
                     CppContext context(new_realm);
-                    Object child_object1 =
-                        any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
-                    Int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
+                    Object child_object1 = util::any_cast<Object>(
+                        parent_object1.get_property_value<std::any>(context, "child_property"));
+                    Int value = util::any_cast<Int>(child_object1.get_property_value<std::any>(context, "value"));
 
                     auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
                     Obj child_object2 = child_table->create_object();
                     child_object2.set("value", value);
 
                     Object parent_object2(new_realm, "parent_table", 1);
-                    parent_object2.set_property_value(context, "child_property", util::Any(child_object2));
+                    parent_object2.set_property_value(context, "child_property", std::any(child_object2));
                 }));
 
             REQUIRE(realm->schema_version() == 2);
@@ -1034,9 +1045,585 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<std::any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<std::any>(context, "value"));
                 REQUIRE(value == 42);
+            }
+        }
+        SECTION(
+            "change table from top-level to embedded, delete objects with 0 incoming links, resolved automatically") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {"child_table",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            realm->begin_transaction();
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            realm->commit_transaction();
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(parent_table->size() == 0);
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE(child_table->size() == 0);
+            REQUIRE(parent_table->size() == 0);
+        }
+        SECTION("change table from top-level to embedded, migration allowed, embedded object with 1 incoming link. "
+                "Resolve automatic "
+                "should not be triggered") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {"child_table",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            realm->begin_transaction();
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            auto child_object_key = child_object.get_key();
+            parent_table->create_object().set_all(child_object_key);
+            realm->commit_transaction();
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(parent_table->size() == 1);
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(parent_table->size() == 1);
+        }
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy array of mixed "
+                "verification") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {
+                        {"mixed_array", PropertyType::Mixed | PropertyType::Array | PropertyType::Nullable},
+                    },
+                },
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            ColKey col_mixed_array = child_table->get_column_key("mixed_array");
+            auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
+            Obj target_object = target_table->create_object();
+            target_object.set("value", 10);
+            List list(realm, child_object, col_mixed_array);
+            list.insert(0, Mixed{10});
+            list.insert(1, Mixed{10.10});
+            list.insert(2, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
+            list.insert(3, Mixed{ObjLink{target_table->get_key(), target_object.get_key()}});
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto o1 = parent_table->create_object();
+            auto o2 = parent_table->create_object();
+            o1.set_all(child_object_key);
+            o2.set_all(child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                auto mixed_array =
+                    util::any_cast<List>(child_object.get_property_value<util::Any>(context, "mixed_array"));
+                REQUIRE(mixed_array.size() == 4);
+                REQUIRE(mixed_array.get_any(0).get<Int>() == 10);
+                REQUIRE(mixed_array.get_any(1).get<Double>() == 10.10);
+                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_table_key() ==
+                        target_object.get_table()->get_key());
+                REQUIRE(mixed_array.get_any(2).get<ObjLink>().get_obj_key() == target_object.get_key());
+                REQUIRE(mixed_array.get_any(3).get<ObjKey>() == target_object.get_key());
+            }
+        }
+        SECTION("change table to embedded - multiple incoming links - resolved automatically + copy set, dictionary, "
+                "any array "
+                "verification") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {
+                        {"value", PropertyType::Int},
+                        {"value_dict", PropertyType::Dictionary | PropertyType::Int},
+                        {"links_dict", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                         "target"},
+                        {"value_set", PropertyType::Set | PropertyType::Int},
+                        {"links_set", PropertyType::Set | PropertyType::Object, "target"},
+                    },
+                },
+                {"parent_table",
+                 {{"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                  {"mixed_links", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            ColKey col_dict_value = child_table->get_column_key("value_dict");
+            ColKey col_dict_links = child_table->get_column_key("links_dict");
+            ColKey col_set_value = child_table->get_column_key("value_set");
+            ColKey col_set_links = child_table->get_column_key("links_set");
+            object_store::Dictionary dict_vals(realm, child_object, col_dict_value);
+            dict_vals.insert("test", 10);
+            object_store::Set set_vals(realm, child_object, col_set_value);
+            set_vals.insert(10);
+            set_vals.insert(11);
+            set_vals.insert(9);
+
+            auto target_table = ObjectStore::table_for_object_type(realm->read_group(), "target");
+            Obj target_object = target_table->create_object();
+            target_object.set("value", 10);
+            object_store::Dictionary dict_links(realm, child_object, col_dict_links);
+            dict_links.insert("link", target_object.get_key());
+            object_store::Set set_links(realm, child_object, col_set_links);
+            set_links.insert(target_object.get_key());
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto o1 = parent_table->create_object();
+            auto o2 = parent_table->create_object();
+            ColKey col_mixed_links = parent_table->get_column_key("mixed_links");
+            object_store::Dictionary mixed_links_o1(realm, o1, col_mixed_links);
+            mixed_links_o1.insert("ref_mixed_link", ObjLink{target_table->get_key(), target_object.get_key()});
+            object_store::Dictionary mixed_links_o2(realm, o2, col_mixed_links);
+            mixed_links_o2.insert("ref_mixed_link", ObjLink{target_table->get_key(), target_object.get_key()});
+            o1.set_all(child_object_key);
+            o2.set_all(child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(dict_vals.size() == 1);
+            REQUIRE(dict_links.size() == 1);
+            REQUIRE(set_vals.size() == 3);
+            REQUIRE(set_links.size() == 1);
+            REQUIRE(mixed_links_o1.size() == 1);
+            REQUIRE(mixed_links_o2.size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(target_table->size() == 1);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(target_table->is_embedded());
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                REQUIRE(value == 42);
+                auto value_dictionary = util::any_cast<object_store::Dictionary>(
+                    child_object.get_property_value<util::Any>(context, "value_dict"));
+                REQUIRE(value_dictionary.size() == 1);
+                auto pair_val = value_dictionary.get_pair(0);
+                REQUIRE(pair_val.first == "test");
+                REQUIRE(pair_val.second == 10);
+                auto links_dictionary = util::any_cast<object_store::Dictionary>(
+                    child_object.get_property_value<util::Any>(context, "links_dict"));
+                REQUIRE(links_dictionary.size() == 1);
+                auto pair_link = links_dictionary.get_pair(0);
+                REQUIRE(pair_link.first == "link");
+                REQUIRE_FALSE(pair_link.second.is_unresolved_link());
+                REQUIRE(pair_link.second.get<ObjKey>() == target_object.get_key());
+
+                auto mixed_links = util::any_cast<object_store::Dictionary>(
+                    parent_object.get_property_value<util::Any>(context, "mixed_links"));
+                REQUIRE(mixed_links.size() == 1);
+                auto pair_mixed_link = mixed_links.get_pair(0);
+                REQUIRE(pair_mixed_link.first == "ref_mixed_link");
+                REQUIRE_FALSE(pair_mixed_link.second.is_unresolved_link());
+                REQUIRE(pair_mixed_link.second.get<ObjKey>() == target_object.get_key());
+
+
+                auto value_set = util::any_cast<object_store::Set>(
+                    child_object.get_property_value<util::Any>(context, "value_set"));
+                REQUIRE(value_set.size() == 3);
+                REQUIRE(value_set.get_any(0) == 9);
+                REQUIRE(value_set.get_any(1) == 10);
+                REQUIRE(value_set.get_any(2) == 11);
+                auto links_set = util::any_cast<object_store::Set>(
+                    child_object.get_property_value<util::Any>(context, "links_set"));
+                REQUIRE(links_set.size() == 1);
+                REQUIRE(links_set.get_any(0).get<ObjKey>() == target_object.get_key());
+            }
+        }
+        SECTION("change table to embedded - multiple links stored in a dictionary") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {{"value", PropertyType::Int}},
+                },
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                      "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto parent_object = parent_table->create_object();
+            ColKey col_links = parent_table->get_column_key("child_property");
+            auto child_object_key = child_object.get_key();
+            object_store::Dictionary dict_links(realm, parent_object, col_links);
+            dict_links.insert("ref", child_object_key);
+            dict_links.insert("ref1", child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
+
+            for (int i = 0; i < 1; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                object_store::Dictionary links_dictionary = util::any_cast<object_store::Dictionary>(
+                    parent_object.get_property_value<util::Any>(context, "child_property"));
+                REQUIRE(links_dictionary.size() == dict_links.size());
+                for (size_t i = 0; i < 2; ++i) {
+                    const auto& [key, value] = links_dictionary.get_pair(i);
+                    const auto& [key1, value1] = dict_links.get_pair(i);
+                    REQUIRE(key == key1);
+                    REQUIRE(value == value1);
+                }
+            }
+        }
+        SECTION("change table to embedded - incoming links stored in a set") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {{"value", PropertyType::Int}},
+                },
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Set | PropertyType::Object, "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto parent_object = parent_table->create_object();
+            ColKey col_links = parent_table->get_column_key("child_property");
+            auto child_object_key = child_object.get_key();
+            object_store::Set set_links(realm, parent_object, col_links);
+            set_links.insert(child_object_key);
+            // this should not create a new ref (set does not allow dups)
+            set_links.insert(child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(set_links.size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                [](auto, auto, auto&) {}));
+        }
+        SECTION("change table to embedded - multiple links stored in linked list") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {
+                    "child_table",
+                    {{"value", PropertyType::Int}},
+                },
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Array, "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto parent_object = parent_table->create_object();
+            auto list = parent_object.get_linklist("child_property");
+            list.insert(0, child_object_key);
+            list.insert(1, child_object_key);
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(list.size() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
+            auto linklist = parent_object.get_linklist("child_property");
+            REQUIRE(linklist.size() == 2);
+            for (size_t i = 1; i < linklist.size(); ++i) {
+                REQUIRE(linklist.get(i - 1) != linklist.get(i));
+            }
+        }
+        SECTION("change table to embedded - convert the whole list of linking embedded objects") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+            Schema schema = {
+                {"child_table",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+                {"origin_table",
+                 {
+                     {"parent_property", PropertyType::Object | PropertyType::Nullable, "parent_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            Obj child_object = child_table->create_object();
+            child_object.set("value", 42);
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto child_object_key = child_object.get_key();
+            auto p1 = parent_table->create_object();
+            auto p2 = parent_table->create_object();
+            p1.set_all(child_object_key);
+            p2.set_all(child_object_key);
+            auto origin_table = ObjectStore::table_for_object_type(realm->read_group(), "origin_table");
+            origin_table->create_object().set_all(p1.get_key());
+            origin_table->create_object().set_all(p2.get_key());
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 2);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "parent_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
+            REQUIRE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "child_table", ObjectType::Embedded), 3,
+                                                 [](auto, auto, auto&) {}));
+
+            REQUIRE(realm->schema_version() == 3);
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(origin_table->size() == 2);
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            std::vector<ObjKey> obj_children;
+            for (auto& child_obj : *child_table) {
+                obj_children.push_back(child_obj.get_key());
+            }
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                Object child_object =
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                REQUIRE(child_object.obj().get_key() == obj_children[i]);
+            }
+        }
+        SECTION("change table to embedded - violate embedded object constraints") {
+            InMemoryTestFile config;
+            config.automatic_handle_backlicks_in_migrations = true;
+
+            Schema schema = {
+                {"child_embedded_table",
+                 ObjectType::Embedded,
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable | PropertyType::Dictionary,
+                      "child_embedded_table"},
+                 }},
+                {"origin_table",
+                 {
+                     {"parent_property", PropertyType::Object | PropertyType::Nullable, "parent_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            realm->begin_transaction();
+
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_embedded_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            Obj parent_object = parent_table->create_object();
+            ColKey col_link = parent_table->get_column_key("child_property");
+            object_store::Dictionary dict_link(realm, parent_object, col_link);
+            auto child_obj = dict_link.insert_embedded("Ref");
+            child_obj.set("value", 42);
+
+            auto origin_table = ObjectStore::table_for_object_type(realm->read_group(), "origin_table");
+            origin_table->create_object().set_all(parent_object.get_key());
+            origin_table->create_object().set_all(parent_object.get_key());
+            realm->commit_transaction();
+            REQUIRE(parent_table->size() == 1);
+            REQUIRE(child_table->size() == 1);
+            REQUIRE(origin_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE_FALSE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+
+            for (auto& obj : *child_table) {
+                REQUIRE(obj.get_backlink_count() == 1);
+            }
+            for (auto& obj : *parent_table) {
+                REQUIRE(obj.get_backlink_count() == 2);
+            }
+            for (auto& obj : *origin_table) {
+                REQUIRE(obj.get_backlink_count() == 0);
+            }
+
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(schema, "parent_table", ObjectType::Embedded), 2,
+                                                 [](auto, auto, auto&) {}));
+            REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
+            REQUIRE(parent_table->is_embedded());
+            REQUIRE_FALSE(origin_table->is_embedded());
+            REQUIRE(parent_table->size() == 2);
+            REQUIRE(child_table->size() == 2);
+            REQUIRE(origin_table->size() == 2);
+
+            for (int i = 0; i < 2; i++) {
+                Object parent_object(realm, "parent_table", i);
+                CppContext context(realm);
+                object_store::Dictionary dictionary_to_embedded_object = util::any_cast<object_store::Dictionary>(
+                    parent_object.get_property_value<util::Any>(context, "child_property"));
+                auto child = dictionary_to_embedded_object.get_any("Ref");
+                ObjLink link = child.get_link();
+                Object child_value(realm, link);
+                REQUIRE(child_value.get_column_value<Int>("value") == 42);
             }
         }
     }
@@ -1094,16 +1681,16 @@ TEST_CASE("migration: Automatic") {
             VERIFY_SCHEMA_IN_MIGRATION(add_table(
                 add_property(schema, "object", {"link", PropertyType::Object | PropertyType::Nullable, "new table"}),
                 {"new table",
-                 IsEmbedded{true},
+                 ObjectType::Embedded,
                  {
                      {"value", PropertyType::Int},
                  }}));
         }
         SECTION("change table type") {
             VERIFY_SCHEMA_IN_MIGRATION(
-                set_embedded(add_property(schema, "object",
-                                          {"link", PropertyType::Object | PropertyType::Nullable, "no pk object"}),
-                             "no pk object", true));
+                set_table_type(add_property(schema, "object",
+                                            {"link", PropertyType::Object | PropertyType::Nullable, "no pk object"}),
+                               "no pk object", ObjectType::Embedded));
         }
         SECTION("add property to table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}));
@@ -1179,7 +1766,7 @@ TEST_CASE("migration: Automatic") {
         auto realm = Realm::get_shared_realm(config);
 
         CppContext ctx(realm);
-        util::Any values = AnyDict{
+        std::any values = AnyDict{
             {"UId", "ID_001"s},
             {"EmployeeId", "XHGR"s},
             {"Name", "John Doe"s},
@@ -1195,7 +1782,7 @@ TEST_CASE("migration: Automatic") {
 
             CppContext ctx1(old_realm);
             CppContext ctx2(new_realm);
-            auto val = old_obj.get_property_value<util::Any>(ctx1, "EmployeeId");
+            auto val = old_obj.get_property_value<std::any>(ctx1, "EmployeeId");
             new_obj.set_property_value(ctx2, "EmployeeId", val);
         });
     }
@@ -1248,7 +1835,7 @@ TEST_CASE("migration: Automatic") {
         auto realm = Realm::get_shared_realm(config);
 
         CppContext ctx(realm);
-        util::Any values = AnyDict{
+        std::any values = AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
@@ -1275,46 +1862,47 @@ TEST_CASE("migration: Automatic") {
             };
             realm->update_schema(schema, 2, [](auto old_realm, auto new_realm, Schema&) {
                 CppContext ctx(old_realm);
-                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", util::Any(INT64_C(1)));
+                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
 
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<std::any>(ctx, "bool")) == true);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "int")) == 5);
+                REQUIRE(util::any_cast<float>(obj.get_property_value<std::any>(ctx, "float")) == 2.2f);
+                REQUIRE(util::any_cast<double>(obj.get_property_value<std::any>(ctx, "double")) == 3.3);
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "string")) == "hello");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "data")) == "olleh");
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<std::any>(ctx, "date")) ==
+                        Timestamp(10, 20));
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<std::any>(ctx, "object id")) ==
                         ObjectId("000000000000000000000001"));
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<std::any>(ctx, "decimal")) ==
                         Decimal128("123.45e6"));
 
-                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                auto link = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object"));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(ctx, "value")) == 10);
 
-                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
                 CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
-                link = any_cast<Object>(list.get(list_ctx, 0));
+                link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
 
                 CppContext ctx2(new_realm);
-                obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
+                obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "bool"));
+                REQUIRE_THROWS(obj.get_property_value<std::any>(ctx, "bool"));
             });
         }
 
         SECTION("cannot mutate old realm") {
             realm->update_schema(schema, 2, [](auto old_realm, auto, Schema&) {
                 CppContext ctx(old_realm);
-                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", util::Any(INT64_C(1)));
+                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS(obj.set_property_value(ctx, "bool", util::Any(false)));
+                REQUIRE_THROWS(obj.set_property_value(ctx, "bool", std::any(false)));
                 REQUIRE_THROWS(old_realm->begin_transaction());
             });
         }
@@ -1328,91 +1916,92 @@ TEST_CASE("migration: Automatic") {
             };
             realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
                 CppContext ctx(new_realm);
-                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
-                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "bool"));
-                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "object"));
-                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "array"));
+                REQUIRE_THROWS(obj.get_property_value<std::any>(ctx, "bool"));
+                REQUIRE_THROWS(obj.get_property_value<std::any>(ctx, "object"));
+                REQUIRE_THROWS(obj.get_property_value<std::any>(ctx, "array"));
             });
         }
 
         SECTION("read values from new object") {
             realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
                 CppContext ctx(new_realm);
-                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
 
 
-                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                auto link = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object"));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(ctx, "value")) == 10);
 
-                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
                 CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
-                link = any_cast<Object>(list.get(list_ctx, 0));
+                link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
             });
         }
 
         SECTION("read and write values in new object") {
             realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
                 CppContext ctx(new_realm);
-                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", std::any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
 
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
-                obj.set_property_value(ctx, "bool", util::Any(false));
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<std::any>(ctx, "bool")) == true);
+                obj.set_property_value(ctx, "bool", std::any(false));
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<std::any>(ctx, "bool")) == false);
 
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
-                obj.set_property_value(ctx, "int", util::Any(INT64_C(6)));
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 6);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "int")) == 5);
+                obj.set_property_value(ctx, "int", std::any(INT64_C(6)));
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "int")) == 6);
 
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
-                obj.set_property_value(ctx, "float", util::Any(1.23f));
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 1.23f);
+                REQUIRE(util::any_cast<float>(obj.get_property_value<std::any>(ctx, "float")) == 2.2f);
+                obj.set_property_value(ctx, "float", std::any(1.23f));
+                REQUIRE(util::any_cast<float>(obj.get_property_value<std::any>(ctx, "float")) == 1.23f);
 
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
-                obj.set_property_value(ctx, "double", util::Any(1.23));
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 1.23);
+                REQUIRE(util::any_cast<double>(obj.get_property_value<std::any>(ctx, "double")) == 3.3);
+                obj.set_property_value(ctx, "double", std::any(1.23));
+                REQUIRE(util::any_cast<double>(obj.get_property_value<std::any>(ctx, "double")) == 1.23);
 
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
-                obj.set_property_value(ctx, "string", util::Any("abc"s));
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "abc");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "string")) == "hello");
+                obj.set_property_value(ctx, "string", std::any("abc"s));
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "string")) == "abc");
 
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
-                obj.set_property_value(ctx, "data", util::Any("abc"s));
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "abc");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "data")) == "olleh");
+                obj.set_property_value(ctx, "data", std::any("abc"s));
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<std::any>(ctx, "data")) == "abc");
 
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
-                obj.set_property_value(ctx, "date", util::Any(Timestamp(1, 2)));
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(1, 2));
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<std::any>(ctx, "date")) ==
+                        Timestamp(10, 20));
+                obj.set_property_value(ctx, "date", std::any(Timestamp(1, 2)));
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<std::any>(ctx, "date")) == Timestamp(1, 2));
 
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<std::any>(ctx, "object id")) ==
                         ObjectId("000000000000000000000001"));
                 ObjectId generated = ObjectId::gen();
-                obj.set_property_value(ctx, "object id", util::Any(generated));
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == generated);
+                obj.set_property_value(ctx, "object id", std::any(generated));
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<std::any>(ctx, "object id")) == generated);
 
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<std::any>(ctx, "decimal")) ==
                         Decimal128("123.45e6"));
-                obj.set_property_value(ctx, "decimal", util::Any(Decimal128("77.88E-99")));
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                obj.set_property_value(ctx, "decimal", std::any(Decimal128("77.88E-99")));
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<std::any>(ctx, "decimal")) ==
                         Decimal128("77.88E-99"));
 
                 Object linked_obj(new_realm, "link target", 0);
                 Object new_obj(new_realm, get_table(new_realm, "link target")->create_object());
 
-                auto linking = any_cast<Results>(linked_obj.get_property_value<util::Any>(ctx, "origin"));
+                auto linking = util::any_cast<Results>(linked_obj.get_property_value<std::any>(ctx, "origin"));
                 REQUIRE(linking.size() == 1);
 
-                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
                         linked_obj.obj().get_key());
-                obj.set_property_value(ctx, "object", util::Any(new_obj));
-                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
+                obj.set_property_value(ctx, "object", std::any(new_obj));
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
                         new_obj.obj().get_key());
 
                 REQUIRE(linking.size() == 0);
@@ -1424,13 +2013,13 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(new_realm->is_in_transaction());
 
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
                 Object obj = Object::create(ctx, new_realm, "all types", values);
 
                 REQUIRE(get_table(new_realm, "all types")->size() == 2);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk")) == 2);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "pk")) == 2);
             });
         }
 
@@ -1438,12 +2027,12 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
                 REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["bool"] = false;
+                util::any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
                 REQUIRE(get_table(new_realm, "all types")->size() == 1);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<std::any>(ctx, "bool")) == false);
             });
         }
 
@@ -1452,12 +2041,12 @@ TEST_CASE("migration: Automatic") {
                 get_table(new_realm, "all types")->set_primary_key_column(ColKey());
                 REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["bool"] = false;
+                util::any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
                 REQUIRE(get_table(new_realm, "all types")->size() == 1);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<std::any>(ctx, "bool")) == false);
             });
         }
 
@@ -1467,7 +2056,7 @@ TEST_CASE("migration: Automatic") {
                 Object obj(new_realm, "all types", 0);
 
                 CppContext ctx(new_realm);
-                obj.set_property_value(ctx, "pk", util::Any("1"s));
+                obj.set_property_value(ctx, "pk", std::any("1"s));
             });
         }
 
@@ -1483,7 +2072,7 @@ TEST_CASE("migration: Automatic") {
                 // Change the old object's PK to elminate the duplication
                 Object old_obj(new_realm, "all types", 0);
                 CppContext ctx(new_realm);
-                old_obj.set_property_value(ctx, "pk", util::Any(INT64_C(5)));
+                old_obj.set_property_value(ctx, "pk", std::any(INT64_C(5)));
 
                 REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values));
             };
@@ -1498,8 +2087,8 @@ TEST_CASE("migration: Automatic") {
             auto object_schema = realm->schema().find("all types");
             realm->begin_transaction();
             for (int i = 1; i < 10; ++i) {
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
-                any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
+                util::any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
                 Object::create(ctx, realm, *object_schema, values);
             }
             realm->commit_transaction();
@@ -1510,15 +2099,15 @@ TEST_CASE("migration: Automatic") {
                 Results results(new_realm, get_table(new_realm, "all types"));
                 for (size_t i = 0, count = results.size(); i < count; ++i) {
                     Object obj(new_realm, results.get<Obj>(i));
-                    util::Any v = 1 + any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk"));
+                    std::any v = 1 + util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "pk"));
                     obj.set_property_value(ctx, "pk", v);
                 }
             });
 
             // Create a new object with the no-longer-used pk of 1
             realm->begin_transaction();
-            any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
-            any_cast<AnyDict&>(values)["int"] = INT64_C(4);
+            util::any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
+            util::any_cast<AnyDict&>(values)["int"] = INT64_C(4);
             object_schema = realm->schema().find("all types");
             Object::create(ctx, realm, *object_schema, values);
             realm->commit_transaction();
@@ -1540,7 +2129,7 @@ TEST_CASE("migration: Automatic") {
             auto object_schema = realm->schema().find("string pk");
             realm->begin_transaction();
             for (int64_t i = 0; i < 10; ++i) {
-                util::Any values = AnyDict{
+                std::any values = AnyDict{
                     {"pk", util::to_string(i)},
                     {"value", i + 1},
                 };
@@ -1554,14 +2143,15 @@ TEST_CASE("migration: Automatic") {
                 Results results(new_realm, get_table(new_realm, "string pk"));
                 for (size_t i = 0, count = results.size(); i < count; ++i) {
                     Object obj(new_realm, results.get<Obj>(i));
-                    util::Any v = util::to_string(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "value")));
+                    std::any v =
+                        util::to_string(util::any_cast<int64_t>(obj.get_property_value<std::any>(ctx, "value")));
                     obj.set_property_value(ctx, "pk", v);
                 }
             });
 
             // Create a new object with the no-longer-used pk of 0
             realm->begin_transaction();
-            util::Any values = AnyDict{
+            std::any values = AnyDict{
                 {"pk", "0"s},
                 {"value", INT64_C(0)},
             };
@@ -1592,8 +2182,8 @@ TEST_CASE("migration: Automatic") {
                 CppContext ctx(new_realm);
                 for (int64_t i = 0; i < 10; ++i) {
                     auto obj = Object::create(ctx, new_realm, *new_realm->schema().find("int pk"),
-                                              util::Any(AnyDict{{"pk", INT64_C(0)}, {"value", i}}));
-                    obj.set_property_value(ctx, "pk", util::Any(i));
+                                              std::any(AnyDict{{"pk", INT64_C(0)}, {"value", i}}));
+                    obj.set_property_value(ctx, "pk", std::any(i));
                 }
             });
 
@@ -1621,8 +2211,8 @@ TEST_CASE("migration: Automatic") {
                 CppContext ctx(new_realm);
                 for (int64_t i = 0; i < 10; ++i) {
                     auto obj = Object::create(ctx, new_realm, *new_realm->schema().find("string pk"),
-                                              util::Any(AnyDict{{"pk", ""s}, {"value", i}}));
-                    obj.set_property_value(ctx, "pk", util::Any(util::to_string(i)));
+                                              std::any(AnyDict{{"pk", ""s}, {"value", i}}));
+                    obj.set_property_value(ctx, "pk", std::any(util::to_string(i)));
                 }
             });
 
@@ -1639,7 +2229,7 @@ TEST_CASE("migration: Automatic") {
             schema = set_primary_key(schema, "all types", "pk");
             REQUIRE_NOTHROW(realm->update_schema(schema, 3, [&](auto, auto new_realm, Schema&) {
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
                 Object::create(ctx, realm, "all types", values);
             }));
         }
@@ -1869,7 +2459,7 @@ TEST_CASE("migration: Automatic") {
                 ObjectStore::rename_property(realm->read_group(), schema, "object", "value", "new");
 
                 CppContext ctx(realm);
-                util::Any values = AnyDict{{"new", INT64_C(11)}};
+                std::any values = AnyDict{{"new", INT64_C(11)}};
                 Object::create(ctx, realm, "object", values);
             }));
             REQUIRE(realm->schema() == new_schema);
@@ -1989,7 +2579,7 @@ TEST_CASE("migration: Immutable") {
                      {"value", PropertyType::Int},
                  }},
             });
-            Schema schema = set_embedded(realm->schema(), "object", true);
+            Schema schema = set_table_type(realm->schema(), "object", ObjectType::Embedded);
             REQUIRE_NOTHROW(realm->update_schema(schema));
         }
     }
@@ -2134,7 +2724,7 @@ TEST_CASE("migration: ReadOnly") {
                  }},
             };
             auto realm = realm_with_schema(schema);
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(realm->schema(), "object", true)));
+            REQUIRE_NOTHROW(realm->update_schema(set_table_type(realm->schema(), "object", ObjectType::Embedded)));
         }
     }
 
@@ -2373,7 +2963,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
                 // in discovered mode, adding embedded orphan types is allowed but ignored
                 REQUIRE_NOTHROW(realm->update_schema(
                     add_table(schema, {"origin",
-                                       ObjectSchema::IsEmbedded{true},
+                                       ObjectType::Embedded,
                                        {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}})));
                 REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
                 REQUIRE(!ObjectStore::table_for_object_type(realm->read_group(), "origin"));
@@ -2382,13 +2972,13 @@ TEST_CASE("migration: AdditiveDiscovered") {
                 // explicitly included embedded orphan types is an error
                 REQUIRE_THROWS(realm->update_schema(
                     add_table(schema, {"origin",
-                                       ObjectSchema::IsEmbedded{true},
+                                       ObjectType::Embedded,
                                        {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}})));
             }
         }
 
         DYNAMIC_SECTION("cannot change existing table type" << mode_string) {
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true)));
+            REQUIRE_THROWS(realm->update_schema(set_table_type(schema, "object", ObjectType::Embedded)));
         }
 
         DYNAMIC_SECTION("indexes are updated when schema version is bumped" << mode_string) {
@@ -2766,3 +3356,111 @@ TEST_CASE("migration: Manual") {
         REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
     }
 }
+
+#if REALM_ENABLE_AUTH_TESTS
+
+TEST_CASE("migrations with asymmetric tables") {
+    realm::app::FLXSyncTestHarness harness("asymmetric_sync_migrations");
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.automatic_change_notifications = false;
+
+    SECTION("migration: Automatic") {
+        config.schema_mode = SchemaMode::Automatic;
+
+        SECTION("add asymmetric object schema") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"object",
+                                                 ObjectType::TopLevelAsymmetric,
+                                                 {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                  {"value", PropertyType::Int}}});
+            Schema schema3 =
+                add_table(schema2, {"object2",
+                                    ObjectType::TopLevelAsymmetric,
+                                    {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                     {"link", PropertyType::Object | PropertyType::Array, "embedded2"}}});
+            schema3 = add_table(schema3, {"embedded2", ObjectType::Embedded, {{"value", PropertyType::Int}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 1);
+        }
+
+        SECTION("cannot change table from top-level to top-level asymmetric without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "object", ObjectType::TopLevelAsymmetric), 1),
+                "Class 'object' has been changed from TopLevel to TopLevelAsymmetric.");
+        }
+
+        SECTION("cannot change table from top-level asymmetric to top-level without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 ObjectType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(realm->update_schema(set_table_type(schema, "object", ObjectType::TopLevel), 1),
+                                      "Class 'object' has been changed from TopLevelAsymmetric to TopLevel.");
+        }
+
+        SECTION("cannot change empty table from top-level to top-level asymmetric") {
+            Schema schema = {
+                {"table",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", ObjectType::TopLevelAsymmetric), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+        }
+
+        SECTION("cannot change empty table from top-level asymmetric to top-level") {
+            Schema schema = {
+                {"table",
+                 ObjectType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", ObjectType::TopLevel), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+        }
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS

@@ -21,7 +21,6 @@
 
 #include "test.hpp"
 
-
 using namespace realm;
 
 TEST(Decimal_Basics)
@@ -99,6 +98,35 @@ TEST(Decimal_Basics)
     Decimal128 d10(10);
     CHECK(d10 < d2);
     CHECK(d10 >= d);
+
+    Decimal128 decimal = Decimal128("+6422018348623853211009174311926606E-32");
+    decimal.unpack(bid, exp, sign);
+    CHECK_EQUAL(exp, -32);
+    Decimal128 decimal2(bid, exp, sign);
+    CHECK_EQUAL(decimal, decimal2);
+
+    decimal = Decimal128("9999999999999999999999999999999999E6111");
+    decimal.unpack(bid, exp, sign);
+    CHECK_EQUAL(exp, 6111);
+    Decimal128 decimal3(bid, exp, sign);
+    CHECK_EQUAL(decimal, decimal3);
+}
+
+TEST(Decimal_Int64_Conversions)
+{
+    auto check_roundtrip = [=](int64_t v) {
+        int64_t v2 = 0;
+        CHECK(Decimal128(v).to_int(v2));
+        CHECK_EQUAL(v, v2);
+    };
+
+    check_roundtrip(std::numeric_limits<int64_t>::lowest());
+    check_roundtrip(std::numeric_limits<int64_t>::lowest() + 1);
+    check_roundtrip(-1);
+    check_roundtrip(0);
+    check_roundtrip(1);
+    check_roundtrip(std::numeric_limits<int64_t>::max() - 1);
+    check_roundtrip(std::numeric_limits<int64_t>::max());
 }
 
 TEST(Decimal_Arithmetics)
@@ -301,7 +329,7 @@ TEST(Decimal_Distinct)
         auto table = wt->add_table("Foo");
         auto col_dec = table->add_column(type_Decimal, "price", true);
         for (int i = 1; i < 100; i++) {
-            auto obj = table->create_object().set(col_dec, Decimal128(i % 10));
+            table->create_object().set(col_dec, Decimal128(i % 10));
         }
 
         wt->commit();

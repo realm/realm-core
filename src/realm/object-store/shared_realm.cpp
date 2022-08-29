@@ -194,12 +194,22 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
-    return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
+    // If there is a subscription store, then return the latest set
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
+        return flx_sub_store->get_latest();
+    }
+    // Otherwise, throw runtime_error
+    throw std::runtime_error("Flexible sync is not enabled");
 }
 
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
-    return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
+    // If there is a subscription store, then return the active set
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
+        return flx_sub_store->get_active();
+    }
+    // Otherwise, throw runtime_error
+    throw std::runtime_error("Flexible sync is not enabled");
 }
 #endif
 
@@ -285,7 +295,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
-            return false;
+            return m_schema_version == ObjectStore::NotVersioned;
 
         case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
@@ -426,7 +436,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
@@ -449,11 +460,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
-                                          required_changes, wrapper);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations,
+                                          wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
@@ -599,6 +611,7 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
+    REALM_ASSERT(m_transaction);
     return m_transaction->get_version_of_current_transaction();
 }
 
@@ -627,6 +640,16 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
+    }
+    return ret;
+}
+
+// Get the version of the latest snapshot
+util::Optional<DB::version_type> Realm::latest_snapshot_version() const
+{
+    util::Optional<DB::version_type> ret;
+    if (m_transaction) {
+        ret = m_transaction->get_version_of_latest_snapshot();
     }
     return ret;
 }
@@ -962,6 +985,9 @@ void Realm::commit_transaction()
     }
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
+    if (auto audit = audit_context()) {
+        audit->prepare_for_write(prev_version);
+    }
 
     m_coordinator->commit_write(*this, /* commit_to_disk */ true);
     cache_new_schema();

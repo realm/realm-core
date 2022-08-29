@@ -179,7 +179,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("Result constructor - Empty") {
@@ -265,7 +265,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         ordering.append_sort(SortDescriptor({{value_col}}, {false}));
         TableView tv = q.find_all();
         Results query_results(realm, tv, ordering);
-        auto obj = query_results.get(0);
+        query_results.get(0);
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
@@ -351,9 +351,8 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
-        REQUIRE_THROWS(
-            frozen_primitive_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_THROWS(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {
@@ -417,14 +416,14 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {
         JoiningThread thread([&] {
             REQUIRE(frozen_obj.is_valid());
-            REQUIRE(any_cast<Int>(frozen_obj.get_property_value<util::Any>(ctx, "value")) == 100);
-            auto object_list = any_cast<List&&>(frozen_obj.get_property_value<util::Any>(ctx, "object_array"));
+            REQUIRE(util::any_cast<Int>(frozen_obj.get_property_value<std::any>(ctx, "value")) == 100);
+            auto object_list = util::any_cast<List&&>(frozen_obj.get_property_value<std::any>(ctx, "object_array"));
             REQUIRE(object_list.is_frozen());
             REQUIRE(object_list.is_valid());
             REQUIRE(object_list.get(0).get<Int>(linked_object_value_col) == 10);
@@ -492,8 +491,8 @@ TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
-        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}));
     }
 
     SECTION("read across threads") {

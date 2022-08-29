@@ -24,6 +24,10 @@
 #include <realm/util/logger.hpp>
 #include <realm/sync/protocol.hpp>
 
+namespace realm::sync {
+class SubscriptionStore;
+}
+
 namespace realm::_impl {
 
 // A ClientResetOperation object is used per client session to keep track of
@@ -39,7 +43,8 @@ public:
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
     // will be inserted in the Realm after download.
-    bool finalize(sync::SaltedFileIdent salted_file_ident); // throws
+    bool finalize(sync::SaltedFileIdent salted_file_ident, sync::SubscriptionStore*,
+                  util::UniqueFunction<void(int64_t)>); // throws
 
     static std::string get_fresh_path_for(const std::string& realm_path);
 

@@ -196,7 +196,9 @@ void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type vers
         if (!m_changesets) {
             using gf = _impl::GroupFriend;
             m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
-            gf::set_history_parent(*m_group, *m_changesets);
+            if (m_group) {
+                gf::set_history_parent(*m_group, *m_changesets);
+            }
         }
         m_changesets->init_from_ref(ref);
         m_size = m_changesets->size();

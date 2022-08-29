@@ -22,10 +22,10 @@
 #include <string>
 #include <vector>
 
+#include <realm/object-store/object_schema.hpp>
 #include <realm/util/features.h>
 
 namespace realm {
-class ObjectSchema;
 class SchemaChange;
 class StringData;
 struct TableKey;
@@ -107,7 +107,7 @@ enum class SchemaMode : uint8_t {
     // is not linked from any top level object types is included.
     AdditiveExplicit,
 
-    // Verify that the schema version has increased, call the migraiton
+    // Verify that the schema version has increased, call the migration
     // function, and then verify that the schema now matches.
     // The migration function is mandatory for this mode.
     //
@@ -184,6 +184,8 @@ struct RemoveTable {
 
 struct ChangeTableType {
     const ObjectSchema* object;
+    const ObjectSchema::ObjectType* old_table_type;
+    const ObjectSchema::ObjectType* new_table_type;
 };
 
 struct AddInitialProperties {

@@ -627,7 +627,8 @@ public:
     // Get a pool for the given sync user. Pools are cached internally to avoid
     // creating duplicate ones.
     static std::shared_ptr<AuditRealmPool> get_pool(std::shared_ptr<SyncUser> user,
-                                                    std::string const& partition_prefix, util::Logger& logger,
+                                                    std::string const& partition_prefix,
+                                                    const std::shared_ptr<util::Logger>& logger,
                                                     ErrorHandler error_handler);
 
     // Write to a pooled Realm. The Transaction should not be retained outside
@@ -636,7 +637,7 @@ public:
 
     // Do not call directly; use get_pool().
     AuditRealmPool(std::shared_ptr<SyncUser> user, std::string const& partition_prefix, ErrorHandler error_handler,
-                   util::Logger& logger, std::string_view app_id);
+                   const std::shared_ptr<util::Logger>& logger, std::string_view app_id);
 
     // Block the calling thread until all pooled Realms have been fully uploaded,
     // including ones which do not currently have sync sessions. For testing
@@ -648,7 +649,7 @@ private:
     const std::string m_partition_prefix;
     const ErrorHandler m_error_handler;
     const std::string m_path_root;
-    util::Logger& m_logger;
+    const std::shared_ptr<util::Logger> m_logger;
 
     std::shared_ptr<Realm> m_current_realm;
     std::vector<std::string> m_metadata_columns;
@@ -665,7 +666,8 @@ private:
 };
 
 std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUser> user,
-                                                         std::string const& partition_prefix, util::Logger& logger,
+                                                         std::string const& partition_prefix,
+                                                         const std::shared_ptr<util::Logger>& logger,
                                                          ErrorHandler error_handler) NO_THREAD_SAFETY_ANALYSIS
 {
     struct CachedPool {
@@ -701,7 +703,8 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
 }
 
 AuditRealmPool::AuditRealmPool(std::shared_ptr<SyncUser> user, std::string const& partition_prefix,
-                               ErrorHandler error_handler, util::Logger& logger, std::string_view app_id)
+                               ErrorHandler error_handler, const std::shared_ptr<util::Logger>& logger,
+                               std::string_view app_id)
     : m_user(user)
     , m_partition_prefix(partition_prefix)
     , m_error_handler(error_handler)
@@ -728,8 +731,8 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
     if (m_current_realm) {
         auto size = util::File::get_size_static(m_current_realm->config().path);
         if (size > g_max_partition_size) {
-            m_logger.info("Audit: Closing Realm at '%1': size %2 > max size %3", m_current_realm->config().path, size,
-                          g_max_partition_size.load());
+            m_logger->info("Audit: Closing Realm at '%1': size %2 > max size %3", m_current_realm->config().path,
+                           size, g_max_partition_size.load());
             auto sync_session = m_current_realm->sync_session();
             {
                 // If we're offline and already have a Realm waiting to upload,
@@ -749,7 +752,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
             m_current_realm = nullptr;
         }
         else {
-            m_logger.detail("Audit: Reusing existing Realm at '%1'", m_current_realm->config().path);
+            m_logger->detail("Audit: Reusing existing Realm at '%1'", m_current_realm->config().path);
         }
     }
 
@@ -771,7 +774,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
 
 void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
 {
-    m_logger.info("Audit: Uploading '%1'", session->path());
+    m_logger->info("Audit: Uploading '%1'", session->path());
     m_upload_sessions.push_back(session);
     session->wait_for_upload_completion([this, weak_self = weak_from_this(), session](std::error_code ec) {
         auto self = weak_self.lock();
@@ -783,17 +786,17 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             auto it = std::find(m_upload_sessions.begin(), m_upload_sessions.end(), session);
             REALM_ASSERT(it != m_upload_sessions.end());
             m_upload_sessions.erase(it);
-            auto path = session->path();
+            std::string path = session->path();
             session->close();
             m_open_paths.erase(path);
             if (ec) {
-                m_logger.error("Audit: Upload on '%1' failed with error '%2'.", path, ec.message());
+                m_logger->error("Audit: Upload on '%1' failed with error '%2'.", path, ec.message());
                 if (m_error_handler) {
                     m_error_handler(SyncError(ec, ec.message(), false));
                 }
             }
             else {
-                m_logger.info("Audit: Upload on '%1' completed.", path);
+                m_logger->info("Audit: Upload on '%1' completed.", path);
                 util::File::remove(path);
             }
             if (!m_upload_sessions.empty())
@@ -814,7 +817,7 @@ std::string AuditRealmPool::prefixed_partition(std::string const& partition)
 void AuditRealmPool::scan_for_realms_to_upload()
 {
     util::CheckedLockGuard lock(m_mutex);
-    m_logger.trace("Audit: Scanning for Realms in '%1' to upload", m_path_root);
+    m_logger->trace("Audit: Scanning for Realms in '%1' to upload", m_path_root);
     util::DirScanner dir(m_path_root);
     std::string file_name;
     while (dir.next(file_name)) {
@@ -823,15 +826,15 @@ void AuditRealmPool::scan_for_realms_to_upload()
 
         std::string path = m_path_root + file_name;
         if (m_open_paths.count(path)) {
-            m_logger.trace("Audit: Skipping '%1': file is already open", path);
+            m_logger->trace("Audit: Skipping '%1': file is already open", path);
             continue;
         }
 
-        m_logger.trace("Audit: Checking file '%1'", path);
+        m_logger->trace("Audit: Checking file '%1'", path);
         auto db = DB::create(std::make_unique<sync::ClientReplication>(false), path);
         auto tr = db->start_read();
         if (tr->get_history()->no_pending_local_changes(tr->get_version())) {
-            m_logger.info("Audit: Realm at '%1' is fully uploaded", path);
+            m_logger->info("Audit: Realm at '%1' is fully uploaded", path);
             tr = nullptr;
             db->close();
             util::File::remove(path);
@@ -840,7 +843,10 @@ void AuditRealmPool::scan_for_realms_to_upload()
 
         m_open_paths.insert(path);
         auto partition = file_name.substr(0, file_name.size() - 6);
-        wait_for_upload(m_user->sync_manager()->get_session(db, SyncConfig{m_user, prefixed_partition(partition)}));
+        RealmConfig config;
+        config.path = db->get_path();
+        config.sync_config = std::make_shared<SyncConfig>(m_user, prefixed_partition(partition));
+        wait_for_upload(m_user->sync_manager()->get_session(db, config));
         return;
     }
 
@@ -872,7 +878,7 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-            self->m_logger.error("Audit: Received sync error: %1 (ec=%2)", error.message, error.error_code.value());
+            self->m_logger->error("Audit: Received sync error: %1 (ec=%2)", error.message, error.error_code.value());
         }
         if (error_handler) {
             error_handler(error);
@@ -892,7 +898,7 @@ void AuditRealmPool::open_new_realm()
     config.schema_version = 0;
     config.sync_config = sync_config;
 
-    m_logger.info("Audit: Opening new Realm at '%1'", config.path);
+    m_logger->info("Audit: Opening new Realm at '%1'", config.path);
     m_current_realm = Realm::get_shared_realm(std::move(config));
     util::CheckedLockGuard lock(m_mutex);
     m_open_paths.insert(m_current_realm->config().path);
@@ -920,6 +926,7 @@ public:
                       util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
 
     void record_query(VersionID, TableView const&) override REQUIRES(!m_mutex);
+    void prepare_for_write(VersionID) override REQUIRES(!m_mutex);
     void record_write(VersionID, VersionID) override REQUIRES(!m_mutex);
     void record_read(VersionID, const Obj& row, const Obj& parent, ColKey col) override REQUIRES(!m_mutex);
 
@@ -1002,7 +1009,7 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     if (!m_serializer)
         m_serializer = std::make_shared<AuditObjectSerializer>();
 
-    m_realm_pool = AuditRealmPool::get_pool(audit_user, audit_config.partition_value_prefix, *m_logger,
+    m_realm_pool = AuditRealmPool::get_pool(audit_user, audit_config.partition_value_prefix, m_logger,
                                             audit_config.sync_error_handler);
 }
 
@@ -1052,12 +1059,18 @@ void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& par
                                                           parent_table_key, parent_obj_key, col});
 }
 
-void AuditContext::record_write(realm::VersionID old_version, realm::VersionID new_version)
+void AuditContext::prepare_for_write(VersionID old_version)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    if (m_current_scope)
+        pin_version(old_version);
+}
+
+void AuditContext::record_write(VersionID old_version, VersionID new_version)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (!m_current_scope)
         return;
-    pin_version(old_version);
     m_current_scope->events.push_back(audit_event::Write{now(), old_version, new_version});
 }
 
@@ -1168,31 +1181,22 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
             AuditEventWriter writer{*m_source_db, *scope.metadata, scope.activity_name, *table, *m_serializer};
 
             m_logger->trace("Audit: Total event count: %1", scope.events.size());
-            for (size_t i = 0; i < scope.events.size();) {
-                {
-                    // We write directly to the replication log and don't want
-                    // the automatic replication to happen
-                    DisableReplication dr(tr);
 
-                    // There's awkward nested looping here because we need
-                    // replication enabled when we commit intermediate transactions
-                    for (; i < scope.events.size(); ++i) {
-                        m_serializer->set_event_index(i);
-                        if (mpark::visit(writer, scope.events[i])) {
-                            // This event didn't fit in the current transaction
-                            // so commit and try it again after that.
-                            break;
-                        }
-                    }
-                    table->clear();
-                }
+            // We write directly to the replication log and don't want
+            // the automatic replication to happen
+            Table::DisableReplication dr(*table);
 
-                // i.e. if we hit the break
-                if (i + 1 < scope.events.size()) {
+            for (size_t i = 0; i < scope.events.size(); ++i) {
+                m_serializer->set_event_index(i);
+                if (mpark::visit(writer, scope.events[i])) {
+                    // This event didn't fit in the current transaction
+                    // so commit and try it again after that.
                     m_logger->detail("Audit: Incrementally comitting transaction after %1 events", i);
                     tr.commit_and_continue_writing();
+                    --i;
                 }
             }
+            table->clear();
         });
 
         if (scope.completion)

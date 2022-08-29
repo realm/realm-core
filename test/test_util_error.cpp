@@ -95,6 +95,7 @@ TEST(BasicSystemErrors_Messages)
 #endif
     }
 
+#if !REALM_HAVE_CLANG_FEATURE(undefined_behavior_sanitizer)
     // Ensure that if we pass an unknown error code, we get some error reporting
     // This may potentially pass on some operating system. If this test starts
     // failing, simply change the magic number below.
@@ -106,6 +107,7 @@ TEST(BasicSystemErrors_Messages)
         // "Unknown error: <errcode>"
         CHECK(err.message().compare(0, error_message.length(), error_message) == 0);
     }
+#endif // !REALM_HAVE_CLANG_FEATURE(undefined_behavior_sanitizer)
 }
 
 #endif // TEST_BASIC_SYSTEM_ERRORS

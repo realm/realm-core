@@ -56,7 +56,9 @@ set(REALM_PARSER_EXTRAS
     query_flex.ll
 )
 
-if(NOT MSVC)
+if(MSVC)
+    set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "/wd4018")
+else()
     set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code;-Wno-sign-compare")
 endif()
 

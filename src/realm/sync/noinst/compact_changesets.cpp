@@ -1,9 +1,6 @@
 #include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/noinst/changeset_index.hpp>
 
-#include <realm/util/metered/map.hpp>
-#include <realm/util/metered/set.hpp>
-
 using namespace realm;
 using namespace realm::sync;
 
@@ -50,20 +47,20 @@ struct ChangesetCompactor {
             InstructionPosition link_list_instr;
             uint32_t prior_size;
         };
-        util::metered::map<StringData, LinkListOp> field_to_link_list_op;
+        std::map<StringData, LinkListOp> field_to_link_list_op;
 
         // If the object is referenced by any alive object, it will become a
         // ghost instead of dead. The object will also be a ghost if it has a
         // primary key.
         // FIXME: Define std::hash for StringData, GlobalID (waiting for Core to
         // give us an implementation of std::hash for StringData).
-        util::metered::map<StringData, util::metered::set<GlobalKey>> referenced_by;
+        std::map<StringData, std::set<GlobalKey>> referenced_by;
     };
 
     // Ordering guaranteed; Can use lower_bound() to find all objects belonging
     // to a particular table.
-    util::metered::map<StringData, util::metered::map<GlobalKey, ObjectInfo>> m_objects;
-    util::metered::vector<Changeset*> m_changesets;
+    std::map<StringData, std::map<GlobalKey, ObjectInfo>> m_objects;
+    std::vector<Changeset*> m_changesets;
 
     void add_changeset(Changeset&);
     void add_instruction_at(RangeMap&, Changeset&, Changeset::iterator);
@@ -330,7 +327,7 @@ void ChangesetCompactor::compact_live_object(ObjectInfo& info)
 {
     // Look for redundant Set instructions, discard them.
 
-    util::metered::map<StringData, std::pair<Changeset*, Changeset::iterator>> last_set_instructions;
+    std::map<StringData, std::pair<Changeset*, Changeset::iterator>> last_set_instructions;
 
     for (auto& changeset_ranges : info.instructions) {
         auto& changeset = *changeset_ranges.first;

@@ -19,6 +19,7 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #endif
 
 #include <stdexcept>
@@ -492,6 +493,14 @@ struct realm_callback_token_schema : realm_callback_token {
     ~realm_callback_token_schema() override;
 };
 
+struct realm_refresh_callback_token : realm_callback_token {
+    realm_refresh_callback_token(realm_t* realm, uint64_t token)
+        : realm_callback_token(realm, token)
+    {
+    }
+    ~realm_refresh_callback_token() override;
+};
+
 struct realm_query : realm::c_api::WrapC {
     realm::Query query;
     std::weak_ptr<realm::Realm> weak_realm;
@@ -595,6 +604,10 @@ struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
 
 struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
     using SyncConfig::SyncConfig;
+    realm_sync_config(const SyncConfig& c)
+        : SyncConfig(c)
+    {
+    }
 };
 
 struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
@@ -722,6 +735,14 @@ struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::Async
         return false;
     }
 };
+
+struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollection {
+    realm_mongodb_collection(realm::app::MongoCollection collection)
+        : realm::app::MongoCollection(std::move(collection))
+    {
+    }
+};
+
 #endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP

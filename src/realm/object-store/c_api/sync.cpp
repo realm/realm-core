@@ -43,6 +43,9 @@ static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Manual) == RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::DiscardLocal) ==
               RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Recover) == RLM_SYNC_SESSION_RESYNC_MODE_RECOVER);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::RecoverOrDiscard) ==
+              RLM_SYNC_SESSION_RESYNC_MODE_RECOVER_OR_DISCARD);
 
 static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::Immediately) ==
               RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY);
@@ -193,6 +196,22 @@ static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_chang
 static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
               RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
 static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
+static_assert(realm_sync_errno_session_e(ProtocolError::compensating_write) ==
+              RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
+
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::NoAction) == RLM_SYNC_ERROR_ACTION_NO_ACTION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ProtocolViolation) ==
+              RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ApplicationBug) ==
+              RLM_SYNC_ERROR_ACTION_APPLICATION_BUG);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Warning) == RLM_SYNC_ERROR_ACTION_WARNING);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Transient) == RLM_SYNC_ERROR_ACTION_TRANSIENT);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::DeleteRealm) ==
+              RLM_SYNC_ERROR_ACTION_DELETE_REALM);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) ==
+              RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
+              RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
 } // namespace
 
 static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
@@ -388,10 +407,12 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
+        c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
         c_error.c_original_file_path_key = error.c_original_file_path_key;
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
+        c_user_info.reserve(error.user_info.size());
         for (auto& info : error.user_info) {
             c_user_info.push_back({info.first.c_str(), info.second.c_str()});
         }
@@ -516,10 +537,10 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                                                               realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
-                  SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
+                  SharedRealm before_realm, ThreadSafeReference after_realm, bool did_recover) {
         realm_t r1{before_realm};
-        realm_t r2{after_realm};
-        if (!callback(userdata.get(), &r1, &r2, did_recover)) {
+        auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
+        if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
             throw CallbackFailed();
         }
     };

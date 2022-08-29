@@ -49,17 +49,6 @@ std::string map_partial_to_reference_virt_path(const std::string& partial_path);
 
 void make_dirs(const std::string& root_path, const std::string& virt_path);
 
-std::unique_ptr<char[]> read_realm_content(const std::string& realm_path, size_t& file_size);
-
-void write_realm_content(const std::string& root_path, const std::string& realm_name,
-                         const BinaryData& realm_content);
-
-// The realm fragment is placed in buffer and fragment_size and realm_size are
-// set. The function throws if the file does not exist or the offset is greater
-// than or equal to the size of the size of the Realm.
-void read_realm_fragment(const std::string& realm_path, char* buffer, size_t buffer_size, uint_fast64_t offset,
-                         size_t& fragment_size, uint_fast64_t& realm_size);
-
 /// Returns the set of virtual paths corresponding to the Realm files found
 /// under the specified root directory.
 std::set<std::string> find_realm_files(const std::string& root_dir);

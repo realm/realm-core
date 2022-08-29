@@ -38,7 +38,7 @@
 #include <vector>
 
 using namespace realm;
-using realm::util::Any;
+using std::any;
 
 struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
@@ -50,7 +50,7 @@ struct TestContext : CppContext {
     {
     }
 
-    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
+    util::Optional<std::any> default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
@@ -63,11 +63,11 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any)
+    std::string print(std::any)
     {
         return "not implemented";
     }
-    bool allow_missing(util::Any)
+    bool allow_missing(std::any)
     {
         return false;
     }
@@ -76,17 +76,17 @@ struct TestContext : CppContext {
 TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     _impl::CollectionChangeBuilder c;
 
-    auto all_modified = [](size_t) {
+    auto all_modified = [](ObjKey) {
         return true;
     };
-    auto none_modified = [](size_t) {
+    auto none_modified = [](ObjKey) {
         return false;
     };
 
     SECTION("reports inserts/deletes for simple reorderings") {
-        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
-                        util::UniqueFunction<bool(size_t)> modifications) {
-            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, std::move(modifications), false);
+        auto calc = [&](const ObjKeys& old_keys, const ObjKeys& new_keys,
+                        util::UniqueFunction<bool(ObjKey)> modifications) {
+            return _impl::CollectionChangeBuilder::calculate(old_keys, new_keys, std::move(modifications), false);
         };
         std::vector<int64_t> indices = {};
         constexpr size_t indices_size = 10000;
@@ -94,17 +94,18 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
         for (size_t i = 0; i < indices_size; ++i) {
             indices.push_back(i);
         }
+        ObjKeys objkeys(indices);
 
         BENCHMARK("no changes")
         {
-            c = calc(indices, indices, none_modified);
+            c = calc(objkeys, objkeys, none_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
         BENCHMARK("all modified")
         {
-            c = calc(indices, indices, all_modified);
+            c = calc(objkeys, objkeys, all_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
@@ -148,8 +149,8 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
 
 TEST_CASE("Benchmark object", "[benchmark]") {
     using namespace std::string_literals;
-    using AnyVec = std::vector<util::Any>;
-    using AnyDict = std::map<std::string, util::Any>;
+    using AnyVec = std::vector<std::any>;
+    using AnyDict = std::map<std::string, std::any>;
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -209,7 +210,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         BENCHMARK("create object")
         {
             return Object::create(d, r, all_types,
-                                  util::Any(AnyDict{
+                                  std::any(AnyDict{
                                       {"pk", benchmark_pk++},
                                       {"bool", true},
                                       {"int", INT64_C(5)},
@@ -239,7 +240,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
         auto obj = Object::create(d, r, all_types,
-                                  util::Any(AnyDict{
+                                  std::any(AnyDict{
                                       {"pk", INT64_C(0)},
                                       {"bool", true},
                                       {"int", INT64_C(5)},
@@ -264,7 +265,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         Results result(r, table);
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
             num_modifications += c.modifications.count();
         });
 
@@ -277,7 +278,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->begin_transaction();
             meter.measure([&d, &all_types, &update_int, &r] {
                 auto shadow = Object::create(d, r, all_types,
-                                             util::Any(AnyDict{
+                                             std::any(AnyDict{
                                                  {"pk", INT64_C(0)},
                                                  {"int", update_int},
                                              }),
@@ -298,7 +299,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         size_t num_insertions = 0;
         size_t num_deletions = 0;
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
             num_insertions += c.insertions.count();
             num_deletions += c.deletions.count();
             num_modifications += c.modifications_new.count();
@@ -327,7 +328,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             meter.measure([&r] {
@@ -364,7 +365,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             advance_and_notify(*r);
@@ -405,7 +406,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i)},
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
             advance_and_notify(*r);
@@ -424,7 +425,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                 AnyDict person{
                     {"name", name.str()}, {"age", static_cast<int64_t>(i + 1)}, // age differs
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::UpdateModified);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::UpdateModified);
             }
             r->commit_transaction();
 
@@ -464,7 +465,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             {"date array", AnyVec{}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         };
-        Object obj = Object::create(d, r, schema, Any(values), CreatePolicy::ForceCreate);
+        Object obj = Object::create(d, r, schema, util::Any(values), CreatePolicy::ForceCreate);
         r->commit_transaction();
         advance_and_notify(*r);
 
@@ -501,7 +502,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             constexpr size_t num_modifications = 300;
             for (size_t i = 0; i < num_modifications; ++i) {
                 Object o = get_object();
-                auto token = o.add_notification_callback([&notifiers, i](CollectionChangeSet c, std::exception_ptr) {
+                auto token = o.add_notification_callback([&notifiers, i](CollectionChangeSet c) {
                     notifiers[i].num_insertions += c.insertions.count();
                     notifiers[i].num_modifications += c.modifications.count();
                     notifiers[i].num_deletions += c.deletions.count();
@@ -545,7 +546,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         size_t num_insertions = 0;
         size_t num_deletions = 0;
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = result.add_notification_callback([&](CollectionChangeSet c) {
             num_insertions += c.insertions.count();
             num_deletions += c.deletions.count();
             num_modifications += c.modifications_new.count();
@@ -563,7 +564,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(index)},
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
         };
@@ -682,7 +683,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
                     {"name", name.str()},
                     {"age", static_cast<int64_t>(i * 2)},
                 };
-                Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
+                Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
 

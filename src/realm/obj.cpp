@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/obj.hpp"
-#include "realm/cluster_tree.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_bool.hpp"
@@ -30,14 +29,15 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
-#include "realm/column_type_traits.hpp"
-#include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
-#include "realm/spec.hpp"
-#include "realm/set.hpp"
+#include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
-#include "realm/table_view.hpp"
+#include "realm/index_string.hpp"
+#include "realm/object_converter.hpp"
 #include "realm/replication.hpp"
+#include "realm/set.hpp"
+#include "realm/spec.hpp"
+#include "realm/table_view.hpp"
 #include "realm/util/base64.hpp"
 
 namespace realm {
@@ -1199,32 +1199,30 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (type != col_type_Mixed)
         throw LogicError(LogicError::illegal_type);
-    if (value_is_null(value)) {
-        if (!attrs.test(col_attr_Nullable)) {
-            throw LogicError(LogicError::column_not_nullable);
-        }
-        return set_null(col_key, is_default);
+    if (value_is_null(value) && !attrs.test(col_attr_Nullable)) {
+        throw LogicError(LogicError::column_not_nullable);
     }
     if (value.is_type(type_Link)) {
         throw LogicError(LogicError::illegal_combination);
+    }
+
+    Mixed old_value = get<Mixed>(col_key);
+    ObjLink old_link{};
+    ObjLink new_link{};
+    if (old_value.is_type(type_TypedLink)) {
+        old_link = old_value.get<ObjLink>();
     }
 
     if (value.is_type(type_TypedLink)) {
         if (m_table->is_asymmetric()) {
             throw LogicError(LogicError::wrong_kind_of_table);
         }
-
-        ObjLink new_link = value.template get<ObjLink>();
-        Mixed old_value = get<Mixed>(col_key);
-        ObjLink old_link;
-        if (old_value.is_type(type_TypedLink)) {
-            old_link = old_value.get<ObjLink>();
-            if (new_link == old_link)
-                return *this;
-        }
+        new_link = value.template get<ObjLink>();
         m_table->get_parent_group()->validate(new_link);
-        recurse = replace_backlink(col_key, old_link, new_link, state);
+        if (new_link == old_link)
+            return *this;
     }
+    recurse = replace_backlink(col_key, old_link, new_link, state);
 
     StringIndex* index = m_table->get_search_index(col_key);
     // The following check on unresolved is just a precaution as it should not
@@ -1936,68 +1934,66 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     return false;
 }
 
-void Obj::assign(const Obj& other)
+void Obj::handle_multiple_backlinks_during_schema_migration()
 {
-    REALM_ASSERT(get_table() == other.get_table());
-    auto cols = m_table->get_column_keys();
-    for (auto col : cols) {
-        if (col.get_attrs().test(col_attr_List)) {
-            auto src_list = other.get_listbase_ptr(col);
-            auto dst_list = get_listbase_ptr(col);
-            auto sz = src_list->size();
-            dst_list->clear();
-            for (size_t i = 0; i < sz; i++) {
-                Mixed val = src_list->get_any(i);
-                dst_list->insert_any(i, val);
-            }
+    REALM_ASSERT(!m_table->get_primary_key_column());
+    auto copy_links = [this](ColKey col) {
+        auto embedded_obj_tracker = std::make_shared<converters::EmbeddedObjectConverter>();
+        auto opposite_table = m_table->get_opposite_table(col);
+        auto opposite_column = m_table->get_opposite_column(col);
+        auto backlinks = get_all_backlinks(col);
+        for (auto backlink : backlinks) {
+            // create a new obj
+            auto obj = m_table->create_object();
+            embedded_obj_tracker->track(*this, obj);
+            auto linking_obj = opposite_table->get_object(backlink);
+            fix_linking_object_during_schema_migration(linking_obj, obj, opposite_column);
         }
-        else {
-            Mixed val = other.get_any(col);
-            if (val.is_null()) {
-                this->set_null(col);
-                continue;
-            }
-            switch (val.get_type()) {
-                case type_String: {
-                    // Need to take copy. Values might be in same cluster
-                    std::string str{val.get_string()};
-                    this->set(col, str);
-                    break;
-                }
-                case type_Binary: {
-                    // Need to take copy. Values might be in same cluster
-                    std::string str{val.get_binary()};
-                    this->set(col, BinaryData(str));
-                    break;
-                }
-                default:
-                    this->set_any(col, val);
-                    break;
-            }
-        }
-    }
-
-    auto copy_links = [this, &other](ColKey col) {
-        auto t = m_table->get_opposite_table(col);
-        auto c = m_table->get_opposite_column(col);
-        auto backlinks = other.get_all_backlinks(col);
-        for (auto bl : backlinks) {
-            auto linking_obj = t->get_object(bl);
-            if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set(c, get_key());
-            }
-            else {
-                auto l = linking_obj.get_linklist(c);
-                auto n = l.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
-            }
-        }
+        embedded_obj_tracker->process_pending();
         return false;
     };
     m_table->for_each_backlink_column(copy_links);
+}
+
+void Obj::fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const
+{
+    // fix linking obj links in order to point to the new object just created
+    if (opposite_col_key.get_type() == col_type_LinkList) {
+        auto linking_obj_list = linking_obj.get_linklist(opposite_col_key);
+        auto n = linking_obj_list.find_first(get_key());
+        REALM_ASSERT(n != realm::npos);
+        linking_obj_list.set(n, obj.get_key());
+    }
+    else if (opposite_col_key.get_attrs().test(col_attr_List)) {
+        auto linking_obj_list = linking_obj.get_listbase_ptr(opposite_col_key);
+        auto n = linking_obj_list->find_any(ObjLink{m_table->get_key(), get_key()});
+        REALM_ASSERT(n != realm::npos);
+        linking_obj_list->insert_any(n, ObjLink{m_table->get_key(), obj.get_key()});
+    }
+    else if (opposite_col_key.get_attrs().test(col_attr_Set)) {
+        // this SHOULD NEVER HAPPEN, since SET sematincs forbids to have a backlink to the same object store
+        // multiple times. update_schema would have thrown way before to reach this point.
+        REALM_UNREACHABLE();
+    }
+    else if (opposite_col_key.get_attrs().test(col_attr_Dictionary)) {
+        auto linking_obj_dictionary = linking_obj.get_dictionary_ptr(opposite_col_key);
+        auto pos = linking_obj_dictionary->find_any(ObjLink{m_table->get_key(), get_key()});
+        REALM_ASSERT(pos != realm::npos);
+        Mixed key = linking_obj_dictionary->get_key(pos);
+        linking_obj_dictionary->insert(key, ObjLink{m_table->get_key(), obj.get_key()});
+    }
+    else if (opposite_col_key.get_type() == col_type_Mixed &&
+             linking_obj.get_any(opposite_col_key).get_type() == type_TypedLink) {
+        REALM_ASSERT(!linking_obj.get<ObjKey>(opposite_col_key) ||
+                     linking_obj.get<ObjKey>(opposite_col_key) == get_key());
+        linking_obj.set_any(opposite_col_key, ObjLink{m_table->get_key(), obj.get_key()});
+    }
+    else if (opposite_col_key.get_type() == col_type_Link) {
+        // Single link
+        REALM_ASSERT(!linking_obj.get<ObjKey>(opposite_col_key) ||
+                     linking_obj.get<ObjKey>(opposite_col_key) == get_key());
+        linking_obj.set(opposite_col_key, obj.get_key());
+    }
 }
 
 Dictionary Obj::get_dictionary(ColKey col_key) const
@@ -2199,6 +2195,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     if (col_type == col_type_Link) {
         set(col_key, null_key);
     }
+    else if (col_type == col_type_Mixed) {
+        set(col_key, Mixed{});
+    }
     else {
         auto attrs = col_key.get_attrs();
         if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
@@ -2240,13 +2239,14 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_Decimal:
                 do_set_null<ArrayDecimal128>(col_key);
                 break;
-            case col_type_Mixed:
-                do_set_null<ArrayMixed>(col_key);
-                break;
             case col_type_UUID:
                 do_set_null<ArrayUUIDNull>(col_key);
                 break;
-            default:
+            case col_type_Mixed:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+            case col_type_TypedLink:
                 REALM_UNREACHABLE();
         }
     }

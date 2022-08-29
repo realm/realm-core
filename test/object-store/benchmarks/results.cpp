@@ -134,26 +134,26 @@ TEST_CASE("Benchmark results", "[benchmark]") {
 
         BENCHMARK("Table forwards") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = r.get<Obj>(i);
+                r.get<Obj>(i);
             }
         };
 
         BENCHMARK("Table reverse") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = r.get<Obj>(size - i - 1);
+                r.get<Obj>(size - i - 1);
             }
         };
 
         auto tv = r.snapshot();
         BENCHMARK("TableView forwards") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = tv.get<Obj>(i);
+                tv.get<Obj>(i);
             }
         };
 
         BENCHMARK("TableView reverse") {
             for (size_t i = 0, size = r.size(); i < size; ++i) {
-                Obj o = tv.get<Obj>(size - i - 1);
+                tv.get<Obj>(size - i - 1);
             }
         };
     }
@@ -234,7 +234,7 @@ TEST_CASE("Benchmark results notifier", "[benchmark]") {
         realm->commit_transaction();
 
         Results r(realm, tables[0]->where());
-        auto token = r.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto token = r.add_notification_callback([](CollectionChangeSet) {});
         auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
         coordinator.on_change();
 
@@ -299,7 +299,7 @@ TEST_CASE("Benchmark results notifier", "[benchmark]") {
         realm->commit_transaction();
 
         Results r(realm, tables[0]->where());
-        auto token = r.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto token = r.add_notification_callback([](CollectionChangeSet) {});
         auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
         coordinator.on_change();
 

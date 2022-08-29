@@ -140,22 +140,37 @@ public:
         , text(str)
     {
     }
+    ConstantNode(ExpressionComparisonType comp_type, const std::string& str)
+        : type(Type::ARG)
+        , text(str)
+        , m_comp_type(comp_type)
+    {
+    }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+    util::Optional<ExpressionComparisonType> m_comp_type;
 };
 
 class ListNode : public ParserNode {
 public:
     std::vector<ConstantNode*> elements;
 
+    ListNode() = default;
     ListNode(ConstantNode* elem)
     {
         elements.emplace_back(elem);
     }
-
     void add_element(ConstantNode* elem)
     {
         elements.emplace_back(elem);
     }
+    void set_comp_type(ExpressionComparisonType comp_type)
+    {
+        m_comp_type = comp_type;
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+
+private:
+    util::Optional<ExpressionComparisonType> m_comp_type;
 };
 
 class PropertyNode : public ParserNode {
@@ -169,6 +184,10 @@ public:
     {
         return false;
     }
+    virtual bool is_list()
+    {
+        return false;
+    }
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
 };
 
@@ -176,6 +195,7 @@ class ValueNode : public ExpressionNode {
 public:
     ConstantNode* constant = nullptr;
     PropertyNode* prop = nullptr;
+    ListNode* list = nullptr;
 
     ValueNode(ConstantNode* node)
         : constant(node)
@@ -185,20 +205,25 @@ public:
         : prop(node)
     {
     }
+    ValueNode(ListNode* node)
+        : list(node)
+    {
+    }
     bool is_constant() final
     {
-        return constant != nullptr;
+        return constant != nullptr || list != nullptr;
     }
-    ConstantNode* get_constant()
+    bool is_list() final
     {
-        REALM_ASSERT(is_constant());
-        return constant;
+        return list != nullptr;
     }
 
     std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
     {
         if (prop)
             return prop->visit(drv);
+        if (list)
+            return list->visit(drv, type);
         return constant->visit(drv, type);
     }
 };
@@ -217,6 +242,10 @@ public:
     bool is_constant() final
     {
         return m_left->is_constant() && m_right->is_constant();
+    }
+    bool is_list() final
+    {
+        return m_left->is_list() || m_right->is_list();
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };
@@ -319,7 +348,7 @@ class PathNode : public ParserNode {
 public:
     std::vector<std::string> path_elems;
 
-    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
+    LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
     void add_element(const std::string& str)
     {
         path_elems.push_back(str);
@@ -362,7 +391,7 @@ class PropNode : public PropertyNode {
 public:
     PathNode* path;
     std::string identifier;
-    ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> comp_type = util::none;
     PostOpNode* post_op = nullptr;
     ConstantNode* index = nullptr;
 
@@ -374,7 +403,7 @@ public:
     {
     }
     PropNode(PathNode* node, std::string id, PostOpNode* po_node,
-             ExpressionComparisonType ct = ExpressionComparisonType::Any)
+             util::Optional<ExpressionComparisonType> ct = util::none)
         : path(node)
         , identifier(id)
         , comp_type(ct)
@@ -384,7 +413,6 @@ public:
     PropNode(PathNode* node, std::string id)
         : path(node)
         , identifier(id)
-        , comp_type(ExpressionComparisonType::Any)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;

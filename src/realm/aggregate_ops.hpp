@@ -147,6 +147,11 @@ public:
                 return true;
             }
         }
+        else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
+            m_result = std::make_unsigned_t<T>(m_result) + value;
+            ++m_count;
+            return true;
+        }
         else {
             if (valid_for_agg(value)) {
                 m_result += value;

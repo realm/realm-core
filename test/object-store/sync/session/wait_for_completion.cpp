@@ -107,7 +107,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
+        SyncError err{code, "Not a real error message", true};
+        err.server_requests_action = sync::ProtocolErrorInfo::Action::ProtocolViolation;
+        SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         EventLoop::main().run_until([&] {
             return error_count > 0;
         });
@@ -124,7 +126,6 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager::Config config;
-    config.base_path = "a";
     config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
     config.should_teardown_test_directory = false;
     SyncServer::Config server_config = {false};

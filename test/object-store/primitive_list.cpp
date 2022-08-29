@@ -331,8 +331,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             CAPTURE(i);
             REQUIRE(list.get<T>(i) == values[i]);
             REQUIRE(results.get<T>(i) == values[i]);
-            REQUIRE(any_cast<Boxed>(list.get(ctx, i)) == Boxed(values[i]));
-            REQUIRE(any_cast<Boxed>(results.get(ctx, i)) == Boxed(values[i]));
+            REQUIRE(util::any_cast<Boxed>(list.get(ctx, i)) == Boxed(values[i]));
+            REQUIRE(util::any_cast<Boxed>(results.get(ctx, i)) == Boxed(values[i]));
         }
         REQUIRE_THROWS(list.get<T>(values.size()));
         REQUIRE_THROWS(results.get<T>(values.size()));
@@ -342,7 +342,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("first()") {
         REQUIRE(*results.first<T>() == values.front());
-        REQUIRE(any_cast<Boxed>(*results.first(ctx)) == Boxed(values.front()));
+        REQUIRE(util::any_cast<Boxed>(*results.first(ctx)) == Boxed(values.front()));
         list.remove_all();
         REQUIRE(results.first<T>() == util::none);
     }
@@ -584,15 +584,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
-        auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = list.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++calls;
         });
-        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c) {
             rchange = c;
             ++calls;
         });
-        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
             srchange = c;
             ++calls;
         });
@@ -679,7 +679,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         SECTION("delete and modify") {
             auto distinct = results.distinct({{"self"}});
             CollectionChangeSet drchange;
-            auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c) {
                 drchange = c;
                 ++calls;
             });
@@ -782,8 +782,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             r->begin_transaction();
 
             CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), util::Any(AnyDict{}));
-            auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{}));
+            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             list.add(static_cast<T>(values[0]));
 
             r->commit_transaction();
@@ -802,7 +802,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
             CppContext ctx(r);
             Object obj(r, "object", 0);
-            auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             REQUIRE(list.get<T>(0) == values[0]);
         }
     }
@@ -830,7 +830,7 @@ TEST_CASE("list of mixed links", "[primitives]") {
     ColKey col_link1 = target1->get_column_key("link1");
     r->begin_transaction();
     Obj obj = table->create_object();
-    Obj obj1 = table->create_object(); // empty dictionary
+    table->create_object(); // empty dictionary
     Obj target1_obj = target1->create_object().set(col_value1, 100);
     Obj target2_obj = target2->create_object().set(col_value2, 200);
     ColKey col = table->get_column_key("value");
@@ -847,7 +847,7 @@ TEST_CASE("list of mixed links", "[primitives]") {
     Results all_objects(r, table->where());
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
-    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
         local_changes = c;
     });
     advance_and_notify(*r);

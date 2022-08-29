@@ -1758,11 +1758,11 @@ return yy::parser::make_LIMIT(yytext);
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-return yy::parser::make_ASCENDING();
+return yy::parser::make_ASCENDING(yytext);
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-return yy::parser::make_DESCENDING();
+return yy::parser::make_DESCENDING(yytext);
 	YY_BREAK
 case 30:
 YY_RULE_SETUP

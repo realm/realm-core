@@ -18,6 +18,7 @@
 
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/object_converter.hpp>
 #include <realm/set.hpp>
 
 #include <realm/sync/history.hpp>
@@ -25,6 +26,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
 
@@ -333,8 +335,14 @@ bool ListPath::operator!=(const ListPath& other) const noexcept
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)
 {
     TableRef remote_table = remote.get_table(m_table_key);
-    Obj base_obj = remote_table->get_object(m_obj_key);
-    std::string path = util::format("%1.pk=%2", remote_table->get_name(), base_obj.get_primary_key());
+
+    std::string path = util::format("%1", remote_table->get_name());
+    if (Obj base_obj = remote_table->try_get_object(m_obj_key)) {
+        path += util::format(".pk=%1", base_obj.get_primary_key());
+    }
+    else {
+        path += util::format(".%1(removed)", m_obj_key);
+    }
     for (auto& e : m_path) {
         switch (e.type) {
             case Element::Type::ColumnKey:
@@ -352,11 +360,11 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
     return path;
 }
 
-RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& remote_wt, Transaction& local_wt,
+RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
+                                                             Transaction& frozen_pre_local_state,
                                                              util::Logger& logger)
-    : InstructionApplier(remote_wt)
-    , m_remote{remote_wt}
-    , m_local{local_wt}
+    : InstructionApplier(dest_wt)
+    , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
 {
 }
@@ -371,17 +379,47 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
     throw realm::_impl::client_reset::ClientResetFailed(full_message);
 }
 
-void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ChunkedBinaryData>& changesets)
+void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientHistory::LocalChange>& changesets,
+                                                       std::vector<sync::SubscriptionSet>&& pending_subscriptions)
 {
-    for (const ChunkedBinaryData& chunked_changeset : changesets) {
-        if (chunked_changeset.size() == 0)
+    // When recovering in PBS, we can iterate through all the changes and apply them in a single commit.
+    // This has the nice property that any exception while applying will revert the entire recovery and leave
+    // the Realm in a "pre reset" state.
+    //
+    // When recovering in FLX mode, we must apply subscription sets interleaved between the correct commits.
+    // This handles the case where some objects were subscribed to for only one commit and then unsubscribed after.
+
+    size_t subscription_index = 0;
+    auto write_pending_subscriptions_up_to = [&](version_type version) {
+        while (subscription_index < pending_subscriptions.size() &&
+               pending_subscriptions[subscription_index].snapshot_version() <= version) {
+            if (m_transaction.get_transact_stage() == DB::TransactStage::transact_Writing) {
+                // List modifications may have happened on an object which we are only subscribed to
+                // for this commit so we need to apply them as we go.
+                copy_lists_with_unrecoverable_changes();
+                m_transaction.commit_and_continue_as_read();
+            }
+            auto pre_sub = pending_subscriptions[subscription_index++];
+            auto post_sub = pre_sub.make_mutable_copy().commit();
+            m_logger.info("Recovering pending subscription version: %1 -> %2, snapshot: %3 -> %4", pre_sub.version(),
+                          post_sub.version(), pre_sub.snapshot_version(), post_sub.snapshot_version());
+        }
+        if (m_transaction.get_transact_stage() != DB::TransactStage::transact_Writing) {
+            m_transaction.promote_to_write();
+        }
+    };
+
+    for (const ClientHistory::LocalChange& change : changesets) {
+        if (change.changeset.size() == 0)
             continue;
 
-        ChunkedBinaryInputStream in{chunked_changeset};
+        ChunkedBinaryInputStream in{change.changeset};
         size_t decompressed_size;
         auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
         if (!decompressed)
             continue;
+
+        write_pending_subscriptions_up_to(change.version);
 
         sync::Changeset parsed_changeset;
         sync::parse_changeset(*decompressed, parsed_changeset); // Throws
@@ -394,6 +432,10 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<Chunked
         }
         InstructionApplier::end_apply();
     }
+
+    // write any remaining subscriptions
+    write_pending_subscriptions_up_to(std::numeric_limits<version_type>::max());
+    REALM_ASSERT_EX(subscription_index == pending_subscriptions.size(), subscription_index);
 
     copy_lists_with_unrecoverable_changes();
 }
@@ -413,13 +455,13 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
     // final state which would be [B].
     // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
     // we would know where list elements ended up or if they were deleted by the server.
-    using namespace realm::_impl::client_reset::converters;
+    using namespace realm::converters;
     std::shared_ptr<EmbeddedObjectConverter> embedded_object_tracker = std::make_shared<EmbeddedObjectConverter>();
     for (auto& it : m_lists) {
         if (!it.second.requires_manual_copy())
             continue;
 
-        std::string path_str = it.first.path_to_string(m_remote, m_intern_keys);
+        std::string path_str = it.first.path_to_string(m_transaction, m_intern_keys);
         bool did_translate = resolve(it.first, [&](LstBase& remote_list, LstBase& local_list) {
             ConstTableRef local_table = local_list.get_table();
             ConstTableRef remote_table = remote_list.get_table();
@@ -437,11 +479,12 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
         if (!did_translate) {
             // object no longer exists in the local state, ignore and continue
             m_logger.warn("Discarding a list recovery made to an object which could not be resolved. "
-                          "remote_path='%3'",
+                          "remote_path='%1'",
                           path_str);
         }
     }
     embedded_object_tracker->process_pending();
+    m_lists.clear();
 }
 
 bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
@@ -501,15 +544,15 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
 
 bool RecoverLocalChangesetsHandler::resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback)
 {
-    auto remote_table = m_remote.get_table(path.table_key());
+    auto remote_table = m_transaction.get_table(path.table_key());
     if (!remote_table)
         return false;
 
-    auto local_table = m_local.get_table(remote_table->get_name());
+    auto local_table = m_frozen_pre_local_state.get_table(remote_table->get_name());
     if (!local_table)
         return false;
 
-    auto remote_obj = remote_table->get_object(path.obj_key());
+    auto remote_obj = remote_table->try_get_object(path.obj_key());
     if (!remote_obj)
         return false;
 
@@ -872,7 +915,6 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
-            auto obj = list.get_obj();
             uint32_t translated_index;
             bool allowed_to_delete =
                 m_recovery_applier->m_lists.at(m_list_path).remove(static_cast<uint32_t>(index), translated_index);

@@ -39,12 +39,10 @@ public:
     {
         Schema schema{
             {"TopLevel",
-             {
-                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                 {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                 {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                 {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
-             }},
+             {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+              {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+              {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+              {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
         };
 
         return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
@@ -95,7 +93,7 @@ public:
         auto realm = Realm::get_shared_realm(config);
         auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
         for (const auto& table : realm->schema()) {
-            if (table.is_asymmetric || table.is_embedded) {
+            if (table.table_type != ObjectSchema::ObjectType::TopLevel) {
                 continue;
             }
             Query query_for_table(realm->read_group().get_table(table.table_key));
@@ -103,6 +101,7 @@ public:
         }
         auto subs = std::move(mut_subs).commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_download(*realm);
 
         realm->begin_transaction();
         func(realm);
@@ -118,6 +117,11 @@ public:
     std::shared_ptr<App> app() const noexcept
     {
         return m_test_session.app();
+    }
+
+    const TestAppSession& session() const
+    {
+        return m_test_session;
     }
 
 private:

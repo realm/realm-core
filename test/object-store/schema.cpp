@@ -58,7 +58,7 @@ struct SchemaChangePrinter {
     REALM_SC_PRINT(AddProperty, v.object, v.property)
     REALM_SC_PRINT(AddTable, v.object)
     REALM_SC_PRINT(RemoveTable, v.object)
-    REALM_SC_PRINT(ChangeTableType, v.object)
+    REALM_SC_PRINT(ChangeTableType, v.object, v.old_table_type, v.new_table_type)
     REALM_SC_PRINT(AddInitialProperties, v.object)
     REALM_SC_PRINT(ChangePrimaryKey, v.object, v.property)
     REALM_SC_PRINT(ChangePropertyType, v.object, v.old_property, v.new_property)
@@ -232,12 +232,10 @@ TEST_CASE("ObjectSchema") {
         REQUIRE(os.table_key == table->get_key());
         ObjectSchema os1(g, "embedded", {});
         REQUIRE(os1.table_key == embedded->get_key());
-        REQUIRE(os1.is_embedded);
-        REQUIRE(!os1.is_asymmetric);
+        REQUIRE(os1.table_type == ObjectSchema::ObjectType::Embedded);
         ObjectSchema os2(g, "asymmetric", asymmetric->get_key());
         REQUIRE(os2.table_key == asymmetric->get_key());
-        REQUIRE(os2.is_asymmetric);
-        REQUIRE(!os2.is_embedded);
+        REQUIRE(os2.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric);
 
 #define REQUIRE_PROPERTY(name, type, ...)                                                                            \
     do {                                                                                                             \
@@ -368,10 +366,10 @@ TEST_CASE("Schema") {
         SECTION("allow asymmetric tables") {
             Schema schema = {
                 {"sensor",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"reading", PropertyType::Int}}},
                 {"location",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::Sync));
@@ -380,7 +378,7 @@ TEST_CASE("Schema") {
         SECTION("asymmetric tables not allowed in local realm") {
             Schema schema = {
                 {"location",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Asymmetric table 'location' not allowed in a local Realm");
@@ -390,7 +388,7 @@ TEST_CASE("Schema") {
             Schema schema = {
                 {"object", {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
             };
             REQUIRE_THROWS_CONTAINING(
@@ -401,22 +399,22 @@ TEST_CASE("Schema") {
         SECTION("rejects link properties with asymmetric origin object") {
             Schema schema = {
                 {"object",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", {{"value", PropertyType::Int}}},
             };
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::Sync),
-                "Asymmetric table with property 'object.link' of type 'object' cannot have an object type.");
+            REQUIRE_THROWS_CONTAINING(schema.validate(SchemaValidationMode::Sync),
+                                      "Asymmetric table with property 'object.link' of type 'object' cannot have a "
+                                      "non-embedded object type.");
         }
 
         SECTION("allow embedded objects with asymmetric sync") {
             Schema schema = {
                 {"object",
-                 ObjectSchema::IsAsymmetric{true},
+                 ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}},
                   {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
-                {"link target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+                {"link target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
             };
             schema.validate(SchemaValidationMode::Sync);
         }
@@ -445,7 +443,7 @@ TEST_CASE("Schema") {
 
         SECTION("allows embedded objects in lists and dictionaries") {
             Schema schema = {
-                {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+                {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
                 {"object",
                  {
                      {"list", PropertyType::Object | PropertyType::Array, "target"},
@@ -458,7 +456,7 @@ TEST_CASE("Schema") {
 
         SECTION("rejects embedded objects in sets") {
             Schema schema = {
-                {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+                {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
                 {"object", {{"set", PropertyType::Object | PropertyType::Set, "target"}}},
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(),
@@ -469,7 +467,7 @@ TEST_CASE("Schema") {
         SECTION("rejects explicitly included embedded object orphans") {
             Schema schema = {{"target", {{"value", PropertyType::Int}}},
                              {"origin",
-                              ObjectSchema::IsEmbedded{true},
+                              ObjectSchema::ObjectType::Embedded,
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_THROWS_CONTAINING(
@@ -478,11 +476,14 @@ TEST_CASE("Schema") {
         }
 
         SECTION("allows embedded object chains starting from a top level object") {
-            Schema schema = {
-                {"top", {{"linkA", PropertyType::Object | PropertyType::Nullable, "A"}}},
-                {"A", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "B"}}},
-                {"B", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "C"}}},
-                {"C", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
+            Schema schema = {{"top", {{"linkA", PropertyType::Object | PropertyType::Nullable, "A"}}},
+                             {"A",
+                              ObjectSchema::ObjectType::Embedded,
+                              {{"link", PropertyType::Object | PropertyType::Nullable, "B"}}},
+                             {"B",
+                              ObjectSchema::ObjectType::Embedded,
+                              {{"link", PropertyType::Object | PropertyType::Nullable, "C"}}},
+                             {"C", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}}};
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
@@ -492,7 +493,7 @@ TEST_CASE("Schema") {
                               {{"value", PropertyType::Int},
                                {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "origin"}}},
                              {"origin",
-                              ObjectSchema::IsEmbedded{true},
+                              ObjectSchema::ObjectType::Embedded,
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
@@ -502,14 +503,14 @@ TEST_CASE("Schema") {
                               {{"value", PropertyType::Int},
                                {"link_to_embedded_object", PropertyType::Object | PropertyType::Array, "origin"}}},
                              {"origin",
-                              ObjectSchema::IsEmbedded{true},
+                              ObjectSchema::ObjectType::Embedded,
                               {{"array", PropertyType::Array | PropertyType::Object, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("allows linking objects from embedded to top-level") {
             Schema schema = {{"target",
-                              ObjectSchema::IsEmbedded{true},
+                              ObjectSchema::ObjectType::Embedded,
                               {{"value", PropertyType::Int}},
                               {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "origin", "array"}}},
                              {"origin", {{"array", PropertyType::Array | PropertyType::Object, "target"}}}};
@@ -521,7 +522,7 @@ TEST_CASE("Schema") {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
@@ -533,7 +534,7 @@ TEST_CASE("Schema") {
                  {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"},
                   {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
@@ -543,7 +544,7 @@ TEST_CASE("Schema") {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}}};
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(),
@@ -555,7 +556,7 @@ TEST_CASE("Schema") {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_self", PropertyType::Object | PropertyType::Array, "EmbeddedObject"}}}};
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(),
@@ -567,10 +568,10 @@ TEST_CASE("Schema") {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
                 {"EmbeddedObjectA",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_b", PropertyType::Object | PropertyType::Array, "EmbeddedObjectB"}}},
                 {"EmbeddedObjectB",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently "
                                                          "supported: 'EmbeddedObjectA.link_to_b.link_to_a'");
@@ -581,14 +582,14 @@ TEST_CASE("Schema") {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
                 {"EmbeddedObjectA",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_c", PropertyType::Object | PropertyType::Array, "EmbeddedObjectC"},
                   {"link_to_b", PropertyType::Object | PropertyType::Array, "EmbeddedObjectB"}}},
                 {"EmbeddedObjectB",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
                 {"EmbeddedObjectC",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             std::string message;
             try {
@@ -616,10 +617,10 @@ TEST_CASE("Schema") {
                 {"TopLevelObjectB",
                  {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
                 {"EmbeddedObjectA",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
                 {"EmbeddedObjectB",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
@@ -630,7 +631,7 @@ TEST_CASE("Schema") {
                 {"TopLevelObjectA",
                  {{"link1_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
                   {"link2_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
-                {"EmbeddedObjectA", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}},
+                {"EmbeddedObjectA", ObjectSchema::ObjectType::Embedded, {{"prop", PropertyType::Int}}},
             };
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
@@ -642,15 +643,15 @@ TEST_CASE("Schema") {
                  {{"link_to_embedded_A", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
                   {"link_to_embedded_B", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
                 {"EmbeddedObjectA",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {{"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
                   {"link_to_b", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
                 {"EmbeddedObjectB",
-                 ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::ObjectType::Embedded,
                  {
                      {"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
                  }},
-                {"EmbeddedObjectC", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}}
+                {"EmbeddedObjectC", ObjectSchema::ObjectType::Embedded, {{"prop", PropertyType::Int}}}
 
             };
             REQUIRE_NOTHROW(schema.validate());
@@ -824,7 +825,7 @@ TEST_CASE("Schema") {
 
         SECTION("rejects primary key on embedded table") {
             Schema schema = {{"object",
-                              ObjectSchema::IsEmbedded{true},
+                              ObjectSchema::ObjectType::Embedded,
                               {
                                   {"pk1", PropertyType::Int, Property::IsPrimary{true}},
                                   {"int", PropertyType::Int},
@@ -1076,7 +1077,7 @@ TEST_CASE("Schema") {
             Schema schema1 = {{"object 1", {{"int", PropertyType::Int}}}};
             Schema schema2 = {
                 {"object 1", {{"int", PropertyType::Int}}},
-                {"object 2", ObjectSchema::IsEmbedded{true}, {{"int", PropertyType::Int}}},
+                {"object 2", ObjectSchema::ObjectType::Embedded, {{"int", PropertyType::Int}}},
             };
 
             SECTION("AdditiveDiscovered") {
@@ -1097,9 +1098,9 @@ TEST_CASE("Schema") {
         }
 
         SECTION("add property to orphaned table") {
-            Schema schema1 = {{"object", ObjectSchema::IsEmbedded{true}, {{"int 1", PropertyType::Int}}}};
+            Schema schema1 = {{"object", ObjectSchema::ObjectType::Embedded, {{"int 1", PropertyType::Int}}}};
             Schema schema2 = {{"object",
-                               ObjectSchema::IsEmbedded{true},
+                               ObjectSchema::ObjectType::Embedded,
                                {{"int 1", PropertyType::Int}, {"int 2", PropertyType::Int}}}};
 
             SECTION("AdditiveDiscovered") {
@@ -1205,7 +1206,7 @@ TEST_CASE("Schema") {
         REQUIRE(os.table_key == table->get_key());
         ObjectSchema os1(g, "embedded", {});
         REQUIRE(os1.table_key == embedded->get_key());
-        REQUIRE(os1.is_embedded);
+        REQUIRE(os1.table_type == ObjectSchema::ObjectType::Embedded);
 
         Schema schema = {os, os1};
         REQUIRE_NOTHROW(schema.validate());

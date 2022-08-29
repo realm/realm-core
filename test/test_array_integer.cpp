@@ -31,7 +31,6 @@
 using namespace realm;
 using namespace realm::test_util;
 
-using realm::util::unwrap;
 
 TEST(ArrayIntNull_SetNull)
 {
