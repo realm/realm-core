@@ -216,7 +216,9 @@ sync::SubscriptionSet Realm::get_active_subscription_set()
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference);
+    const bool additive_mode = m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                               m_config.schema_mode == SchemaMode::AdditiveDiscovered;
+    schema.copy_keys_from(reference, additive_mode);
     m_schema = std::move(schema);
     notify_schema_changed();
 }

@@ -302,10 +302,27 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
             ++j;
         }
     }
+
     for (; i < a.size(); ++i)
         func(&a[i], nullptr);
     for (; j < b.size(); ++j)
         func(nullptr, &b[j]);
+}
+
+void Schema::append_missing_objects(const Schema& other)
+{
+    size_t i = 0;
+    Schema missing_objects;
+    Schema& current_schema = *this;
+    size_t size = std::min(current_schema.size(), other.size());
+
+    for (; i < size; ++i)
+        if (current_schema[i].name.compare(other[i].name) > 0)
+            missing_objects.push_back(other[i]);
+
+    current_schema.insert(current_schema.end(), missing_objects.begin(), missing_objects.end());
+    for (; i < other.size(); ++i)
+        current_schema.push_back(other[i]);
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
@@ -349,8 +366,10 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other) noexcept
+void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive) noexcept
 {
+    // compute properties for objects that are in common between the current schema and the new schema.
+    // Append to the end of the new schema peristed properties, all those properties that have been deleted
     zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
         if (!existing || !other)
             return;
@@ -362,14 +381,19 @@ void Schema::copy_keys_from(realm::Schema const& other) noexcept
             if (target_prop) {
                 target_prop->column_key = current_prop.column_key;
             }
-            else {
+            else if (is_schema_additive) {
                 unmatched_properties.push_back(current_prop);
             }
         }
 
-        existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
-                                              unmatched_properties.end());
+        if (is_schema_additive) {
+            existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
+                                                  unmatched_properties.end());
+        }
     });
+
+    if (is_schema_additive)
+        this->append_missing_objects(other);
 }
 
 namespace realm {

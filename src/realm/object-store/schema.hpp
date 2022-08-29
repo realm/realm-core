@@ -153,7 +153,7 @@ public:
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,
                                       bool include_removals = false) const;
 
-    void copy_keys_from(Schema const&) noexcept;
+    void copy_keys_from(Schema const&, bool is_schema_additive = false) noexcept;
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
     friend bool operator!=(Schema const& a, Schema const& b) noexcept
@@ -171,6 +171,8 @@ public:
 private:
     template <typename T, typename U, typename Func>
     static void zip_matching(T&& a, U&& b, Func&& func) noexcept;
+
+    void append_missing_objects(const Schema& other);
 };
 
 namespace schema_change {
