@@ -695,10 +695,10 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             // Fake it for "dry run" mode
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(client_version, progress.download, batch_state); // Throws
+        on_changesets_integrated(client_version, progress); // Throws
     }
     catch (const IntegrationException& e) {
-        on_integration_failure(e, batch_state);
+        on_integration_failure(e);
     }
     m_wrapper.on_sync_progress(); // Throws
 }
@@ -768,7 +768,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         process_pending_flx_bootstrap();
     }
     catch (const IntegrationException& e) {
-        on_integration_failure(e, batch_state);
+        on_integration_failure(e);
     }
 
     return true;
@@ -787,7 +787,7 @@ void SessionImpl::process_pending_flx_bootstrap()
     }
     auto& history = access_realm().get_history();
     VersionInfo new_version;
-    DownloadCursor download_cursor;
+    SyncProgress progress;
     int64_t query_version = -1;
     while (bootstrap_store->has_pending()) {
         auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
@@ -808,10 +808,6 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
 
-        if (batch_state == DownloadBatchState::LastInBatch) {
-            update_progress(*pending_batch.progress);
-        }
-
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
             pending_batch.changesets.size(), new_version, batch_state, logger,
@@ -819,14 +815,14 @@ void SessionImpl::process_pending_flx_bootstrap()
                 bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
             },
             get_transact_reporter());
-        download_cursor = pending_batch.progress->download;
+        progress = *pending_batch.progress;
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
                     pending_batch.remaining);
     }
-    on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
+    on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();

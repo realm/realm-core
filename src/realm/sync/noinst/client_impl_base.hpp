@@ -734,10 +734,9 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
-                                  DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
 
-    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
+    void on_integration_failure(const IntegrationException& e);
 
     void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
 
@@ -895,8 +894,6 @@ private:
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
-
-    DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
@@ -1068,7 +1065,6 @@ private:
     void reset_protocol_state() noexcept;
     void ensure_enlisted_to_send();
     void enlist_to_send();
-    void update_progress(const SyncProgress&);
     bool check_received_sync_progress(const SyncProgress&) noexcept;
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
@@ -1435,7 +1431,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_last_download_mark_sent          = m_last_download_mark_received;
-    m_download_batch_state = DownloadBatchState::LastInBatch;
     // clang-format on
 }
 
