@@ -210,6 +210,30 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 }
 
 
+TEST(Sync_AsyncWaitForUploadCompletionNoPendingLocalChanges)
+{
+    TEST_DIR(dir);
+    TEST_CLIENT_DB(db);
+    ClientServerFixture fixture(dir, test_context);
+    fixture.start();
+
+    Session session = fixture.make_bound_session(db, "/test");
+
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+        wt.add_table("class_foo");
+    });
+
+    auto pf = util::make_promise_future<bool>();
+    session.async_wait_for_upload_completion(
+        [promise = std::move(pf.promise), tr = db->start_read()](std::error_code ec) mutable {
+            REALM_ASSERT(!ec);
+            tr->advance_read();
+            promise.emplace_value(tr->get_history()->no_pending_local_changes(tr->get_version()));
+        });
+    CHECK(pf.future.get());
+}
+
+
 TEST(Sync_AsyncWaitForDownloadCompletion)
 {
     TEST_DIR(dir);

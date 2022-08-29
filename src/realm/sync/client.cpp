@@ -676,7 +676,7 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
 }
 
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
-                                                const ReceivedChangesets& changesets)
+                                                const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
@@ -687,7 +687,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
+            integrate_changesets(repl, progress, downloadable_bytes, changesets, version_info,
                                  batch_state); // Throws
             client_version = version_info.realm_version;
         }
@@ -695,7 +695,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             // Fake it for "dry run" mode
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(client_version, m_progress.download, batch_state); // Throws
+        on_changesets_integrated(client_version, progress.download, batch_state); // Throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e, batch_state);
