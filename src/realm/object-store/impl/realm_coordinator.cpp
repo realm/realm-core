@@ -76,41 +76,14 @@ RealmCoordinator::get_coordinator(const Realm::Config& config) NO_THREAD_SAFETY_
     auto coordinator = get_coordinator(config.path);
     util::CheckedLockGuard lock(coordinator->m_realm_mutex);
     coordinator->set_config(config);
+    coordinator->open_db();
     return coordinator;
 }
 
 std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(StringData path)
 {
     std::lock_guard<std::mutex> lock(s_coordinator_mutex);
-
-    auto& weak_coordinator = s_coordinators_per_path[path];
-    if (auto coordinator = weak_coordinator.lock()) {
-        return coordinator;
-    }
-
-    return {};
-}
-
-void RealmCoordinator::create_sync_session()
-{
-#if REALM_ENABLE_SYNC
-    if (m_sync_session)
-        return;
-
-    open_db();
-    if (m_sync_session)
-        return;
-
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, m_config);
-
-    std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-    SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
-        if (auto self = weak_self.lock()) {
-            if (self->m_notifier)
-                self->m_notifier->notify_others();
-        }
-    });
-#endif
+    return s_coordinators_per_path[path].lock();
 }
 
 void RealmCoordinator::set_config(const Realm::Config& config)
@@ -312,36 +285,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
-    if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
-        // Creating ExternalCommitHelper with mutex locked creates a potential deadlock
-        // as the commit helper calls back on the Realm::on_change (not in the constructor,
-        // but the thread sanitizer warns anyway)
-        // FIXME: this introduced a race condition, as getting a cached Realm requires
-        // that the lock be held from when the cache lookup is done until when the
-        // new Realm is added to the cache
-        realm_lock.unlock_unchecked();
-        std::unique_ptr<ExternalCommitHelper> notifier;
-        try {
-            notifier = std::make_unique<ExternalCommitHelper>(*this);
-        }
-        catch (std::system_error const& ex) {
-            throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
-        }
-        realm_lock.lock_unchecked();
-        if (!m_notifier)
-            m_notifier = std::move(notifier);
-        else {
-            // The notifier may be waiting on m_realm_mutex, in which case
-            // destroying it with m_realm_mutex held will deadlock
-            realm_lock.unlock_unchecked();
-            notifier.reset();
-            realm_lock.lock_unchecked();
-        }
-    }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
-
-    if (realm->config().sync_config)
-        create_sync_session();
 
     if (realm->config().audit_config) {
 #ifdef REALM_ENABLE_SYNC
@@ -381,7 +325,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    create_sync_session();
+    open_db();
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -390,14 +334,12 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     REALM_ASSERT(config.sync_config);
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    create_sync_session();
+    open_db();
 }
 
 #endif
 
-namespace realm {
-namespace _impl {
-REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
+REALM_NOINLINE void realm::_impl::translate_file_exception(StringData path, bool immutable)
 {
     try {
         throw;
@@ -460,8 +402,6 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
             ex.what());
     }
 }
-} // namespace _impl
-} // namespace realm
 
 void RealmCoordinator::open_db()
 {
@@ -473,11 +413,11 @@ void RealmCoordinator::open_db()
         // If we previously opened this Realm, we may have a lingering sync
         // session which outlived its RealmCoordinator. If that happens we
         // want to reuse it instead of creating a new DB.
-        auto existing_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
-        if (existing_session) {
-            m_sync_session = existing_session;
-            m_db = SyncSession::Internal::get_db(*existing_session);
+        m_sync_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
+        if (m_sync_session) {
+            m_db = SyncSession::Internal::get_db(*m_sync_session);
             m_sync_session->revive_if_needed();
+            init_external_helpers();
             return;
         }
     }
@@ -545,17 +485,52 @@ void RealmCoordinator::open_db()
         translate_file_exception(m_config.path, m_config.immutable());
     }
 
-    if (!m_config.should_compact_on_launch_function)
-        return;
-
-    size_t free_space = 0;
-    size_t used_space = 0;
-    if (auto tr = m_db->start_write(true)) {
-        tr->commit();
-        m_db->get_stats(free_space, used_space);
+    if (m_config.should_compact_on_launch_function) {
+        size_t free_space = 0;
+        size_t used_space = 0;
+        if (auto tr = m_db->start_write(true)) {
+            tr->commit();
+            m_db->get_stats(free_space, used_space);
+        }
+        if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
+            m_db->compact();
     }
-    if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
-        m_db->compact();
+
+    init_external_helpers();
+}
+
+void RealmCoordinator::init_external_helpers()
+{
+    // There's a circular dependency between SyncSession and ExternalCommitHelper
+    // where sync commits notify ECH and other commits notify sync via ECH. This
+    // happens on background threads, so to avoid needing locking on every access
+    // we have to wire things up in a specific order.
+#if REALM_ENABLE_SYNC
+    // We may have reused an existing sync session that outlived its original RealmCoordinator
+    if (m_config.sync_config && !m_sync_session)
+        m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, m_config);
+#endif
+
+    if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
+        try {
+            m_notifier = std::make_unique<ExternalCommitHelper>(*this, m_config);
+        }
+        catch (std::system_error const& ex) {
+            throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
+        }
+    }
+
+#if REALM_ENABLE_SYNC
+    if (m_sync_session) {
+        std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
+        SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
+            if (auto self = weak_self.lock()) {
+                if (self->m_notifier)
+                    self->m_notifier->notify_others();
+            }
+        });
+    }
+#endif
 }
 
 void RealmCoordinator::close()
@@ -564,10 +539,18 @@ void RealmCoordinator::close()
     m_db = nullptr;
 }
 
+void RealmCoordinator::delete_and_reopen()
+{
+    util::CheckedLockGuard lock(m_realm_mutex);
+    close();
+    util::File::remove(m_config.path);
+    open_db();
+}
+
 TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
 {
-    open_db();
-    return (frozen_transaction) ? m_db->start_frozen(version) : m_db->start_read(version);
+    REALM_ASSERT(m_db);
+    return frozen_transaction ? m_db->start_frozen(version) : m_db->start_read(version);
 }
 
 uint64_t RealmCoordinator::get_schema_version() const noexcept
@@ -622,7 +605,7 @@ void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
     m_schema_transaction_version_max = std::max(next, m_schema_transaction_version_max);
 }
 
-RealmCoordinator::RealmCoordinator() {}
+RealmCoordinator::RealmCoordinator() = default;
 
 RealmCoordinator::~RealmCoordinator()
 {

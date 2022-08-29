@@ -22,6 +22,7 @@
 #include <windows.h>
 
 namespace realm {
+struct RealmConfig;
 namespace _impl {
 class RealmCoordinator;
 
@@ -101,7 +102,7 @@ private:
 
 class ExternalCommitHelper {
 public:
-    ExternalCommitHelper(RealmCoordinator& parent);
+    ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&);
     ~ExternalCommitHelper();
 
     void notify_others();

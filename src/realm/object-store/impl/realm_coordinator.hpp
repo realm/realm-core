@@ -199,6 +199,10 @@ public:
     bool compact();
     void write_copy(StringData path, const char* key);
 
+    // Close the DB, delete the file, and then reopen it. This operation is *not*
+    // implemented in a safe manner and will only work in fairly specific circumstances
+    void delete_and_reopen() REQUIRES(!m_realm_mutex);
+
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
@@ -241,10 +245,10 @@ private:
 
     std::shared_ptr<AuditInterface> m_audit_context;
 
-    void open_db();
+    void open_db() REQUIRES(m_realm_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
-    void create_sync_session();
+    void init_external_helpers() REQUIRES(m_realm_mutex);
     std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config,
                                                std::shared_ptr<util::Scheduler> scheduler = nullptr)
         REQUIRES(m_realm_mutex);

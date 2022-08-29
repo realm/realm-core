@@ -22,13 +22,14 @@
 #include <vector>
 
 namespace realm {
+struct RealmConfig;
 
 namespace _impl {
 class RealmCoordinator;
 
 class ExternalCommitHelper {
 public:
-    ExternalCommitHelper(RealmCoordinator& parent);
+    ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&);
     ~ExternalCommitHelper();
 
     void notify_others();

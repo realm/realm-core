@@ -137,11 +137,11 @@ void ExternalCommitHelper::FdHolder::close()
     m_fd = -1;
 }
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
     : m_parent(parent)
 {
     std::string path;
-    std::string temp_dir = util::normalize_dir(parent.get_config().fifo_files_fallback_path);
+    std::string temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
     std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
 
     // Object Store needs to create a named pipe in order to coordinate notifications.
@@ -162,14 +162,14 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     // Note that hash collisions are okay here because they just result in doing extra work instead of resulting
     // in correctness problems.
 
-    path = parent.get_path() + ".note";
+    path = config.path + ".note";
     bool fifo_created = util::try_create_fifo(path);
     if (!fifo_created && !temp_dir.empty()) {
-        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(config.path));
         fifo_created = util::try_create_fifo(path);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(parent.get_path()));
+        path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(config.path));
         util::create_fifo(path);
     }
 
