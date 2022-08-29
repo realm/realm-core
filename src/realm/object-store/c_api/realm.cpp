@@ -171,8 +171,8 @@ RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_w
                                              realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
                                              bool notify_only)
 {
-    auto cb = [realm, callback, userdata = UserdataPtr{userdata, userdata_free}]() {
-        callback(realm, userdata.get());
+    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
+        callback(userdata.get());
     };
     return wrap_err([&]() {
         return (*realm)->async_begin_transaction(std::move(cb), notify_only);
@@ -182,17 +182,17 @@ RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_w
 RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
                                         realm_free_userdata_func_t userdata_free, bool allow_grouping)
 {
-    auto cb = [realm, callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
+    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
         if (err) {
             try {
                 std::rethrow_exception(err);
             }
             catch (const std::exception& e) {
-                callback(nullptr, userdata.get(), true, e.what());
+                callback(userdata.get(), true, e.what());
             }
         }
         else {
-            callback(realm, userdata.get(), false, nullptr);
+            callback(userdata.get(), false, nullptr);
         }
     };
     return wrap_err([&]() {

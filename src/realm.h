@@ -372,8 +372,8 @@ typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const r
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
 typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
-typedef void (*realm_async_begin_write_func_t)(realm_t*, realm_userdata_t userdata);
-typedef void (*realm_async_commit_func_t)(realm_t*, realm_userdata_t userdata, bool error, const char* desc);
+typedef void (*realm_async_begin_write_func_t)(realm_userdata_t userdata);
+typedef void (*realm_async_commit_func_t)(realm_userdata_t userdata, bool error, const char* desc);
 
 /**
  * Callback for realm schema changed notifications.
