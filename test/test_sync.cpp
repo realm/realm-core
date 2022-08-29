@@ -5669,10 +5669,8 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
             fixture.cancel_reconnect_delay();
         }
         else {
-            {
-                std::lock_guard<std::mutex> lk(mx);
-                failed_twice = true;
-            }
+            std::unique_lock<std::mutex> lk(mx);
+            failed_twice = true;
             fixture.stop();
             cv.notify_one();
         }
