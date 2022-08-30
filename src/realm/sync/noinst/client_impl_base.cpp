@@ -1402,26 +1402,30 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 }
 
 
-void Session::on_integration_failure(const IntegrationException& error, DownloadBatchState batch_state)
+void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        m_progress.download = m_download_progress;
-    }
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
     m_conn.close_due_to_protocol_error(error.code());
 }
 
-void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
-                                       DownloadBatchState batch_state)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
 {
     REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
-    m_download_batch_state = batch_state;
-    if (m_download_batch_state != DownloadBatchState::LastInBatch) {
-        return;
+    REALM_ASSERT(progress.download.server_version >= m_download_progress.server_version);
+    m_download_progress = progress.download;
+    bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
+    m_progress = progress;
+    if (upload_progressed) {
+        if (progress.upload.client_version > m_last_version_selected_for_upload) {
+            if (progress.upload.client_version > m_upload_progress.client_version)
+                m_upload_progress = progress.upload;
+            m_last_version_selected_for_upload = progress.upload.client_version;
+        }
+
+        check_for_upload_completion();
     }
-    m_download_progress = download_progress;
+
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
@@ -1625,8 +1629,7 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
-        (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1764,8 +1767,7 @@ void Session::send_upload_message()
 
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
-        if (m_upload_completion_notification_requested)
-            check_for_upload_completion(); // Throws
+        check_for_upload_completion(); // Throws
     }
     else {
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
@@ -2088,8 +2090,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         return;
     }
 
-    update_progress(progress);                                                           // Throws
-    initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
@@ -2272,26 +2273,6 @@ void Session::clear_resumption_delay_state()
     }
 }
 
-void Session::update_progress(const SyncProgress& progress)
-{
-    REALM_ASSERT(check_received_sync_progress(progress));
-
-    bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
-
-    m_progress = progress;
-
-    if (upload_progressed) {
-        if (progress.upload.client_version > m_last_version_selected_for_upload) {
-            if (progress.upload.client_version > m_upload_progress.client_version)
-                m_upload_progress = progress.upload;
-            m_last_version_selected_for_upload = progress.upload.client_version;
-        }
-        if (m_upload_completion_notification_requested)
-            check_for_upload_completion(); // Throws
-    }
-}
-
-
 bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
     const SyncProgress& a = m_progress;
@@ -2345,7 +2326,9 @@ bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progr
 void Session::check_for_upload_completion()
 {
     REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_upload_completion_notification_requested);
+    if (!m_upload_completion_notification_requested) {
+        return;
+    }
 
     // during an ongoing client reset operation, we never upload anything
     if (m_client_reset_operation)
