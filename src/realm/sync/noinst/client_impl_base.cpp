@@ -115,6 +115,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
+    , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
@@ -333,7 +334,7 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
     }
     m_reconnect_info.m_reason = ConnectionTerminationReason::bad_headers_in_http_response;
     bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, is_fatal); // Throws
+    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -384,7 +385,7 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
         }
     }
 
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -392,7 +393,7 @@ void Connection::websocket_protocol_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
     bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -823,7 +824,7 @@ void Connection::handle_pong_timeout()
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
     m_reconnect_info.m_reason = ConnectionTerminationReason::pong_timeout;
-    close_due_to_client_side_error(ClientError::pong_timeout, false);
+    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
 }
 
 
@@ -1004,7 +1005,7 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
         ec2 = ec;
         is_fatal = false;
     }
-    close_due_to_client_side_error(ec2, is_fatal); // Throws
+    close_due_to_client_side_error(ec2, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -1012,15 +1013,15 @@ void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
-void Connection::close_due_to_protocol_error(std::error_code ec)
+void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                         // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    bool is_fatal = true;                              // A sync protocol violation is a fatal error
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
@@ -1029,16 +1030,22 @@ void Connection::close_due_to_missing_protocol_feature()
     m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
     std::error_code ec = ClientError::missing_protocol_feature;
     bool is_fatal = true;                         // A missing protocol feature is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
 // Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal)
+void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
+                                                bool is_fatal)
 {
     logger.info("Connection closed due to error"); // Throws
     const bool try_again = !is_fatal;
-    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
+    std::string message = ec.message();
+    if (msg) {
+        message += ": ";
+        message += *msg;
+    }
+    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
 }
 
 
@@ -1387,17 +1394,15 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    const Transformer::RemoteChangeset* changesets = received_changesets.data();
-    std::size_t num_changesets = received_changesets.size();
-    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
                                         download_batch_state, logger, {}, get_transact_reporter()); // Throws
-    if (num_changesets == 1) {
+    if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
     }
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
-                     version_info.sync_version.version, num_changesets); // Throws
+                     version_info.sync_version.version, received_changesets.size()); // Throws
     }
 }
 
@@ -1406,7 +1411,7 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    m_conn.close_due_to_protocol_error(error.code());
+    m_conn.close_due_to_protocol_error(error.code(), error.what());
 }
 
 void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
@@ -2000,8 +2005,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return make_error_code(sync::ClientError::auto_client_reset_failure);
     }
     if (!did_client_reset) {
-        constexpr bool fix_up_object_ids = true;
-        repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
         this->m_last_version_selected_for_upload = 0;
