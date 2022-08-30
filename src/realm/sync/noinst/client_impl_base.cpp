@@ -1778,7 +1778,7 @@ void Session::send_query_change_message()
 
     m_last_sent_flx_query_version = latest_sub_set.version();
 
-    enlist_to_send(); // throws
+    request_download_completion_notification();
 }
 
 void Session::send_upload_message()

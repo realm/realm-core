@@ -313,6 +313,9 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
 {
     check_is_mutable();
     auto old_state = state();
+    if (error_str && new_state != State::Error) {
+        throw std::logic_error("Cannot supply an error message for a subscription set when state is not Error");
+    }
     switch (new_state) {
         case State::Uncommitted:
             throw std::logic_error("cannot set subscription set state to uncommitted");
@@ -330,17 +333,12 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             m_error_str = std::string{*error_str};
             break;
         case State::Bootstrapping:
-            if (error_str) {
-                throw std::logic_error(
-                    "Cannot supply an error message for a subscription set when state is not Error");
-            }
+            m_state = new_state;
+            break;
+        case State::AwaitingMark:
             m_state = new_state;
             break;
         case State::Complete: {
-            if (error_str) {
-                throw std::logic_error(
-                    "Cannot supply an error message for a subscription set when state is not Error");
-            }
             auto mgr = get_flx_subscription_store(); // Throws
             m_state = new_state;
             mgr->supercede_prior_to(m_tr, version());
@@ -624,11 +622,11 @@ SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
-    }
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
-    auto latest_obj = sub_sets->get_object_with_primary_key(latest_id);
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
+
+    auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
     return SubscriptionSet(weak_from_this(), *tr, latest_obj);
 }
@@ -637,15 +635,16 @@ SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
     auto res = sub_sets->where()
                    .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .Or()
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
@@ -654,28 +653,32 @@ SubscriptionSet SubscriptionStore::get_active() const
     return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
-std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
+SubscriptionStore::VersionInfo SubscriptionStore::get_active_and_latest_versions() const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return {0, 0};
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
+    VersionInfo ret;
+    ret.latest = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
+
     auto res = sub_sets->where()
                    .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .Or()
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
+    ret.active = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
-    if (res.is_empty()) {
-        return {-1, latest_id.get_int()};
-    }
+    res = sub_sets->where()
+              .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
+              .find_all(descriptor_ordering);
+    ret.pending_mark = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
-    auto active_id = res.get_object(0).get_primary_key();
-    return {active_id.get_int(), latest_id.get_int()};
+    return ret;
 }
 
 util::Optional<SubscriptionStore::PendingSubscription>
@@ -683,9 +686,8 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return util::none;
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {true}});
@@ -761,11 +763,11 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
 SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
 {
     auto sub_sets = tr.get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return {};
-    }
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
-    auto latest_obj = sub_sets->get_object_with_primary_key(latest_id);
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
+
+    auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
     TableSet ret;
     auto subs = latest_obj.get_linklist(m_sub_set_subscriptions);

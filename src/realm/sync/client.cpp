@@ -254,6 +254,7 @@ private:
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
+    int64_t m_flx_pending_mark_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
 
     bool m_initiated = false;
@@ -955,8 +956,10 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
     if (m_flx_subscription_store) {
-        std::tie(m_flx_active_version, m_flx_latest_version) =
-            m_flx_subscription_store->get_active_and_latest_versions();
+        auto versions_info = m_flx_subscription_store->get_active_and_latest_versions();
+        m_flx_active_version = versions_info.active;
+        m_flx_latest_version = versions_info.latest;
+        m_flx_pending_mark_version = versions_info.pending_mark;
     }
 }
 
@@ -1037,7 +1040,13 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
                 return;
             }
             on_flx_sync_version_complete(new_version);
-            new_state = SubscriptionSet::State::Complete;
+            if (new_version == 0) {
+                new_state = SubscriptionSet::State::Complete;
+            }
+            else {
+                new_state = SubscriptionSet::State::AwaitingMark;
+                m_flx_pending_mark_version = new_version;
+            }
             break;
         case DownloadBatchState::MoreToCome:
             if (m_flx_last_seen_version == new_version) {
@@ -1443,6 +1452,16 @@ void SessionWrapper::on_download_completion()
         m_upload_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
+
+    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
+                             m_flx_pending_mark_version);
+        auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
+        mutable_subs.update_state(SubscriptionSet::State::Complete);
+        std::move(mutable_subs).commit();
+        m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
+    }
+
     util::LockGuard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
@@ -1463,6 +1482,11 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 void SessionWrapper::on_resumed()
 {
     m_suspended = false;
+    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        m_sess->logger.debug("Requesting download notification for query version %1 after resume",
+                             m_flx_pending_mark_version);
+        m_sess->request_download_completion_notification();
+    }
     if (m_connection_state_change_listener) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {

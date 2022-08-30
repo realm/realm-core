@@ -1099,7 +1099,9 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     {
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
         auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
-        REQUIRE(sub_store->get_active_and_latest_versions() == std::pair<int64_t, int64_t>{0, 1});
+        auto version_info = sub_store->get_active_and_latest_versions();
+        REQUIRE(version_info.active == 0);
+        REQUIRE(version_info.latest == 1);
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
@@ -1500,7 +1502,9 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         REQUIRE(top_level->is_empty());
 
         auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
-        REQUIRE(sub_store->get_active_and_latest_versions() == std::pair<int64_t, int64_t>{0, 1});
+        auto version_info = sub_store->get_active_and_latest_versions();
+        REQUIRE(version_info.latest == 1);
+        REQUIRE(version_info.active == 0);
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
@@ -1735,7 +1739,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 auto latest_sub_set = session->get_flx_subscription_store()->get_latest();
                 auto active_sub_set = session->get_flx_subscription_store()->get_active();
                 REQUIRE(latest_sub_set.version() == active_sub_set.version());
-                REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
+                REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
 
                 auto db = SyncSession::OnlyForTesting::get_db(*session);
                 auto tr = db->start_read();

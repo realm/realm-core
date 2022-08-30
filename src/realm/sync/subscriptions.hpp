@@ -90,13 +90,13 @@ public:
     /*
      * State diagram:
      *
-     *                    ┌───────────┬─────────►Error─────────┐
-     *                    │           │                        │
-     *                    │           │                        ▼
-     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superseded
-     *                    │                                    ▲
-     *                    │                                    │
-     *                    └────────────────────────────────────┘
+     *                    ┌───────────┬─────────►Error─────────────┐
+     *                    │           │                            │
+     *                    │           │                            ▼
+     *   Uncommitted──►Pending──►Bootstrapping──►AwaitingMark──►Complete───►Superseded
+     *                    │                                        ▲
+     *                    │                                        │
+     *                    └────────────────────────────────────────┘
      *
      */
     enum class State : int64_t {
@@ -107,6 +107,9 @@ public:
         Pending,
         // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
+        // The last bootstrap message containing the initial state for this subscription set has been received. The
+        // client is awaiting a mark message to mark this subscription as fully caught up to history.
+        AwaitingMark,
         // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
         // An error occurred while processing this subscription set on the server. Check error_str() for details.
@@ -115,6 +118,8 @@ public:
         // local storage of subscription sets.
         Superseded,
     };
+
+    static constexpr int64_t EmptyVersion = int64_t(-1);
 
     // Used in tests.
     inline friend std::ostream& operator<<(std::ostream& o, State state)
@@ -128,6 +133,9 @@ public:
                 break;
             case State::Bootstrapping:
                 o << "Bootstrapping";
+                break;
+            case State::AwaitingMark:
+                o << "AwaitingMark";
                 break;
             case State::Complete:
                 o << "Complete";
@@ -312,9 +320,14 @@ public:
     // zero.
     SubscriptionSet get_active() const;
 
+    struct VersionInfo {
+        int64_t latest;
+        int64_t active;
+        int64_t pending_mark;
+    };
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
-    std::pair<int64_t, int64_t> get_active_and_latest_versions() const;
+    VersionInfo get_active_and_latest_versions() const;
 
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
