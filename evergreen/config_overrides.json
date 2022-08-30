@@ -11,7 +11,7 @@
         }
     },
     "sync": {
-        "brokerRegistryCacheTTL": "0s",
         "allowSyncSessionTestCommands": true
     }
+  }
 }
