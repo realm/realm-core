@@ -333,6 +333,72 @@ void LinkChain::add(ColKey ck)
     m_link_cols.push_back(ck);
 }
 
+LinkTranslator::LinkTranslator(Obj origin, ColKey origin_col_key)
+    : m_origin_obj(origin)
+    , m_origin_col_key(origin_col_key)
+{
+}
+
+void LinkTranslator::run()
+{
+    ColumnAttrMask attr = m_origin_col_key.get_attrs();
+    if (attr.test(col_attr_List)) {
+        if (m_origin_col_key.get_type() == col_type_LinkList) {
+            LnkLst link_list = m_origin_obj.get_linklist(m_origin_col_key);
+            on_list_of_links(link_list);
+        }
+        else if (m_origin_col_key.get_type() == col_type_Mixed) {
+            Lst<Mixed> list = m_origin_obj.get_list<Mixed>(m_origin_col_key);
+            on_list_of_mixed(list);
+        }
+        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
+            Lst<ObjLink> list = m_origin_obj.get_list<ObjLink>(m_origin_col_key);
+            on_list_of_typedlink(list);
+        }
+        else {
+            throw std::runtime_error(
+                util::format("LinkTranslator unhandled list type: %1", m_origin_col_key.get_type()));
+        }
+    }
+    else if (attr.test(col_attr_Set)) {
+        if (m_origin_col_key.get_type() == col_type_Link) {
+            LnkSet set = m_origin_obj.get_linkset(m_origin_col_key);
+            on_set_of_links(set);
+        }
+        else if (m_origin_col_key.get_type() == col_type_Mixed) {
+            Set<Mixed> set = m_origin_obj.get_set<Mixed>(m_origin_col_key);
+            on_set_of_mixed(set);
+        }
+        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
+            Set<ObjLink> set = m_origin_obj.get_set<ObjLink>(m_origin_col_key);
+            on_set_of_typedlink(set);
+        }
+        else {
+            throw std::runtime_error(
+                util::format("LinkTranslator unhandled set type: %1", m_origin_col_key.get_type()));
+        }
+    }
+    else if (attr.test(col_attr_Dictionary)) {
+        auto dict = m_origin_obj.get_dictionary(m_origin_col_key);
+        on_dictionary(dict);
+    }
+    else {
+        REALM_ASSERT_EX(!m_origin_col_key.is_collection(), m_origin_col_key);
+        if (m_origin_col_key.get_type() == col_type_Link) {
+            on_link_property(m_origin_col_key);
+        }
+        else if (m_origin_col_key.get_type() == col_type_Mixed) {
+            on_mixed_property(m_origin_col_key);
+        }
+        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
+            on_typedlink_property(m_origin_col_key);
+        }
+        else {
+            throw std::runtime_error(
+                util::format("LinkTranslator unhandled property type: %1", m_origin_col_key.get_type()));
+        }
+    }
+}
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -1115,14 +1181,33 @@ void Table::set_embedded(bool embedded)
     }
     else if (size() > 0) {
         for (auto object : *this) {
-            size_t backlink_count = object.get_backlink_count();
+            size_t backlink_count = 0;
+            for_each_backlink_column([&](ColKey backlink_col_key) {
+                size_t cur_backlinks = object.get_backlink_cnt(backlink_col_key);
+                if (cur_backlinks > 0) {
+                    // Make sure this link is not an untyped ObjLink which lacks core support in many places
+                    ColKey source_col = get_opposite_column(backlink_col_key);
+                    REALM_ASSERT(source_col); // backlink columns should always have a source
+                    TableRef source_table = get_opposite_table(backlink_col_key);
+                    ColKey forward_col_mapped = source_table->get_opposite_column(source_col);
+                    if (!forward_col_mapped) {
+                        throw std::logic_error(util::format("There is a dynamic/untyped link from a Mixed property "
+                                                            "'%1.%2' which prevents migrating class '%3' to embedded",
+                                                            source_table->get_name(),
+                                                            source_table->get_column_name(source_col), get_name()));
+                    }
+                }
+                backlink_count += cur_backlinks;
+                if (backlink_count > 1) {
+                    throw std::logic_error(
+                        util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
+                }
+                return false; // continue
+            });
+
             if (backlink_count == 0) {
                 throw std::logic_error(util::format(
                     "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
-            }
-            else if (backlink_count > 1) {
-                throw std::logic_error(
-                    util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
             }
         }
     }

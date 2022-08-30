@@ -426,6 +426,8 @@ private:
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
+    template <class ArrayType, class ValueType>
+    inline void nullify_single_link(ColKey col, ValueType target);
 
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
 };
