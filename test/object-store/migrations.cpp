@@ -3012,7 +3012,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE_NOTHROW(realm->update_schema(remove_property(schema, "object", "value")));
             REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 2);
             auto const& properties = realm->schema().find("object")->persisted_properties;
-            REQUIRE(properties.size() == 1);
+            REQUIRE(properties.size() == 2);
             auto col_keys = table->get_column_keys();
             REQUIRE(col_keys.size() == 2);
             REQUIRE(properties[0].column_key == col_keys[1]);
@@ -3100,10 +3100,14 @@ TEST_CASE("migration: AdditiveDiscovered") {
             realm2.reset();
             realm3.reset();
 
+            // In case of additive schemas, changes to an external realm are on purpose
+            // propagated between different realm instances.
             realm = Realm::get_shared_realm(config);
-            REQUIRE(realm->schema() == schema);
+            REQUIRE(realm->schema() != schema);
+            REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
             REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
             REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+            REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
         }
 
         DYNAMIC_SECTION("can have different subsets of columns in different Realm instances" << mode_string) {
@@ -3119,7 +3123,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             auto realm3 = Realm::get_shared_realm(config3);
             REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
             REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
-            REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 1);
+            REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 3);
 
             realm->refresh();
             realm2->refresh();
