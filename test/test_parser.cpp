@@ -4113,6 +4113,16 @@ TEST(Parser_Object)
 }
 
 
+TEST(Parser_Contains)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto str_col_key = table->add_column(type_String, "str", true);
+    table->create_object().set(str_col_key, "Here is a Unicorn 🦄 today");
+    verify_query(test_context, table, "str CONTAINS 'unicorn 🦄 today'", 0);
+    verify_query(test_context, table, "str CONTAINS[c] 'unicorn 🦄 today'", 1);
+}
+
 TEST(Parser_OddColumnNames)
 {
     Group g;
