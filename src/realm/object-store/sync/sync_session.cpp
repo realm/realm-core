@@ -392,7 +392,28 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         std::move(fresh_mut_sub)
             .commit()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+            .then([=, weak_self = weak_from_this()](sync::SubscriptionSet::State) {
+                auto pf = util::make_promise_future<void>();
+                sync_session->wait_for_download_completion([=, promise = std::move(pf.promise)](
+                                                               std::error_code ec) mutable {
+                    auto strong_self = weak_self.lock();
+                    if (!strong_self) {
+                        return promise.set_error({ErrorCodes::RuntimeError,
+                                                  "SyncSession was destroyed before download could be completed"});
+                    }
+
+                    if (ec) {
+                        return promise.set_error(
+                            {ErrorCodes::RuntimeError,
+                             util::format("Error waiting for download completion for fresh realm (code: %1): %2",
+                                          ec.value(), ec.message())});
+                    }
+
+                    promise.emplace_value();
+                });
+                return std::move(pf.future);
+            })
+            .get_async([=, weak_self = weak_from_this()](Status s) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 sync_session->close();
@@ -401,8 +422,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                         strong_self->handle_fresh_realm_downloaded(db, none, server_requests_action);
                     }
                     else {
-                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status().reason(),
-                                                                   server_requests_action);
+                        strong_self->handle_fresh_realm_downloaded(nullptr, s.reason(), server_requests_action);
                     }
                 }
             });
