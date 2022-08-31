@@ -30,7 +30,6 @@ struct ProtocolCodecException : public std::runtime_error {
 };
 class HeaderLineParser {
 public:
-    HeaderLineParser() = default;
     explicit HeaderLineParser(std::string_view line)
         : m_sv(line)
     {

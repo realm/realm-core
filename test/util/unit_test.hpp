@@ -119,7 +119,8 @@
                 test_context.check_succeeded();                                                                      \
                 return true;                                                                                         \
             }                                                                                                        \
-            test_context.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, #exception_cond);         \
+            test_context.throw_ex_cond_failed(__FILE__, __LINE__, e.what(), #expr, #exception_class,                 \
+                                              #exception_cond);                                                      \
         }                                                                                                            \
         return false;                                                                                                \
     }())
@@ -521,8 +522,8 @@ public:
     void throw_failed(const char* file, long line, const char* expr_text, const char* exception_name);
     void throw_ex_failed(const char* file, long line, const char* expr_text, const char* exception_name,
                          const char* exception_cond_text);
-    void throw_ex_cond_failed(const char* file, long line, const char* expr_text, const char* exception_name,
-                              const char* exception_cond_text);
+    void throw_ex_cond_failed(const char* file, long line, const char* exception_what, const char* expr_text,
+                              const char* exception_name, const char* exception_cond_text);
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
     std::string get_test_name() const;

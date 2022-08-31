@@ -246,15 +246,13 @@ public:
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
     ///
-    /// \param num_changesets The number of passed changesets. Must be non-zero.
-    ///
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
     void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                     const RemoteChangeset* changesets, std::size_t num_changesets,
-                                     VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
-                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
+                                     util::Span<const RemoteChangeset> changesets, VersionInfo& new_version,
+                                     DownloadBatchState download_type, util::Logger&,
+                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr = nullptr,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
@@ -381,8 +379,15 @@ private:
     // ServerHistory object.
     mutable util::Optional<Arrays> m_arrays;
 
-    mutable std::vector<char> m_changeset_from_server_owner;
-    mutable util::Optional<HistoryEntry> m_changeset_from_server;
+    // When applying server changesets, we create a history entry with the data
+    // from the server instead of using the one generated from applying the
+    // instructions to the local data. integrate_server_changesets() sets this
+    // to true to indicate to add_changeset() that it should skip creating a
+    // history entry.
+    //
+    // This field is guarded by the DB's write lock and should only be accessed
+    // while that is held.
+    mutable bool m_applying_server_changeset = false;
 
     util::Optional<BinaryData> m_client_reset_changeset;
 
@@ -412,7 +417,7 @@ private:
 
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
-    void add_sync_history_entry(HistoryEntry);
+    void add_sync_history_entry(const HistoryEntry&);
     void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
     void trim_ct_history();
     void trim_sync_history();
@@ -480,7 +485,6 @@ public:
 
     // Overriding member functions in realm::Replication
     version_type prepare_changeset(const char*, size_t, version_type) override;
-    void finalize_changeset() noexcept override;
 
     ClientHistory& get_history() noexcept
     {

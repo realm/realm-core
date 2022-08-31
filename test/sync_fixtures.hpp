@@ -541,6 +541,7 @@ public:
             config_2.disable_upload_compaction = config.disable_upload_compaction;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
+            config_2.fix_up_object_ids = true;
             m_clients[i] = std::make_unique<Client>(std::move(config_2));
         }
 
