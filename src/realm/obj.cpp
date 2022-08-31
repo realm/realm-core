@@ -32,6 +32,7 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
 #include "realm/replication.hpp"
