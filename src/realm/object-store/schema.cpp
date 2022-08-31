@@ -65,25 +65,6 @@ Schema::iterator Schema::find(StringData name) noexcept
             it = end();
     }
     return it;
-
-    //    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
-    //        return lft.name < rgt;
-    //    });
-    //    if (it != end() && it->name != name) {
-    //        it = end();
-    //    }
-    //
-    //    if(it == end()) {
-    //        it = std::lower_bound(m_others.begin(), m_others.end(), name, [](ObjectSchema const& lft, StringData
-    //        rgt) {
-    //            return lft.name < rgt;
-    //        });
-    //
-    //        if(it != m_others.end() && it->name != name)
-    //            return it = end();
-    //    }
-    //
-    //    return it;
 }
 
 Schema::const_iterator Schema::find(StringData name) const noexcept
