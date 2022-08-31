@@ -22,15 +22,6 @@ struct Changeset {
     using file_ident_type = uint_fast64_t;
     using version_type = uint_fast64_t; // FIXME: Get from `History`.
 
-    Changeset();
-    struct share_buffers_tag {
-    };
-    Changeset(const Changeset&, share_buffers_tag);
-    Changeset(Changeset&&) = default;
-    Changeset& operator=(Changeset&&) = default;
-    Changeset(const Changeset&) = delete;
-    Changeset& operator=(const Changeset&) = delete;
-
     InternString intern_string(StringData);              // Slow!
     InternString find_string(StringData) const noexcept; // Slow!
     StringData string_data() const noexcept;
@@ -195,8 +186,8 @@ struct Changeset {
 
 private:
     std::vector<Instruction> m_instructions;
-    std::shared_ptr<std::string> m_string_buffer;
-    std::shared_ptr<InternStrings> m_strings;
+    std::string m_string_buffer;
+    InternStrings m_strings;
     bool m_is_dirty = false;
 
     iterator const_iterator_to_iterator(const_iterator);
@@ -471,45 +462,44 @@ inline void Changeset::clear() noexcept
 
 inline util::Optional<StringBufferRange> Changeset::try_get_intern_string(InternString string) const noexcept
 {
-    if (string.value >= m_strings->size())
+    if (string.value >= m_strings.size())
         return util::none;
-    return (*m_strings)[string.value];
+    return m_strings[string.value];
 }
 
 inline StringBufferRange Changeset::get_intern_string(InternString string) const noexcept
 {
-    auto str = try_get_intern_string(string);
-    REALM_ASSERT(str);
-    return *str;
+    REALM_ASSERT(string.value < m_strings.size());
+    return m_strings[string.value];
 }
 
 inline InternStrings& Changeset::interned_strings() noexcept
 {
-    return *m_strings;
+    return m_strings;
 }
 
 inline const InternStrings& Changeset::interned_strings() const noexcept
 {
-    return *m_strings;
+    return m_strings;
 }
 
 inline auto Changeset::string_buffer() noexcept -> std::string&
 {
-    return *m_string_buffer;
+    return m_string_buffer;
 }
 
 inline auto Changeset::string_buffer() const noexcept -> const std::string&
 {
-    return *m_string_buffer;
+    return m_string_buffer;
 }
 
 inline util::Optional<StringData> Changeset::try_get_string(StringBufferRange range) const noexcept
 {
-    if (range.offset > m_string_buffer->size())
+    if (range.offset > m_string_buffer.size())
         return util::none;
-    if (range.offset + range.size > m_string_buffer->size())
+    if (range.offset + range.size > m_string_buffer.size())
         return util::none;
-    return StringData{m_string_buffer->data() + range.offset, range.size};
+    return StringData{m_string_buffer.data() + range.offset, range.size};
 }
 
 inline util::Optional<StringData> Changeset::try_get_string(InternString str) const noexcept
@@ -534,7 +524,7 @@ inline StringData Changeset::get_string(InternString string) const noexcept
 
 inline StringData Changeset::string_data() const noexcept
 {
-    return StringData{m_string_buffer->data(), m_string_buffer->size()};
+    return StringData{m_string_buffer.data(), m_string_buffer.size()};
 }
 
 inline StringBufferRange Changeset::append_string(StringData string)
@@ -542,11 +532,11 @@ inline StringBufferRange Changeset::append_string(StringData string)
     // We expect more strings. Only do this at the beginning because until C++20, reserve
     // will shrink_to_fit if the request is less than the current capacity.
     constexpr size_t small_string_buffer_size = 1024;
-    if (m_string_buffer->capacity() < small_string_buffer_size) {
-        m_string_buffer->reserve(small_string_buffer_size);
+    if (m_string_buffer.capacity() < small_string_buffer_size) {
+        m_string_buffer.reserve(small_string_buffer_size);
     }
-    size_t offset = m_string_buffer->size();
-    m_string_buffer->append(string.data(), string.size());
+    size_t offset = m_string_buffer.size();
+    m_string_buffer.append(string.data(), string.size());
     return StringBufferRange{uint32_t(offset), uint32_t(string.size())};
 }
 
