@@ -1391,9 +1391,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_pk_name != right_pk_name) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "' on one side,"
-                          "but primary key '"
-                       << right_pk_name << "' on the other.";
+                       << "' on one side, but primary key '" << right_pk_name << "' on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1408,7 +1406,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_spec->pk_nullable != right_spec->pk_nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is nullable on one side, but not the other";
+                       << "', which is nullable on one side, but not the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1427,7 +1425,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
                 std::stringstream ss;
-                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other";
+                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other.";
                 throw SchemaMismatchError(ss.str());
             }
         }
@@ -2522,8 +2520,8 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 }
 
 void TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                  version_type current_local_version, Changeset* parsed_changesets,
-                                                  std::size_t num_changesets, util::Logger* logger)
+                                                  version_type current_local_version,
+                                                  util::Span<Changeset> parsed_changesets, util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
@@ -2532,8 +2530,8 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
     try {
         // p points to the beginning of a range of changesets that share the same
         // "base", i.e. are based on the same local version.
-        auto p = parsed_changesets;
-        auto parsed_changesets_end = parsed_changesets + num_changesets;
+        auto p = parsed_changesets.begin();
+        auto parsed_changesets_end = parsed_changesets.end();
         while (p != parsed_changesets_end) {
             // Find the range of incoming changesets that share the same
             // last_integrated_local_version, which means we can merge them in one go.
@@ -2586,14 +2584,11 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
 Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
                                                      version_type version, const HistoryEntry& history_entry)
 {
-    auto p = m_reciprocal_transform_cache.emplace(version, nullptr); // Throws
-    auto i = p.first;
-    if (p.second) {
-        i->second = std::make_unique<Changeset>(); // Throws
+    auto& changeset = m_reciprocal_transform_cache[version]; // Throws
+    if (changeset.empty()) {
         bool is_compressed = false;
         ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
-        Changeset& changeset = *i->second;
         if (is_compressed) {
             size_t total_size;
             auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
@@ -2612,28 +2607,22 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
             origin_file_ident = local_file_ident;
         changeset.origin_file_ident = origin_file_ident;
     }
-    return *i->second;
+    return changeset;
 }
 
 
 void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history)
 {
-    try {
-        ChangesetEncoder::Buffer output_buffer;
-        for (const auto& entry : m_reciprocal_transform_cache) {
-            if (entry.second->is_dirty()) {
-                encode_changeset(*entry.second, output_buffer); // Throws
-                version_type version = entry.first;
-                BinaryData data{output_buffer.data(), output_buffer.size()};
-                history.set_reciprocal_transform(version, data); // Throws
-                output_buffer.clear();
-            }
+    auto changesets = std::move(m_reciprocal_transform_cache);
+    m_reciprocal_transform_cache.clear();
+    ChangesetEncoder::Buffer output_buffer;
+    for (const auto& [version, changeset] : changesets) {
+        if (changeset.is_dirty()) {
+            encode_changeset(changeset, output_buffer); // Throws
+            BinaryData data{output_buffer.data(), output_buffer.size()};
+            history.set_reciprocal_transform(version, data); // Throws
+            output_buffer.clear();
         }
-        m_reciprocal_transform_cache.clear();
-    }
-    catch (...) {
-        m_reciprocal_transform_cache.clear();
-        throw;
     }
 }
 
