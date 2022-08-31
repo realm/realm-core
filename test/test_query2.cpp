@@ -6024,6 +6024,9 @@ TEST(Query_FullTextMulti)
     tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
     CHECK_EQUAL(2, tv.size());
 
+    tv = origin->query("link.text TEXT 'object gemstone'").find_all();
+    CHECK_EQUAL(2, tv.size());
+
     // through LnkLst
     auto obj = tv.get_object(0);
     auto ll = obj.get_linklist(col_link);
@@ -6036,6 +6039,9 @@ TEST(Query_FullTextMulti)
 
     // many terms
     tv = table->where().fulltext(col, "object database management brown").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    tv = table->query("text TEXT 'object database management brown'").find_all();
     CHECK_EQUAL(1, tv.size());
 
     while (table->size() > 0) {
