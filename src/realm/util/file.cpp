@@ -835,12 +835,6 @@ void File::prealloc(size_t size)
 #endif
     };
 
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
-    // Mostly Linux only
-    if (!prealloc_if_supported(0, new_size)) {
-        consume_space_interlocked();
-    }
-#else // Non-atomic fallback
 #if REALM_PLATFORM_APPLE
     // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and
     // ftruncate().
@@ -901,15 +895,14 @@ void File::prealloc(size_t size)
         // so this is some other runtime error and not OutOfDiskSpace
         throw std::system_error(err, std::system_category(), "ftruncate() inside prealloc() failed");
     }
-#elif REALM_ANDROID || defined(_WIN32)
-
-    consume_space_interlocked();
-
 #else
-#error Please check if/how your OS supports file preallocation
-#endif
 
-#endif // !(_POSIX_C_SOURCE >= 200112L)
+    // Mostly Linux only
+    if (!prealloc_if_supported(0, new_size)) {
+        consume_space_interlocked();
+    }
+
+#endif // REALM_PLATFORM_APPLE
 }
 
 

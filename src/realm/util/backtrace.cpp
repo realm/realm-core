@@ -23,13 +23,13 @@
 #include <cstdlib>
 #include <cstring>
 
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID && __GLIBC__)
 #include <execinfo.h>
 #endif
 
 using namespace realm::util;
 
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID && __GLIBC__)
 static const size_t g_backtrace_depth = 128;
 #endif
 static const char* g_backtrace_error = "<error calculating backtrace>";
@@ -105,7 +105,7 @@ Backtrace& Backtrace::operator=(const Backtrace& other) noexcept
 
 Backtrace Backtrace::capture() noexcept
 {
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
+#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID && __GLIBC__)
     static_cast<void>(g_backtrace_unsupported_error);
     void* callstack[g_backtrace_depth];
     int frames = ::backtrace(callstack, g_backtrace_depth);
