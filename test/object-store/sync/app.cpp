@@ -4262,6 +4262,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
     }
 }
 
+#if 0
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
@@ -4354,3 +4355,4 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
+#endif
