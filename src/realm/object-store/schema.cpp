@@ -58,13 +58,32 @@ Schema::Schema(base types) noexcept
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
-        return lft.name < rgt;
-    });
-    if (it != end() && it->name != name) {
-        it = end();
+    auto it = find(*this, name);
+    if (it == end()) {
+        it = find(m_others, name);
+        if (it == m_others.end())
+            it = end();
     }
     return it;
+
+    //    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
+    //        return lft.name < rgt;
+    //    });
+    //    if (it != end() && it->name != name) {
+    //        it = end();
+    //    }
+    //
+    //    if(it == end()) {
+    //        it = std::lower_bound(m_others.begin(), m_others.end(), name, [](ObjectSchema const& lft, StringData
+    //        rgt) {
+    //            return lft.name < rgt;
+    //        });
+    //
+    //        if(it != m_others.end() && it->name != name)
+    //            return it = end();
+    //    }
+    //
+    //    return it;
 }
 
 Schema::const_iterator Schema::find(StringData name) const noexcept
@@ -318,11 +337,25 @@ void Schema::append_missing_objects(const Schema& other)
 
     for (; i < size; ++i)
         if (current_schema[i].name.compare(other[i].name) > 0)
-            missing_objects.push_back(other[i]);
+            m_others.push_back(other[i]);
 
-    current_schema.insert(current_schema.end(), missing_objects.begin(), missing_objects.end());
     for (; i < other.size(); ++i)
-        current_schema.push_back(other[i]);
+        m_others.push_back(other[i]);
+
+    std::sort(m_others.begin(), m_others.end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+        return lft.name < rgt.name;
+    });
+}
+
+Schema::iterator Schema::find(std::vector<ObjectSchema>& schema, StringData name) noexcept
+{
+    auto it = std::lower_bound(schema.begin(), schema.end(), name, [](ObjectSchema const& lft, StringData rgt) {
+        return lft.name < rgt;
+    });
+    if (it != schema.end() && it->name != name) {
+        it = schema.end();
+    }
+    return it;
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,

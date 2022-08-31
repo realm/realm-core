@@ -173,6 +173,9 @@ private:
     static void zip_matching(T&& a, U&& b, Func&& func) noexcept;
 
     void append_missing_objects(const Schema& other);
+    iterator find(std::vector<ObjectSchema>& schema, StringData name) noexcept;
+
+    std::vector<ObjectSchema> m_others;
 };
 
 namespace schema_change {
