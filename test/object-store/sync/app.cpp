@@ -1997,7 +1997,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request_hook) {
                 request_hook(request);
@@ -2967,9 +2967,9 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         {
         }
 
-        void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
-            completion_block(std::move(request), Response{0, m_code, http_headers_t(), m_message});
+            completion_block(std::move(request), Response{0, m_code, util::HTTPHeaders(), m_message});
         }
 
     private:
@@ -3051,7 +3051,7 @@ public:
     }
 
 private:
-    void handle_profile(Request& request, http_completion_t& completion_block)
+    void handle_profile(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3070,7 +3070,7 @@ private:
         completion_block(std::move(request), Response{200, 0, {}, response});
     }
 
-    void handle_login(Request& request, http_completion_t& completion_block)
+    void handle_login(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3093,7 +3093,7 @@ private:
         completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_location(Request& request, http_completion_t& completion_block)
+    void handle_location(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -3107,7 +3107,7 @@ private:
         completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(Request& request, http_completion_t& completion_block)
+    void handle_create_api_key(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3121,7 +3121,7 @@ private:
         completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(Request& request, http_completion_t& completion_block)
+    void handle_fetch_api_key(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3135,7 +3135,7 @@ private:
         completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(Request& request, http_completion_t& completion_block)
+    void handle_fetch_api_keys(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3151,7 +3151,7 @@ private:
         completion_block(request, Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(Request& request, http_completion_t& completion_block)
+    void handle_token_refresh(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3166,7 +3166,7 @@ private:
     }
 
 public:
-    void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+    void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
     {
         if (request.url.find("/login") != std::string::npos) {
             handle_login(request, completion_block);
@@ -3352,7 +3352,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
     SECTION("login_anonymous bad") {
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     completion_block(std::move(request), {200, 0, {}, user_json(bad_access_token).dump()});
@@ -3569,7 +3569,7 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+    void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
     {
         completion_block(std::move(request), Response(*m_response));
     }
@@ -3629,7 +3629,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("session error code") {
-        response.headers = http_headers_t{{"Content-Type", "application/json"}};
+        response.headers = util::HTTPHeaders{{"Content-Type", "application/json"}};
         response.http_status_code = 400;
         response.body = nlohmann::json({{"error_code", "MongoDBError"},
                                         {"error", "a fake MongoDB error message!"},
@@ -3934,7 +3934,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -3964,7 +3964,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -4006,7 +4006,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             bool get_profile_2_hit = false;
             bool refresh_hit = false;
 
-            void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     login_hit = true;
@@ -4069,7 +4069,7 @@ public:
     {
     }
 
-    void add_work_item(Request request, Response response, http_completion_t completion_block)
+    void add_work_item(Request request, Response response, HttpCompletion completion_block)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
         transport_work.push_front(
@@ -4097,7 +4097,7 @@ private:
     struct ResponseWorkItem {
         Request request;
         Response response;
-        http_completion_t completion_block;
+        HttpCompletion completion_block;
     };
 
     void worker_routine()
@@ -4182,7 +4182,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
@@ -4288,7 +4288,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_ws_hostname = "wsproto://host:1234";
 
     struct transport : UnitTestTransport {
-        void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
@@ -4484,7 +4484,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request, http_completion_t&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 state.advance_to(TestState::login);

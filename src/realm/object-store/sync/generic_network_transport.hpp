@@ -164,7 +164,6 @@ std::ostream& operator<<(std::ostream& os, AppError error);
  */
 enum class HttpMethod { get, post, patch, put, del };
 
-using http_headers_t = std::map<std::string, std::string, realm::util::HeterogeneousCaseInsensitiveCompare>;
 /**
  * An HTTP request that can be made to an arbitrary server.
  */
@@ -188,7 +187,7 @@ struct Request {
     /**
      * The HTTP headers of this request - keys are case insensitive.
      */
-    http_headers_t headers;
+    util::HTTPHeaders headers;
 
     /**
      * The body of the request.
@@ -221,7 +220,7 @@ struct Response {
     /**
      * The headers of the HTTP response - keys are case insensitive.
      */
-    http_headers_t headers;
+    util::HTTPHeaders headers;
 
     /**
      * The body of the HTTP response.
@@ -234,11 +233,12 @@ struct Response {
     util::Optional<ClientErrorCode> client_error_code;
 };
 
-using http_completion_t = realm::util::UniqueFunction<void(const Request&, const Response&)>;
+
+using HttpCompletion = util::UniqueFunction<void(const Request&, const Response&)>;
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request, http_completion_t&& completion_block) = 0;
+    virtual void send_request_to_server(Request&& request, HttpCompletion&& completion_block) = 0;
     virtual ~GenericNetworkTransport() = default;
 };
 

@@ -57,13 +57,13 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     }
 
     if (response.client_error_code) {
-        error_msg = (!response.body.empty()) ? response.body : "client error code value considered fatal";
+        error_msg = response.body.empty() ? "client error code value considered fatal" : response.body;
         return AppError(make_client_error_code(*(response.client_error_code)), error_msg, "",
                         response.http_status_code);
     }
 
     if (response.custom_status_code != 0) {
-        error_msg = (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        error_msg = response.body.empty() ? "non-zero custom status code considered fatal" : response.body;
         return AppError(make_custom_error_code(response.custom_status_code), error_msg, "",
                         response.http_status_code);
     }

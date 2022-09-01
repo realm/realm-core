@@ -134,10 +134,10 @@ enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 
 // generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is
 // passed
-http_headers_t get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
-                                   RequestTokenType token_type = RequestTokenType::RefreshToken)
+util::HTTPHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
+                                      RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
-    http_headers_t headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
+    util::HTTPHeaders headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
 
     if (with_user_authorization) {
         switch (token_type) {
@@ -818,7 +818,7 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
         [completion = std::move(completion), request = std::move(request), base_url = m_base_url,
          anchor = shared_from_this()](const util::Optional<Response>& response) mutable {
             if (response) {
-                if (response->http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
+                if (util::HTTPStatus(response->http_status_code) == util::HTTPStatus::MovedPermanently) {
                     anchor->handle_redirect_response(std::move(request), std::move(const_cast<Response&>(*response)),
                                                      std::move(completion));
                 }

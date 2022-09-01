@@ -172,19 +172,20 @@ struct CustomErrorCategory : public std::error_category {
 
 CustomErrorCategory g_custom_error_category;
 
-static const std::map<std::string, ClientErrorCode> client_error_map = {
-    {"user_not_found", ClientErrorCode::user_not_found},
-    {"user_not_logged_in", ClientErrorCode::user_not_logged_in},
-    {"app_deallocated", ClientErrorCode::app_deallocated},
-    {"redirect_error", ClientErrorCode::redirect_error},
-    {"too_many_redirects", ClientErrorCode::too_many_redirects}};
-
 std::string get_error_message(ClientErrorCode error)
 {
-    for (auto it : client_error_map) {
-        if (it.second == error) {
-            return it.first;
-        }
+    static const std::vector<std::pair<std::string, ClientErrorCode>> client_errors = {
+        {"user_not_found", ClientErrorCode::user_not_found},
+        {"user_not_logged_in", ClientErrorCode::user_not_logged_in},
+        {"app_deallocated", ClientErrorCode::app_deallocated},
+        {"redirect_error", ClientErrorCode::redirect_error},
+        {"too_many_redirects", ClientErrorCode::too_many_redirects}};
+    if (auto it = std::find_if(client_errors.begin(), client_errors.end(),
+                               [&](const auto& pair) {
+                                   return pair.second == error;
+                               });
+        it != client_errors.end()) {
+        return it->first;
     }
     return "unknown";
 }

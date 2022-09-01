@@ -23,8 +23,7 @@ struct Changeset {
     using version_type = uint_fast64_t; // FIXME: Get from `History`.
 
     Changeset();
-    struct share_buffers_tag {
-    };
+    struct share_buffers_tag {};
     Changeset(const Changeset&, share_buffers_tag);
     Changeset(Changeset&&) = default;
     Changeset& operator=(Changeset&&) = default;

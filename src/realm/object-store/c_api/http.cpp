@@ -32,14 +32,14 @@ static_assert(realm_http_request_method_e(HttpMethod::del) == RLM_HTTP_REQUEST_M
 class CNetworkTransport final : public GenericNetworkTransport {
 public:
     struct HttpCompletionData {
-        HttpCompletionData(Request&& request, http_completion_t&& completion)
+        HttpCompletionData(Request&& request, HttpCompletion&& completion)
             : request(std::move(request))
             , completion(std::move(completion))
         {
         }
 
         Request request;
-        http_completion_t completion;
+        HttpCompletion completion;
     };
 
     CNetworkTransport(UserdataPtr userdata, realm_http_request_func_t request_executor)
@@ -50,9 +50,9 @@ public:
 
     static void on_response_completed(void* completion_data, const realm_http_response_t* response) noexcept
     {
-        std::unique_ptr<HttpCompletionData> comp_data(reinterpret_cast<HttpCompletionData*>(completion_data));
+        std::unique_ptr<HttpCompletionData> comp_data(static_cast<HttpCompletionData*>(completion_data));
 
-        http_headers_t headers;
+        util::HTTPHeaders headers;
         for (size_t i = 0; i < response->num_headers; i++) {
             headers.emplace(response->headers[i].name, response->headers[i].value);
         }
@@ -63,7 +63,7 @@ public:
     }
 
 private:
-    void send_request_to_server(Request&& request, http_completion_t&& completion_block) final
+    void send_request_to_server(Request&& request, HttpCompletion&& completion_block) final
     {
         std::vector<realm_http_header_t> c_headers;
         c_headers.reserve(request.headers.size());

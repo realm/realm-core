@@ -289,7 +289,7 @@ app::Response do_http_request(const app::Request& request)
     });
 
     std::string response;
-    app::http_headers_t response_headers;
+    util::HTTPHeaders response_headers;
 
     /* First set the URL that is about to receive our POST. This URL can
      just as well be a https:// URL if that is what should receive the

@@ -251,7 +251,7 @@ public:
     // the desired result
     struct TransportCallback {
         realm::app::Request request;
-        realm::app::http_completion_t completion_block;
+        realm::app::HttpCompletion completion_block;
 
         void operator()(realm::app::Response&& response)
         {
@@ -268,7 +268,7 @@ public:
         }
 
         void send_request_to_server(realm::app::Request&& request,
-                                    realm::app::http_completion_t&& completion_block) override
+                                    realm::app::HttpCompletion&& completion_block) override
         {
             *network_callback = TransportCallback{std::move(request), std::move(completion_block)};
         }
