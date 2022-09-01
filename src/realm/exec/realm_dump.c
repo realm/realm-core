@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <assert.h>
 
 #ifdef _WIN64
@@ -10,7 +11,7 @@
 #define do_seek fseek
 #endif
 
-typedef struct _Header {
+typedef struct _FileHeader {
     uint64_t m_top_ref[2]; // 2 * 8 bytes
     // Info-block 8-bytes
     uint8_t m_mnemonic[4];    // "T-DB"
@@ -18,7 +19,18 @@ typedef struct _Header {
     uint8_t m_reserved;
     // bit 0 of m_flags is used to select between the two top refs.
     uint8_t m_flags;
-} Header;
+} FileHeader;
+
+typedef struct _NodeHeader {
+    unsigned wtype;
+    unsigned width;
+    int is_inner;
+    int has_refs;
+    int context;
+    size_t size;
+    char* type;
+    size_t num_bytes;
+} NodeHeader;
 
 char to_print(unsigned char ch)
 {
@@ -28,7 +40,6 @@ char to_print(unsigned char ch)
 void dump_buffer(unsigned char* buffer, uint64_t addr, size_t sz)
 {
     char printable[20];
-    size_t index = 0;
     unsigned char* ptr = buffer;
     unsigned char* end = buffer + sz;
     while (ptr < end) {
@@ -75,67 +86,172 @@ void dump(FILE* fp, int64_t offset, size_t sz)
     }
 }
 
-size_t dump_header(FILE* fp, int64_t offset)
+int get_header(NodeHeader* node_header, FILE* fp, int64_t offset)
 {
+    memset(node_header, 0, sizeof(NodeHeader));
     unsigned char header[8];
     do_seek(fp, offset, SEEK_SET);
-    size_t actual = fread(header, 1, 8, fp);
-    if (strncmp(header, "AAAA", 4) != 0) {
+    fread(header, 1, 8, fp);
+    if (strncmp((const char*)header, "AAAA", 4) != 0) {
         printf("Ref '0x%zx' does not point to an array\n", offset);
         dump(fp, offset, 64);
         return 0;
     }
     /* dump_buffer(header, offset, 8); */
 
-    size_t size = (header[5] << 16) + (header[6] << 8) + header[7];
+    node_header->size = (header[5] << 16) + (header[6] << 8) + header[7];
 
     unsigned flags = header[4];
-    unsigned wtype = (flags & 0x18) >> 3;
-    unsigned width = (1 << (flags & 0x07)) >> 1;
-    int is_inner = (flags & 0x80) ? 1 : 0;
-    int has_refs = (flags & 0x40) ? 1 : 0;
-    int context = (flags & 0x20) ? 1 : 0;
+    node_header->wtype = (flags & 0x18) >> 3;
+    node_header->width = (1 << (flags & 0x07)) >> 1;
+    node_header->is_inner = (flags & 0x80) ? 1 : 0;
+    node_header->has_refs = (flags & 0x40) ? 1 : 0;
+    node_header->context = (flags & 0x20) ? 1 : 0;
 
-    size_t num_bytes = 0;
-    const char* type = "";
-    switch (wtype) {
+    node_header->type = "";
+    switch (node_header->wtype) {
         case 0: {
-            assert(size < 0x1000000);
-            size_t num_bits = size * width;
-            num_bytes = (num_bits + 7) >> 3;
-            type = "bits";
+            assert(node_header->size < 0x1000000);
+            size_t num_bits = node_header->size * node_header->width;
+            node_header->num_bytes = (num_bits + 7) >> 3;
+            node_header->type = "bits";
             break;
         }
         case 1: {
-            num_bytes = size * width;
-            type = "bytes";
+            node_header->num_bytes = node_header->size * node_header->width;
+            node_header->type = "bytes";
             break;
         }
         case 2:
-            num_bytes = size;
+            node_header->num_bytes = node_header->size;
             break;
     }
+    return 1;
+}
 
-    if (is_inner && has_refs) {
-        printf("Ref: %zx, Size: %zd, width: %d %s Inner B+tree node\n", offset, size, width, type);
-    }
-    else {
-        printf("Ref: %zx, Size: %zd, width: %d %s, hasRefs: %d\n", offset, size, width, type, has_refs);
+size_t dump_header(FILE* fp, int64_t offset)
+{
+    NodeHeader header;
+    if (get_header(&header, fp, offset)) {
+        if (header.is_inner && header.has_refs) {
+            printf("Ref: 0x%zx, Size: %zd, width: %d %s Inner B+tree node\n", offset, header.size, header.width,
+                   header.type);
+        }
+        else {
+            printf("Ref: 0x%zx, Size: %zd, width: %d %s, hasRefs: %d, flag: %d\n", offset, header.size, header.width,
+                   header.type, header.has_refs, header.context);
+        }
     }
 
-    return num_bytes;
+    return header.num_bytes;
 }
 
 void dump_file_header(FILE* fp)
 {
-    Header header;
+    FileHeader header;
     do_seek(fp, 0, SEEK_SET);
-    size_t actual = fread(&header, sizeof(Header), 1, fp);
+    fread(&header, sizeof(FileHeader), 1, fp);
     dump_buffer((unsigned char*)&header, 0, 24);
     size_t sz = dump_header(fp, header.m_top_ref[0]);
     dump(fp, header.m_top_ref[0] + 8, sz);
     sz = dump_header(fp, header.m_top_ref[1]);
     dump(fp, header.m_top_ref[1] + 8, sz);
+}
+
+int64_t get_top_ref(FILE* fp)
+{
+    FileHeader header;
+    do_seek(fp, 0, SEEK_SET);
+    fread(&header, sizeof(FileHeader), 1, fp);
+    return header.m_top_ref[header.m_flags];
+}
+
+int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, int* stack)
+{
+    NodeHeader header;
+    get_header(&header, fp, ref);
+    if (header.has_refs) {
+        assert(header.width >= 8);
+        size_t byte_size = header.width / 8;
+        char buffer[byte_size * header.size];
+        do_seek(fp, ref + 8, SEEK_SET);
+        fread(buffer, byte_size * header.size, 1, fp);
+        for (size_t i = 0; i < header.size; i++) {
+            stack[level] = i;
+            int64_t subref = 1;
+            switch (byte_size) {
+                case 1:
+                    subref = buffer[i];
+                    break;
+                case 2:
+                    subref = ((int16_t*)buffer)[i];
+                    break;
+                case 4:
+                    subref = ((int32_t*)buffer)[i];
+                    break;
+                case 8:
+                    subref = ((int64_t*)buffer)[i];
+                    break;
+            }
+            if (subref && (subref & 1) == 0) {
+                if (subref == target) {
+                    printf("Ref '0x%zx' found at [", target);
+                    for (size_t j = 0; j < level + 1; j++) {
+                        if (j == 0)
+                            printf("%d", stack[j]);
+                        else
+                            printf(",%d", stack[j]);
+                    }
+                    printf("]\n");
+                    return 1;
+                }
+                if (search_ref(fp, subref, target, level + 1, stack))
+                    return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void dump_index(FILE* fp, int64_t ref, const char* arr)
+{
+    char* p = (char*)arr;
+    unsigned idx = strtoll(arr, &p, 0);
+    NodeHeader header;
+    get_header(&header, fp, ref);
+    if (!header.has_refs) {
+        printf("Ref '0x%zx' does not point to an array with refs\n", ref);
+        dump_header(fp, ref);
+        exit(1);
+    }
+    if (idx >= header.size) {
+        printf("Index '%d' is out of bounds (size = %d)\n", idx, (int)header.size);
+        dump_header(fp, ref);
+        exit(1);
+    }
+
+    int64_t subref = 0;
+    assert(header.width >= 8);
+    size_t byte_size = header.width / 8;
+    int64_t offset = ref + 8 + byte_size * idx;
+    do_seek(fp, offset, SEEK_SET);
+    fread(&subref, byte_size, 1, fp);
+
+    if (subref & 1) {
+        printf("Value '%ld' is not a subref\n", subref);
+        exit(1);
+    }
+    while (isspace(*p))
+        p++;
+    if (*p == ',') {
+        p++;
+        dump_index(fp, subref, p);
+    }
+    else {
+        printf("looking up index %d at 0x%zx = 0x%zx\n", idx, (size_t)offset, subref);
+        size_t sz = dump_header(fp, subref);
+        dump(fp, subref + 8, sz);
+    }
 }
 
 void usage()
@@ -158,23 +274,46 @@ int main(int argc, const char* argv[])
 
     printf("File: '%s'\n", argv[1]);
     int64_t ref = 0;
+    int64_t find_ref = 0;
+    const char* array_str = NULL;
     if (argc == 3) {
-        char* end;
-        ref = strtoll(argv[2], &end, 0);
-        if (*end != '\0') {
-            printf("'%s' is not a number\n", argv[2]);
-            exit(1);
+        if (*argv[2] == '[') {
+            array_str = argv[2] + 1;
+        }
+        else if (*argv[2] == '?') {
+            char* end;
+            find_ref = strtoll(argv[2] + 1, &end, 0);
+            if (*end != '\0') {
+                printf("'%s' is not a number\n", argv[2]);
+                exit(1);
+            }
+        }
+        else {
+            char* end;
+            ref = strtoll(argv[2], &end, 0);
+            if (*end != '\0') {
+                printf("'%s' is not a number\n", argv[2]);
+                exit(1);
+            }
         }
     }
+
     if (ref) {
         size_t sz = dump_header(fp, ref);
         dump(fp, ref + 8, sz);
     }
+    else if (find_ref) {
+        int stack[128];
+        ref = get_top_ref(fp);
+        search_ref(fp, ref, find_ref, 0, stack);
+    }
+    else if (array_str) {
+        ref = get_top_ref(fp);
+        dump_index(fp, ref, array_str);
+    }
     else {
         dump_file_header(fp);
     }
-
-    printf("\n");
 
     fclose(fp);
 

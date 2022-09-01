@@ -118,7 +118,7 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 static std::string create_jwt(const std::string& appId)
 {
     nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
-    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
+    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1961896476}};
 
     payload["user_data"]["name"] = "Foo Bar";
     payload["user_data"]["occupation"] = "firefighter";
@@ -1556,13 +1556,12 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
         CppContext c(realm);
         realm->begin_transaction();
-        auto target_obj =
-            Object::create(c, realm, "Target",
-                           util::Any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
+        auto target_obj = Object::create(
+            c, realm, "Target", std::any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
         mixed_list_values.push_back(Mixed(target_obj.obj().get_link()));
 
         Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{
+                       std::any(AnyDict{
                            {valid_pk_name, obj_id},
                            {"mixed_array", mixed_list_values},
                        }),
@@ -1578,11 +1577,11 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
         CHECK(!wait_for_download(*realm));
         CppContext c(realm);
-        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
-        auto list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "mixed_array"));
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{obj_id});
+        auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(c, "mixed_array"));
         for (size_t idx = 0; idx < list.size(); ++idx) {
             Mixed mixed = list.get_any(idx);
-            CHECK(mixed == any_cast<Mixed>(mixed_list_values[idx]));
+            CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
         }
     }
 }
@@ -1778,7 +1777,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         realm->begin_transaction();
         auto array_of_objs =
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{
+                           std::any(AnyDict{
                                {valid_pk_name, array_of_objs_id},
                                {"array_of_objs", AnyVector{AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}},
                            }),
@@ -1786,7 +1785,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         auto embedded_obj =
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{
+                           std::any(AnyDict{
                                {valid_pk_name, embedded_obj_id},
                                {"embedded_obj", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
                            }),
@@ -1794,7 +1793,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         auto dict_obj = Object::create(
             c, realm, "TopLevel",
-            util::Any(AnyDict{
+            std::any(AnyDict{
                 {valid_pk_name, dict_obj_id},
                 {"embedded_dict", AnyDict{{"foo", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}}},
             }),
@@ -1804,7 +1803,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         {
             realm->begin_transaction();
             embedded_obj.set_property_value(c, "embedded_obj",
-                                            util::Any(AnyDict{{
+                                            std::any(AnyDict{{
                                                 "array",
                                                 AnyVector{INT64_C(3), INT64_C(4)},
                                             }}),
@@ -1816,7 +1815,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             realm->begin_transaction();
             List array(array_of_objs, array_of_objs.get_object_schema().property_for_name("array_of_objs"));
             CppContext c2(realm, &array.get_object_schema());
-            array.set(c2, 0, util::Any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
+            array.set(c2, 0, std::any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
             realm->commit_transaction();
         }
 
@@ -1824,7 +1823,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             realm->begin_transaction();
             object_store::Dictionary dict(dict_obj, dict_obj.get_object_schema().property_for_name("embedded_dict"));
             CppContext c2(realm, &dict.get_object_schema());
-            dict.insert(c2, "foo", util::Any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
+            dict.insert(c2, "foo", std::any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
             realm->commit_transaction();
         }
         CHECK(!wait_for_upload(*realm));
@@ -1837,31 +1836,31 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         CHECK(!wait_for_download(*realm));
         CppContext c(realm);
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{embedded_obj_id});
-            auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{embedded_obj_id});
+            auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<std::any>(c, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(3));
             CHECK(array_list.get<int64_t>(1) == int64_t(4));
         }
 
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{array_of_objs_id});
-            auto embedded_list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{array_of_objs_id});
+            auto embedded_list = util::any_cast<List&&>(obj.get_property_value<std::any>(c, "array_of_objs"));
             CppContext c2(realm, &embedded_list.get_object_schema());
-            auto embedded_array_obj = any_cast<Object&&>(embedded_list.get(c2, 0));
-            auto array_list = any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_array_obj = util::any_cast<Object&&>(embedded_list.get(c2, 0));
+            auto array_list = util::any_cast<List&&>(embedded_array_obj.get_property_value<std::any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(5));
             CHECK(array_list.get<int64_t>(1) == int64_t(6));
         }
 
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{dict_obj_id});
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{dict_obj_id});
             object_store::Dictionary dict(obj, obj.get_object_schema().property_for_name("embedded_dict"));
             CppContext c2(realm, &dict.get_object_schema());
-            auto embedded_obj = any_cast<Object&&>(dict.get(c2, "foo"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_obj = util::any_cast<Object&&>(dict.get(c2, "foo"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<std::any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(7));
             CHECK(array_list.get<int64_t>(1) == int64_t(8));
@@ -1886,10 +1885,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         realm->begin_transaction();
         CppContext c;
         Object::create(c, realm, "Person",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"age", INT64_C(64)},
-                                                {"firstName", std::string("Paul")},
-                                                {"lastName", std::string("McCartney")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"age", INT64_C(64)},
+                                               {"firstName", std::string("Paul")},
+                                               {"lastName", std::string("McCartney")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
         wait_for_download(*realm);
@@ -1899,10 +1898,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         // Write some additional data
         realm->begin_transaction();
         Object::create(c, realm, "Dog",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"breed", std::string("stabyhoun")},
-                                                {"name", std::string("albert")},
-                                                {"realm_id", std::string("foo")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"breed", std::string("stabyhoun")},
+                                               {"name", std::string("albert")},
+                                               {"realm_id", std::string("foo")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
     }
@@ -1923,10 +1922,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         realm->begin_transaction();
         CppContext c;
         Object::create(c, realm, "Dog",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"breed", std::string("bulldog")},
-                                                {"name", std::string("fido")},
-                                                {"realm_id", std::string("foo")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"breed", std::string("bulldog")},
+                                               {"name", std::string("fido")},
+                                               {"realm_id", std::string("foo")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
     }
@@ -1962,9 +1961,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->begin_transaction();
         CppContext c;
         Object::create(c, r, "Dog",
-                       util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                         {"breed", std::string("bulldog")},
-                                         {"name", std::string("fido")}}),
+                       std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                        {"breed", std::string("bulldog")},
+                                        {"name", std::string("fido")}}),
                        CreatePolicy::ForceCreate);
         r->commit_transaction();
     };
@@ -2425,9 +2424,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         for (auto i = 'a'; i < 'z'; ++i) {
             r->begin_transaction();
             Object::create(c, r, "Dog",
-                           util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                             {"breed", std::string("bulldog")},
-                                             {"name", random_string(1024 * 1024)}}),
+                           std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                            {"breed", std::string("bulldog")},
+                                            {"name", random_string(1024 * 1024)}}),
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
@@ -2469,9 +2468,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         CppContext c;
         for (auto i = 'a'; i < 'z'; ++i) {
             Object::create(c, r, "Dog",
-                           util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                             {"breed", std::string("bulldog")},
-                                             {"name", random_string(1024 * 1024)}}),
+                           std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                            {"breed", std::string("bulldog")},
+                                            {"name", random_string(1024 * 1024)}}),
                            CreatePolicy::ForceCreate);
         }
         r->commit_transaction();
@@ -2629,7 +2628,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         r->begin_transaction();
         auto object = Object::create(
             c, r, "source",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
@@ -2642,7 +2641,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         r->begin_transaction();
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
@@ -2769,11 +2768,11 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
     };
     using T = typename TestType::Type;
     CppContext c;
-    auto create_object = [&](realm::SharedRealm r, int64_t val, util::Any partition) {
+    auto create_object = [&](realm::SharedRealm r, int64_t val, std::any partition) {
         r->begin_transaction();
         auto object = Object::create(
             c, r, Group::table_name_to_class_name(table_name),
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {partition_key_col_name, partition}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {partition_key_col_name, partition}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
     };
@@ -4012,7 +4011,6 @@ private:
 
 } // namespace
 
-#if 0
 TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
@@ -4147,7 +4145,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
-#endif
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";

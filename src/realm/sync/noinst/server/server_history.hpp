@@ -220,12 +220,10 @@ public:
 
     class IntegrationReporter;
     class Context;
-    class CompactionControl;
-    class DummyCompactionControl;
 
     static constexpr bool is_direct_client(ClientType) noexcept;
 
-    ServerHistory(Context&, CompactionControl&);
+    ServerHistory(Context&);
 
     /// Get the current Realm version and server version.
     ///
@@ -236,9 +234,6 @@ public:
     /// the partial view. Otherwise both are set to zero.
     void get_status(sync::VersionInfo&, bool& has_upstream_status, file_ident_type& partial_file_ident,
                     version_type& partial_progress_reference_version) const;
-
-    /// For testing purposes
-    version_type get_compacted_until_version() const;
 
     /// Validate the specified client file identifier, download progress, and
     /// server version as received in an IDENT message. If they are valid, fetch
@@ -402,8 +397,6 @@ public:
     /// This function throws std::runtime_error if the history is nonempty or if
     /// new client file identifiers have already been allocated from this file.
     void add_upstream_sync_status();
-
-    bool compact_history(const TransactionRef&, util::Logger&);
 
     /// Perform a transaction on the shared group associated with this
     /// history. If the handler returns true, the transaction will be comitted,
@@ -606,8 +599,6 @@ private:
 
     Context& m_context;
 
-    CompactionControl& m_compaction_control;
-
     // Salt to attach to new server versions (history entries) produced on
     // behalf of this history object. The salt is allowed to differ between
     // every server version, but for the purpose of compressibility (on the
@@ -671,11 +662,6 @@ private:
     mutable util::Optional<Accessors> m_acc;
 
     bool m_is_local_changeset = true;
-
-    bool m_enable_compaction = false;
-    bool m_compaction_ignore_clients = false;
-    std::chrono::seconds m_compaction_ttl;
-    std::chrono::seconds m_compaction_interval;
 
     std::vector<file_ident_type> m_client_file_order_buffer;
 
@@ -745,10 +731,6 @@ private:
     bool update_upload_progress(version_type orig_client_version, ReciprocalHistory& recip_hist,
                                 UploadCursor upload_progress);
 
-    // Returns true if, and only if changes were made to the Realm file (state
-    // or history compartment).
-    bool do_compact_history(util::Logger& logger, bool force);
-
     void fixup_state_and_changesets_for_assigned_file_ident(Transaction&, file_ident_type);
 
     void record_current_schema_version();
@@ -770,63 +752,8 @@ public:
     virtual util::Buffer<char>& get_transform_buffer();
     // @}
 
-    /// \param ignore_clients If true, the determination of how far in-place
-    /// history compaction can proceed must be based entirely on the history
-    /// itself. The 'last access' timestamps of client file entries must be
-    /// completely ignored.
-    ///
-    /// \param time_to_live This is the amount of time the server will wait for
-    /// offline clients before compacting history that they depend on for
-    /// operational transformation. In other words, a client that is offline for
-    /// longer than this duration may experience client resets.
-    ///
-    /// \param compaction_interval is the average number of seconds that must pass
-    /// before the server considers running the compaction algorithm.
-    ///
-    /// \return True iff history compaction is supposed to occur for history
-    /// objects associated with this context. If the implementation returns
-    /// false, \a time_to_live and \a compaction_interval must remain
-    /// unmodified.
-    ///
-    /// The default implementation returns false.
-    virtual bool get_compaction_params(bool& ignore_clients, std::chrono::seconds& time_to_live,
-                                       std::chrono::seconds& compaction_interval) noexcept;
-
-    /// The default implementation returns the current time of the system clock.
-    virtual sync::Clock::time_point get_compaction_clock_now() const noexcept;
-
 protected:
     Context() noexcept = default;
-};
-
-
-class ServerHistory::CompactionControl {
-public:
-    struct LastClientAccessesEntry {
-        file_ident_type client_file_ident;
-        std::time_t last_seen_timestamp;
-    };
-    using LastClientAccessesRange = std::pair<const LastClientAccessesEntry*, const LastClientAccessesEntry*>;
-
-    /// Each invocation may clobber the result returned during the previous
-    /// invocation.
-    virtual LastClientAccessesRange get_last_client_accesses() = 0;
-
-    virtual version_type get_max_compactable_server_version() = 0;
-};
-
-
-class ServerHistory::DummyCompactionControl : public CompactionControl {
-public:
-    LastClientAccessesRange get_last_client_accesses() override final
-    {
-        return {};
-    }
-
-    version_type get_max_compactable_server_version() override final
-    {
-        return std::numeric_limits<version_type>::max();
-    }
 };
 
 
@@ -862,13 +789,9 @@ inline ServerHistory::IntegratableChangeset::IntegratableChangeset(file_ident_ty
 {
 }
 
-inline ServerHistory::ServerHistory(Context& context, CompactionControl& compaction_control)
+inline ServerHistory::ServerHistory(Context& context)
     : m_context{context}
-    , m_compaction_control{compaction_control}
 {
-    m_enable_compaction =
-        context.get_compaction_params(m_compaction_ignore_clients, m_compaction_ttl, m_compaction_interval);
-
     // The synchronization protocol specification requires that server version
     // salts are nonzero positive integers that fit in 63 bits.
     std::mt19937_64& random = context.server_history_get_random();

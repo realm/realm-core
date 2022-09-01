@@ -2,16 +2,26 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
+* Action returned from the server in the json error messages is surfaced through the SyncError. ([PR #5690](https://github.com/realm/realm-core/pull/5690)).
+* `NotificationToken` grew an `unregister()` method as an alternative to destroying it or doing `token = {};` ([PR #5776](https://github.com/realm/realm-core/pull/5776)).
+* Automatic handling backlinks for schema migrations where a class changes to being embedded. ([PR #5737](https://github.com/realm/realm-core/pull/5737)).
+* Expose `Obj::add_int()` in the CAPI. ([PR #5770](https://github.com/realm/realm-core/pull/5770)).
+* Expose `Realm::async_begin_transaction`, `Realm::async_commit_transaction`, `Realm::async_cancel_transaction` in the CAPI.([PR 5783 #](https://github.com/realm/realm-core/pull/5783)).
+* Added `Obj::get_parent_object()` that will allow you to get the parent object of an embedded object ([#3898](https://github.com/realm/realm-core/issues/3898))
+* Improve performance when a new Realm file connects to the server for the first time, especially when significant amounts of data has been written while offline.
+* Shift more of the work done on the sync worker thread out of the write transaction used to apply server changes, reducing how long it blocks other threads from writing.
+* Improve the performance of the sync changeset parser, which speeds up applying changesets from the server.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Exposed the boolean `merge_with_existing` in the C-API's functions `realm_convert_with_config` and `realm_convert_with_path`. ([#5713](https://github.com/realm/realm-core/issues/5713))
-* Processing a pending bootstrap before the sync client connects will properly surface errors to the user's error handler ([#5707](https://github.com/realm/realm-core/issues/5707), since v12.0.0)
-* Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` would remove any columns present on the server but not in the local schema (since 12.5.0).
-* Parsing a constant list of strings from RealmJS SDK to QueryParser would result in a "use after free situation". ([#5735](https://github.com/realm/realm-core/issues/5735))
+* Fixed undefined behaviour on queries involving a constant and an indexed column on some property types like UUID and Timestamp. ([#5753](https://github.com/realm/realm-core/issues/5753), since 12.5.0)
+* Fix all UBSan failures hit by tests. It is unclear if any of these manifested as visible bugs. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
+* Fix sorting order for `realm_query_find_first` in the C API.([#5720](https://github.com/realm/realm-core/issues/5720))
+* Upload completion callbacks may have called before the download message that completed them was fully integrated. ([#4865](https://github.com/realm/realm-core/issues/4865)).
 * Syncing of a Decimal128 with big significand could result in a crash. ([#5728](https://github.com/realm/realm-core/issues/5728))
- 
+
+
 ### Breaking changes
 * None.
 
@@ -21,7 +31,33 @@
 -----------
 
 ### Internals
+* `util::Any` is now just a typedef for `std::any`. `util::any_cast()` remains for deployment support on older Apple platforms. Outside of niche ADL implications, this should not have any visible effects. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
+
+----------------------------------------------
+
+# 12.5.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed an issue where having realm-cocoa as SPM sub-target dependency leads to missing symbols error during iOS archiving. ([#7645](https://github.com/realm/realm-swift/issues/7645))
+* Exposed the boolean `merge_with_existing` in the C-API's functions `realm_convert_with_config` and `realm_convert_with_path`. ([#5713](https://github.com/realm/realm-core/issues/5713))
+* Processing a pending bootstrap before the sync client connects will properly surface errors to the user's error handler ([#5707](https://github.com/realm/realm-core/issues/5707), since v12.0.0)
+* Opening a read-only Realm for the first time via `Realm::get_synchronized_realm()` would remove any columns present on the server but not in the local schema (since 12.5.0).
+* Parsing a constant list of strings from RealmJS SDK to QueryParser would result in a "use after free situation". ([#5735](https://github.com/realm/realm-core/issues/5735))
+
+### Breaking changes
+* Notification callbacks no longer take an `exception_ptr` argument because errors haven't been possible for a few years. (PR [#5741](https://github.com/realm/realm-core/pull/5741))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * The top function of an assertion stack trace now includes the core version number.
+* Unset SDKROOT env variable when building ios targets with tools/build-apple-device.sh
 
 ----------------------------------------------
 
@@ -106,7 +142,7 @@
 * Fix a UBSan failure when mapping encrypted pages.
 * Improved performance of sync clients during integration of changesets with many small strings (totalling > 1024 bytes per changeset) on iOS 14, and devices which have restrictive or fragmented memory. ([#5614](https://github.com/realm/realm-core/issues/5614))
 * Fixed a bug that prevented the detection of tables being changed to or from asymmetric during migrations. ([#5603](https://github.com/realm/realm-core/pull/5603), since v12.1.0)
- 
+
 ### Breaking changes
 * In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
 
@@ -134,7 +170,7 @@
 * Fixed a missing backlink removal when setting a Mixed from a TypedLink to null or any other non-link value. Users may have seen exception of "key not found" or assertion failures such as `mixed.hpp:165: [realm-core-12.1.0] Assertion failed: m_type` when removing the destination link object. ([#5574](https://github.com/realm/realm-core/pull/5573), since the introduction of Mixed in v11.0.0)
 * Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since v12.1.0)
 * Fixed an issue on Windows that would cause high CPU usage by the sync client when there are no active sync sessions. (Issue [#5591](https://github.com/realm/realm-core/issues/5591), since the introduction of Sync support for Windows)
- 
+
 ### Breaking changes
 * `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
 

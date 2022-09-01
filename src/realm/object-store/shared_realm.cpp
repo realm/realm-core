@@ -460,11 +460,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
-                                          required_changes, wrapper);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations,
+                                          wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
@@ -610,6 +611,7 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
+    REALM_ASSERT(m_transaction);
     return m_transaction->get_version_of_current_transaction();
 }
 
@@ -638,6 +640,16 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
+    }
+    return ret;
+}
+
+// Get the version of the latest snapshot
+util::Optional<DB::version_type> Realm::latest_snapshot_version() const
+{
+    util::Optional<DB::version_type> ret;
+    if (m_transaction) {
+        ret = m_transaction->get_version_of_latest_snapshot();
     }
     return ret;
 }

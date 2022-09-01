@@ -99,7 +99,7 @@ struct Base {
     {
         return prop_type;
     }
-    static util::Any to_any(T value)
+    static std::any to_any(T value)
     {
         return value;
     }
@@ -242,17 +242,17 @@ struct String : Base<PropertyType::String, StringData> {
     {
         return {"c", "a", "b"};
     }
-    static util::Any to_any(StringData value)
+    static std::any to_any(StringData value)
     {
-        return value ? std::string(value) : util::Any();
+        return value ? std::string(value) : std::any();
     }
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
-    static util::Any to_any(BinaryData value)
+    static std::any to_any(BinaryData value)
     {
-        return value ? std::string(value) : util::Any();
+        return value ? std::string(value) : std::any();
     }
     static std::vector<BinaryData> values()
     {
@@ -402,9 +402,9 @@ struct BoxedOptional : BaseT {
     {
         return *value;
     }
-    static util::Any to_any(Type value)
+    static std::any to_any(Type value)
     {
-        return value ? util::Any(*value) : util::Any();
+        return value ? std::any(*value) : std::any();
     }
 
     template <typename Fn>

@@ -18,6 +18,7 @@
 
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/object_converter.hpp>
 #include <realm/set.hpp>
 
 #include <realm/sync/history.hpp>
@@ -454,7 +455,7 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
     // final state which would be [B].
     // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
     // we would know where list elements ended up or if they were deleted by the server.
-    using namespace realm::_impl::client_reset::converters;
+    using namespace realm::converters;
     std::shared_ptr<EmbeddedObjectConverter> embedded_object_tracker = std::make_shared<EmbeddedObjectConverter>();
     for (auto& it : m_lists) {
         if (!it.second.requires_manual_copy())
