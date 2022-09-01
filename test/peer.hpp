@@ -486,8 +486,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     }
 
     TransformHistoryImpl transform_hist{*this, remote_file_ident};
-    m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets.data(),
-                                               changesets.size(), logger);
+    m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets, logger);
 
     sync::ChangesetEncoder::Buffer assembled_transformed_changeset;
 

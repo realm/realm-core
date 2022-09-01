@@ -1197,8 +1197,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
             TransformHistoryImpl transform_hist{remote_file_ident, *this, recip_hist};
             Transformer& transformer = m_context.get_transformer(); // Throws
             transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
-                                                    parsed_transformed_changesets.data(), num_changesets,
-                                                    &logger); // Throws
+                                                    parsed_transformed_changesets, &logger); // Throws
         }
 
         // Apply the transformed changesets to the Realm state
