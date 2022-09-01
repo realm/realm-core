@@ -682,7 +682,7 @@ bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
     }
     auto state_endpoint = apps()[app_id]["sync"]["state"];
     auto state_result = state_endpoint.get_json(
-        {{"sync_type", config.mode == ServiceConfig::SyncMode::Flexible ? "flexible" : "partitioned"}});
+        {{"sync_type", config.mode == ServiceConfig::SyncMode::Flexible ? "flexible" : "partition"}});
     return state_result["state"].get<std::string>().empty();
 }
 
