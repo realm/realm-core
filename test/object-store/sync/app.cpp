@@ -4236,8 +4236,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
                 mock_transport_worker.add_work_item(
-                    std::move(request),
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
+                    std::move(request), Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
                     std::move(completion_block));
             }
             else if (request.url.find("/profile") != std::string::npos) {
@@ -4252,16 +4251,15 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 }
                 else if (cur_state == TestState::login) {
                     state.advance_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(std::move(request),
-                                                        Response{401, 0, {}}, std::move(completion_block));
+                    mock_transport_worker.add_work_item(std::move(request), Response{401, 0, {}},
+                                                        std::move(completion_block));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
                     state.advance_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(std::move(request),
-                                                        Response{200, 0, {}, json.dump()},
+                    mock_transport_worker.add_work_item(std::move(request), Response{200, 0, {}, json.dump()},
                                                         std::move(completion_block));
                 }
                 else if (state.get() == TestState::profile_2) {
@@ -4274,8 +4272,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                     CHECK(state.get() == TestState::refresh_2);
                     state.advance_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(std::move(request),
-                                                        Response{200, 0, {}, json.dump()},
+                    mock_transport_worker.add_work_item(std::move(request), Response{200, 0, {}, json.dump()},
                                                         std::move(completion_block));
                 }
             }
