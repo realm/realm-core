@@ -5,6 +5,9 @@ project(RealmCore)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake")
 
+# Load work-around for using ccache with XCode generator
+include(XCodeGeneratorCCacheSupport)
+
 if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     # Realm Core is being built as part of another project, likely an SDK
     set(REALM_CORE_SUBMODULE_BUILD ON)
