@@ -26,4 +26,5 @@ path=$(echo "$hdiutil_out" | tail -n1 | cut -f3)
 
 UNITTEST_ENABLE_SYNC_TO_DISK=1 ./test/realm-tests.app/Contents/MacOS/realm-tests "$path/"
 UNITTEST_ENABLE_SYNC_TO_DISK=1 ./test/realm-sync-tests.app/Contents/MacOS/realm-sync-tests "$path/"
+echo "finished running tests"
 
