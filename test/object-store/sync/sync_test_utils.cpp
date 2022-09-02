@@ -394,13 +394,14 @@ struct BaasClientReset : public TestClientReset {
             std::string pk_col_name = table->get_column_name(table->get_primary_key_column());
             obj.set(col, 1);
             obj.set(col, 2);
-            obj.set(col, 3);
+            constexpr int64_t last_synced_value = 3;
+            obj.set(col, last_synced_value);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
             wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
-                                       {{pk_col_name, m_pk_driving_reset}});
+                                       {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
 
             session->log_out();
 
