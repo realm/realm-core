@@ -3,10 +3,6 @@
         {
             "name": "openssl",
             "platform": "android | linux | windows"
-        },
-        {
-            "name": "zlib",
-            "platform": "windows"
         }
     ],
     "features": {

@@ -55,10 +55,7 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_dependency(Threads)
 
-# Use Zlib for Sync, but allow integrators to override it
-# Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
-# so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
-# Just use -lz and let Xcode figure it out
-if(TARGET Realm::Sync AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
-    find_dependency(ZLIB)
+get_target_property(_realm_storage_link_libraries Realm::Storage INTERFACE_LINK_LIBRARIES)
+if("ZLIB::ZLIB" IN_LIST _realm_storage_link_libraries)
+    find_dependency(ZLIB REQUIRED)
 endif()

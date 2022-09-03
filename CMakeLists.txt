@@ -275,24 +275,7 @@ elseif(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
-# Use Zlib for Sync, but allow integrators to override it
-# Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
-# so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
-# Just use -lz and let Xcode figure it out
-if(NOT APPLE AND NOT TARGET ZLIB::ZLIB)
-    if(ANDROID)
-        # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
-        # (see https://github.com/android/ndk/issues/1179)
-        # We want to link against the stub library instead of statically linking anyway,
-        # so we hack find_library to only consider shared object libraries when looking for libz
-        set(_CMAKE_FIND_LIBRARY_SUFFIXES_orig ${CMAKE_FIND_LIBRARY_SUFFIXES})
-        set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
-    endif()
-    find_package(ZLIB REQUIRED)
-    if(ANDROID)
-        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES_orig})
-    endif()
-endif()
+include(AcquireZLIB)
 
 # Store configuration in header file
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)
@@ -359,7 +342,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
 endif()
 export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
+configure_file(tools/cmake/RealmConfig.cmake.in RealmConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
