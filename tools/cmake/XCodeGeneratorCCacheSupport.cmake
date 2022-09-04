@@ -4,14 +4,15 @@
 #
 # See # See https://crascit.com/2016/04/09/using-ccache-with-cmake/#h-improved-functionality-from-cmake-3-4
 #
-# The work-around mentioned in the above link modified slightly to also work when Realm Core is used through
+# The work-around mentioned in the above link is modified to also work when Realm Core is used through
 # `add_subdirectory()`.
-#
+
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
-    message(STATUS "Found ccache. Copying launcher scripts from ${PROJECT_SOURCE_DIR} to ${PROJECT_BINARY_DIR}")
-
     # Set up wrapper scripts
+    # Note: this will override any other user-defined CMAKE_C_COMPILER_LAUNCHER or CMAKE_CXX_COMPILER_LAUNCHER settings.
+
+    message(STATUS "Found ccache. Copying launcher scripts from ${PROJECT_SOURCE_DIR} to ${PROJECT_BINARY_DIR}")
     set(C_LAUNCHER   "${CCACHE_PROGRAM}")
     set(CXX_LAUNCHER "${CCACHE_PROGRAM}")
     configure_file("${PROJECT_SOURCE_DIR}/tools/cmake/launch-c.in" "${PROJECT_BINARY_DIR}/launch-c")
