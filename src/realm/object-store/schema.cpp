@@ -280,8 +280,8 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
     }
 }
 
-template <typename T, typename U, typename Func>
-void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
+template <typename T, typename U, typename Func, typename O>
+void Schema::zip_matching(T&& a, U&& b, Func&& func, O&& o, bool is_additive) noexcept
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
@@ -293,39 +293,33 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
             ++i;
             ++j;
         }
-        else if (cmp < 0) {
-            func(&object_schema, nullptr);
-            ++i;
-        }
         else {
-            func(nullptr, &matching_schema);
-            ++j;
+            if (cmp < 0) {
+                func(&object_schema, nullptr);
+                ++i;
+            }
+            else {
+                func(nullptr, &matching_schema);
+                ++j;
+            }
+            if (is_additive) {
+                o.push_back(object_schema);
+            }
         }
     }
 
-    for (; i < a.size(); ++i)
+    for (; i < a.size(); ++i) {
         func(&a[i], nullptr);
-    for (; j < b.size(); ++j)
+
+        if (is_additive)
+            o.push_back(a[i]);
+    }
+    for (; j < b.size(); ++j) {
         func(nullptr, &b[j]);
-}
 
-void Schema::append_missing_objects(const Schema& other)
-{
-    size_t i = 0;
-    Schema missing_objects;
-    Schema& current_schema = *this;
-    size_t size = std::min(current_schema.size(), other.size());
-
-    for (; i < size; ++i)
-        if (current_schema[i].name.compare(other[i].name) > 0)
-            m_others.push_back(other[i]);
-
-    for (; i < other.size(); ++i)
-        m_others.push_back(other[i]);
-
-    std::sort(m_others.begin(), m_others.end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
-        return lft.name < rgt.name;
-    });
+        if (is_additive)
+            o.push_back(b[j]);
+    }
 }
 
 Schema::iterator Schema::find(std::vector<ObjectSchema>& schema, StringData name) noexcept
@@ -384,30 +378,33 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
 {
     // compute properties for objects that are in common between the current schema and the new schema.
     // Append to the end of the new schema peristed properties, all those properties that have been deleted
-    zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
-        if (!existing || !other)
-            return;
+    std::vector<ObjectSchema> other_objects;
+    other_objects.reserve(this->size() + other.size());
+    zip_matching(
+        *this, other,
+        [&](ObjectSchema* existing, const ObjectSchema* other) {
+            if (!existing || !other)
+                return;
 
-        std::vector<Property> unmatched_properties;
-        existing->table_key = other->table_key;
-        for (auto& current_prop : other->persisted_properties) {
-            auto target_prop = existing->property_for_name(current_prop.name);
-            if (target_prop) {
-                target_prop->column_key = current_prop.column_key;
+            std::vector<Property> unmatched_properties;
+            existing->table_key = other->table_key;
+            for (auto& current_prop : other->persisted_properties) {
+                auto target_prop = existing->property_for_name(current_prop.name);
+                if (target_prop) {
+                    target_prop->column_key = current_prop.column_key;
+                }
+                else if (is_schema_additive) {
+                    unmatched_properties.push_back(current_prop);
+                }
             }
-            else if (is_schema_additive) {
-                unmatched_properties.push_back(current_prop);
+
+            if (is_schema_additive) {
+                existing->persisted_properties.insert(existing->persisted_properties.end(),
+                                                      unmatched_properties.begin(), unmatched_properties.end());
             }
-        }
-
-        if (is_schema_additive) {
-            existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
-                                                  unmatched_properties.end());
-        }
-    });
-
-    if (is_schema_additive)
-        this->append_missing_objects(other);
+        },
+        std::move(other_objects), is_schema_additive);
+    m_others.swap(other_objects);
 }
 
 namespace realm {
