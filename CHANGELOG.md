@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 12.6.0 Release notes
+
+### Enhancements
 * Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
 * Action returned from the server in the json error messages is surfaced through the SyncError. ([PR #5690](https://github.com/realm/realm-core/pull/5690)).
 * `NotificationToken` grew an `unregister()` method as an alternative to destroying it or doing `token = {};` ([PR #5776](https://github.com/realm/realm-core/pull/5776)).
@@ -14,7 +36,6 @@
 * Improve the performance of the sync changeset parser, which speeds up applying changesets from the server.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed undefined behaviour on queries involving a constant and an indexed column on some property types like UUID and Timestamp. ([#5753](https://github.com/realm/realm-core/issues/5753), since 12.5.0)
 * Fix all UBSan failures hit by tests. It is unclear if any of these manifested as visible bugs. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
 * Fix sorting order for `realm_query_find_first` in the C API.([#5720](https://github.com/realm/realm-core/issues/5720))
