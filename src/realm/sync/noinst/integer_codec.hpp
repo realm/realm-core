@@ -176,7 +176,7 @@ bool decode_int(I& input, _impl::Bid128& value) noexcept
 {
     uint64_t value_0 = 0;
     uint64_t value_1 = 0;
-    constexpr int max_bytes = 16; // 112 bits / 7
+    constexpr int max_bytes = 17; // 113 bits / 7
 
     int i = 0;
     for (;;) {

@@ -215,10 +215,12 @@ TEST(InstructionReplication_CreateObjectObjectIdPK)
     Decimal128 large_w0_zero(uint64_t(0x1234500000000000));
     large_w0_zero *= Decimal128(0x1000000);
     large_w0_zero += Decimal128(0x23);
+    Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
     Fixture fixture{test_context};
     ObjKey key;
     ObjKey key2;
     ObjKey key3;
+    ObjKey key4;
     {
         WriteTransaction wt{fixture.sg_1};
         TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_ObjectId, "_id", false);
@@ -226,6 +228,7 @@ TEST(InstructionReplication_CreateObjectObjectIdPK)
         key = foo->create_object_with_primary_key(id).set(col_dec, cost).get_key();
         key2 = foo->create_object_with_primary_key(ObjectId::gen()).set(col_dec, large).get_key();
         key3 = foo->create_object_with_primary_key(ObjectId::gen()).set(col_dec, large_w0_zero).get_key();
+        key4 = foo->create_object_with_primary_key(ObjectId::gen()).set(col_dec, large_significand).get_key();
         wt.commit();
     }
     fixture.replay_transactions();
@@ -234,7 +237,7 @@ TEST(InstructionReplication_CreateObjectObjectIdPK)
         ReadTransaction rt{fixture.sg_2};
         CHECK(rt.has_table("class_foo"));
         ConstTableRef foo = rt.get_table("class_foo");
-        CHECK_EQUAL(foo->size(), 3);
+        CHECK_EQUAL(foo->size(), 4);
         ColKey col_ndx = foo->get_column_key("_id");
         ColKey col_dec = foo->get_column_key("cost");
         auto obj = foo->get_object(key);
@@ -244,6 +247,8 @@ TEST(InstructionReplication_CreateObjectObjectIdPK)
         CHECK_EQUAL(obj.get<Decimal128>(col_dec), large);
         obj = foo->get_object(key3);
         CHECK_EQUAL(obj.get<Decimal128>(col_dec), large_w0_zero);
+        obj = foo->get_object(key4);
+        CHECK_EQUAL(obj.get<Decimal128>(col_dec), large_significand);
     }
 }
 
