@@ -22,6 +22,7 @@
 #include <realm/array_string_short.hpp>
 #include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm {
 
@@ -118,6 +119,7 @@ public:
     static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     void verify() const;
+    static bool verify_cluster(util::Logger& logger, std::vector<unsigned>& path, ref_type, Allocator&);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort

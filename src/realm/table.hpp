@@ -629,6 +629,8 @@ public:
 
     // Debug
     void verify() const;
+    void verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const;
+
 
 #ifdef REALM_DEBUG
     MemStats stats() const;

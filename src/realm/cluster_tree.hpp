@@ -191,6 +191,7 @@ public:
         m_root->dump_objects(0, "");
     }
     void verify() const;
+    void verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const;
 
 protected:
     friend class Obj;

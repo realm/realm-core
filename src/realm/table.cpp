@@ -2908,6 +2908,13 @@ void Table::verify() const
 #endif
 }
 
+void Table::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const
+{
+    path.push_back(top_position_for_cluster_tree); // Clusters are at position 2 in table
+    m_clusters.verify_cluster(logger, path);
+    path.pop_back();
+}
+
 #ifdef REALM_DEBUG
 MemStats Table::stats() const
 {

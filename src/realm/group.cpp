@@ -1863,6 +1863,20 @@ void Group::verify() const
 #endif
 }
 
+void Group::verify_cluster(util::Logger& logger) const
+{
+    std::vector<unsigned> path;
+    path.push_back(s_table_refs_ndx); // Tables are located at position 1 in group
+    auto keys = get_table_keys();
+    path.push_back(0); // Reserve space for the Table index
+    for (auto key : keys) {
+        path.back() = key.value; // Assign table index
+        ConstTableRef table = get_table(key);
+        REALM_ASSERT_3(table->get_key().value, ==, key.value);
+        table->verify_cluster(logger, path);
+    }
+}
+
 void Group::validate_primary_columns()
 {
     auto table_keys = this->get_table_keys();

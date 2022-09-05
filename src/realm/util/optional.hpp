@@ -21,6 +21,7 @@
 #define REALM_UTIL_OPTIONAL_HPP
 
 #include <optional>
+#include <vector>
 #include <ostream>
 
 namespace realm {
@@ -48,6 +49,21 @@ template <class T>
 struct RemoveOptional<Optional<T>> {
     using type = typename RemoveOptional<T>::type; // Remove recursively
 };
+
+template <class T>
+std::ostream& operator<<(std::ostream& ostr, const std::vector<T>& vec)
+{
+    ostr << '[';
+    bool first = true;
+    for (auto e : vec) {
+        if (!first)
+            ostr << ',';
+        ostr << e;
+        first = false;
+    }
+    ostr << ']';
+    return ostr;
+}
 
 /**
  * Writes a T to an ostream, with special handling if T is a std::optional.
