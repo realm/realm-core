@@ -1868,6 +1868,20 @@ void Group::verify() const
 #endif
 }
 
+void Group::verify_cluster(util::Logger& logger) const
+{
+    std::vector<unsigned> path;
+    path.push_back(1);
+    auto keys = get_table_keys();
+    path.push_back(0);
+    for (auto key : keys) {
+        path.back() = key.value;
+        ConstTableRef table = get_table(key);
+        REALM_ASSERT_3(table->get_key().value, ==, key.value);
+        table->verify_cluster(logger, path);
+    }
+}
+
 void Group::validate_primary_columns()
 {
     auto table_keys = this->get_table_keys();

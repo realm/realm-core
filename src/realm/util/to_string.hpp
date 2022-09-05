@@ -23,12 +23,15 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <realm/util/optional.hpp>
 
 namespace realm {
 class StringData;
 namespace util {
+
+std::ostream& operator<<(std::ostream& ostr, std::vector<unsigned> vec);
 
 class Printable {
 public:

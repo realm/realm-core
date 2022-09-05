@@ -44,6 +44,20 @@ void quoted(std::ostream& out, T&& str, ...)
 namespace realm {
 namespace util {
 
+std::ostream& operator<<(std::ostream& ostr, std::vector<unsigned> vec)
+{
+    ostr << '[';
+    bool first = true;
+    for (auto e : vec) {
+        if (!first)
+            ostr << ',';
+        ostr << e;
+        first = false;
+    }
+    ostr << ']';
+    return ostr;
+}
+
 Printable::Printable(StringData value)
     : m_type(Type::String)
 {

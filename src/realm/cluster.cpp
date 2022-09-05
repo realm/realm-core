@@ -1484,6 +1484,55 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 }
 // LCOV_EXCL_STOP
 
+void Cluster::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const
+{
+    auto cluster_sz = node_size();
+    path.push_back(0);
+    auto col_keys = m_tree_top.get_owning_table()->get_column_keys();
+    for (size_t i = 1; i < Array::size(); i++) {
+        path.back() = i;
+        auto val = Array::get(i);
+        if (val & 7) {
+            logger.debug("Path %1: Not a ref %2", path, val);
+        }
+        else {
+            Array child(m_alloc);
+            child.init_from_ref(to_ref(val));
+            auto col_size = child.size();
+            auto col_key = col_keys[i - 1];
+            if (!col_key.is_collection()) {
+                if (col_key.get_type() == col_type_Int && col_key.is_nullable()) {
+                    col_size -= 1;
+                }
+                else if (col_key.get_type() == col_type_String) {
+                    if (ArrayString::verify_cluster(logger, path, to_ref(val), m_alloc)) {
+                        ArrayString arr(m_alloc);
+                        arr.init_from_ref(to_ref(val));
+                        col_size = arr.size();
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                else if (col_key.get_type() == col_type_Timestamp) {
+                    ArrayTimestamp arr(m_alloc);
+                    arr.init_from_ref(to_ref(val));
+                    col_size = arr.size();
+                }
+                else if (col_key.get_type() == col_type_Mixed) {
+                    ArrayMixed arr(m_alloc);
+                    arr.init_from_ref(to_ref(val));
+                    col_size = arr.size();
+                }
+            }
+            if (col_size != cluster_sz) {
+                logger.debug("Path %1: Expected column size %2, found %3", path, cluster_sz, col_size);
+            }
+        }
+    }
+    path.pop_back();
+}
+
 void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjKey>& keys,
                                CascadeState& state) const
 {

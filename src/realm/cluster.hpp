@@ -25,6 +25,7 @@
 #include <realm/array_unsigned.hpp>
 #include <realm/data_type.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm {
 
@@ -174,6 +175,8 @@ public:
     virtual void move(size_t ndx, ClusterNode* new_leaf, int64_t key_adj) = 0;
 
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
+    virtual void verify_cluster(util::Logger&, std::vector<unsigned>&) const = 0;
+
 
     ObjKey get_real_key(size_t ndx) const
     {
@@ -295,6 +298,7 @@ public:
 
     void verify() const;
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    void verify_cluster(util::Logger&, std::vector<unsigned>&) const override;
 
 private:
     friend class ClusterTree;
