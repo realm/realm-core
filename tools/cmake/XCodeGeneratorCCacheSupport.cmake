@@ -1,17 +1,13 @@
 # Work-around for the XCode Generator not working correctly with CCache.
-# While not needed for Ninja and Makefiles, use the same helper scripts 
+# While not needed for Ninja and Makefiles, we use the same helper scripts 
 # to ensure that all build types are routed through the same code path.
 #
-# See # See https://crascit.com/2016/04/09/using-ccache-with-cmake/#h-improved-functionality-from-cmake-3-4
-#
-# The work-around mentioned in the above link is modified to also work when Realm Core is used through
-# `add_subdirectory()`.
-
+# The work-around was lifted from https://crascit.com/2016/04/09/using-ccache-with-cmake/#h-improved-functionality-from-cmake-3-4
+# and modified, so it also works when Realm Core is added using `add_subdirectory()`.
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
     # Set up wrapper scripts
-    # Note: this will override any other user-defined CMAKE_C_COMPILER_LAUNCHER or CMAKE_CXX_COMPILER_LAUNCHER settings.
-
+    # Note: this will override any user-defined CMAKE_C_COMPILER_LAUNCHER or CMAKE_CXX_COMPILER_LAUNCHER settings.
     message(STATUS "Found ccache. Copying launcher scripts from ${PROJECT_SOURCE_DIR} to ${PROJECT_BINARY_DIR}")
     set(C_LAUNCHER   "${CCACHE_PROGRAM}")
     set(CXX_LAUNCHER "${CCACHE_PROGRAM}")
