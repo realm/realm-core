@@ -1410,6 +1410,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(!m_client_error && !m_error_to_send);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
 
     m_client_error = util::make_optional<IntegrationException>(error);
@@ -2236,6 +2237,10 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    // Ignore the error because the connection is going to be closed.
+    if (m_connection_to_close)
+        return std::error_code{}; // Success
+
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
         logger.error("Illegal message at this time");
@@ -2294,7 +2299,7 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
 
-    return {};
+    return std::error_code{}; // Success;
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
