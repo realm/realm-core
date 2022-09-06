@@ -35,12 +35,12 @@ app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
 public:
-    app::Response get() const;
+    app::Response get(const std::vector<std::pair<std::string, std::string>>& params = {}) const;
     app::Response patch(std::string body) const;
     app::Response post(std::string body) const;
     app::Response put(std::string body) const;
     app::Response del() const;
-    nlohmann::json get_json() const;
+    nlohmann::json get_json(const std::vector<std::pair<std::string, std::string>>& params = {}) const;
     nlohmann::json patch_json(nlohmann::json body) const;
     nlohmann::json post_json(nlohmann::json body) const;
     nlohmann::json put_json(nlohmann::json body) const;
@@ -112,6 +112,7 @@ public:
     ServiceConfig set_disable_recovery_to(const std::string& app_id, const std::string& service_id,
                                           ServiceConfig sync_config, bool disable) const;
     bool is_sync_enabled(const std::string& app_id) const;
+    bool is_sync_terminated(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {

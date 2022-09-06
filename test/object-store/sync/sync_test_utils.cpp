@@ -418,7 +418,9 @@ struct BaasClientReset : public TestClientReset {
         auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+        });
         app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
@@ -524,7 +526,9 @@ struct BaasFLXClientReset : public TestClientReset {
         auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+        });
         app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
