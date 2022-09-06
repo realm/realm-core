@@ -294,7 +294,7 @@ struct ClientConfig {
     bool disable_sync_to_disk = false;
 
     // Custom implementation of the WebSocket factory.
-    std::shared_ptr<realm::util::websocket::SocketFactory> socket_factory;
+    std::shared_ptr<util::websocket::SocketFactory> socket_factory;
 };
 
 /// \brief Information about an error causing a session to be temporarily

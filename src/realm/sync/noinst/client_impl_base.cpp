@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2022 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "realm/sync/protocol.hpp"
 #include <system_error>
 #include <sstream>
@@ -20,6 +38,10 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
+
+#ifndef REALM_NO_LEGACY_WEBSOCKET
+#include <realm/util/legacy_websocket.hpp>
+#endif
 
 #include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove
 
@@ -126,6 +148,10 @@ ClientImpl::ClientImpl(ClientConfig config)
         m_socket_factory = config.socket_factory;
     }
     else {
+#ifdef REALM_NO_LEGACY_WEBSOCKET
+        throw util::invalid_argument("No websocket implementation provided to client config");
+#else
+        logger.debug("Using legacy websocket");
         m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(
             websocket::SocketFactoryConfig{
                 get_user_agent_string(),
@@ -135,6 +161,7 @@ ClientImpl::ClientImpl(ClientConfig config)
                 m_random,
                 m_service,
             });
+#endif
     }
 
     // FIXME: Would be better if seeding was up to the application.

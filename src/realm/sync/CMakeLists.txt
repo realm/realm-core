@@ -22,11 +22,17 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
-    ../util/network_ssl.cpp
     ../util/network.cpp
     ../util/websocket.cpp
-    ../util/client_websocket.cpp
 )
+
+if(NOT REALM_NO_LEGACY_WEBSOCKET)
+    list(APPEND SYNC_SOURCES
+        ../util/network_ssl.cpp
+        ../util/legacy_websocket.cpp)
+endif()
+
+set(LEGACY_WEBSOCKET)
 
 set(IMPL_INSTALL_HEADERS
     impl/clock.hpp
@@ -82,7 +88,7 @@ target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
-else()
+elseif(NOT REALM_NO_LEGACY_WEBSOCKET)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 
@@ -90,7 +96,7 @@ if(WIN32 AND NOT WINDOWS_STORE)
     target_link_libraries(Sync INTERFACE Version.lib)
     if(CMAKE_VERSION VERSION_LESS "3.21")
         # This is needed for OpenSSL, but CMake's FindOpenSSL didn't declare it
-        # on the OpenSSL::Crypto target until CMake 3.21.0. 
+        # on the OpenSSL::Crypto target until CMake 3.21.0.
         target_link_libraries(Sync INTERFACE Crypt32.lib)
     endif()
 endif()

@@ -37,13 +37,6 @@ struct SocketFactoryConfig {
     std::string user_agent;
 };
 
-// Legacy socket configuration
-struct DefaultSocketFactoryConfig {
-    util::Logger& logger;
-    std::mt19937_64& random;
-    util::network::Service& service;
-};
-
 struct Endpoint {
     std::string address;
     port_type port;
@@ -115,8 +108,8 @@ public:
 
 class SocketFactory {
 public:
-    SocketFactory(DefaultSocketFactoryConfig config)
-        : defaultSocketConfig(config)
+    SocketFactory(SocketFactoryConfig config)
+        : m_config(config)
     {
     }
 
@@ -147,35 +140,11 @@ public:
     /// two handlers, A and B, and the execution of post(A) ends before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    template <class H>
-    void post(H handler);
+    virtual void post(util::UniqueFunction<void()>&& handler) = 0;
 
-private:
-    DefaultSocketFactoryConfig defaultSocketConfig;
+protected:
+    const SocketFactoryConfig m_config;
 };
-
-// Legacy Core websocket implementation
-class DefaultSocketFactory : public SocketFactory {
-public:
-    DefaultSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig defaultSocketConfig)
-        : SocketFactory(defaultSocketConfig)
-        , m_config(config)
-        , m_defaultSocketConfig(defaultSocketConfig)
-    {
-    }
-
-    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
-
-private:
-    SocketFactoryConfig m_config;
-    DefaultSocketFactoryConfig m_defaultSocketConfig;
-};
-
-template <class H>
-inline void SocketFactory::post(H handler)
-{
-    defaultSocketConfig.service.post(std::move(handler)); // Throws
-}
 
 } // namespace realm::util::websocket
 

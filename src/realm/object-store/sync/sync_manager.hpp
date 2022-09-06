@@ -86,6 +86,7 @@ struct SyncClientConfig {
     std::string user_agent_application_info;
 
     SyncClientTimeouts timeouts;
+    // The implementation specific websocket factory for creating websocket connections
     std::shared_ptr<util::websocket::SocketFactory> socket_factory;
 };
 

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2022 Realm Inc.
+// Copyright 2021 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,21 +16,23 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
-#include <memory>
-
 #if REALM_ENABLE_SYNC
-#include <realm/object-store/object_schema.hpp>
+#include <catch2/catch_all.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/util/legacy_websocket.hpp>
 
-#include <realm/util/client_websocket.hpp>
+#include "collection_fixtures.hpp"
+#include "sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
+#include "util/test_utils.hpp"
+#include "util/test_file.hpp"
+
+#include <memory>
+
 
 using namespace realm;
 using namespace realm::sync;
@@ -38,74 +40,65 @@ using namespace realm::util::websocket;
 
 class TestSocketFactory : public DefaultSocketFactory {
 public:
-    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig cfg2,
-                      std::function<void()> factoryCallback)
-        : DefaultSocketFactory(config, cfg2)
-        , didCallHandler(factoryCallback)
+    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig legacy_config,
+                      util::UniqueFunction<void()>&& factoryCallback)
+        : DefaultSocketFactory(config, legacy_config)
+        , didCallHandler(std::move(factoryCallback))
     {
     }
 
     std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override
     {
-        didCallHandler();
+        if (didCallHandler) {
+            didCallHandler();
+        }
         return DefaultSocketFactory::connect(observer, std::move(endpoint));
     }
-    std::function<void()> didCallHandler;
+    util::UniqueFunction<void()> didCallHandler;
 };
 
 TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
-    if (!util::EventLoop::has_implementation())
-        return;
-
     bool didCallConnect = false;
-    std::function<void()> factoryCallHandler = [&]() {
-        didCallConnect = true;
-    };
 
-    TestSyncManager::Config testConfig;
-    TestLogger logger;
+    auto logger = std::make_unique<util::StderrLogger>();
     std::mt19937_64 random;
     util::network::Service service;
+    logger->set_level_threshold(TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off);
 
-    // Configuring custom socket factory in SyncClientConfig
-    SyncClientConfig sc_config;
-    std::string m_base_file_path =
-        testConfig.base_path.empty() ? util::make_temp_dir() + random_string(10) : testConfig.base_path;
-    util::try_make_dir(m_base_file_path);
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = testConfig.metadata_mode;
-    sc_config.log_level =
-        testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"},
-                                                                   DefaultSocketFactoryConfig{
-                                                                       logger,
-                                                                       random,
-                                                                       service,
-                                                                   },
-                                                                   factoryCallHandler);
+    TestAppSession session(
+//        get_runtime_app_session(get_base_url()), nullptr, true);
+        get_runtime_app_session(get_base_url()), nullptr, true,
+        std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"},
+                                            DefaultSocketFactoryConfig{
+                                                *logger,
+                                                random,
+                                                service, },
+                                            [&]() {
+                                                didCallConnect = true;
+                                            }));
+    auto app = session.app();
 
-    TestSyncManager init_sync_manager(testConfig, {}, util::some<SyncClientConfig>(sc_config));
+    auto schema = default_app_config("").schema;
+    SyncTestFile original_config(app, bson::Bson("foo"), schema);
+    create_user_and_log_in(app);
+    SyncTestFile target_config(app, bson::Bson("foo"), schema);
 
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.cache = false;
-    ObjectSchema object_schema = {"object",
-                                  {
-                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                                      {"value", PropertyType::Int},
-                                  }};
-    config.schema = Schema{object_schema};
+    // Create and load the realm information
+    {
+        auto realm = Realm::get_shared_realm(original_config);
+        wait_for_download(*realm);
 
-    SECTION("Can setup custom sockets factory") {
-        bool called = false;
-        auto task = Realm::get_synchronized_realm(config);
-        task->start(realm::util::EventLoopDispatcher([&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(ref);
-            REQUIRE(!error);
-            called = true;
-        }));
-        util::EventLoop::main().run_until([&] {
-            return called;
-        });
+        // Write some data
+        realm->begin_transaction();
+        CppContext c;
+        Object::create(c, realm, "Person",
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"age", INT64_C(64)},
+                                               {"firstName", std::string("Paul")},
+                                               {"lastName", std::string("McCartney")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
         REQUIRE(didCallConnect);
     }
 }

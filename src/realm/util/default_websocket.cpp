@@ -15,7 +15,8 @@
  * limitations under the License.
  *
  **************************************************************************/
-#include <realm/util/client_websocket.hpp>
+
+#include <realm/util/legacy_websocket.hpp>
 
 #include <realm/util/websocket.hpp>
 #include <realm/util/network_ssl.hpp>
@@ -23,12 +24,12 @@
 namespace realm::util::websocket {
 
 namespace {
-class SocketImpl final : public WebSocket, public realm::util::websocket::Config {
+class LegacyWebsocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    SocketImpl(SocketFactoryConfig& config, DefaultSocketFactoryConfig defaultSocketConfig, SocketObserver& observer,
-               Endpoint&& endpoint)
+    LegacyWebsocketImpl(const SocketFactoryConfig& config, const DefaultSocketFactoryConfig& legacy_config,
+               SocketObserver& observer, Endpoint&& endpoint)
         : m_config(config)
-        , m_defaultSocketConfig(defaultSocketConfig)
+        , m_legacy_config(legacy_config)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
         , m_websocket(*this)
@@ -51,11 +52,11 @@ private:
 
     util::Logger& websocket_get_logger() noexcept override
     {
-        return m_defaultSocketConfig.logger;
+        return m_legacy_config.logger;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
-        return m_defaultSocketConfig.random;
+        return m_legacy_config.random;
     }
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
@@ -104,19 +105,13 @@ private:
     void initiate_websocket_handshake();
     void handle_connection_established();
 
-    void schedule_urgent_ping();
-    void initiate_ping_delay(milliseconds_type now);
-    void handle_ping_delay();
-    void initiate_pong_timeout();
-    void handle_pong_timeout();
-
     util::Logger& logger() const
     {
-        return m_defaultSocketConfig.logger;
+        return m_legacy_config.logger;
     }
 
-    SocketFactoryConfig& m_config;
-    DefaultSocketFactoryConfig m_defaultSocketConfig;
+    const SocketFactoryConfig& m_config;
+    const DefaultSocketFactoryConfig& m_legacy_config;
     SocketObserver& m_observer;
 
     const Endpoint m_endpoint;
@@ -126,10 +121,10 @@ private:
     util::Optional<util::network::ssl::Stream> m_ssl_stream;
     util::network::ReadAheadBuffer m_read_ahead_buffer;
     util::websocket::Socket m_websocket;
-    util::Optional<util::HTTPClient<SocketImpl>> m_proxy_client;
+    util::Optional<util::HTTPClient<LegacyWebsocketImpl>> m_proxy_client;
 };
 
-void SocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
+void LegacyWebsocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -140,7 +135,7 @@ void SocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandle
     }
 }
 
-void SocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
+void LegacyWebsocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -151,7 +146,7 @@ void SocketImpl::async_read_until(char* buffer, std::size_t size, char delim, Re
     }
 }
 
-void SocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
+void LegacyWebsocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -162,7 +157,7 @@ void SocketImpl::async_write(const char* data, std::size_t size, WriteCompletion
     }
 }
 
-void SocketImpl::initiate_resolve()
+void LegacyWebsocketImpl::initiate_resolve()
 {
     const std::string& address = m_endpoint.proxy ? m_endpoint.proxy->address : m_endpoint.address;
     const port_type& port = m_endpoint.proxy ? m_endpoint.proxy->port : m_endpoint.port;
@@ -180,11 +175,11 @@ void SocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_defaultSocketConfig.service);               // Throws
+    m_resolver.emplace(m_legacy_config.service);               // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
-void SocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
+void LegacyWebsocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
 {
     if (ec) {
         logger().error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
@@ -195,13 +190,13 @@ void SocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::Lis
     initiate_tcp_connect(std::move(endpoints), 0); // Throws
 }
 
-void SocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
+void LegacyWebsocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
-    m_socket.emplace(m_defaultSocketConfig.service); // Throws
+    m_socket.emplace(m_legacy_config.service); // Throws
     m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         // If the operation is aborted, the connection object may have been
         // destroyed.
@@ -211,7 +206,7 @@ void SocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, s
     logger().detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
-void SocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
+void LegacyWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
@@ -243,7 +238,7 @@ void SocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint:
     initiate_websocket_or_ssl_handshake(); // Throws
 }
 
-void SocketImpl::initiate_websocket_or_ssl_handshake()
+void LegacyWebsocketImpl::initiate_websocket_or_ssl_handshake()
 {
     if (m_endpoint.is_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -253,7 +248,7 @@ void SocketImpl::initiate_websocket_or_ssl_handshake()
     }
 }
 
-void SocketImpl::initiate_http_tunnel()
+void LegacyWebsocketImpl::initiate_http_tunnel()
 {
     HTTPRequest req;
     req.method = HTTPMethod::Connect;
@@ -282,7 +277,7 @@ void SocketImpl::initiate_http_tunnel()
     m_proxy_client->async_request(req, std::move(handler)); // Throws
 }
 
-void SocketImpl::initiate_ssl_handshake()
+void LegacyWebsocketImpl::initiate_ssl_handshake()
 {
     using namespace util::network::ssl;
 
@@ -329,7 +324,7 @@ void SocketImpl::initiate_ssl_handshake()
     // FIXME: We also need to perform the SSL shutdown operation somewhere
 }
 
-void SocketImpl::handle_ssl_handshake(std::error_code ec)
+void LegacyWebsocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
@@ -340,7 +335,7 @@ void SocketImpl::handle_ssl_handshake(std::error_code ec)
     initiate_websocket_handshake(); // Throws
 }
 
-void SocketImpl::initiate_websocket_handshake()
+void LegacyWebsocketImpl::initiate_websocket_handshake()
 {
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
@@ -359,7 +354,7 @@ WebSocket::~WebSocket() = default;
 
 std::unique_ptr<WebSocket> DefaultSocketFactory::connect(SocketObserver* observer, Endpoint&& endpoint)
 {
-    return std::make_unique<SocketImpl>(m_config, m_defaultSocketConfig, *observer, std::move(endpoint));
+    return std::make_unique<LegacyWebsocketImpl>(m_config, m_legacy_config, *observer, std::move(endpoint));
 }
 
 } // namespace realm::util::websocket

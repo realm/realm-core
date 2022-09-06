@@ -192,7 +192,7 @@ class TestAppSession {
 public:
     TestAppSession();
     TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true);
+                   DeleteApp = true, std::shared_ptr<realm::util::websocket::SocketFactory> = nullptr);
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept
