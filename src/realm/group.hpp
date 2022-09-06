@@ -113,9 +113,9 @@ public:
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     explicit Group(const std::string& file, const char* encryption_key = nullptr);
@@ -357,9 +357,9 @@ public:
     ///
     /// \param write_history Indicates if you want the Sync Client History to
     /// be written to the file (only relevant for synchronized files).
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,

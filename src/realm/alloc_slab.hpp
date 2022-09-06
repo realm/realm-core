@@ -146,7 +146,7 @@ public:
     /// This can happen if the conflicting thread (or process) terminates or
     /// crashes before the next retry.
     ///
-    /// \throw util::File::AccessError
+    /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& file_path, Config& cfg);
 

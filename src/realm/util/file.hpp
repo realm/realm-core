@@ -61,9 +61,9 @@ class EncryptedFileMapping;
 
 /// Create the specified directory in the file system.
 ///
-/// \throw File::AccessError If the directory could not be created. If
+/// \throw FileAccessError If the directory could not be created. If
 /// the reason corresponds to one of the exception types that are
-/// derived from File::AccessError, the derived exception type is
+/// derived from FileAccessError, the derived exception type is
 /// thrown (as long as the underlying system provides the information
 /// to unambiguously distinguish that particular reason).
 void make_dir(const std::string& path);
@@ -74,7 +74,7 @@ void make_dir(const std::string& path);
 bool try_make_dir(const std::string& path);
 
 /// Recursively create each of the directories in the given absolute path. Existing directories are ignored, and
-/// File::AccessError is thrown for any other errors that occur.
+/// FileAccessError is thrown for any other errors that occur.
 void make_dir_recursive(std::string path);
 
 /// Remove the specified empty directory path from the file system. It is an
@@ -82,9 +82,9 @@ void make_dir_recursive(std::string path);
 /// directory. In so far as the specified path is a directory, std::remove(const
 /// char*) is equivalent to this function.
 ///
-/// \throw File::AccessError If the directory could not be removed. If the
+/// \throw FileAccessError If the directory could not be removed. If the
 /// reason corresponds to one of the exception types that are derived from
-/// File::AccessError, the derived exception type is thrown (as long as the
+/// FileAccessError, the derived exception type is thrown (as long as the
 /// underlying system provides the information to unambiguously distinguish that
 /// particular reason).
 void remove_dir(const std::string& path);
@@ -99,7 +99,7 @@ bool try_remove_dir(const std::string& path);
 /// (nondirectory entries) will be removed as if by a call to File::remove(),
 /// and empty directories as if by a call to remove_dir().
 ///
-/// \throw File::AccessError If removal of the directory, or any of its contents
+/// \throw FileAccessError If removal of the directory, or any of its contents
 /// fail.
 ///
 /// remove_dir_recursive() assumes that no other process or thread is making
@@ -611,9 +611,6 @@ public:
     class Streambuf;
 
     // Exceptions
-    class AccessError;
-    class PermissionDenied;
-    class NotFound;
     class Exists;
 
 private:
