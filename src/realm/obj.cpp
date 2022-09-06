@@ -515,6 +515,26 @@ Obj Obj::_get_linked_object(ColKey link_col_key, Mixed link) const
     return obj;
 }
 
+Obj Obj::get_parent_object() const
+{
+    Obj obj;
+    update_if_needed();
+
+    if (!m_table->is_embedded()) {
+        throw std::runtime_error("Object is not embedded");
+    }
+    m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
+        if (get_backlink_cnt(backlink_col_key) == 1) {
+            auto obj_key = get_backlink(backlink_col_key, 0);
+            obj = m_table->get_opposite_table(backlink_col_key)->get_object(obj_key);
+            return true;
+        }
+        return false;
+    });
+
+    return obj;
+}
+
 template <class T>
 inline bool Obj::do_is_null(ColKey::Idx col_ndx) const
 {
