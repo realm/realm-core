@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If a case insensitive query searched for a string including an 4-byte UTF8 character, the program would crash ([#5825](https://github.com/realm/realm-core/issues/5825), since v2.3.0)
  
 ### Breaking changes
 * None.
