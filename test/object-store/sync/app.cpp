@@ -118,7 +118,7 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 static std::string create_jwt(const std::string& appId)
 {
     nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
-    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
+    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1961896476}};
 
     payload["user_data"]["name"] = "Foo Bar";
     payload["user_data"]["occupation"] = "firefighter";
@@ -1583,6 +1583,55 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
             Mixed mixed = list.get_any(idx);
             CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
         }
+    }
+}
+
+TEST_CASE("app: roundtrip values", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"decimal", PropertyType::Decimal | PropertyType::Nullable},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "roundtrip_values", schema);
+    auto app_session = create_app(server_app_config);
+    auto partition = random_string(100);
+
+    Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
+    auto obj_id = ObjectId::gen();
+    {
+        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        SyncTestFile config(test_session.app(), partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {valid_pk_name, obj_id},
+                           {"decimal", large_significand},
+                       }),
+                       CreatePolicy::ForceCreate);
+        realm->commit_transaction();
+        CHECK(!wait_for_upload(*realm, std::chrono::seconds(600)));
+    }
+
+    {
+        TestAppSession test_session(app_session);
+        SyncTestFile config(test_session.app(), partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+
+        CHECK(!wait_for_download(*realm));
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
+        auto val = obj.get_column_value<Decimal128>("decimal");
+        CHECK(val == large_significand);
     }
 }
 
@@ -4262,6 +4311,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
     }
 }
 
+#if 0
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
@@ -4354,3 +4404,4 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
+#endif

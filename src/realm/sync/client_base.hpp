@@ -293,6 +293,14 @@ struct ClientConfig {
     /// Testing/debugging feature. Should never be enabled in production.
     bool disable_sync_to_disk = false;
 
+    /// The sync client supports tables without primary keys by synthesizing a
+    /// pk using the client file ident, which means that all changesets waiting
+    /// to be uploaded need to be rewritten with the correct ident the first time
+    /// we connect to the server. The modern server doesn't support this and
+    /// requires pks for all tables, so this is now only applicable to old sync
+    /// tests and so is disabled by default.
+    bool fix_up_object_ids = false;
+
     // Custom implementation of the WebSocket factory.
     std::shared_ptr<util::websocket::SocketFactory> socket_factory;
 };
