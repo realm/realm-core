@@ -866,12 +866,7 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name like[c] \"?O?\"", 2);
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 
-#if defined(_WIN32)
-    // This unicode is not supported on Windows
-    CHECK_THROW(verify_query(test_context, t, "name ==[c] 'unicorn🦄'", 1), query_parser::InvalidQueryError);
-#else
     verify_query(test_context, t, "name ==[c] 'unicorn🦄'", 1);
-#endif
 
     verify_query(test_context, t, "name == NULL", 1);
     verify_query(test_context, t, "name == nil", 1);

@@ -368,18 +368,18 @@ util::Optional<std::string> case_map(StringData source, bool upper)
 
         wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
 
-        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
+        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 2);
         if (n2 == 0)
             return util::none;
 
-        REALM_ASSERT(n2 == 1);
-        tmp[n2] = 0;
+        if (n2 == 1)
+            tmp[n2] = 0;
 
         // Note: If tmp[0] == 0, it is because the string contains a
         // null-chacarcter, which is perfectly fine.
 
         wchar_t mapped_tmp[2];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 1, mapped_tmp, 2,
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp, 2,
                       nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
@@ -388,7 +388,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // the flag is specified, the function fails with error
         // ERROR_INVALID_FLAGS.
         DWORD flags = 0;
-        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, 1, &*output, static_cast<int>(end - begin), 0, 0);
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, n2, &*output, static_cast<int>(end - begin), 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
             return util::none;
 
