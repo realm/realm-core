@@ -274,79 +274,6 @@ bool utf8_compare(StringData string1, StringData string2)
     return false;
 }
 
-// Here is a version for Windows that may be closer to what is ultimately needed.
-/*
-bool case_map(const char* begin, const char* end, StringBuffer& dest, bool upper)
-{
-const int wide_buffer_size = 32;
-wchar_t wide_buffer[wide_buffer_size];
-
-dest.resize(end-begin);
-size_t dest_offset = 0;
-
-for (;;) {
-int num_out;
-
-// Decode
-{
-size_t num_in = end - begin;
-if (size_t(32) <= num_in) {
-num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, 32, wide_buffer, wide_buffer_size);
-if (num_out != 0) {
-begin += 32;
-goto convert;
-}
-if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
-}
-if (num_in == 0) break;
-int n = num_in < size_t(8) ? int(num_in) : 8;
-num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, wide_buffer, wide_buffer_size);
-if (num_out != 0) {
-begin += n;
-goto convert;
-}
-return false;
-}
-
-convert:
-if (upper) {
-for (int i=0; i<num_out; ++i) {
-CharUpperW(wide_buffer + i);
-}
-}
-else {
-for (int i=0; i<num_out; ++i) {
-CharLowerW(wide_buffer + i);
-}
-}
-
-encode:
-{
-size_t free = dest.size() - dest_offset;
-if (int_less_than(std::numeric_limits<int>::max(), free)) free = std::numeric_limits<int>::max();
-int n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_buffer, num_out,
-dest.data() + dest_offset, int(free), 0, 0);
-if (i != 0) {
-dest_offset += n;
-continue;
-}
-if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
-size_t dest_size = dest.size();
-if (int_multiply_with_overflow_detect(dest_size, 2)) {
-if (dest_size == std::numeric_limits<size_t>::max()) return false;
-dest_size = std::numeric_limits<size_t>::max();
-}
-dest.resize(dest_size);
-goto encode;
-}
-}
-
-dest.resize(dest_offset);
-return true;
-}
-*/
-
-
 // Converts UTF-8 source into upper or lower case. This function
 // preserves the byte length of each UTF-8 character in following way:
 // If an output character differs in size, it is simply substituded by
@@ -358,28 +285,41 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     result.resize(source.size());
 
 #if defined(_WIN32)
+    constexpr size_t tmp_buffer_size = 32;
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
     while (begin != end) {
-        int n = static_cast<int>(sequence_length(*begin));
-        if (n == 0 || end - begin < n)
-            return util::none;
+        size_t n = end - begin;
+        if (n > tmp_buffer_size) {
+            // Break the input string into chunks - but don't break in the middle of a multibyte character
+            const char* p = begin;
+            n = 0;
+            while (p != end) {
+                size_t len = sequence_length(*p);
+                p += len;
+                n += len;
+                if (n > tmp_buffer_size) {
+                    n -= len;
+                    break;
+                }
+            }
+        }
 
-        wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
+        wchar_t tmp[tmp_buffer_size];
 
-        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 2);
+        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, tmp_buffer_size);
         if (n2 == 0)
             return util::none;
 
-        if (n2 == 1)
+        if (n2 < tmp_buffer_size)
             tmp[n2] = 0;
 
         // Note: If tmp[0] == 0, it is because the string contains a
         // null-chacarcter, which is perfectly fine.
 
-        wchar_t mapped_tmp[2];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp, 2,
+        wchar_t mapped_tmp[tmp_buffer_size];
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp, tmp_buffer_size,
                       nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
@@ -388,7 +328,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // the flag is specified, the function fails with error
         // ERROR_INVALID_FLAGS.
         DWORD flags = 0;
-        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, n2, &*output, static_cast<int>(end - begin), 0, 0);
+        auto m = static_cast<int>(end - begin);
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, n2, &*output, m, 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
             return util::none;
 

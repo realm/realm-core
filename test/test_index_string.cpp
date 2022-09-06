@@ -1826,4 +1826,12 @@ TEST(StringIndex_MixedEqualBitPattern)
     CHECK_EQUAL(tv.get_object(1).get_any(col), val1);
 }
 
+TEST(Unicode_Casemap)
+{
+    std::string inp = "A very old house 🏠 is on 🔥, we have to save the 🦄";
+    auto out = case_map(inp, true);
+    if (CHECK(out)) {
+        CHECK_EQUAL(*out, "A VERY OLD HOUSE 🏠 IS ON 🔥, WE HAVE TO SAVE THE 🦄");
+    }
+}
 #endif // TEST_INDEX_STRING
