@@ -1781,7 +1781,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             REQUIRE(table->size() == 0);
         });
     }
-
+// TODO: Re-enable it in RCORE-1238.
+#if 0
     SECTION("replace object") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
@@ -1803,7 +1804,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             REQUIRE(table->size() == 0);
         });
     }
-
+#endif
     SECTION("create multiple objects - separate commits") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
