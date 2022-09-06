@@ -29,7 +29,7 @@ set(SYNC_SOURCES
 if(NOT REALM_NO_LEGACY_WEBSOCKET)
     list(APPEND SYNC_SOURCES
         ../util/network_ssl.cpp
-        ../util/legacy_websocket.cpp)
+        ../util/default_websocket.cpp)
 endif()
 
 set(LEGACY_WEBSOCKET)

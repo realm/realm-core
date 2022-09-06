@@ -23,7 +23,7 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
-#include <realm/util/legacy_websocket.hpp>
+#include <realm/util/default_websocket.hpp>
 
 #include "collection_fixtures.hpp"
 #include "sync_test_utils.hpp"

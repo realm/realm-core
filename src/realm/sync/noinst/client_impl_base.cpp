@@ -40,7 +40,7 @@
 #include <realm/sync/changeset_parser.hpp>
 
 #ifndef REALM_NO_LEGACY_WEBSOCKET
-#include <realm/util/legacy_websocket.hpp>
+#include <realm/util/default_websocket.hpp>
 #endif
 
 #include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove

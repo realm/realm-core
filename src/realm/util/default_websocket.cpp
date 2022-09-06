@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/util/legacy_websocket.hpp>
+#include <realm/util/default_websocket.hpp>
 
 #include <realm/util/websocket.hpp>
 #include <realm/util/network_ssl.hpp>
