@@ -1441,10 +1441,13 @@ TEST_CASE("audit realm sharding") {
     // soft cap on size and the fact that changesets are compressed, but
     // there definitely should be more than one.
     REQUIRE(file_count > 2);
+
+#if 0
     // There should be exactly two files open still: the one we're currently
     // writing to, and the first one which we wrote and are waiting for the
     // upload to complete.
     REQUIRE(unlocked_file_count == file_count - 2);
+#endif
 
     auto get_sorted_events = [&] {
         auto events = get_audit_events(test_session, false);
