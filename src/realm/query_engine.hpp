@@ -225,16 +225,6 @@ public:
                                    ArrayPayload* source_column);
 
 
-    virtual std::string validate()
-    {
-        if (error_code != "")
-            return error_code;
-        if (m_child == nullptr)
-            return "";
-        else
-            return m_child->validate();
-    }
-
     ParentNode(const ParentNode& from);
 
     void add_child(std::unique_ptr<ParentNode> child)
@@ -320,7 +310,6 @@ protected:
     ConstTableRef m_table = ConstTableRef();
     const Cluster* m_cluster = nullptr;
     QueryStateBase* m_state = nullptr;
-    std::string error_code;
     static std::vector<ObjKey> s_dummy_keys;
 
     ColumnType get_real_column_type(ColKey key)
@@ -1582,7 +1571,7 @@ public:
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
-            error_code = "Malformed UTF-8: " + std::string(v);
+            throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", v));
         }
         else {
             m_ucase = std::move(*upper);
@@ -1707,7 +1696,7 @@ public:
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
-            error_code = "Malformed UTF-8: " + std::string(v);
+            throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", v));
         }
         else {
             m_ucase = std::move(*upper);
@@ -1921,7 +1910,7 @@ public:
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
-            error_code = "Malformed UTF-8: " + std::string(v);
+            throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", v));
         }
         else {
             m_ucase = std::move(*upper);
@@ -2106,27 +2095,6 @@ public:
         return index;
     }
 
-    std::string validate() override
-    {
-        if (error_code != "")
-            return error_code;
-        if (m_conditions.size() == 0)
-            return "Missing left-hand side of OR";
-        if (m_conditions.size() == 1)
-            return "Missing right-hand side of OR";
-        std::string s;
-        if (m_child != 0)
-            s = m_child->validate();
-        if (s != "")
-            return s;
-        for (size_t i = 0; i < m_conditions.size(); ++i) {
-            s = m_conditions[i]->validate();
-            if (s != "")
-                return s;
-        }
-        return "";
-    }
-
     std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new OrNode(*this));
@@ -2166,6 +2134,9 @@ public:
         : m_condition(std::move(condition))
     {
         m_dT = 50.0;
+        if (!m_condition) {
+            throw query_parser::InvalidQueryError("Missing argument to Not");
+        }
     }
 
     void table_changed() override
@@ -2193,23 +2164,6 @@ public:
     }
 
     size_t find_first_local(size_t start, size_t end) override;
-
-    std::string validate() override
-    {
-        if (error_code != "")
-            return error_code;
-        if (m_condition == 0)
-            return "Missing argument to Not";
-        std::string s;
-        if (m_child != 0)
-            s = m_child->validate();
-        if (s != "")
-            return s;
-        s = m_condition->validate();
-        if (s != "")
-            return s;
-        return "";
-    }
 
     std::string describe(util::serializer::SerialisationState& state) const override
     {
