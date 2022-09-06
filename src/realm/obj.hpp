@@ -276,6 +276,7 @@ public:
     {
         return get_linked_object(get_column_key(link_col_name));
     }
+    Obj get_parent_object() const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
