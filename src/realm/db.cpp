@@ -480,9 +480,7 @@ public:
 
     version_type get_newest_version()
     {
-        std::lock_guard lock(m_mutex);
-        ensure_full_reader_mapping();
-        return r_info->readers.get_newest().version;
+        return get_version_id_of_latest_snapshot().version;
     }
 
     VersionID get_version_id_of_latest_snapshot()
@@ -490,8 +488,7 @@ public:
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
         uint_fast32_t index = r_info->readers.newest;
-        auto& r = r_info->readers.get_newest();
-        return {r.version, index};
+        return {r_info->readers.get(index).version, index};
     }
 
     void release_read_lock(ReadLockInfo& read_lock)
@@ -514,7 +511,7 @@ public:
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        bool pick_specific = version_id.version != std::numeric_limits<version_type>::max();
+        const bool pick_specific = version_id.version != VersionID().version;
         read_lock.m_reader_idx = pick_specific ? version_id.index : r_info->readers.newest;
         REALM_ASSERT(r_info->readers.newest >= 0);
         bool picked_newest = read_lock.m_reader_idx == (unsigned)r_info->readers.newest;
@@ -592,7 +589,6 @@ private:
             m_local_max_entry = r_info->readers.capacity();
             REALM_ASSERT(index < m_local_max_entry);
             size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
-            // std::cout << "Growing reader mapping to " << infosize << std::endl;
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
             r_info = m_reader_map.get_addr();
         }
