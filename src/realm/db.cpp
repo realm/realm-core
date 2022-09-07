@@ -94,21 +94,20 @@ struct VersionList {
         bool active;
     };
 
-    void reserve(uint32_t end) noexcept
+    void reserve(uint32_t size) noexcept
     {
-        uint32_t begin = entries;
-        for (auto i = begin; i < end; ++i)
+        for (auto i = entries; i < size; ++i)
             data[i].active = false;
-        if (end > entries) {
-            num_free += end - entries;
-            entries = end;
+        if (size > entries) {
+            num_free += size - entries;
+            entries = size;
         }
     }
 
     VersionList() noexcept
     {
-        newest = nil;                 // empty
-        num_free = init_readers_size; // empty
+        newest = nil; // empty
+        num_free = 0; // empty
         entries = 0;
         reserve(init_readers_size);
     }
@@ -135,14 +134,16 @@ struct VersionList {
     {
         return get(newest);
     }
-    ReadCount& allocate_entry()
+    ReadCount& allocate_entry(uint64_t top, uint64_t size, uint64_t version)
     {
         for (uint32_t i = 0; i < entries; ++i) {
             if (!data[i].active) {
                 num_free--;
                 auto& rc = data[i];
                 rc.count_frozen = rc.count_live = 0;
-                rc.current_top = rc.filesize = 0;
+                rc.current_top = top;
+                rc.filesize = size;
+                rc.version = version;
                 rc.active = true;
                 newest = i;
                 return rc;
@@ -156,10 +157,11 @@ struct VersionList {
         return static_cast<int>(&rc - data);
     }
 
-    void free_entry(int idx)
+    void free_entry(ReadCount* rc)
     {
+        rc->current_top = rc->filesize = rc->version = -1ULL; // easy to recognize in debugger
+        rc->active = false;
         num_free++;
-        get(idx).active = false;
     }
 
     // This method resets the version list to an empty state, then allocates an entry.
@@ -169,13 +171,13 @@ struct VersionList {
     // condition that it is the session initiator and under guard by the control mutex,
     // thus ensuring the precondition. It is also called from compact() in a similar situation.
     // It is most likely not suited for any other use.
-    ReadCount& init_versioning() noexcept
+    ReadCount& init_versioning(uint64_t top, uint64_t filesize, uint64_t version) noexcept
     {
         newest = nil;
         auto t_free = entries;
         entries = num_free = 0;
         reserve(t_free);
-        ReadCount& r = allocate_entry();
+        ReadCount& r = allocate_entry(top, filesize, version);
         return r;
     }
 
@@ -185,27 +187,26 @@ struct VersionList {
     }
 
     void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
-                        int& num_unreachable) noexcept
+                        bool& any_new_unreachables) noexcept
     {
         oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
-        num_unreachable = 0;
+        any_new_unreachables = false;
         for (auto* rc = data; rc < data + entries; ++rc) {
             if (rc->active) {
                 if (rc->count_live != 0) {
                     if (rc->version < oldest_live_v)
                         oldest_live_v = rc->version;
                 }
-                if (rc->count_frozen == 0 && rc->count_live == 0) {
+                if (rc->count_frozen == 0 && rc->count_live == 0) { // unreachable
                     REALM_ASSERT(index_of(*rc) != newest);
-                    rc->active = false;
                     rc->version = 0;
-                    free_entry(index_of(*rc));
-                    ++num_unreachable;
+                    free_entry(rc);
+                    any_new_unreachables = true;
                 }
                 else {
                     if (rc->version < oldest_v)
                         oldest_v = rc->version;
-                    // only get here on a still active entry
+                    // still active
                     top_refs.emplace(rc->version, VersionInfo{to_ref(rc->current_top), to_ref(rc->filesize)});
                 }
             }
@@ -382,10 +383,7 @@ struct alignas(8) DB::SharedInfo {
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
-        VersionList::ReadCount& r = readers.init_versioning();
-        r.filesize = file_size;
-        r.version = initial_version;
-        r.current_top = top_ref;
+        readers.init_versioning(top_ref, file_size, initial_version);
     }
 };
 
@@ -471,11 +469,11 @@ public:
     }
 
     void cleanup_versions(uint64_t& oldest_version, uint64_t& oldest_live_version, TopRefMap& top_refs,
-                          int& num_unreachable)
+                          bool& any_new_unreachables)
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, num_unreachable);
+        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
     }
 
     version_type get_newest_version()
@@ -518,15 +516,12 @@ public:
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
             throw BadVersion();
-        /*** enable this when we can reclaim all intermediate versions
-         **/
         if (!picked_newest) {
             if (frozen && r.count_frozen == 0 && r.count_live == 0)
                 throw BadVersion();
             if (!frozen && r.count_live == 0)
                 throw BadVersion();
         }
-        /* */
         if (frozen) {
             ++r.count_frozen;
         }
@@ -554,15 +549,7 @@ public:
             m_local_max_entry = new_entries;
             r_info->readers.reserve(new_entries);
         }
-        VersionList::ReadCount& r = r_info->readers.allocate_entry();
-        r.current_top = new_top_ref;
-        r.filesize = new_file_size;
-        r.version = new_version;
-    }
-
-    ~VersionManager()
-    {
-        m_reader_map.unmap();
+        r_info->readers.allocate_entry(new_top_ref, new_file_size, new_version);
     }
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
@@ -587,7 +574,6 @@ private:
         if (index >= m_local_max_entry) {
             // handle mapping expansion if required
             m_local_max_entry = r_info->readers.capacity();
-            REALM_ASSERT(index < m_local_max_entry);
             size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
             r_info = m_reader_map.get_addr();
@@ -2063,10 +2049,10 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     // of the current session.
     uint64_t oldest_version = 0, oldest_live_version = 0;
     TopRefMap top_refs;
-    int num_unreachable;
+    bool any_new_unreachables;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, num_unreachable);
+        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
 
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest *live* bound snapshot.
@@ -2084,7 +2070,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 #endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
-    out.set_versions(new_version, oldest_version, top_refs, num_unreachable);
+    out.set_versions(new_version, oldest_version, top_refs, any_new_unreachables);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
