@@ -1275,6 +1275,14 @@ RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, s
 RLM_API bool realm_find_class(const realm_t*, const char* name, bool* out_found, realm_class_info_t* out_class_info);
 
 /**
+ * Find class info based on a realm object.
+ *
+ * @param object object which is an instance of the class.
+ * @return a `realm_class_info_t` that will contain information about the class.
+ */
+RLM_API realm_class_info_t realm_object_get_class(realm_object_t* object) RLM_API_NOEXCEPT;
+
+/**
  * Get the class with @a key from the schema.
  *
  * Passing an invalid @a key for this schema is considered an error.

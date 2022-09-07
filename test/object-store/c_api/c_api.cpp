@@ -1430,6 +1430,14 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(!found);
     }
 
+    SECTION("realm_object_get_class()") {
+        write([&]() {
+            CPtr<realm_object_t> obj = cptr_checked(realm_object_create(realm, class_foo.key));
+            realm_class_info_t foo = realm_object_get_class(obj.get());
+            CHECK(strcmp(foo.name, "Foo") == 0);
+        });
+    }
+
     SECTION("realm_get_property_keys()") {
         size_t num_found = 0;
         size_t properties_found = 0;

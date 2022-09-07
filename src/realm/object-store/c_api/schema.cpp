@@ -126,6 +126,12 @@ RLM_API bool realm_find_class(const realm_t* realm, const char* name, bool* out_
     });
 }
 
+RLM_API realm_class_info_t realm_object_get_class(realm_object_t* object) RLM_API_NOEXCEPT
+{
+    const auto& schema = object->get_object_schema();
+    return realm_class_info_t(to_capi(schema));
+}
+
 RLM_API bool realm_get_class(const realm_t* realm, realm_class_key_t key, realm_class_info_t* out_class_info)
 {
     return wrap_err([&]() {
