@@ -326,11 +326,11 @@ auto GroupWriter::map_reachable() -> std::vector<FreeSpaceEntry>
     }
 
     std::sort(collector.blocks.begin(), collector.blocks.end(), [](const FreeSpaceEntry& a, const FreeSpaceEntry& b) {
-        if (a.ref == b.ref)
-            return a.released_at_version < b.released_at_version;
-        return a.ref < b.ref;
+        if (a.ref != b.ref)
+            return a.ref < b.ref;
+        return a.released_at_version < b.released_at_version;
     });
-    return collector.blocks;
+    return std::move(collector.blocks);
 }
 
 void GroupWriter::backdate()
@@ -369,11 +369,11 @@ void GroupWriter::backdate()
 
     // little helper: get a youngest version older than given
     auto get_earlier = [&](uint64_t version) -> FreeList* {
-        auto pred = [](const std::unique_ptr<FreeList>& e, uint64_t v) {
-            return e->version < v;
-        };
-        auto it = std::lower_bound(old_freelists.begin(), old_freelists.end(), version, pred);
-        // There will allways be at least one freelist:
+        auto it = std::lower_bound(old_freelists.begin(), old_freelists.end(), version,
+                                   [](const std::unique_ptr<FreeList>& e, uint64_t v) {
+                                       return e->version < v;
+                                   });
+        // There will always be at least one freelist:
         REALM_ASSERT(it != old_freelists.end());
         if (it == old_freelists.begin())
             return nullptr;
@@ -383,9 +383,9 @@ void GroupWriter::backdate()
     };
 
 
-    // find youngest time stamp in any block which (partially) overlaps a given one.
+    // find youngest time stamp in any block in a sequence that completely covers a given one.
     // if no such block exists, return the current version of the given block.
-    auto find_cover_for = [&](FreeSpaceEntry& entry, FreeList& free_list) -> uint64_t {
+    auto find_cover_for = [&](const FreeSpaceEntry& entry, FreeList& free_list) -> uint64_t {
         if (!free_list.initialized) {
             // setup arrays
             free_list.initialized = true;
@@ -517,9 +517,7 @@ void GroupWriter::backdate()
     std::cout << std::endl << "  Backdating:";
 #endif
 #endif
-    size_t limit = m_not_free_in_file.size();
-    for (size_t index = 0; index < limit; ++index) {
-        auto& entry = m_not_free_in_file[index];
+    for (auto&& entry : m_not_free_in_file) {
         bool referenced = false;
 #ifdef REALM_DEBUG
 #if REALM_ALLOC_DEBUG
@@ -613,7 +611,7 @@ ref_type GroupWriter::write_group()
 #if REALM_ALLOC_DEBUG
     std::cout << "  Freelist size after allocations: " << m_size_map.size() << std::endl;
 #endif
-    // We now back-date (if possbible) any blocks freed in versions which
+    // We now back-date (if possible) any blocks freed in versions which
     // are becoming unreachable.
     if (m_num_unreachable)
         backdate();
