@@ -82,10 +82,8 @@ namespace {
 const uint_fast16_t g_shared_info_version = 13;
 
 
-// VersionList
 struct VersionList {
-    // the VersionList is a doubly linked list of ReadCount structures.
-    // it also holds a freelist.
+    // the VersionList is an array of ReadCount structures.
     // it is placed in the "lock-file" and accessed via memory mapping
     struct ReadCount {
         uint64_t version;
@@ -93,33 +91,26 @@ struct VersionList {
         uint64_t current_top;
         uint32_t count_live;
         uint32_t count_frozen;
-        int32_t older;
-        int32_t newer;
+        bool active;
     };
-    const int nil = -1;
 
-    void expand_to(uint_fast32_t new_entries) noexcept
+    void reserve(uint32_t end) noexcept
     {
-        for (uint32_t i = entries; i < new_entries; i++) {
-            data[i].version = 1;
-            data[i].count_live = 0;
-            data[i].count_frozen = 0;
-            data[i].current_top = 0;
-            data[i].filesize = 0;
-            data[i].older = i + 1;
-            data[i].newer = nil;
+        uint32_t begin = entries;
+        for (auto i = begin; i < end; ++i)
+            data[i].active = false;
+        if (end > entries) {
+            num_free += end - entries;
+            entries = end;
         }
-        data[new_entries - 1].older = freelist;
-        freelist = entries;
-        entries = uint32_t(new_entries);
     }
 
     VersionList() noexcept
     {
+        newest = nil;                 // empty
+        num_free = init_readers_size; // empty
         entries = 0;
-        oldest = newest = nil; // empty
-        freelist = nil;        // empty
-        expand_to(init_readers_size);
+        reserve(init_readers_size);
     }
 
     static size_t compute_required_space(uint_fast32_t num_entries) noexcept
@@ -130,7 +121,7 @@ struct VersionList {
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    unsigned int get_num_entries() const noexcept
+    unsigned int capacity() const noexcept
     {
         return entries;
     }
@@ -140,38 +131,24 @@ struct VersionList {
         return data[idx];
     }
 
-    ReadCount& get_oldest() noexcept
-    {
-        return get(oldest);
-    }
-
     ReadCount& get_newest() noexcept
     {
         return get(newest);
     }
     ReadCount& allocate_entry()
     {
-        // grab entry from freelist:
-        REALM_ASSERT(freelist != nil);
-        auto& r = get(freelist);
-        freelist = r.older;
-
-        if (newest == nil) {
-            // list was empty
-            REALM_ASSERT(oldest == nil);
-            newest = oldest = index_of(r);
-            r.older = r.newer = nil;
+        for (uint32_t i = 0; i < entries; ++i) {
+            if (!data[i].active) {
+                num_free--;
+                auto& rc = data[i];
+                rc.count_frozen = rc.count_live = 0;
+                rc.current_top = rc.filesize = 0;
+                rc.active = true;
+                newest = i;
+                return rc;
+            }
         }
-        else {
-            // add to existing list
-            auto& n = get(newest);
-            REALM_ASSERT(n.newer == nil);
-            r.newer = nil;
-            r.older = newest;
-            newest = index_of(r);
-            n.newer = newest;
-        }
-        return r;
+        REALM_ASSERT_RELEASE(false);
     }
 
     int index_of(const ReadCount& rc)
@@ -181,88 +158,71 @@ struct VersionList {
 
     void free_entry(int idx)
     {
-        auto& r = get(idx);
-        if (idx == oldest)
-            oldest = r.newer;
-        if (idx == newest)
-            newest = r.older; // can this happen?
-        if (r.older != nil)
-            get(r.older).newer = r.newer;
-        if (r.newer != nil)
-            get(r.newer).older = r.older;
-
-        // add to freelist
-        r.newer = nil;
-        r.older = freelist;
-        freelist = idx;
+        num_free++;
+        get(idx).active = false;
     }
 
-    // This method re-initialises the last used VersionList entry to hold a new entry.
+    // This method resets the version list to an empty state, then allocates an entry.
     // Precondition: This should *only* be done if the caller has established that she
     // is the only thread/process that has access to the VersionList. It is currently
     // called from init_versioning(), which is called by DB::open() under the
     // condition that it is the session initiator and under guard by the control mutex,
-    // thus ensuring the precondition.
+    // thus ensuring the precondition. It is also called from compact() in a similar situation.
     // It is most likely not suited for any other use.
     ReadCount& init_versioning() noexcept
     {
-        int num_entries = entries;
-        entries = 0;
-        newest = oldest = freelist = nil;
-        expand_to(num_entries);
+        newest = nil;
+        auto t_free = entries;
+        entries = num_free = 0;
+        reserve(t_free);
         ReadCount& r = allocate_entry();
-        r.count_live = r.count_frozen = 0;
         return r;
     }
 
     bool is_full() const noexcept
     {
-        return freelist == nil;
+        return num_free == 0;
     }
 
     void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
                         int& num_unreachable) noexcept
     {
-        // run through list of versions and reclaim unused entries.
-        // buld a map of reachable versions on the way.
-        // there is always at least one live entry
-        auto it = oldest;
-        bool looking_for_oldest_live = true;
-        bool have_seen_a_reachable_version = false;
-        REALM_ASSERT(oldest != nil);
-        while (it != nil) {
-            auto& r = get(it);
-            it = r.newer;
-            if (looking_for_oldest_live && r.count_live != 0) {
-                looking_for_oldest_live = false;
-                oldest_v = get(oldest).version;
-                oldest_live_v = r.version;
-                REALM_ASSERT(oldest_v <= oldest_live_v);
-            }
-            if (r.count_frozen == 0 && r.count_live == 0) {
-                // only count in-between versions... this results in fewer runs
-                // of the backdating algorithm in group_writer.
-                if (have_seen_a_reachable_version)
-                    num_unreachable++;
-                r.version = 0;
-                free_entry(index_of(r));
-            }
-            else {
-                have_seen_a_reachable_version = true;
-                top_refs.emplace(r.version, VersionInfo{to_ref(r.current_top), to_ref(r.filesize)});
+        oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
+        num_unreachable = 0;
+        for (auto* rc = data; rc < data + entries; ++rc) {
+            if (rc->active) {
+                if (rc->count_live != 0) {
+                    if (rc->version < oldest_live_v)
+                        oldest_live_v = rc->version;
+                }
+                if (rc->count_frozen == 0 && rc->count_live == 0) {
+                    REALM_ASSERT(index_of(*rc) != newest);
+                    rc->active = false;
+                    rc->version = 0;
+                    free_entry(index_of(*rc));
+                    ++num_unreachable;
+                }
+                else {
+                    if (rc->version < oldest_v)
+                        oldest_v = rc->version;
+                    // only get here on a still active entry
+                    top_refs.emplace(rc->version, VersionInfo{to_ref(rc->current_top), to_ref(rc->filesize)});
+                }
             }
         }
+        REALM_ASSERT(oldest_v != std::numeric_limits<uint64_t>::max());
+        REALM_ASSERT(oldest_live_v != std::numeric_limits<uint64_t>::max());
     }
 
     uint32_t entries;
-    int32_t oldest;
     int32_t newest;
-    int32_t freelist;
+    int32_t num_free;
 
+    constexpr static int nil = -1;
     const static int init_readers_size = 32;
 
-    // IMPORTANT: The actual data comprising the linked list MUST BE PLACED LAST in
-    // the VersionList structure, as the linked list area is extended at run time.
+    // IMPORTANT: The actual data comprising the version list MUST BE PLACED LAST in
+    // the VersionList structure, as the data area is extended at run time.
     // Similarly, the VersionList must be the final element of the SharedInfo structure.
     // IMPORTANT II:
     // To ensure proper alignment across all platforms, the SharedInfo structure
@@ -301,8 +261,8 @@ TransactionRef make_transaction_ref(Args&&... args)
 /// Members `init_complete`, `shared_info_version`, `size_of_mutex`, and
 /// `size_of_condvar` may only be modified only while holding an exclusive lock
 /// on the file, and may be read only while holding a shared (or exclusive) lock
-/// on the file. All other members (except for the VersionList) may be accessed
-/// only while holding a lock on `controlmutex`.
+/// on the file. All other members (except for the VersionList which has its own mutex)
+/// may be accessed only while holding a lock on `controlmutex`.
 ///
 /// SharedInfo must be 8-byte aligned. On 32-bit Apple platforms, mutexes store their
 /// alignment as part of the mutex state. We're copying the SharedInfo (including
@@ -506,7 +466,7 @@ public:
         size_t size = static_cast<size_t>(m_file.get_size());
         m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
         r_info = m_reader_map.get_addr();
-        m_local_max_entry = r_info->readers.get_num_entries();
+        m_local_max_entry = r_info->readers.capacity();
         REALM_ASSERT(sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry) == size);
     }
 
@@ -587,15 +547,15 @@ public:
         std::lock_guard lock(m_mutex);
         if (r_info->readers.is_full()) {
             // buffer expansion
-            auto entries = r_info->readers.get_num_entries();
-            entries = entries + 32;
-            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
+            auto entries = r_info->readers.capacity();
+            auto new_entries = entries + 32;
+            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(new_entries);
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
             m_file.prealloc(new_info_size);                                          // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
             r_info = m_reader_map.get_addr();
-            m_local_max_entry = entries;
-            r_info->readers.expand_to(entries);
+            m_local_max_entry = new_entries;
+            r_info->readers.reserve(new_entries);
         }
         VersionList::ReadCount& r = r_info->readers.allocate_entry();
         r.current_top = new_top_ref;
@@ -626,10 +586,10 @@ private:
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
 
-        auto index = r_info->readers.get_num_entries() - 1;
+        auto index = r_info->readers.capacity() - 1;
         if (index >= m_local_max_entry) {
             // handle mapping expansion if required
-            m_local_max_entry = r_info->readers.get_num_entries();
+            m_local_max_entry = r_info->readers.capacity();
             REALM_ASSERT(index < m_local_max_entry);
             size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
             // std::cout << "Growing reader mapping to " << infosize << std::endl;
@@ -1078,7 +1038,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                     top.init_from_ref(top_ref);
                     file_size = Group::get_logical_file_size(top);
                 }
-                // REALM_ASSERT(m_alloc.matches_section_boundary(file_size));
                 version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
@@ -1933,7 +1892,6 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, bool is_frozen, VersionID versi
 
     m_local_locks_held.emplace_back(read_lock);
     ++m_transaction_count;
-    // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
     REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
 }
 

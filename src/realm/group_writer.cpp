@@ -1023,7 +1023,7 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(
     while (it != m_size_map.end()) {
         // Accept either a perfect match or a block that is twice the size. Tests have shown
         // that this is a good strategy.
-        if (it->first >= size || it->first >= 2 * size) {
+        if (it->first == size || it->first >= 2 * size) {
             auto ret = search_free_space_in_free_list_element(it, size);
             if (ret != m_size_map.end()) {
                 return ret;
