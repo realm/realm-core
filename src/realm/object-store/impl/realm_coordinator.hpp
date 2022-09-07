@@ -205,7 +205,7 @@ public:
 
     using NotifierVector = std::vector<std::shared_ptr<_impl::CollectionNotifier>>;
     // Called by NotifierPackage in the cases where we don't know what version
-    // we need to notifiers for until after we begin advancing (e.g. when
+    // we need notifiers for until after we begin advancing (e.g. when
     // starting a write transaction).
     void package_notifiers(NotifierVector& notifiers, VersionID::version_type)
         REQUIRES(!m_notifier_mutex, !m_running_notifiers_mutex);

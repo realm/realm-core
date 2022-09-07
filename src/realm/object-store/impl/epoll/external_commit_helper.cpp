@@ -258,8 +258,12 @@ void DaemonThread::listen()
         }
 
         // One of the ExternalCommitHelper fds was notified. We need to check
-        // if the target is still alive while holding the mutex, but we need to
-        // then release the mutex before calling on_change().
+        // if the target is still alive while holding m_mutex, but we can't
+        // hold it while calling on_change() as that would lead to a lock-order
+        // inversions with one of RealmCoordinator's mutexes.
+        // m_running_on_change_mutex guarantees that the coordinator is not
+        // torn down while we're inside on_change(), while allowing new
+        // coordinators to be added.
         util::CheckedLockGuard lock(m_running_on_change_mutex);
         RealmCoordinator* coordinator = static_cast<RealmCoordinator*>(ev.data.ptr);
         {
