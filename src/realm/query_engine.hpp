@@ -1571,7 +1571,7 @@ public:
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
         if (!upper || !lower) {
-            throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", v));
+            throw std::runtime_error(util::format("Malformed UTF-8: %1", v));
         }
         else {
             m_ucase = std::move(*upper);

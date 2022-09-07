@@ -294,16 +294,16 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         if (n > tmp_buffer_size) {
             // Break the input string into chunks - but don't break in the middle of a multibyte character
             const char* p = begin;
-            n = 0;
-            while (p != end) {
+            const char* buffer_end = begin + tmp_buffer_size;
+            while (p < buffer_end) {
                 size_t len = sequence_length(*p);
                 p += len;
-                n += len;
-                if (n > tmp_buffer_size) {
-                    n -= len;
+                if (p > buffer_end) {
+                    p -= len;
                     break;
                 }
             }
+            n = p - begin;
         }
 
         wchar_t tmp[tmp_buffer_size];
