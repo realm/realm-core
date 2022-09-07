@@ -28,7 +28,6 @@
 #include <unordered_set>
 
 using namespace realm;
-using namespace realm::schema;
 
 namespace realm {
 bool operator==(Schema const& a, Schema const& b) noexcept

@@ -36,7 +36,6 @@
 #include <unordered_set>
 
 using namespace realm;
-using namespace realm::schema;
 
 constexpr uint64_t ObjectStore::NotVersioned;
 

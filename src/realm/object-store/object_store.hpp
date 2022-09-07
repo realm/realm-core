@@ -132,7 +132,6 @@ private:
     uint64_t m_old_version, m_new_version;
 };
 
-namespace schema {
 // Schema validation exceptions
 struct ObjectSchemaValidationException {
     ObjectSchemaValidationException(std::string message)
@@ -166,7 +165,6 @@ struct InvalidReadOnlySchemaChangeException : public LogicError {
 struct InvalidExternalSchemaChangeException : public LogicError {
     InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
-} // namespace schema
 } // namespace realm
 
 #endif /* defined(REALM_OBJECT_STORE_HPP) */
