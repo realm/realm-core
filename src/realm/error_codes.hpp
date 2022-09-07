@@ -74,13 +74,6 @@ private:
     unsigned m_value;
 };
 
-/*
- * This is a generated class containing a table of error codes and their corresponding error
- * strings. The class is derived from the definitions in src/realm/error_codes.yml file and the
- * src/realm/error_codes.tpl.hpp template.
- *
- * Do not update this file directly. Update src/realm/error_codes.yml instead.
- */
 class ErrorCodes {
 public:
     // Explicitly 32-bits wide so that non-symbolic values,
