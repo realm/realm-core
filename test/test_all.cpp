@@ -545,7 +545,7 @@ bool run_tests(util::Logger* logger)
 } // anonymous namespace
 
 
-int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
+int test_all(util::Logger* logger)
 {
     // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
     // git client will attempt to access the files when it sees that new files have been created). This may cause
@@ -563,7 +563,8 @@ int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
     // e.g. due to power off.
     // NOTE: This is not strictly true. If encryption is enabled, a crash of the testsuite
     // (not the whole platform) may produce corrupt realm files.
-    if (disable_all_sync_to_disk)
+    char* enable_sync_to_disk = getenv("UNITTEST_ENABLE_SYNC_TO_DISK");
+    if (!enable_sync_to_disk)
         disable_sync_to_disk();
 #endif
 
