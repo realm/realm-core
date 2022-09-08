@@ -519,10 +519,6 @@ public:
             config_2.connection_reaper_interval = config.server_connection_reaper_interval;
             config_2.max_download_size = config.max_download_size;
             config_2.disable_download_compaction = config.disable_download_compaction;
-            config_2.disable_history_compaction = config.disable_history_compaction;
-            config_2.history_compaction_clock = config.history_compaction_clock;
-            config_2.history_ttl = config.history_ttl;
-            config_2.history_compaction_interval = config.history_compaction_interval;
             config_2.tcp_no_delay = true;
             config_2.authorization_header_name = config.authorization_header_name;
             config_2.encryption_key = make_crypt_key(config.server_encryption_key);
@@ -545,6 +541,7 @@ public:
             config_2.disable_upload_compaction = config.disable_upload_compaction;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
+            config_2.fix_up_object_ids = true;
             m_clients[i] = std::make_unique<Client>(std::move(config_2));
         }
 

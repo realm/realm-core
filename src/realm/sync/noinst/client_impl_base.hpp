@@ -153,6 +153,7 @@ private:
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
+    const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
     util::network::Service m_service;
@@ -447,9 +448,9 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
     void read_or_write_error(std::error_code);
-    void close_due_to_protocol_error(std::error_code);
+    void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_missing_protocol_feature();
-    void close_due_to_client_side_error(std::error_code, bool is_fatal);
+    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
     void involuntary_disconnect(const SessionErrorInfo& info);
@@ -734,10 +735,9 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
-                                  DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
 
-    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
+    void on_integration_failure(const IntegrationException& e);
 
     void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
 
@@ -831,7 +831,7 @@ private:
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
     void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
-                                       const ReceivedChangesets&);
+                                       const SyncProgress& progress, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
     ///
@@ -896,8 +896,6 @@ private:
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
 
-    DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
-
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
     // download completion is reached again.
@@ -906,6 +904,8 @@ private:
     bool m_upload_completion_notification_requested = false;
 
     bool m_is_flx_sync_session = false;
+
+    bool m_fix_up_object_ids = false;
 
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
@@ -1068,7 +1068,6 @@ private:
     void reset_protocol_state() noexcept;
     void ensure_enlisted_to_send();
     void enlist_to_send();
-    void update_progress(const SyncProgress&);
     bool check_received_sync_progress(const SyncProgress&) noexcept;
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
@@ -1306,6 +1305,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_conn{conn}
     , m_ident{ident}
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
+    , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
@@ -1435,7 +1435,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_last_download_mark_sent          = m_last_download_mark_received;
-    m_download_batch_state = DownloadBatchState::LastInBatch;
     // clang-format on
 }
 

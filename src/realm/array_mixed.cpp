@@ -344,7 +344,7 @@ int64_t ArrayMixed::store(const Mixed& value)
         case type_Int: {
             int64_t int_val = value.get_int();
             if (std::numeric_limits<int32_t>::min() <= int_val && int_val <= std::numeric_limits<int32_t>::max()) {
-                val = (int_val << s_data_shift);
+                val = (static_cast<uint64_t>(int_val) << s_data_shift);
             }
             else {
                 ensure_int_array();

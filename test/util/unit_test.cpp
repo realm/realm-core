@@ -892,12 +892,12 @@ void TestContext::throw_ex_failed(const char* file, long line, const char* expr_
 }
 
 
-void TestContext::throw_ex_cond_failed(const char* file, long line, const char* expr_text, const char* exception_name,
-                                       const char* exception_cond_text)
+void TestContext::throw_ex_cond_failed(const char* file, long line, const char* exception_what, const char* expr_text,
+                                       const char* exception_name, const char* exception_cond_text)
 {
     std::ostringstream out;
     out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " << exception_cond_text
-        << ") failed: Did throw, but condition failed";
+        << ") failed: Did throw \"" << exception_what << "\", but condition failed";
     check_failed(file, line, out.str());
 }
 

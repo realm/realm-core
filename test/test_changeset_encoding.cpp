@@ -3,6 +3,7 @@
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/noinst/integer_codec.hpp>
 
 using namespace realm;
 using namespace realm::sync::instr;
@@ -20,7 +21,6 @@ Changeset encode_then_parse(const Changeset& changeset)
     parse_changeset(stream, parsed);
     return parsed;
 }
-} // namespace
 
 TEST(ChangesetEncoding_AddTable)
 {
@@ -294,3 +294,148 @@ TEST(ChangesetEncoding_AccentWords)
     // This will throw if a string is interned twice.
     CHECK_NOTHROW(parse_changeset(stream, parsed));
 }
+
+void encode_instruction(util::AppendBuffer<char>& buffer, char instr)
+{
+    buffer.append(&instr, 1);
+}
+
+void encode_int(util::AppendBuffer<char>& buffer, int64_t value)
+{
+    char buf[_impl::encode_int_max_bytes<int64_t>()];
+    size_t written = _impl::encode_int(buf, value);
+    buffer.append(buf, written);
+}
+
+void encode_string(util::AppendBuffer<char>& buffer, uint32_t index, std::string_view value)
+{
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, index);        // Index
+    encode_int(buffer, value.size()); // String length
+    buffer.append(value.data(), value.size());
+}
+
+#define CHECK_BADCHANGESET(buffer, msg)                                                                              \
+    do {                                                                                                             \
+        util::SimpleNoCopyInputStream stream{buffer};                                                                \
+        Changeset parsed;                                                                                            \
+        CHECK_THROW_EX(parse_changeset(stream, parsed), sync::BadChangesetError,                                     \
+                       StringData(e.what()).contains(msg));                                                          \
+    } while (0)
+
+TEST(ChangesetParser_BadInstruction)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, 0x3e);
+    CHECK_BADCHANGESET(buffer, "unknown instruction");
+}
+
+TEST(ChangesetParser_GoodInternString)
+{
+    util::AppendBuffer<char> buffer;
+    encode_string(buffer, 0, "a");
+    encode_string(buffer, 1, "b");
+
+    util::SimpleNoCopyInputStream stream{buffer};
+    Changeset parsed;
+    CHECK_NOTHROW(parse_changeset(stream, parsed));
+}
+
+TEST(ChangesetParser_BadInternString_MissingIndex)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    CHECK_BADCHANGESET(buffer, "bad changeset - integer decoding failure");
+}
+
+TEST(ChangesetParser_BadInternString_IndexTooLarge)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, std::numeric_limits<int64_t>::max()); // Index
+    encode_int(buffer, 0);                                   // String length
+    CHECK_BADCHANGESET(buffer, "bad changeset - integer decoding failure");
+}
+
+TEST(ChangesetParser_BadInternString_UnorderedIndex)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 1); // Index
+    CHECK_BADCHANGESET(buffer, "Unexpected intern index");
+}
+
+TEST(ChangesetParser_BadInternString_MissingLength)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 1); // Index
+    CHECK_BADCHANGESET(buffer, "Unexpected intern index");
+}
+
+TEST(ChangesetParser_BadInternString_LengthTooLong)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 0);                          // Index
+    encode_int(buffer, Table::max_string_size + 1); // String length
+    CHECK_BADCHANGESET(buffer, "string too long");
+}
+
+TEST(ChangesetParser_BadInternString_NegativeLength)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 0);  // Index
+    encode_int(buffer, -1); // String length
+    CHECK_BADCHANGESET(buffer, "bad changeset - integer decoding failure");
+}
+
+TEST(ChangesetParser_BadInternString_TruncatedLength)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 0); // Index
+
+    char buf[_impl::encode_int_max_bytes<uint32_t>()];
+    size_t written = _impl::encode_int(buf, Table::max_string_size);
+    buffer.append(buf, written - 1);
+
+    CHECK_BADCHANGESET(buffer, "bad changeset - integer decoding failure");
+}
+
+TEST(ChangesetParser_BadInternString_MissingBody)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_int(buffer, 0); // Index
+    encode_int(buffer, 1); // String length
+    CHECK_BADCHANGESET(buffer, "truncated input");
+}
+
+TEST(ChangesetParser_BadInternString_RepeatedIndex)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, sync::InstrTypeInternString);
+    encode_string(buffer, 0, "a");
+    encode_string(buffer, 0, "b");
+    CHECK_BADCHANGESET(buffer, "Unexpected intern index");
+}
+
+TEST(ChangesetParser_BadInternString_RepeatedBody)
+{
+    util::AppendBuffer<char> buffer;
+    encode_string(buffer, 0, "a");
+    encode_string(buffer, 1, "a");
+    CHECK_BADCHANGESET(buffer, "Unexpected intern string");
+}
+
+TEST(ChangesetParser_BadInternString_InvalidUse)
+{
+    util::AppendBuffer<char> buffer;
+    encode_instruction(buffer, char(sync::Instruction::Type::CreateObject));
+    encode_int(buffer, 0); // Index
+    CHECK_BADCHANGESET(buffer, "Invalid interned string");
+}
+
+} // namespace

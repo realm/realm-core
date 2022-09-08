@@ -81,6 +81,10 @@ functions:
               set_cmake_var realm_vars REALM_TSAN BOOL On
           fi
 
+          if [ -n "${enable_ubsan|}" ]; then
+              set_cmake_var realm_vars REALM_USAN BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -104,9 +108,8 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          if [ -n "${enable_logging|}" ]; then
-              set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
-          fi
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
+          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING_LEVEL STRING "debug"
 
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
@@ -171,7 +174,14 @@ functions:
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
-          TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
+
+          if [[ -n "${verbose_test_output}" ]]; then
+              TEST_FLAGS="$TEST_FLAGS -VV"
+          else
+              TEST_FLAGS="$TEST_FLAGS -V"
+          fi
+
+          TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_PROGRESS=1
@@ -184,7 +194,7 @@ functions:
           fi
 
           cd build
-          $CTEST -C ${cmake_build_type|Debug} -V $TEST_FLAGS
+          $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
 
   "upload test results":
   - command: attach.results
@@ -358,6 +368,17 @@ tasks:
 
         xcrun swift build
         xcrun swift run ObjectStoreTests
+
+- name: test-on-exfat
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build
+      shell: /bin/bash
+      script: ../tools/run-tests-on-exfat.sh
 
 - name: bloaty
   commands:
@@ -565,6 +586,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: ObjectStoreTests
+      verbose_test_output: true
 
 - name: lint
   tags: [ "for_pull_requests" ]
@@ -786,6 +808,23 @@ buildvariants:
     distros:
     - ubuntu2004-large
 
+- name: ubuntu2004-ubsan
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 UBSAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_ubsan: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
+  - name: compile_test
+    distros:
+    - ubuntu2004-large
+
 - name: rhel70
   display_name: "RHEL 7 x86_64"
   run_on: rhel70-small
@@ -871,6 +910,7 @@ buildvariants:
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
+  - name: test-on-exfat
 
 - name: macos-1100-arm64
   display_name: "MacOS 11 arm64"

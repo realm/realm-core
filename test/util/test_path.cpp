@@ -161,7 +161,9 @@ bool test_dir_is_exfat()
     REALM_ASSERT_RELEASE(ret == 0);
     // The documentation and headers helpfully don't list any of the values of
     // f_type or provide constants for them
-    return fsbuf.f_type == 28 /* exFAT */;
+    std::string fs_typename = fsbuf.f_fstypename;
+    std::transform(fs_typename.begin(), fs_typename.end(), fs_typename.begin(), toLowerAscii);
+    return fs_typename.find(std::string("exfat")) != std::string::npos;
 #else
     return false;
 #endif

@@ -196,46 +196,6 @@ public:
         /// sure to research the subject before you enable this option.
         bool tcp_no_delay = false;
 
-        /// Unless disabled, the server will periodically run log compaction on
-        /// history that it knows that no currently known client relies on for
-        /// operational transformation. Only clients seen within `history_ttl`
-        /// will keep history uncompacted. See also
-        /// `history_compaction_interval` for how to control how often the
-        /// server considers performing compaction.
-        bool disable_history_compaction = true;
-
-        /// Clients that haven't been seen for this amount may experience a
-        /// client reset, due to the server having compacted history that they
-        /// rely on for operational transformation.
-        /// Default is infinity.
-        std::chrono::seconds history_ttl = std::chrono::seconds::max();
-
-        /// The average amount of time that must pass between running history
-        /// log compaction. The actual time that log compaction will run is
-        /// `time_of_last_compaction + interval +/- rand(0, interval / 2)`,
-        /// meaning that at least `interval / 2` seconds will elapse, but no
-        /// more than `interval * 1.5` seconds.
-        /// The default value is 1 hour.
-        std::chrono::seconds history_compaction_interval = std::chrono::seconds{3600};
-
-        /// If set to true, the determination of how far in-place history
-        /// compaction can proceed will be based entirely on the history
-        /// itself. The 'last access' timestamps of client file entries will be
-        /// completely ignored. This should only be done in emergency
-        /// situations. Expect it to cause expiration of client files even when
-        /// they have seen acitivity within the specified 'time to live' (\ref
-        /// history_ttl).
-        ///
-        /// CAUTION: Do **not** enable this unless you know what you are doing,
-        /// and it is absolutely necessary. When enabled, a warning will be
-        /// logged.
-        bool history_compaction_ignore_clients = false;
-
-        /// An optional custom clock to be used for in-place history compaction
-        /// checks. If no clock is specified, the server will use the system
-        /// clock.
-        const Clock* history_compaction_clock = nullptr;
-
         /// An optional 64 byte key to encrypt all files with.
         util::Optional<std::array<char, 64>> encryption_key;
 
