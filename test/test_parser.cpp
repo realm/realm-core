@@ -5515,4 +5515,73 @@ TEST(Parser_Between)
     CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
 }
 
+TEST(Parser_PrimaryKey)
+{
+    UUID u1("3b241101-e2bb-4255-8caf-4136c566a961");
+    ObjectId o1 = ObjectId::gen();
+    Group g;
+    auto table_int = g.add_table_with_primary_key("class_Int", type_Int, "_id");
+    auto table_string = g.add_table_with_primary_key("class_String", type_String, "_id");
+    auto table_oid = g.add_table_with_primary_key("class_Oid", type_ObjectId, "_id");
+    auto table_uuid = g.add_table_with_primary_key("class_Uuid", type_UUID, "_id");
+
+    auto origin = g.add_table("origin");
+    auto col_int = origin->add_column(*table_int, "int");
+    auto col_string = origin->add_column(*table_string, "string");
+    auto col_oid = origin->add_column(*table_oid, "oid");
+    auto col_uuid = origin->add_column(*table_uuid, "uuid");
+
+    auto linking = g.add_table("linking");
+    auto col_link = linking->add_column(*origin, "link");
+
+    origin->create_object().set(col_int, table_int->create_object_with_primary_key(1).get_key());
+    origin->create_object().set(col_string, table_string->create_object_with_primary_key("first").get_key());
+    origin->create_object().set(col_oid, table_oid->create_object_with_primary_key(o1).get_key());
+    origin->create_object().set(col_uuid, table_uuid->create_object_with_primary_key(u1).get_key());
+
+    for (auto o : *origin) {
+        linking->create_object().set(col_link, o.get_key());
+    }
+
+    std::string query_string = "int == obj(\"class_Int\",1)";
+    Query q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "string == obj(\"class_String\",\"first\")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "oid == obj(\"class_Oid\"," + util::serializer::print_value(o1) + ")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "uuid == obj(\"class_Uuid\"," + util::serializer::print_value(u1) + ")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.int == obj(\"class_Int\",1)";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.string == obj(\"class_String\",\"first\")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.oid == obj(\"class_Oid\"," + util::serializer::print_value(o1) + ")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.uuid == obj(\"class_Uuid\"," + util::serializer::print_value(u1) + ")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+}
+
 #endif // TEST_PARSER

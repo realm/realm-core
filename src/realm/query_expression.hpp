@@ -4215,6 +4215,7 @@ public:
                                                  m_left->description(state));
         }
         else {
+            std::string value = m_right->description(state);
             if constexpr (std::is_same_v<TCond, Equal>) {
                 if (m_right->has_single_value()) {
                     auto val = m_right->get_mixed();
@@ -4224,16 +4225,15 @@ public:
                             if (auto obj = target_table->try_get_object(val.get<ObjKey>())) {
                                 auto pk_val = obj.get_any(pk_col);
                                 std::ostringstream ostr;
-                                ostr << "obj('" << target_table->get_name() << "'," << pk_val << ')';
-                                return util::serializer::print_value(m_left->description(state) +
-                                                                     " == " + ostr.str());
+                                ostr << "obj(" << util::serializer::print_value(target_table->get_name()) << ","
+                                     << pk_val << ')';
+                                value = ostr.str();
                             }
                         }
                     }
                 }
             }
-            return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
-                                                 m_right->description(state));
+            return m_left->description(state) + " " + TCond::description() + " " + value;
         }
     }
 

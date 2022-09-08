@@ -1633,67 +1633,68 @@ namespace yy {
                                 { yystack_[2].value.as < ListNode* > ()->add_element(yystack_[0].value.as < ConstantNode* > ()); yylhs.value.as < ListNode* > () = yystack_[2].value.as < ListNode* > (); }
     break;
 
-  case 51: // constant: "natural0"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
-    break;
-
-  case 52: // constant: primary_key
+  case 51: // constant: primary_key
                                 { yylhs.value.as < ConstantNode* > () = yystack_[0].value.as < ConstantNode* > (); }
     break;
 
-  case 53: // constant: "infinity"
+  case 52: // constant: "infinity"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 54: // constant: "NaN"
+  case 53: // constant: "NaN"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 55: // constant: "base64"
+  case 54: // constant: "base64"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 56: // constant: "float"
+  case 55: // constant: "float"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 57: // constant: "date"
+  case 56: // constant: "date"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 58: // constant: "link"
+  case 57: // constant: "link"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 59: // constant: "typed link"
+  case 58: // constant: "typed link"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 60: // constant: "true"
+  case 59: // constant: "true"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
     break;
 
-  case 61: // constant: "false"
+  case 60: // constant: "false"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     break;
 
-  case 62: // constant: "null"
+  case 61: // constant: "null"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
     break;
 
-  case 63: // constant: "argument"
+  case 62: // constant: "argument"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 64: // constant: comp_type "argument"
+  case 63: // constant: comp_type "argument"
                                 { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType(yystack_[1].value.as < int > ()), yystack_[0].value.as < std::string > ()); }
     break;
 
-  case 65: // constant: "obj" '(' "string" ',' primary_key ')'
-                                           { 
+  case 64: // constant: "obj" '(' "string" ',' primary_key ')'
+                                { 
                                     auto tmp = yystack_[1].value.as < ConstantNode* > ();
                                     tmp->add_table(yystack_[3].value.as < std::string > ());
-                                    yylhs.value.as < ConstantNode* > () = tmp; }
+                                    yylhs.value.as < ConstantNode* > () = tmp;
+                                }
+    break;
+
+  case 65: // primary_key: "natural0"
+                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 66: // primary_key: "number"
@@ -2235,30 +2236,30 @@ namespace yy {
      136,    23,   -83,   -83,   -83,   -83,   -83,   -83,   -83,   227,
      227,   227,   227,   182,   227,   -83,   -83,   -83,   -83,     2,
      273,   -83,   358,   400,    -6,   -83,   -83,   -83,   -83,   -83,
-     -83,   -83,   -83,   -83,   -83,   -83,   -83,   -83,   -83,    45,
+     -83,   -83,   -83,   -83,   -83,   -83,   -83,   -83,   -83,    64,
        4,   400,    16,   -83,   -83,   358,   -83,   -83,    31,     6,
-      51,    55,   -83,   -83,   -83,   227,   -30,   -83,   -30,   -83,
-     -83,   227,    75,    75,   -83,    56,   316,   -83,    61,    36,
-      65,   -10,   -83,   358,    70,   -83,   400,    71,    77,   -83,
-     -83,   -83,    93,    40,    75,   -83,   -83,   109,    34,   -83,
-      73,   -83,   -83,    82,   -83,   -83,   -83,   -83,    74,    81,
-     -83,    86,   -19,   400,    -8,   400,    87,   122,    91,   400,
-     136,   -83,   -83,   -83,   -37,   -83,   -83,    71,   -83,   -83,
+      47,    51,   -83,   -83,   -83,   227,   -30,   -83,   -30,   -83,
+     -83,   227,    75,    75,   -83,    49,   316,   -83,    71,    36,
+      58,   -10,   -83,   358,    70,   -83,   400,    61,    77,   -83,
+     -83,   -83,    97,    40,    75,   -83,   -83,   108,    34,   -83,
+      73,   -83,   -83,    82,   -83,   -83,   -83,   -83,    83,    81,
+     -83,    87,   -19,   400,    -8,   400,    88,   123,    91,   400,
+     136,   -83,   -83,   -83,   -37,   -83,   -83,    61,   -83,   -83,
       34,   -83,   -83,    -2,   400,   -83,   -83,   -83,   400,    92,
-     -37,    71,    97,   -83,   -83
+     -37,    61,   104,   -83,   -83
   };
 
   const signed char
   parser::yydefact_[] =
   {
-      93,    70,    71,     0,    60,    61,    62,    72,    73,    74,
-      93,    67,    55,    53,    54,    51,    66,    56,    57,    68,
-      69,    58,    59,    63,     0,    93,    49,     0,    33,     3,
-       0,    15,    22,    30,    23,    21,    52,     8,    93,     0,
+      93,    70,    71,     0,    59,    60,    61,    72,    73,    74,
+      93,    67,    54,    52,    53,    65,    66,    55,    56,    68,
+      69,    57,    58,    62,     0,    93,    49,     0,    33,     3,
+       0,    15,    22,    30,    23,    21,    51,     8,    93,     0,
       93,     6,     0,     0,     0,     0,    48,     0,     1,    93,
       93,     2,    82,    83,    85,    87,    88,    86,    84,    93,
       93,    93,    93,    93,    93,    89,    90,    91,    92,     0,
-      93,    64,    49,     0,    75,    96,    98,    99,   100,   101,
+      93,    63,    49,     0,    75,    96,    98,    99,   100,   101,
      102,   109,   104,   105,   106,   107,   108,   103,    94,    75,
        0,     0,     0,     7,    16,     0,    46,     5,     4,     0,
        0,     0,    35,    34,    36,    93,    19,    15,    20,    17,
@@ -2267,7 +2268,7 @@ namespace yy {
       93,    93,     0,     0,    10,    13,    47,     0,    95,    26,
        0,    76,    77,     0,    78,    79,    80,    81,    29,     0,
       95,     0,     0,     0,     0,     0,     0,     0,    75,     0,
-      93,    65,    40,    93,     0,    37,    93,    38,    43,    97,
+      93,    64,    40,    93,     0,    37,    93,    38,    43,    97,
        0,    25,    28,     0,     0,    44,    45,    41,     0,     0,
        0,    39,     0,    42,    32
   };
@@ -2276,7 +2277,7 @@ namespace yy {
   parser::yypgoto_[] =
   {
      -83,   -83,    -9,   -83,     1,     0,   -83,   -83,   -83,   -83,
-     -83,   -83,   -83,   -83,   -83,   -23,    89,   105,   -20,    33,
+     -83,   -83,   -83,   -83,   -83,   -22,    90,    89,   -20,    35,
      -83,   -21,   -82,   -83,   -83,   -83,   -83,   -36,   -83,   -70
   };
 
@@ -2301,14 +2302,14 @@ namespace yy {
      117,    99,   100,   101,    47,   129,   171,    59,    60,    61,
       62,   128,    94,   164,    95,   167,    96,   141,   142,   172,
      144,   145,   146,   147,   153,   155,    59,    60,    61,    62,
-     137,    94,    47,   143,   180,    11,   133,   123,   181,   124,
-      16,   131,   134,    19,    20,   132,   135,    65,    66,    67,
-      68,    69,    72,   141,   142,   156,    95,   174,   136,   138,
-     178,    59,    60,    61,    62,   150,   140,   157,   159,     1,
-       2,     3,     4,     5,     6,   158,   160,   161,   168,   169,
-     184,   173,     7,     8,     9,   170,   182,   183,   114,     0,
-      31,   151,    10,     0,    11,    12,    13,    14,    15,    16,
-      17,    18,    19,    20,    21,    22,    23,   118,     0,     0,
+     137,    94,    47,   143,   180,    11,   133,   131,   181,    15,
+      16,   132,   134,    19,    20,    72,   135,    65,    66,    67,
+      68,    69,   138,   141,   142,   150,   123,   174,   124,   156,
+     178,    59,    60,    61,    62,   140,    95,   157,   136,     1,
+       2,     3,     4,     5,     6,   158,   160,   159,   161,   168,
+     169,   173,     7,     8,     9,   170,   182,   184,   183,   114,
+      31,   118,    10,   151,    11,    12,    13,    14,    15,    16,
+      17,    18,    19,    20,    21,    22,    23,     0,     0,     0,
        0,     0,     0,    24,     0,     0,     0,     3,     4,     5,
        6,     0,     0,     0,     0,     0,    25,   111,     7,     8,
        9,     0,    26,    52,    53,    54,    55,    56,    57,     0,
@@ -2352,14 +2353,14 @@ namespace yy {
       70,    48,    49,    50,    95,    95,   158,    56,    57,    58,
       59,    65,    61,   153,    65,   155,    67,    53,    54,   159,
       20,    21,    22,    23,   130,   131,    56,    57,    58,    59,
-      64,    61,   123,   123,   174,    28,   105,    62,   178,    64,
-      33,    60,   111,    36,    37,    60,   116,    41,    42,    43,
-      44,    45,    66,    53,    54,    32,    65,   163,    67,    64,
-     166,    56,    57,    58,    59,    64,    27,    64,    64,     3,
-       4,     5,     6,     7,     8,    63,    65,    61,    61,    27,
-      53,   160,    16,    17,    18,    64,    64,   180,    69,    -1,
-     160,   128,    26,    -1,    28,    29,    30,    31,    32,    33,
-      34,    35,    36,    37,    38,    39,    40,    72,    -1,    -1,
+      64,    61,   123,   123,   174,    28,   105,    60,   178,    32,
+      33,    60,   111,    36,    37,    66,   116,    41,    42,    43,
+      44,    45,    64,    53,    54,    64,    62,   163,    64,    32,
+     166,    56,    57,    58,    59,    27,    65,    64,    67,     3,
+       4,     5,     6,     7,     8,    63,    65,    64,    61,    61,
+      27,   160,    16,    17,    18,    64,    64,    53,   180,    69,
+     160,    72,    26,   128,    28,    29,    30,    31,    32,    33,
+      34,    35,    36,    37,    38,    39,    40,    -1,    -1,    -1,
       -1,    -1,    -1,    47,    -1,    -1,    -1,     5,     6,     7,
        8,    -1,    -1,    -1,    -1,    -1,    60,    15,    16,    17,
       18,    -1,    66,     9,    10,    11,    12,    13,    14,    -1,
@@ -2423,7 +2424,7 @@ namespace yy {
       74,    75,    76,    77,    77,    77,    77,    78,    79,    79,
       80,    81,    81,    82,    83,    83,    84,    84,    85,    85,
       85,    86,    86,    86,    86,    86,    86,    86,    86,    86,
-      86,    86,    86,    86,    86,    86,    87,    87,    87,    87,
+      86,    86,    86,    86,    86,    87,    87,    87,    87,    87,
       88,    88,    89,    89,    89,    90,    90,    90,    91,    91,
       91,    91,    92,    92,    92,    93,    93,    93,    93,    94,
       94,    94,    94,    95,    95,    96,    97,    97,    97,    97,
@@ -2439,7 +2440,7 @@ namespace yy {
        1,     2,    10,     0,     2,     2,     2,     4,     2,     4,
        4,     3,     5,     4,     1,     1,     3,     4,     1,     0,
        3,     1,     1,     1,     1,     1,     1,     1,     1,     1,
-       1,     1,     1,     1,     2,     6,     1,     1,     1,     1,
+       1,     1,     1,     2,     6,     1,     1,     1,     1,     1,
        1,     1,     1,     1,     1,     0,     2,     2,     1,     1,
        1,     1,     1,     1,     1,     1,     1,     1,     1,     1,
        1,     1,     1,     0,     2,     2,     1,     5,     1,     1,
@@ -2485,11 +2486,11 @@ namespace yy {
      195,   198,   201,   204,   205,   206,   207,   209,   212,   213,
      215,   218,   219,   221,   224,   225,   227,   228,   231,   232,
      233,   236,   237,   238,   239,   240,   241,   242,   243,   244,
-     245,   246,   247,   248,   249,   250,   256,   257,   258,   259,
-     262,   263,   266,   267,   268,   271,   272,   273,   276,   277,
-     278,   279,   282,   283,   284,   287,   288,   289,   290,   293,
-     294,   295,   296,   299,   300,   303,   306,   307,   308,   309,
-     310,   311,   312,   313,   314,   315,   316,   317,   318,   319
+     245,   246,   247,   248,   249,   257,   258,   259,   260,   261,
+     264,   265,   268,   269,   270,   273,   274,   275,   278,   279,
+     280,   281,   284,   285,   286,   289,   290,   291,   292,   295,
+     296,   297,   298,   301,   302,   305,   308,   309,   310,   311,
+     312,   313,   314,   315,   316,   317,   318,   319,   320,   321
   };
 
   void
