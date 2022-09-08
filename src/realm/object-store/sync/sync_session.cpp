@@ -1046,20 +1046,38 @@ void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::er
 
 bool SyncSession::wait_for_upload_completion()
 {
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_upload_complete_or_client_stopped();
+    {
+        // If there is no session, this call may block forever - exit immediately
+        util::CheckedUniqueLock lock(m_state_mutex);
+        if (!m_session) {
+            return false;
+        }
     }
-    return false;
+    auto [promise, future] = util::make_promise_future<std::error_code>();
+    wait_for_upload_completion([&promise = promise](std::error_code ec) {
+        promise.emplace_value(ec);
+    });
+
+    auto ec = future.get();
+    return ec.value() == 0;
 }
 
 bool SyncSession::wait_for_download_completion()
 {
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_download_complete_or_client_stopped();
+    {
+        // If there is no session, this call may block forever - exit immediately
+        util::CheckedUniqueLock lock(m_state_mutex);
+        if (!m_session) {
+            return false;
+        }
     }
-    return false;
+    auto [promise, future] = util::make_promise_future<std::error_code>();
+    wait_for_download_completion([&promise = promise](std::error_code ec) {
+        promise.emplace_value(ec);
+    });
+
+    auto ec = future.get();
+    return ec.value() == 0;
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
