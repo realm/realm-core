@@ -222,7 +222,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(dict.get<T>(keys[i]) == values[i]);
             auto val = dict.get(ctx, keys[i]);
-            REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
+            REQUIRE(util::any_cast<Boxed>(val) == Boxed(values[i]));
             REQUIRE(dict.get_any(keys[i]) == Mixed{values[i]});
             REQUIRE(*dict.try_get_any(keys[i]) == Mixed{values[i]});
         }
@@ -298,7 +298,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         for (auto key : keys) {
             size_t ndx = keys_as_results.index_of(StringData(key));
             REQUIRE(ndx < keys.size());
-            size_t ndx_ctx = keys_as_results.index_of(ctx, util::Any(key));
+            size_t ndx_ctx = keys_as_results.index_of(ctx, std::any(key));
             REQUIRE(ndx_ctx == ndx);
             found.push_back(ndx);
         }
@@ -324,8 +324,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("links") {
-        links.insert(ctx, "foo", util::Any(another));
-        links.insert(ctx, "m", util::Any());
+        links.insert(ctx, "foo", std::any(another));
+        links.insert(ctx, "m", std::any());
     }
 
     SECTION("iteration") {
@@ -450,7 +450,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("key") {
             auto expected = keys_as_results.get<String>(0);
             REQUIRE(keys_as_results.first<String>() == expected);
-            REQUIRE(any_cast<std::string>(*keys_as_results.first(ctx)) == expected);
+            REQUIRE(util::any_cast<std::string>(*keys_as_results.first(ctx)) == expected);
             keys_as_results.clear();
             REQUIRE(!keys_as_results.first<String>());
             REQUIRE(!keys_as_results.first(ctx));
@@ -458,7 +458,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("value") {
             auto expected = values_as_results.get<T>(0);
             REQUIRE(*values_as_results.first<T>() == expected);
-            REQUIRE(any_cast<Boxed>(*values_as_results.first(ctx)) == Boxed(expected));
+            REQUIRE(util::any_cast<Boxed>(*values_as_results.first(ctx)) == Boxed(expected));
             values_as_results.clear();
             REQUIRE(!values_as_results.first<T>());
             REQUIRE(!values_as_results.first(ctx));
@@ -469,7 +469,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("key") {
             auto expected = keys_as_results.get<String>(keys_as_results.size() - 1);
             REQUIRE(keys_as_results.last<String>() == expected);
-            REQUIRE(any_cast<std::string>(*keys_as_results.last(ctx)) == expected);
+            REQUIRE(util::any_cast<std::string>(*keys_as_results.last(ctx)) == expected);
             keys_as_results.clear();
             REQUIRE(!keys_as_results.last<String>());
             REQUIRE(!keys_as_results.last(ctx));
@@ -477,7 +477,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("value") {
             auto expected = values_as_results.get<T>(values_as_results.size() - 1);
             REQUIRE(*values_as_results.last<T>() == expected);
-            REQUIRE(any_cast<Boxed>(*values_as_results.last(ctx)) == Boxed(expected));
+            REQUIRE(util::any_cast<Boxed>(*values_as_results.last(ctx)) == Boxed(expected));
             values_as_results.clear();
             REQUIRE(!values_as_results.last<T>());
             REQUIRE(!values_as_results.last(ctx));
@@ -549,15 +549,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
-        auto token = dict.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++calls;
         });
-        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c) {
             rchange = c;
             ++calls;
         });
-        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c) {
             srchange = c;
             ++calls;
         });
@@ -619,10 +619,9 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
         SECTION("key based notification") {
             DictionaryChangeSet key_change;
-            auto token =
-                dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c, std::exception_ptr) {
-                    key_change = c;
-                });
+            auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
+                key_change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -728,7 +727,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(&res.get_object_schema() == objectschema);
 
             CollectionChangeSet local_change;
-            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
+            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c) {
                 local_change = c;
             });
             advance_and_notify(*r);
@@ -778,10 +777,9 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             Results all_sources(r, source->where());
             REQUIRE(all_sources.size() == 2);
             CollectionChangeSet local_changes;
-            auto x =
-                all_sources.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
-                    local_changes = c;
-                });
+            auto x = all_sources.add_notification_callback([&local_changes](CollectionChangeSet c) {
+                local_changes = c;
+            });
             advance_and_notify(*r);
 
             SECTION("direct insertion") {
@@ -881,14 +879,14 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
         r->begin_transaction();
 
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(target->get_object(5))),
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(Object(r, target->get_object(5)))),
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
         SECTION("creates new object for dictionary") {
-            dict.insert(ctx, "foo", util::Any(AnyDict{{"value", INT64_C(20)}}));
+            dict.insert(ctx, "foo", std::any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(dict.size() == 11);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
@@ -1021,7 +1019,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     Results all_objects(r, table->where());
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
-    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
         local_changes = c;
     });
     advance_and_notify(*r);

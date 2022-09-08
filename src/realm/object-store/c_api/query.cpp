@@ -231,7 +231,6 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
         auto realm = existing_query->weak_realm.lock();
         auto table = existing_query->query.get_table();
         Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-
         Query combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = existing_query->get_ordering();
@@ -276,6 +275,12 @@ RLM_API bool realm_query_count(const realm_query_t* query, size_t* out_count)
 RLM_API bool realm_query_find_first(realm_query_t* query, realm_value_t* out_value, bool* out_found)
 {
     return wrap_err([&]() {
+        const auto& realm_query_ordering = query->get_ordering();
+        if (realm_query_ordering.size() > 0) {
+            auto orderding = util::make_bind<DescriptorOrdering>();
+            orderding->append(realm_query_ordering);
+            query->query.set_ordering(orderding);
+        }
         auto key = query->query.find();
         if (out_found)
             *out_found = bool(key);

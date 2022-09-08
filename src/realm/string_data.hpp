@@ -86,8 +86,6 @@ public:
     /// Construct a null reference.
     StringData() noexcept;
 
-    StringData(int) = delete;
-
     /// If \a external_data is 'null', \a data_size must be zero.
     StringData(const char* external_data, size_t data_size) noexcept;
 

@@ -142,7 +142,9 @@ using SharedUserdata = std::shared_ptr<void>;
 template <typename... Args>
 class CallbackRegistry {
 public:
-    uint64_t add(util::UniqueFunction<void(Args...)>&& callback)
+    using Callback_T = util::UniqueFunction<void(Args...)>;
+
+    uint64_t add(Callback_T&& callback)
     {
         uint64_t token = m_next_token++;
         m_callbacks.emplace_hint(m_callbacks.end(), token, std::move(callback));
@@ -162,9 +164,47 @@ public:
     }
 
 private:
-    std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
+    std::map<uint64_t, Callback_T> m_callbacks;
     uint64_t m_next_token = 0;
 };
+
+template <typename... Args>
+class CallbackRegistryWithVersion {
+public:
+    using Callback_T = util::UniqueFunction<void(Args...)>;
+
+    uint64_t add(DB::version_type version, Callback_T&& callback)
+    {
+        uint64_t token = m_next_token++;
+        m_callbacks.emplace_hint(m_callbacks.end(), token, std::make_pair(version, std::move(callback)));
+        return token;
+    }
+
+    void remove(uint64_t token)
+    {
+        m_callbacks.erase(token);
+    }
+
+    void invoke(DB::version_type version, Args... args)
+    {
+        std::vector<uint64_t> tokens;
+        tokens.reserve(m_callbacks.size());
+        for (const auto& [token, callback_object] : m_callbacks) {
+            if (auto& [expected, callback] = callback_object; expected <= version) {
+                callback(args...);
+                tokens.push_back(token);
+            }
+        }
+        for (const auto& token : tokens) {
+            remove(token);
+        }
+    }
+
+private:
+    std::map<uint64_t, std::pair<uint64_t, Callback_T>> m_callbacks;
+    uint64_t m_next_token = 0;
+};
+
 
 /**
  * Convenience struct for safely filling external arrays with new-allocated pointers.

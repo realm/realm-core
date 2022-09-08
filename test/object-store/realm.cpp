@@ -2433,9 +2433,9 @@ TEST_CASE("SharedRealm: close()") {
         List list(realm, obj.get_linklist("list"));
         Object object(realm, obj);
 
-        auto obj_token = object.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
-        auto list_token = list.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
-        auto results_token = results.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto obj_token = object.add_notification_callback([](CollectionChangeSet) {});
+        auto list_token = list.add_notification_callback([](CollectionChangeSet) {});
+        auto results_token = results.add_notification_callback([](CollectionChangeSet) {});
 
         // Perform a dummy transaction to ensure the notifiers actually acquire
         // resources that need to be closed
@@ -2459,7 +2459,7 @@ TEST_CASE("Realm::delete_files()") {
     // We need to create some additional files that might not be present
     // for a freshly opened realm but need to be tested for as the will
     // be created during a Realm's life cycle.
-    util::File(path + ".log", util::File::mode_Write);
+    (void)util::File(path + ".log", util::File::mode_Write);
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
@@ -2600,7 +2600,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     SECTION("did_change with async results") {
         r1->m_binding_context.reset(new Context());
         Results results(r1, table->where());
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             // Should not be called.
             REQUIRE(false);
         });
@@ -3159,7 +3159,7 @@ TEST_CASE("SharedRealm: compact on launch") {
 
         // Registering for a collection notification shouldn't crash when compact on launch is used.
         Results results(r, r->read_group().get_table("class_object"));
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
         r->close();
 #endif
     }
@@ -3352,13 +3352,11 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
         Results results1(r, table->where().greater_equal(col, 0));
         Results results2(r, table->where().less(col, 10));
 
-        auto token1 = results1.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token1 = results1.add_notification_callback([&](CollectionChangeSet) {
             ++notification_calls;
         });
 
-        auto token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet) {
             ++notification_calls;
         });
 
@@ -3411,7 +3409,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
     SECTION("did_send() is skipped if the Realm is closed first") {
         Results results(r, table->where());
         bool do_close = true;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             if (do_close)
                 r->close();
         });
@@ -3508,75 +3506,6 @@ TEST_CASE("Statistics on Realms") {
 #endif
 }
 
-#if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
-TEST_CASE("BindingContext is notified in case of notifier errors") {
-    _impl::RealmCoordinator::assert_no_open_realms();
-
-    class OpenFileLimiter {
-    public:
-        OpenFileLimiter()
-        {
-            // Set the max open files to zero so that opening new files will fail
-            getrlimit(RLIMIT_NOFILE, &m_old);
-            rlimit rl = m_old;
-            rl.rlim_cur = 0;
-            setrlimit(RLIMIT_NOFILE, &rl);
-        }
-
-        ~OpenFileLimiter()
-        {
-            setrlimit(RLIMIT_NOFILE, &m_old);
-        }
-
-    private:
-        rlimit m_old;
-    };
-
-    InMemoryTestFile config;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {{"value", PropertyType::Int}}},
-    });
-
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
-    Results results(r, *r->read_group().get_table("class_object"));
-    static int binding_context_start_notify_calls = 0;
-    static int binding_context_end_notify_calls = 0;
-    static bool error_called = false;
-    struct Context : BindingContext {
-        void will_send_notifications() override
-        {
-            REQUIRE_FALSE(error_called);
-            ++binding_context_start_notify_calls;
-        }
-
-        void did_send_notifications() override
-        {
-            REQUIRE(error_called);
-            ++binding_context_end_notify_calls;
-        }
-    };
-    r->m_binding_context.reset(new Context());
-
-    SECTION("realm on background thread could not be opened") {
-        OpenFileLimiter limiter;
-
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE(err);
-            REQUIRE_FALSE(error_called);
-            error_called = true;
-        });
-        advance_and_notify(*r);
-        REQUIRE(error_called);
-        REQUIRE(binding_context_start_notify_calls == 1);
-        REQUIRE(binding_context_end_notify_calls == 1);
-    }
-}
-#endif
-
 TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     TestFile config;
     config.cache = true;
@@ -3604,7 +3533,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto realm = Realm::get_shared_realm(std::move(ref));
         Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
         bool called = false;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             called = true;
         });
         util::EventLoop::main().run_until([&] {

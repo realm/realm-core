@@ -938,7 +938,7 @@ private:
             // Otherwise, the error code is the first two bytes of the body as a uint16_t in
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
-            error_code = ntohs((data[1] << 8) | data[0]);
+            error_code = ntohs((uint8_t(data[1]) << 8) | uint8_t(data[0]));
             error_message = StringData(data + 2, size - 2);
         }
 

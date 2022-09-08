@@ -260,7 +260,13 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
-    void assign(const Obj& other);
+    // The main algorithm for handling schema migrations if we try to convert
+    // from TopLevel* to Embedded, in this case all the orphan objects are deleted
+    // and all the objects with multiple backlinks are cloned in order to avoid to
+    // get schema violations during the migration.
+    // By default this alogirithm is disabled. RealmConfig contains a boolean flag
+    // to enable it.
+    void handle_multiple_backlinks_during_schema_migration();
 
     Obj get_linked_object(ColKey link_col_key) const
     {
@@ -270,6 +276,7 @@ public:
     {
         return get_linked_object(get_column_key(link_col_name));
     }
+    Obj get_parent_object() const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -420,6 +427,8 @@ private:
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
+
+    void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

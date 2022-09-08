@@ -133,7 +133,6 @@ private:
 
     Bid128 m_value;
 
-    void from_int64_t(int64_t val);
     uint64_t get_coefficient_high() const noexcept
     {
         return m_value.w[1] & MASK_COEFF;

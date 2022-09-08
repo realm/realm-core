@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "12.5.1"
+let versionStr = "12.6.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -80,6 +80,7 @@ let notSyncServerSources: [String] = [
     "realm/node.cpp",
     "realm/obj.cpp",
     "realm/obj_list.cpp",
+    "realm/object_converter.cpp",
     "realm/object_id.cpp",
     "realm/query.cpp",
     "realm/query_engine.cpp",

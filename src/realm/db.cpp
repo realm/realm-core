@@ -97,11 +97,11 @@ struct VersionList {
     void reserve(uint32_t size) noexcept
     {
         for (auto i = entries; i < size; ++i)
-            data[i].active = false;
+            data()[i].active = false;
         if (size > entries) {
             num_free += size - entries;
             entries = size;
-        }
+         }
     }
 
     VersionList() noexcept
@@ -127,7 +127,7 @@ struct VersionList {
 
     ReadCount& get(uint_fast32_t idx) noexcept
     {
-        return data[idx];
+        return data()[idx];
     }
 
     ReadCount& get_newest() noexcept
@@ -137,9 +137,9 @@ struct VersionList {
     ReadCount& allocate_entry(uint64_t top, uint64_t size, uint64_t version)
     {
         for (uint32_t i = 0; i < entries; ++i) {
-            if (!data[i].active) {
+            if (!data()[i].active) {
                 num_free--;
-                auto& rc = data[i];
+                auto& rc = data()[i];
                 rc.count_frozen = rc.count_live = 0;
                 rc.current_top = top;
                 rc.filesize = size;
@@ -154,7 +154,7 @@ struct VersionList {
 
     int index_of(const ReadCount& rc)
     {
-        return static_cast<int>(&rc - data);
+        return static_cast<int>(&rc - data());
     }
 
     void free_entry(ReadCount* rc)
@@ -191,7 +191,7 @@ struct VersionList {
     {
         oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
-        for (auto* rc = data; rc < data + entries; ++rc) {
+        for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (rc->active) {
                 if (rc->count_live != 0) {
                     if (rc->version < oldest_live_v)
@@ -228,7 +228,17 @@ struct VersionList {
     // IMPORTANT II:
     // To ensure proper alignment across all platforms, the SharedInfo structure
     // should NOT have a stricter alignment requirement than the ReadCount structure.
-    ReadCount data[init_readers_size];
+    ReadCount m_data[init_readers_size];
+
+    // Silence UBSan errors about out-of-bounds reads on m_data by casting to a pointer
+    ReadCount* data() noexcept
+    {
+        return m_data;
+    }
+    const ReadCount* data() const noexcept
+    {
+        return m_data;
+    }
 };
 
 // Using lambda rather than function so that shared_ptr shared state doesn't need to hold a function pointer.

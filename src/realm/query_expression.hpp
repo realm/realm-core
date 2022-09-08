@@ -1623,6 +1623,8 @@ public:
         return !m_link_column_keys.empty();
     }
 
+    static ref_type get_ref(const ArrayPayload* array_payload, ColumnType type, size_t ndx);
+
 private:
     void map_links(size_t column, ObjKey key, LinkMapFunction& lm) const;
     void map_links(size_t column, size_t row, LinkMapFunction& lm) const;
@@ -3447,8 +3449,13 @@ Query compare(const Subexpr2<Link>& left, null)
 
 template <class T>
 class Columns : public ObjPropertyExpr<T> {
+    constexpr static bool requires_null_column = realm::is_any_v<T, int64_t, bool>;
+
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using NullableLeafType =
+        std::conditional_t<requires_null_column, typename ColumnTypeTraits<util::Optional<T>>::cluster_leaf_type,
+                           LeafType>;
     using ObjPropertyExpr<T>::links_exist;
     using ObjPropertyBase::is_nullable;
 
@@ -3469,6 +3476,12 @@ public:
         m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
+        }
+        else if (requires_null_column && is_nullable()) {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) NullableLeafType(this->get_base_table()->get_alloc()));
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
         }
         else {
             // Create new Leaf
@@ -3555,11 +3568,8 @@ public:
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
-            evaluate_internal<ArrayIntNull>(index, destination);
-        }
-        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
-            evaluate_internal<ArrayBoolNull>(index, destination);
+        if (is_nullable()) {
+            evaluate_internal<NullableLeafType>(index, destination);
         }
         else {
             evaluate_internal<LeafType>(index, destination);
@@ -3571,11 +3581,8 @@ public:
         destination.init(false, 1);
         auto table = m_link_map.get_target_table();
         auto obj = table.unchecked_ptr()->get_object(key);
-        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
-            destination.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
-        }
-        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
-            destination.set(0, obj.template get<util::Optional<bool>>(m_column_key));
+        if (requires_null_column && is_nullable()) {
+            destination.set(0, obj.template get<util::Optional<T>>(m_column_key));
         }
         else {
             destination.set(0, obj.template get<T>(m_column_key));
@@ -3587,7 +3594,8 @@ private:
     using ObjPropertyExpr<T>::m_column_key;
 
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafCacheStorage =
+        typename std::aligned_storage<std::max(sizeof(LeafType), sizeof(NullableLeafType)), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
@@ -4060,7 +4068,9 @@ public:
                     column = m_left.get();
                 }
 
-                if (column->has_search_index() && *column->get_comparison_type() == ExpressionComparisonType::Any) {
+                if (column->has_search_index() &&
+                    column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                        ExpressionComparisonType::Any) {
                     if (const_value.is_null()) {
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,

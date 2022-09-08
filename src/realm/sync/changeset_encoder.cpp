@@ -306,16 +306,7 @@ void ChangesetEncoder::append_path_instr(Instruction::Type t, const Instruction:
 template <class T>
 void ChangesetEncoder::append_int(T integer)
 {
-    // One sign bit plus number of value bits
-    const int num_bits = 1 + std::numeric_limits<T>::digits;
-    // Only the first 7 bits are available per byte. Had it not been
-    // for the fact that maximum guaranteed bit width of a char is 8,
-    // this value could have been increased to 15 (one less than the
-    // number of value bits in 'unsigned').
-    const int bits_per_byte = 7;
-    const int max_bytes = (num_bits + (bits_per_byte - 1)) / bits_per_byte;
-
-    char buffer[max_bytes];
+    char buffer[_impl::encode_int_max_bytes<T>()];
     std::size_t n = _impl::encode_int(buffer, integer);
     append_bytes(buffer, n);
 }
@@ -398,10 +389,12 @@ void ChangesetEncoder::append_value(Decimal128 id)
     int exp;
     bool sign;
     id.unpack(cx, exp, sign);
-    char buffer[16];
+    constexpr int max_bytes = 17; // 113 bits / 7
+    char buffer[max_bytes];
     _impl::Bid128 tmp;
     memcpy(&tmp, &cx, sizeof(Decimal128::Bid128));
     auto n = _impl::encode_int(buffer, tmp);
+    REALM_ASSERT(n <= max_bytes);
     append_bytes(buffer, n);
     append_value(int64_t(exp));
     append_value(sign);
