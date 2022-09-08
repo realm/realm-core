@@ -36,6 +36,11 @@ namespace realm {
 class Group;
 class SlabAlloc;
 
+class Reachable {
+public:
+    ref_type pos;
+    size_t size;
+};
 class VersionInfo {
 public:
     VersionInfo(ref_type t, ref_type l)
@@ -45,6 +50,8 @@ public:
     }
     ref_type top_ref;
     ref_type logical_file_size;
+    // used in debug mode to validate backdating algo:
+    std::vector<Reachable> reachable_blocks;
 };
 
 using TopRefMap = std::map<uint64_t, VersionInfo>;
@@ -203,8 +210,8 @@ private:
     /// is that many blocks can be freed earlier.
     void backdate();
 
-    /// Debug helper
-    std::vector<FreeSpaceEntry> map_reachable();
+    /// Debug helper - extends the TopRefMap with list of reachable blocks
+    void map_reachable();
 };
 
 
