@@ -124,6 +124,8 @@ void wait_for_advance(const SharedRealm& realm)
     });
 }
 
+// TODO: Re-enable it in RCORE-1241.
+#if 0
 // Returns true if `err` is among the erros received from the server, false otherwise.
 bool wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
 {
@@ -145,6 +147,7 @@ bool wait_for_error_to_persist(const AppSession& app_session, const std::string&
 
     return error_found;
 }
+#endif
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -1890,10 +1893,13 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
 
+// TODO: Re-enable it in RCORE-1241.
+#if 0
         REQUIRE(wait_for_error_to_persist(
             harness->session().app_session(),
             "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
             "on one side, but not on the other. (ProtocolErrorCode=112)"));
+#endif
     }
 
     SECTION("basic embedded object construction") {
@@ -1995,6 +2001,8 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
 }
 #endif
 
+// TODO: Re-enable it in RCORE-1241.
+#if 0
 TEST_CASE("flx: send client error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_client_error");
 
@@ -2010,10 +2018,11 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     new_query.insert_or_assign(Query(table));
     std::move(new_query).commit();
 
-    wait_for_download(*realm);
+    error_future.get();
 
     REQUIRE(wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
 }
+#endif
 
 } // namespace realm::app
 
