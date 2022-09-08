@@ -123,6 +123,31 @@ void wait_for_advance(const SharedRealm& realm)
         return !TestHelper::can_advance(realm);
     });
 }
+
+// TODO: Re-enable it in RCORE-1241.
+#if 0
+// Returns true if `err` is among the erros received from the server, false otherwise.
+bool wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
+{
+    bool error_found = false;
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            auto errors = app_session.admin_api.get_errors(app_session.server_app_id);
+            auto it = std::find_if(errors.begin(), errors.end(), [&err](const auto& error) {
+                return err == error;
+            });
+
+            if (it == errors.end()) {
+                millisleep(500); // don't spam the server too much
+            }
+            error_found = it != errors.end();
+            return error_found;
+        },
+        std::chrono::minutes(10));
+
+    return error_found;
+}
+#endif
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -1868,6 +1893,14 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             });
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
+
+// TODO: Re-enable it in RCORE-1241.
+#if 0
+        REQUIRE(wait_for_error_to_persist(
+            harness->session().app_session(),
+            "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
+            "on one side, but not on the other. (ProtocolErrorCode=112)"));
+#endif
     }
 
     SECTION("basic embedded object construction") {
@@ -1966,6 +1999,29 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
             wait_for_upload(*realm);
         },
         schema);
+}
+#endif
+
+// TODO: Re-enable it in RCORE-1241.
+#if 0
+TEST_CASE("flx: send client error", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_client_error");
+
+    // An integration error is simulated while bootstrapping.
+    // This results in the client sending an error message to the server.
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.sync_config->simulate_integration_error = true;
+    auto&& [error_future, err_handler] = make_error_handler();
+    config.sync_config->error_handler = err_handler;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+    new_query.insert_or_assign(Query(table));
+    std::move(new_query).commit();
+
+    error_future.get();
+
+    REQUIRE(wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
 }
 #endif
 
