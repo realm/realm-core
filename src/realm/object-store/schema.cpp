@@ -280,9 +280,10 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
     }
 }
 
-template <typename T, typename U, typename Func, typename O>
-void Schema::zip_matching(T&& a, U&& b, Func&& func, O&& o, bool is_additive) noexcept
+template <typename T, typename U, typename Func>
+std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool is_additive) noexcept
 {
+    std::vector<ObjectSchema> different_classes;
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
         auto& object_schema = a[i];
@@ -303,7 +304,7 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func, O&& o, bool is_additive) no
                 ++j;
             }
             if (is_additive) {
-                o.push_back(object_schema);
+                different_classes.push_back(object_schema);
             }
         }
     }
@@ -312,14 +313,15 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func, O&& o, bool is_additive) no
         func(&a[i], nullptr);
 
         if (is_additive)
-            o.push_back(a[i]);
+            different_classes.push_back(a[i]);
     }
     for (; j < b.size(); ++j) {
         func(nullptr, &b[j]);
 
         if (is_additive)
-            o.push_back(b[j]);
+            different_classes.push_back(b[j]);
     }
+    return different_classes;
 }
 
 Schema::iterator Schema::find(std::vector<ObjectSchema>& schema, StringData name) noexcept
@@ -378,9 +380,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
 {
     // compute properties for objects that are in common between the current schema and the new schema.
     // Append to the end of the new schema peristed properties, all those properties that have been deleted
-    std::vector<ObjectSchema> other_objects;
-    other_objects.reserve(this->size() + other.size());
-    zip_matching(
+    auto other_objects = zip_matching(
         *this, other,
         [&](ObjectSchema* existing, const ObjectSchema* other) {
             if (!existing || !other)
@@ -403,7 +403,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
                                                       unmatched_properties.begin(), unmatched_properties.end());
             }
         },
-        std::move(other_objects), is_schema_additive);
+        is_schema_additive);
     m_others.swap(other_objects);
 }
 

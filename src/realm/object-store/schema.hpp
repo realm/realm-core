@@ -169,8 +169,10 @@ public:
     using base::size;
 
 private:
-    template <typename T, typename U, typename Func, typename O = std::vector<ObjectSchema>>
-    static void zip_matching(T&& a, U&& b, Func&& func, O&& o = {}, bool is_schema_additive = false) noexcept;
+    template <typename T, typename U, typename Func>
+    static std::vector<ObjectSchema> zip_matching(T&& a, U&& b, Func&& func,
+                                                  bool is_schema_additive = false) noexcept;
+
     iterator find(std::vector<ObjectSchema>& schema, StringData name) noexcept;
     std::vector<ObjectSchema> m_others;
 };
