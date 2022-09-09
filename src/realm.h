@@ -2269,7 +2269,7 @@ RLM_API const char* realm_query_get_description(realm_query_t*);
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_append_query(const realm_query_t*, const char* query_string, size_t num_args,
+RLM_API realm_query_t* realm_query_append_query(realm_query_t*, const char* query_string, size_t num_args,
                                                 const realm_query_arg_t* args);
 
 /**
