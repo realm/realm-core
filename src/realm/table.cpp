@@ -3164,8 +3164,7 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
-    auto obj_key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
-    return obj_key ? m_clusters.get(obj_key) : Obj{};
+    return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 
 Mixed Table::get_primary_key(ObjKey key) const
