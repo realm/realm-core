@@ -1314,3 +1314,13 @@ void SyncSession::ConnectionChangeNotifier::invoke_callbacks(ConnectionState old
     }
     m_callback_index = npos;
 }
+
+util::Future<std::string> SyncSession::send_test_command(std::string body)
+{
+    util::CheckedLockGuard lk(m_state_mutex);
+    if (!m_session) {
+        return Status{ErrorCodes::RuntimeError, "Session doesn't exist to send test command on"};
+    }
+
+    return m_session->send_test_command(std::move(body));
+}
