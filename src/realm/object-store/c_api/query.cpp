@@ -231,7 +231,7 @@ RLM_API realm_query_t* realm_query_append_query(realm_query_t* existing_query, c
         auto realm = existing_query->weak_realm.lock();
         auto table = existing_query->query.get_table();
         Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        Query combined = existing_query->get_query().and_query(query);
+        Query combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         if (auto ordering = query.get_ordering())
             ordering_copy->append(*ordering);
