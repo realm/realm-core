@@ -1222,14 +1222,30 @@ public:
     {
     }
 
-    std::string value_to_string(size_t ndx) const
+    std::string value_to_string(size_t ndx, util::serializer::SerialisationState& state) const
     {
         auto val = get(ndx);
         if (val.is_null())
             return "NULL";
         else {
+            static_cast<void>(state);
             if constexpr (std::is_same_v<T, TypeOfValue>) {
                 return util::serializer::print_value(val.get_type_of_value());
+            }
+            else if constexpr (std::is_same_v<T, ObjKey>) {
+                ObjLink link(state.taget_table->get_key(), val.template get<ObjKey>());
+                return util::serializer::print_value(link, state.group);
+            }
+            else if constexpr (std::is_same_v<T, ObjLink>) {
+                return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+            }
+            else if constexpr (std::is_same_v<T, Mixed>) {
+                if (val.is_type(type_TypedLink)) {
+                    return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+                }
+                else {
+                    return util::serializer::print_value(val);
+                }
             }
             else {
                 return util::serializer::print_value(val.template get<T>());
@@ -1246,13 +1262,13 @@ public:
                 if (i != 0) {
                     desc += ", ";
                 }
-                desc += value_to_string(i);
+                desc += value_to_string(i, state);
             }
             desc += "}";
             return desc;
         }
         else if (sz == 1) {
-            return value_to_string(0);
+            return value_to_string(0, state);
         }
         return "";
     }
@@ -3800,7 +3816,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state(state.class_prefix);
+        util::serializer::SerialisationState empty_state(state.class_prefix, state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4215,25 +4231,8 @@ public:
                                                  m_left->description(state));
         }
         else {
-            std::string value = m_right->description(state);
-            if constexpr (std::is_same_v<TCond, Equal>) {
-                if (m_right->has_single_value()) {
-                    auto val = m_right->get_mixed();
-                    if (val.is_type(type_Link, type_TypedLink)) {
-                        auto target_table = m_left->get_target_table();
-                        if (ColKey pk_col = target_table ? target_table->get_primary_key_column() : ColKey{}) {
-                            if (auto obj = target_table->try_get_object(val.get<ObjKey>())) {
-                                auto pk_val = obj.get_any(pk_col);
-                                std::ostringstream ostr;
-                                ostr << "obj(" << util::serializer::print_value(target_table->get_name()) << ","
-                                     << pk_val << ')';
-                                value = ostr.str();
-                            }
-                        }
-                    }
-                }
-            }
-            return m_left->description(state) + " " + TCond::description() + " " + value;
+            state.taget_table = m_left->get_target_table();
+            return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
         }
     }
 

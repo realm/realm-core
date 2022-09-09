@@ -780,9 +780,9 @@ TEST(Parser_LinksToDifferentTable)
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
 
-    verify_query(test_context, t, "items = obj('class_Items', 'coffee')", 0); // nobody buys coffee
-    verify_query(test_context, t, "items = obj('class_Items', 'milk')", 2);   // but milk
-    verify_query(test_context, t, "items = O0", 2);              // how many people bought milk?
+    verify_query(test_context, t, "items = obj('Items', 'coffee')", 0); // nobody buys coffee
+    verify_query(test_context, t, "items = obj('Items', 'milk')", 2);   // but milk
+    verify_query(test_context, t, "items = O0", 2);                     // how many people bought milk?
     verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
     verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
@@ -3364,7 +3364,7 @@ TEST(Parser_BacklinksIndex)
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;
-    util::serializer::SerialisationState test_state("");
+    util::serializer::SerialisationState test_state("", nullptr);
 
     TableRef test_table = g.add_table("test");
 
@@ -4104,7 +4104,7 @@ TEST(Parser_Object)
 
     Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get_object(0));
     std::string description = q0.get_description(); // shouldn't throw
-    CHECK(description.find("O0") != std::string::npos);
+    CHECK(description.find("L0:0") != std::string::npos);
 
     Query q1 = table->column<Link>(link_col) == realm::null();
     description = q1.get_description(); // shouldn't throw
@@ -5530,14 +5530,20 @@ TEST(Parser_PrimaryKey)
     auto col_string = origin->add_column(*table_string, "string");
     auto col_oid = origin->add_column(*table_oid, "oid");
     auto col_uuid = origin->add_column(*table_uuid, "uuid");
+    auto col_any = origin->add_column(type_Mixed, "mixed");
+
 
     auto linking = g.add_table("linking");
     auto col_link = linking->add_column(*origin, "link");
 
-    origin->create_object().set(col_int, table_int->create_object_with_primary_key(1).get_key());
-    origin->create_object().set(col_string, table_string->create_object_with_primary_key("first").get_key());
-    origin->create_object().set(col_oid, table_oid->create_object_with_primary_key(o1).get_key());
-    origin->create_object().set(col_uuid, table_uuid->create_object_with_primary_key(u1).get_key());
+    auto target = table_int->create_object_with_primary_key(1);
+    origin->create_object().set(col_int, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_string->create_object_with_primary_key("first");
+    origin->create_object().set(col_string, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_oid->create_object_with_primary_key(o1);
+    origin->create_object().set(col_oid, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_uuid->create_object_with_primary_key(u1);
+    origin->create_object().set(col_uuid, target.get_key()).set(col_any, Mixed(target.get_link()));
 
     for (auto o : *origin) {
         linking->create_object().set(col_link, o.get_key());
@@ -5545,6 +5551,11 @@ TEST(Parser_PrimaryKey)
 
     std::string query_string = "int == obj(\"class_Int\",1)";
     Query q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "mixed == obj(\"class_Int\",1)";
+    q = origin->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
 
@@ -5564,6 +5575,11 @@ TEST(Parser_PrimaryKey)
     CHECK_EQUAL(q.get_description(), query_string);
 
     query_string = "link.int == obj(\"class_Int\",1)";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.mixed == obj(\"class_Int\",1)";
     q = linking->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);

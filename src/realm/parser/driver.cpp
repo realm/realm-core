@@ -373,7 +373,7 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
         }
     }
     if (!Mixed::is_numeric(left->get_type(), right->get_type())) {
-        util::serializer::SerialisationState state("");
+        util::serializer::SerialisationState state("", nullptr);
         std::string op(&m_op, 1);
         throw std::invalid_argument(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
                                                  left->description(state), right->description(state)));
@@ -944,13 +944,20 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         const Group* g = drv->m_base_table->get_parent_group();
         TableKey table_key;
         ObjKey obj_key;
-        if (auto table = g->get_table(target_table)) {
-            table_key = table->get_key();
-            target_table = "";
-            auto pk_val_node = visit(drv, hint); // call recursively
-            auto pk_val = pk_val_node->get_mixed();
-            obj_key = table->find_primary_key(pk_val);
+        auto table = g->get_table(target_table);
+        if (!table) {
+            // Perhaps class prefix is missing
+            Group::TableNameBuffer buffer;
+            table = g->get_table(Group::class_name_to_table_name(target_table, buffer));
         }
+        if (!table) {
+            throw InvalidQueryError(util::format("Unknown object type '%1'", target_table));
+        }
+        table_key = table->get_key();
+        target_table = "";
+        auto pk_val_node = visit(drv, hint); // call recursively
+        auto pk_val = pk_val_node->get_mixed();
+        obj_key = table->find_primary_key(pk_val);
         return std::make_unique<Value<ObjLink>>(ObjLink(table_key, ObjKey(obj_key)));
     }
     switch (type) {
@@ -1417,7 +1424,7 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
 }
 
 ParserDriver::ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping)
-    : m_serializer_state(mapping.get_backlink_class_prefix())
+    : m_serializer_state(mapping.get_backlink_class_prefix(), nullptr)
     , m_base_table(t)
     , m_args(args)
     , m_mapping(mapping)
