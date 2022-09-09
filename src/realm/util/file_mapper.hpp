@@ -72,9 +72,10 @@ inline void set_page_reclaim_governor_to_default()
     set_page_reclaim_governor(nullptr);
 }
 
-// There are several globals that rely on being process specific
-// The unit tests which use fork() need to set up their own
-void reset_reclaim_governor_globals_after_fork();
+// There are several globals that rely on being process specific.
+// The unit tests which use fork() need to start with empty mappings.
+// We do not support fork() in production.
+void clear_mappings_before_test_forks();
 
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
