@@ -101,7 +101,7 @@ struct VersionList {
         if (size > entries) {
             num_free += size - entries;
             entries = size;
-         }
+        }
     }
 
     VersionList() noexcept
@@ -473,9 +473,9 @@ public:
         std::lock_guard lock(m_mutex);
         size_t size = static_cast<size_t>(m_file.get_size());
         m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
-        r_info = m_reader_map.get_addr();
-        m_local_max_entry = r_info->readers.capacity();
-        REALM_ASSERT(sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry) == size);
+        m_info = m_reader_map.get_addr();
+        m_local_max_entry = m_info->readers.capacity();
+        REALM_ASSERT(sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry) == size);
     }
 
     void cleanup_versions(uint64_t& oldest_version, uint64_t& oldest_live_version, TopRefMap& top_refs,
@@ -483,7 +483,7 @@ public:
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        r_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
+        m_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
     }
 
     version_type get_newest_version()
@@ -495,8 +495,8 @@ public:
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        uint_fast32_t index = r_info->readers.newest;
-        return {r_info->readers.get(index).version, index};
+        uint_fast32_t index = m_info->readers.newest;
+        return {m_info->readers.get(index).version, index};
     }
 
     void release_read_lock(ReadLockInfo& read_lock)
@@ -505,7 +505,7 @@ public:
         // we should not need to call ensure_full_reader_mapping,
         // since releasing a read lock means it has been grabbed
         // earlier - and hence must reside in mapped memory.
-        auto& r = r_info->readers.get(read_lock.m_reader_idx);
+        auto& r = m_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
         if (read_lock.m_is_frozen) {
             --r.count_frozen;
@@ -520,10 +520,10 @@ public:
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
         const bool pick_specific = version_id.version != VersionID().version;
-        read_lock.m_reader_idx = pick_specific ? version_id.index : r_info->readers.newest;
-        REALM_ASSERT(r_info->readers.newest >= 0);
-        bool picked_newest = read_lock.m_reader_idx == (unsigned)r_info->readers.newest;
-        auto& r = r_info->readers.get(read_lock.m_reader_idx);
+        read_lock.m_reader_idx = pick_specific ? version_id.index : m_info->readers.newest;
+        REALM_ASSERT(m_info->readers.newest >= 0);
+        bool picked_newest = read_lock.m_reader_idx == (unsigned)m_info->readers.newest;
+        auto& r = m_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
             throw BadVersion();
         if (!picked_newest) {
@@ -547,48 +547,47 @@ public:
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
         std::lock_guard lock(m_mutex);
-        if (r_info->readers.is_full()) {
+        if (m_info->readers.is_full()) {
             // buffer expansion
-            auto entries = r_info->readers.capacity();
+            auto entries = m_info->readers.capacity();
             auto new_entries = entries + 32;
-            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(new_entries);
+            size_t new_info_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(new_entries);
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
             m_file.prealloc(new_info_size);                                          // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
-            r_info = m_reader_map.get_addr();
+            m_info = m_reader_map.get_addr();
             m_local_max_entry = new_entries;
-            r_info->readers.reserve(new_entries);
+            m_info->readers.reserve(new_entries);
         }
-        r_info->readers.allocate_entry(new_top_ref, new_file_size, new_version);
+        m_info->readers.allocate_entry(new_top_ref, new_file_size, new_version);
     }
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         std::lock_guard lock(m_mutex);
-        r_info->init_versioning(top_ref, file_size, initial_version);
+        m_info->init_versioning(top_ref, file_size, initial_version);
     }
 
 private:
-    unsigned int m_local_max_entry;
-    SharedInfo* r_info;
-    File& m_file;
-    File::Map<DB::SharedInfo> m_reader_map;
-    util::InterprocessMutex& m_mutex;
-
     void ensure_full_reader_mapping()
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
 
-        auto index = r_info->readers.capacity() - 1;
+        auto index = m_info->readers.capacity() - 1;
         if (index >= m_local_max_entry) {
             // handle mapping expansion if required
-            m_local_max_entry = r_info->readers.capacity();
-            size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+            m_local_max_entry = m_info->readers.capacity();
+            size_t info_size = sizeof(DB::SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry);
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
-            r_info = m_reader_map.get_addr();
+            m_info = m_reader_map.get_addr();
         }
     }
+    unsigned int m_local_max_entry;
+    SharedInfo* m_info;
+    File& m_file;
+    File::Map<DB::SharedInfo> m_reader_map;
+    util::InterprocessMutex& m_mutex;
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -1316,7 +1315,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         top_ref = m_alloc.attach_file(m_db_path, cfg);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
-        size_t logical_file_size = 24;
+        size_t logical_file_size = sizeof(SlabAlloc::Header);
         if (top_ref) {
             Array top(m_alloc);
             top.init_from_ref(top_ref);
