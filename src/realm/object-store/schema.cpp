@@ -60,8 +60,8 @@ Schema::iterator Schema::find(StringData name) noexcept
 {
     auto it = find(*this, name);
     if (it == end()) {
-        it = find(m_others, name);
-        if (it == m_others.end())
+        it = find(m_other_classes, name);
+        if (it == m_other_classes.end())
             it = end();
     }
     return it;
@@ -298,13 +298,16 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
             if (cmp < 0) {
                 func(&object_schema, nullptr);
                 ++i;
+                if (is_additive) {
+                    different_classes.push_back(object_schema);
+                }
             }
             else {
                 func(nullptr, &matching_schema);
                 ++j;
-            }
-            if (is_additive) {
-                different_classes.push_back(object_schema);
+                if (is_additive) {
+                    different_classes.push_back(matching_schema);
+                }
             }
         }
     }
@@ -380,7 +383,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
 {
     // compute properties for objects that are in common between the current schema and the new schema.
     // Append to the end of the new schema peristed properties, all those properties that have been deleted
-    auto other_objects = zip_matching(
+    auto other_classes = zip_matching(
         *this, other,
         [&](ObjectSchema* existing, const ObjectSchema* other) {
             if (!existing || !other)
@@ -404,7 +407,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
             }
         },
         is_schema_additive);
-    m_others.swap(other_objects);
+    m_other_classes.insert(m_other_classes.end(), other_classes.begin(), other_classes.end());
 }
 
 namespace realm {

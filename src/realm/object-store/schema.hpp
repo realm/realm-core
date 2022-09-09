@@ -174,7 +174,7 @@ private:
                                                   bool is_schema_additive = false) noexcept;
 
     iterator find(std::vector<ObjectSchema>& schema, StringData name) noexcept;
-    std::vector<ObjectSchema> m_others;
+    std::vector<ObjectSchema> m_other_classes;
 };
 
 namespace schema_change {
