@@ -403,6 +403,11 @@ void GroupWriter::backdate()
 
     // find (if possible) youngest time stamp in any block in a sequence that fully covers a given one.
     auto find_cover_for = [&](const FreeSpaceEntry& entry, FreeList& free_list) -> std::optional<uint64_t> {
+        auto entry_end = std::min(entry.ref + entry.size, free_list.logical_file_size);
+        if (entry.ref >= entry_end) {
+            return 0; // block completely beyond end of file
+        }
+
         if (!free_list.initialized) {
             // setup arrays
             free_list.initialized = true;
@@ -417,59 +422,43 @@ void GroupWriter::backdate()
                 }
             }
         }
-        size_t index = 0, limit = 0;
-        if (free_list.positions.is_attached()) {
-            // find block to allow for possible backdating
-            index = free_list.positions.upper_bound_int(entry.ref);
-            limit = free_list.positions.size();
-            if (index > 0) {
-                --index;
-            }
+
+        if (!free_list.positions.is_attached()) {
+            return {}; // no free list associated with that version
         }
-        ref_type start_pos = 0, end_pos = 0;
-        uint64_t found_version = 0;
-        if (index < limit) {
-            start_pos = static_cast<ref_type>(free_list.positions.get(index));
-            end_pos = start_pos + static_cast<ref_type>(free_list.lengths.get(index));
-            if (start_pos > entry.ref || end_pos <= entry.ref) {
-                index = limit; // discard entry
-            }
+        const size_t limit = free_list.positions.size();
+        if (limit == 0) {
+            return {}; // empty freelist
         }
-        if (index < limit) {
-            // coalesce any subsequent contiguous entries
-            auto next = index + 1;
-            found_version = free_list.versions.get(index);
-            auto entry_end = entry.ref + entry.size;
-            while (next < limit && free_list.positions.get(next) == (int64_t)end_pos && end_pos < entry_end) {
-                end_pos += static_cast<ref_type>(free_list.lengths.get(next));
-                // pick youngest (highest) version of blocks
-                uint64_t tmp_version = free_list.versions.get(next);
-                if (tmp_version > found_version)
-                    found_version = tmp_version;
-                ++next;
-            }
+        const size_t index = free_list.positions.upper_bound_int(entry.ref) - 1;
+        if (index == size_t(-1)) {
+            return {}; // no free blocks before the 'ref' we are looking for
         }
-        else {
-            start_pos = end_pos = free_list.logical_file_size;
+        REALM_ASSERT(index < limit); // follows from above
+        const auto start_pos = static_cast<ref_type>(free_list.positions.get(index));
+        REALM_ASSERT(start_pos <= entry.ref);
+        auto end_pos = start_pos + static_cast<ref_type>(free_list.lengths.get(index));
+        if (end_pos <= entry.ref) {
+            return {}; // free block ends before the 'ref' we are looking for
         }
-        // consider additional free space beyond logical end of file
-        if (end_pos == free_list.logical_file_size) {
-            end_pos = std::numeric_limits<ref_type>::max(); // entry.ref + entry.size;
+        uint64_t found_version = free_list.versions.get(index);
+
+        // coalesce any subsequent contiguous entries
+        for (auto next = index + 1;
+             next < limit && free_list.positions.get(next) == (int64_t)end_pos && end_pos < entry_end; ++next) {
+            end_pos += static_cast<ref_type>(free_list.lengths.get(next));
+            // pick youngest (highest) version of blocks
+            found_version = std::max<uint64_t>(found_version, free_list.versions.get(next));
         }
         // is the block fully covered by range established above?
-        ALLOC_DBG_COUT << " [" << start_pos << " - " << end_pos << "]";
-        if (start_pos <= entry.ref && end_pos >= entry.ref + entry.size) {
-            // found a fully covering entry!
-            REALM_ASSERT(found_version <= entry.released_at_version);
-            ALLOC_DBG_COUT << "  backdating [" << entry.ref << ", " << entry.size
-                           << "]  version: " << entry.released_at_version << " -> " << found_version;
-            return found_version;
+        if (end_pos < entry_end) {
+            return {}; // no, it isn't
         }
-        ALLOC_DBG_COUT << "  not free at that point";
-        return {};
+        REALM_ASSERT(found_version <= entry.released_at_version);
+        return found_version;
     };
 
-    // check if a given entry overlaps a reachable block. Only computed in debug mode.
+    // check if a given entry overlaps a reachable block. Only used in debug mode.
     auto is_referenced = [&](FreeSpaceEntry& entry) -> bool {
         bool referenced = false;
 #ifdef REALM_DEBUG
@@ -519,14 +508,18 @@ void GroupWriter::backdate()
             auto earlier_it = get_earlier(entry.released_at_version);
             ALLOC_DBG_COUT << " - earlier freelist: " << earlier_it->version;
             if (auto covering_version = find_cover_for(entry, *earlier_it)) {
+                ALLOC_DBG_COUT << "  backdating [" << entry.ref << ", " << entry.size
+                               << "]  version: " << entry.released_at_version << " -> " << *covering_version;
                 REALM_ASSERT_DEBUG(!referenced);
                 entry.released_at_version = *covering_version;
             }
             else {
+                ALLOC_DBG_COUT << "  not free at that point";
                 REALM_ASSERT_DEBUG(referenced);
                 break;
             }
         }
+        ALLOC_DBG_COUT << std::endl;
     };
 
 
@@ -536,7 +529,6 @@ void GroupWriter::backdate()
     for (auto&& entry : m_not_free_in_file) {
         backdate_single_entry(entry);
     }
-    ALLOC_DBG_COUT << std::endl;
 }
 
 ref_type GroupWriter::write_group()
