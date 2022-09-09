@@ -1286,6 +1286,8 @@ public:
 
     void receive_ping(milliseconds_type timestamp, milliseconds_type rtt);
 
+    void receive_error_message(session_ident_type, int error_code, std::string_view error_body);
+
     void protocol_error(ProtocolError, Session* = nullptr);
 
     void initiate_soft_close();
@@ -2702,6 +2704,13 @@ public:
 
         // Protocol state is now SendUnbound
         ensure_enlisted_to_send();
+    }
+
+    void receive_error_message(session_ident_type, int, std::string_view)
+    {
+        REALM_ASSERT(!m_unbind_message_received);
+
+        logger.detail("Received: ERROR"); // Throws
     }
 
 private:
@@ -4405,6 +4414,26 @@ void SyncConnection::receive_ping(milliseconds_type timestamp, milliseconds_type
     m_last_ping_timestamp = timestamp;
     if (!m_is_sending)
         send_next_message();
+}
+
+
+void SyncConnection::receive_error_message(session_ident_type session_ident, int error_code,
+                                           std::string_view error_body)
+{
+    logger.debug("Received: ERROR(error_code=%1, message_size=%2, session_ident=%3)", error_code, error_body.size(),
+                 session_ident); // Throws
+    auto i = m_sessions.find(session_ident);
+    if (REALM_UNLIKELY(i == m_sessions.end())) {
+        bad_session_ident("ERROR", session_ident);
+        return;
+    }
+    Session& sess = *i->second;
+    if (REALM_UNLIKELY(sess.unbind_message_received())) {
+        message_after_unbind("ERROR", session_ident); // Throws
+        return;
+    }
+
+    sess.receive_error_message(session_ident, error_code, error_body); // Throws
 }
 
 
