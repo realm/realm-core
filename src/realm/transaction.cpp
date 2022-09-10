@@ -111,7 +111,8 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
+    RefRanges ranges; // FIXME: db->get_ranges_needing_refresh(m_read_lock.m_version) ?
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version, ranges);
 }
 
 Transaction::~Transaction()
@@ -262,7 +263,8 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         }
 
         // Remap file if it has grown, and update refs in underlying node structure
-        remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
+        const RefRanges empty_ranges; // a writer already has the latest pages (assumes serialized commits)
+        remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false, empty_ranges); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
     catch (...) {
@@ -298,7 +300,8 @@ void Transaction::commit_and_continue_writing()
     }
 
     bool writable = true;
-    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+    RefRanges empty_ranges; // a writer already has the latest pages in memory (assumes serialized commits)
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, empty_ranges); // Throws
 }
 
 TransactionRef Transaction::freeze()

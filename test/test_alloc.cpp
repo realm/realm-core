@@ -321,6 +321,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
 
     SlabAlloc::Config cfg;
     SlabAlloc alloc;
+    RefRanges empty_ranges = {};
 
     { // Initial Header mapping fails
         _impl::SimulatedFailure::prime_mmap([](size_t) {
@@ -359,16 +360,16 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
             return true;
         });
         // Does not expand so it succeeds
-        alloc.update_reader_view(page_size);
+        alloc.update_reader_view(page_size, empty_ranges);
 
-        CHECK_THROW(alloc.update_reader_view(page_size * 2), std::bad_alloc);
+        CHECK_THROW(alloc.update_reader_view(page_size * 2, empty_ranges), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
         CHECK_EQUAL(initial_translated, alloc.translate(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
         alloc.get_file().resize(page_size * 2);
-        alloc.update_reader_view(page_size * 2);
+        alloc.update_reader_view(page_size * 2, empty_ranges);
         CHECK_EQUAL(alloc.get_baseline(), page_size * 2);
         // These two no longer applies:
         // CHECK_EQUAL(initial_version + 1, alloc.get_mapping_version());
@@ -382,7 +383,7 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     // Expand the first mapping to a full section
     static constexpr auto section_size = Allocator::section_size();
     alloc.get_file().resize(section_size * 2);
-    alloc.update_reader_view(Allocator::section_size());
+    alloc.update_reader_view(Allocator::section_size(), empty_ranges);
     alloc.purge_old_mappings(3, 3);
 
     { // Add a new complete section after a complete section
@@ -394,13 +395,13 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
             return true;
         });
 
-        CHECK_THROW(alloc.update_reader_view(section_size * 2), std::bad_alloc);
+        CHECK_THROW(alloc.update_reader_view(section_size * 2, empty_ranges), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
         CHECK_EQUAL(initial_translated, alloc.translate(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
-        alloc.update_reader_view(section_size * 2);
+        alloc.update_reader_view(section_size * 2, empty_ranges);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 2);
         CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
         CHECK_EQUAL(initial_translated, alloc.translate(1000));    // first section was not remapped
@@ -422,14 +423,14 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
             return size < section_size;
         });
 
-        CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size), std::bad_alloc);
+        CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size, empty_ranges), std::bad_alloc);
         CHECK_EQUAL(initial_baseline, alloc.get_baseline());
         CHECK_EQUAL(initial_version, alloc.get_mapping_version());
         CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
         CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
-        alloc.update_reader_view(section_size * 3 + page_size);
+        alloc.update_reader_view(section_size * 3 + page_size, empty_ranges);
         CHECK_EQUAL(alloc.get_baseline(), section_size * 3 + page_size);
         CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
         CHECK_EQUAL(initial_translated_1, alloc.translate(1000));

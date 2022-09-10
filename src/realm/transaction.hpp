@@ -428,7 +428,8 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     size_t file_size = m_read_lock.m_file_size;
 
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    m_alloc.update_reader_view(file_size, top_ref); // Throws
+    RefRanges empty_ranges; // since we had the write lock, we already have the latest pages in memory
+    m_alloc.update_reader_view(file_size, empty_ranges); // Throws
     update_allocator_wrappers(false);
     advance_transact(top_ref, reversed_in, false); // Throws
 
@@ -460,7 +461,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
-    alloc.update_reader_view(new_file_size, new_top_ref);
+    alloc.update_reader_view(new_file_size, db->get_ranges_needing_refresh(old_version, new_version, alloc));
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;
     ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);

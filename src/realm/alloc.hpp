@@ -73,6 +73,11 @@ private:
 };
 static_assert(std::is_trivially_copyable_v<MemRef>);
 
+struct RefRange {
+    ref_type begin;
+    ref_type end;
+};
+using RefRanges = std::vector<RefRange>;
 
 /// The common interface for Realm allocators.
 ///

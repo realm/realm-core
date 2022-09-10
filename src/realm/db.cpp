@@ -257,6 +257,31 @@ struct VersionList {
         REALM_ASSERT(oldest_live_v != std::numeric_limits<uint64_t>::max());
     }
 
+    std::vector<std::pair<ref_type, uint64_t>> get_top_refs_for_live_versions_between(uint64_t begin_version,
+                                                                                      uint64_t end_version) noexcept
+    {
+        bool did_find_begin = false;
+        bool did_find_end = false;
+        std::vector<std::pair<ref_type, uint64_t>> top_refs;
+        for (auto* rc = data(); rc < data() + entries; ++rc) {
+            if (rc->is_active() && (rc->count_live || rc->count_frozen)) {
+                if (rc->version >= begin_version && rc->version <= end_version) {
+                    if (rc->version == end_version) {
+                        did_find_end = true;
+                    }
+                    else if (rc->version == begin_version) {
+                        did_find_begin = true;
+                    }
+                    top_refs.push_back({rc->current_top, rc->version});
+                }
+            }
+        }
+        // begin and end versions must be found because this should be called with a read lock on both
+        REALM_ASSERT_EX(did_find_begin, begin_version);
+        REALM_ASSERT_EX(did_find_end, end_version);
+        return top_refs;
+    }
+
     constexpr static uint32_t nil = (uint32_t)-1;
     const static int init_readers_size = 32;
     uint32_t entries;
@@ -523,6 +548,14 @@ public:
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
+    }
+
+    std::vector<std::pair<ref_type, uint64_t>> get_top_refs_for_live_versions_between(version_type from,
+                                                                                      version_type to)
+    {
+        std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
+        return m_info->readers.get_top_refs_for_live_versions_between(from, to);
     }
 
     version_type get_newest_version()
@@ -1434,6 +1467,118 @@ void DB::release_all_read_locks() noexcept
     }
     m_local_locks_held.clear();
     REALM_ASSERT(m_transaction_count == 0);
+}
+
+RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, SlabAlloc& alloc) noexcept
+{
+    // FIXME: don't refresh the same page more than once!
+    if (m_key) {
+        // FIXME: we need read locks on all these versions since we are making accessors to their
+        // free lists below
+        std::vector<std::pair<ref_type, version_type>> top_refs =
+            m_version_manager->get_top_refs_for_live_versions_between(from, to);
+        std::sort(top_refs.begin(), top_refs.end(), [](auto& a, auto& b) {
+            return a.second < b.second;
+        });
+        constexpr size_t top_array_size = Group::s_group_max_size;
+        RefRanges ranges;
+        for (auto ref : top_refs) {
+            ranges.push_back(RefRange{ref.first, ref.first + top_array_size});
+        }
+        alloc.refresh_encrypted_pages(ranges);
+
+        Array prev_freelist_positions(alloc);
+        Array prev_freelist_lengths(alloc);
+        for (auto& ref_pair : top_refs) {
+            ref_type top_ref = ref_pair.first;
+            version_type version = ref_pair.second;
+            Array top_array(alloc), free_positions(alloc), free_lengths(alloc);
+            top_array.init_from_ref(top_ref);
+            REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), top_ref);
+
+            ref_type free_positions_ref = top_array.get_as_ref(Group::s_free_pos_ndx);
+            ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
+            alloc.refresh_encrypted_pages({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
+                                           {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
+
+            free_positions.init_from_ref(free_positions_ref);
+            free_lengths.init_from_ref(free_sizes_ref);
+            size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
+            size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
+
+            alloc.refresh_encrypted_pages({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
+                                           {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
+
+            // we can now access this freelist version's pos and lengths
+            Array cur_freelist_posistions(alloc), cur_freelist_lengths(alloc);
+            cur_freelist_posistions.init_from_ref(free_positions_ref);
+            cur_freelist_lengths.init_from_ref(free_sizes_ref);
+
+            auto print_freelist = [&]() {
+                std::cout << util::format("freelist for version: %1 has %2 entries.\n", ref_pair.first,
+                                          cur_freelist_posistions.size());
+                for (size_t i = 0; i < cur_freelist_posistions.size(); ++i) {
+                    std::cout << util::format("{%1, %2}, ", cur_freelist_posistions.get(i),
+                                              cur_freelist_lengths.get(i));
+                }
+                std::cout << std::endl;
+            };
+            if (version == from) {
+                prev_freelist_positions.init_from_ref(free_positions_ref);
+                prev_freelist_lengths.init_from_ref(free_sizes_ref);
+                // print_freelist();
+                continue;
+            }
+
+            // print_freelist();
+            RefRanges allocations;
+
+            // Assumes freelists are in sorted order and are minimal contiguous ranges.
+            // find allocations by walking through differences
+            size_t previous_ndx = 0;
+            size_t current_ndx = 0;
+            const size_t prev_freelist_size = prev_freelist_positions.size();
+            const size_t cur_freelist_size = cur_freelist_posistions.size();
+            while (previous_ndx < prev_freelist_size && current_ndx < cur_freelist_size) {
+                ref_type prev_start = prev_freelist_positions.get(previous_ndx);
+                ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
+                ref_type cur_start = cur_freelist_posistions.get(current_ndx);
+                ref_type cur_end = cur_start + cur_freelist_lengths.get(current_ndx);
+                if (cur_start > prev_end) {
+                    allocations.push_back(RefRange{prev_start, prev_end});
+                    ++previous_ndx;
+                }
+                else if (cur_start > prev_start) {
+                    allocations.push_back(RefRange{prev_start, cur_start});
+                    ++previous_ndx;
+                    if (cur_end < prev_end) {
+                        allocations.push_back(RefRange{cur_end, prev_end});
+                        ++current_ndx;
+                    }
+                }
+                else if (cur_end < prev_end) {
+                    ++current_ndx;
+                }
+                else if (cur_end < prev_end) {
+                    allocations.push_back(RefRange{cur_end, prev_end});
+                    ++previous_ndx;
+                    ++current_ndx;
+                }
+                else {
+                    REALM_ASSERT_EX(cur_start <= prev_start && cur_end >= prev_end, cur_start, cur_end, prev_start,
+                                    prev_end);
+                    ++previous_ndx;
+                    ++current_ndx;
+                }
+            }
+
+            alloc.refresh_encrypted_pages(allocations);
+
+            prev_freelist_positions.init_from_ref(free_positions_ref);
+            prev_freelist_lengths.init_from_ref(free_sizes_ref);
+        }
+    }
+    return {};
 }
 
 // Note: close() and close_internal() may be called from the DB::~DB().

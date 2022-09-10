@@ -547,6 +547,8 @@ private:
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept;
 
+    RefRanges get_ranges_needing_refresh(version_type from, version_type to, SlabAlloc& alloc) noexcept;
+
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();

@@ -652,14 +652,16 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
+                       const RefRanges& ranges_to_refresh);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
 
     void reset_free_space_tracking();
 
-    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable,
+                               const RefRanges& ranges_to_refresh);
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any

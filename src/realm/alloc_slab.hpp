@@ -293,7 +293,7 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    void update_reader_view(size_t file_size, ref_type top_ref = 1);
+    void update_reader_view(size_t file_size, const RefRanges& refs_to_refresh);
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
     void init_mapping_management(uint64_t currently_live_version);
 
@@ -365,7 +365,7 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void refresh_encrypted_pages(ref_type top_ref, size_t size);
+    void refresh_encrypted_pages(const RefRanges& ranges);
 
 private:
     enum AttachMode {
