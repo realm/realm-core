@@ -370,6 +370,9 @@ let package = Package(
         .library(
             name: "RealmFFI",
             targets: ["RealmFFI"]),
+        .library(
+            name: "BaasTestUtils",
+            targets: ["BaasTestUtils"]),
     ],
     targets: [
         .target(
@@ -495,8 +498,19 @@ let package = Package(
             path: "test/object-store/util",
             publicHeadersPath: ".",
             cxxSettings: ([
-                .headerSearchPath(".."),
-                .define("_LIBCPP_DISABLE_AVAILABILITY")
+                .headerSearchPath("."),
+                .define("_LIBCPP_DISABLE_AVAILABILITY"),
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "BaasTestUtils",
+            dependencies: ["ObjectStoreTestUtils"],
+            path: "baas_admin_api",
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .headerSearchPath("."),
+                .define("_LIBCPP_DISABLE_AVAILABILITY"),
+                .define("REALM_ENABLE_SYNC"),
+                .define("REALM_ENABLE_AUTH_TESTS"),
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
             name: "ObjectStoreTests",

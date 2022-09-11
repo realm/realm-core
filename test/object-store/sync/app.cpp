@@ -31,8 +31,8 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
-#include "sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include "util/sync/sync_test_utils.hpp"
+#include "util/baas/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
@@ -157,6 +157,56 @@ static std::string create_jwt(const std::string& appId)
 
     return jwtPayload + "." + signature;
 }
+
+#ifdef REALM_MONGODB_ENDPOINT
+TEST_CASE("app: baas admin api", "[sync][app]") {
+    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
+    base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
+    SECTION("embedded objects") {
+        Schema schema{{"top",
+                       {{"_id", PropertyType::String, true},
+                        {"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
+                      {"location",
+                       ObjectSchema::ObjectType::Embedded,
+                       {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        create_app(test_app_config);
+    }
+
+    SECTION("embedded object with array") {
+        Schema schema{
+            {"a",
+             {{"_id", PropertyType::String, true},
+              {"b_link", PropertyType::Object | PropertyType::Array | PropertyType::Nullable, "b"}}},
+            {"b",
+             ObjectSchema::ObjectType::Embedded,
+             {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
+            {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
+        };
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        create_app(test_app_config);
+    }
+
+    SECTION("dictionaries") {
+        Schema schema{
+            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Dictionary | PropertyType::String}}},
+        };
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        create_app(test_app_config);
+    }
+
+    SECTION("set") {
+        Schema schema{
+            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Set | PropertyType::String}}},
+        };
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        create_app(test_app_config);
+    }
+}
+#endif
 
 // MARK: - Login with Credentials Tests
 

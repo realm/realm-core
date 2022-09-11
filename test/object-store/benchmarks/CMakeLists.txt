@@ -19,11 +19,11 @@ set(SOURCES
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        ../sync/sync_test_utils.hpp
-        ../sync/session/session_util.hpp
+        ../util/sync/sync_test_utils.hpp
+        ../util/session/session_util.hpp
     )
     list(APPEND SOURCES
-        ../sync/sync_test_utils.cpp
+        ../util/sync/sync_test_utils.cpp
         client_reset.cpp
     )
 endif()

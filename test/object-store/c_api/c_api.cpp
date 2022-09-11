@@ -16,13 +16,13 @@
 #include <thread>
 
 #if REALM_ENABLE_SYNC
+#include "util/sync/sync_test_utils.hpp"
 #include <realm/object-store/sync/sync_user.hpp>
 #include <external/json/json.hpp>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include "util/baas/baas_admin_api.hpp"
 #endif
 
 using namespace realm;
@@ -4375,7 +4375,7 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 }
 #endif
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 
 std::atomic_bool baas_client_stop{false};
 std::atomic<std::size_t> error_handler_counter{0};

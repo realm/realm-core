@@ -22,6 +22,10 @@
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
+#if REALM_ENABLE_SYNC
+#include "util/sync/sync_test_utils.hpp"
+#endif
+
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/object_accessor.hpp>
@@ -37,7 +41,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 #include "sync/flx_sync_harness.hpp"
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif
 
 #include <cstdint>
 

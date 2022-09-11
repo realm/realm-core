@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
+#include "util/sync/sync_test_utils.hpp"
 
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>

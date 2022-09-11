@@ -18,7 +18,7 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "sync/session/session_util.hpp"
+#include "../../util/session/session_util.hpp"
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -26,8 +26,8 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
+#include "../../util/event_loop.hpp"
+#include "../../util/test_utils.hpp"
 
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/time.hpp>

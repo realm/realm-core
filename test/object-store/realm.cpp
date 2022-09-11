@@ -37,6 +37,7 @@
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "util/sync/sync_test_utils.hpp"
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>

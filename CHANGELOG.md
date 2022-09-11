@@ -21,7 +21,7 @@
 -----------
 
 ### Internals
-* None.
+* Rearrange the Object Store test utilities so that SDK's can use the Object Store Baas Admin API.
 
 ----------------------------------------------
 

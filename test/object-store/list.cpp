@@ -22,6 +22,10 @@
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 
+#if REALM_ENABLE_SYNC
+#include "util/sync/sync_test_utils.hpp"
+#endif
+
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>

@@ -19,19 +19,36 @@
 #include "baas_admin_api.hpp"
 #include "external/mpark/variant.hpp"
 #include "realm/object-store/sync/app_credentials.hpp"
+#include "realm/object-store/sync/sync_manager.hpp"
 
 #if REALM_ENABLE_AUTH_TESTS
+#include <realm/util/file.hpp>
 
 #include <iostream>
 #include <mutex>
 
-#include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
 #include "realm/object_id.hpp"
 #include "realm/util/scope_exit.hpp"
 
 namespace realm {
+namespace reset_utils {
+std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
+                                                        const Realm::Config& remote_config,
+                                                        TestAppSession& test_app_session)
+{
+    return std::make_unique<BaasClientReset>(local_config, remote_config, test_app_session);
+}
+
+std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
+                                                            const Realm::Config& remote_config,
+                                                            const TestAppSession& session)
+{
+    return std::make_unique<BaasFLXClientReset>(local_config, remote_config, session);
+}
+} // namespace reset_utils
+
 namespace {
 std::string property_type_to_bson_type_str(PropertyType type)
 {
@@ -272,7 +289,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
     return nitems * size;
 }
 
-} // namespace
+} // anonymous amespace
 
 app::Response do_http_request(app::Request&& request)
 {
@@ -557,7 +574,6 @@ std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::s
     return services;
 }
 
-
 std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["logs"];
@@ -569,7 +585,6 @@ std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id) 
     });
     return errors;
 }
-
 
 AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& app_id) const
 {
@@ -1096,57 +1111,94 @@ AppSession get_runtime_app_session(std::string base_url)
     return cached_app_session;
 }
 
-
-#ifdef REALM_MONGODB_ENDPOINT
-TEST_CASE("app: baas admin api", "[sync][app]") {
+std::string get_base_url()
+{
+    // allows configuration with or without quotes
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
-    SECTION("embedded objects") {
-        Schema schema{{"top",
-                       {{"_id", PropertyType::String, true},
-                        {"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
-                      {"location",
-                       ObjectSchema::ObjectType::Embedded,
-                       {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
-
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
-        create_app(test_app_config);
+    if (base_url.size() > 0 && base_url[0] == '"') {
+        base_url.erase(0, 1);
     }
-
-    SECTION("embedded object with array") {
-        Schema schema{
-            {"a",
-             {{"_id", PropertyType::String, true},
-              {"b_link", PropertyType::Object | PropertyType::Array | PropertyType::Nullable, "b"}}},
-            {"b",
-             ObjectSchema::ObjectType::Embedded,
-             {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
-            {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
-        };
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
-        create_app(test_app_config);
+    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
+        base_url.erase(base_url.size() - 1);
     }
-
-    SECTION("dictionaries") {
-        Schema schema{
-            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Dictionary | PropertyType::String}}},
-        };
-
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
-        create_app(test_app_config);
-    }
-
-    SECTION("set") {
-        Schema schema{
-            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Set | PropertyType::String}}},
-        };
-
-        auto test_app_config = minimal_app_config(base_url, "test", schema);
-        create_app(test_app_config);
-    }
+    return base_url;
 }
-#endif
+
+AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
+{
+    // emails with this prefix will pass through the baas app due to the register function
+    email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    password = random_string(10);
+    static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
+}
+
+AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
+{
+    REALM_ASSERT(app.get());
+    AutoVerifiedEmailCredentials creds;
+    app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+        creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+            REALM_ASSERT(!error);
+        });
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                 [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                     REALM_ASSERT(user);
+                                     REALM_ASSERT(!error);
+                                 });
+    return creds;
+}
 
 } // namespace realm
 
-#endif
+// MARK: - TestAppSession
+
+using namespace realm;
+TestAppSession::TestAppSession()
+    : TestAppSession(get_runtime_app_session(get_base_url()), nullptr, DeleteApp{false})
+{
+}
+
+TestAppSession::TestAppSession(AppSession session,
+                               std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
+                               DeleteApp delete_app)
+    : m_app_session(std::make_unique<AppSession>(session))
+    , m_base_file_path(util::make_temp_dir() + random_string(10))
+    , m_delete_app(delete_app)
+    , m_transport(custom_transport)
+{
+    if (!m_transport)
+        m_transport = instance_of<SynchronousTestTransport>;
+    auto app_config = get_config(m_transport, *m_app_session);
+    set_app_config_defaults(app_config, m_transport);
+
+    util::try_make_dir(m_base_file_path);
+    SyncClientConfig sc_config;
+    sc_config.base_file_path = m_base_file_path;
+    sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+
+    m_app = app::App::get_uncached_app(app_config, sc_config);
+
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+    create_user_and_log_in(m_app);
+}
+
+TestAppSession::~TestAppSession()
+{
+    if (util::File::exists(m_base_file_path)) {
+        try {
+            m_app->sync_manager()->reset_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
+    if (m_delete_app) {
+        m_app_session->admin_api.delete_app(m_app_session->server_app_id);
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS

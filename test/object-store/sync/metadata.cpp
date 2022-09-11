@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
+#include "util/sync/sync_test_utils.hpp"
 #include "util/test_path.hpp"
 #include "util/test_utils.hpp"
 

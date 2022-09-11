@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_test_utils.hpp"
+#include "../sync/sync_test_utils.hpp"
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
+#include "../event_loop.hpp"
+#include "../test_file.hpp"
 
 #include <realm/sync/config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>

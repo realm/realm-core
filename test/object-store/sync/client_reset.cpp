@@ -19,12 +19,12 @@
 #include <catch2/catch_all.hpp>
 
 #include "collection_fixtures.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include "../util/baas/baas_admin_api.hpp"
+#include "../util/event_loop.hpp"
+#include "../util/sync/sync_test_utils.hpp"
+#include "../util/test_file.hpp"
+#include "../util/test_utils.hpp"
 
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>

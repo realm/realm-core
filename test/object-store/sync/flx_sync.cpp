@@ -21,7 +21,8 @@
 #include <catch2/catch_all.hpp>
 
 #include "flx_sync_harness.hpp"
-#include "sync/sync_test_utils.hpp"
+#include "util/baas/baas_admin_api.hpp"
+#include "util/sync/sync_test_utils.hpp"
 #include "util/test_file.hpp"
 #include "realm/object-store/binding_context.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"

@@ -39,6 +39,7 @@
 #include <realm/query_expression.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "util/sync/sync_test_utils.hpp"
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #endif

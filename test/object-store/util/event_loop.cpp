@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include "util/event_loop.hpp"
+#include "event_loop.hpp"
 
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
 #include <realm/util/scope_exit.hpp>
