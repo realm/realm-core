@@ -7,6 +7,7 @@
 * Expose `realm_list_find` in the C API (PR [#5848](https://github.com/realm/realm-core/pull/5848))
 * Expose `Group::remove_table` in the C API (PR [#5860](https://github.com/realm/realm-core/pull/5860))
 * Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -23,7 +24,7 @@
 * If a case insensitive query searched for a string including an 4-byte UTF8 character, the program would crash ([#5825](https://github.com/realm/realm-core/issues/5825), since v2.3.0)
 
 ### Breaking changes
-* None.
+* The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

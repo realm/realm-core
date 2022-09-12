@@ -393,28 +393,67 @@ size_t Dictionary::find_any_key(Mixed key) const noexcept
     return m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
 }
 
+namespace {
+bool can_minmax(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+        case type_Timestamp:
+            return true;
+        default:
+            return false;
+    }
+}
+bool can_sum(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+            return true;
+        default:
+            return false;
+    }
+}
+} // anonymous namespace
+
 util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->min(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->max(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->sum(return_cnt, get_value_data_type());
     }
@@ -425,6 +464,9 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 
 util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->avg(return_cnt, get_value_data_type());
     }

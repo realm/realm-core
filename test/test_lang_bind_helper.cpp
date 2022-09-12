@@ -5039,8 +5039,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     // Verify that an aggregate on the view with detached refs gives the expected result.
     CHECK_EQUAL(false, view.is_in_sync());
     ObjKey res;
-    double min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 
     // Sync the view to discard the detached refs.
@@ -5048,8 +5047,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
     // Verify that an aggregate on the view still gives the expected result.
     res = ObjKey();
-    min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 }
 

@@ -547,286 +547,24 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
-DataType Results::prepare_for_aggregate(ColKey column, const char* name)
-{
-    DataType type;
-    switch (m_mode) {
-        case Mode::Table:
-            type = m_table->get_column_type(column);
-            break;
-        case Mode::Collection:
-            type = m_collection->get_table()->get_column_type(m_collection->get_col_key());
-            if (type != type_LinkList && type != type_Link)
-                break;
-            m_query = do_get_query();
-            m_mode = Mode::Query;
-            REALM_FALLTHROUGH;
-        case Mode::Query:
-        case Mode::TableView:
-            ensure_up_to_date();
-            type = m_table->get_column_type(column);
-            break;
-        default:
-            REALM_COMPILER_HINT_UNREACHABLE();
-    }
-    switch (type) {
-        case type_Timestamp:
-        case type_Double:
-        case type_Float:
-        case type_Int:
-        case type_Decimal:
-        case type_Mixed:
-            break;
-        default:
-            if (m_mode == Mode::Collection) {
-                throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
-            }
-            else {
-                throw UnsupportedColumnTypeException{column, *m_table, name};
-            }
-    }
-    return type;
-}
-
 namespace {
-template <typename T, typename Table>
-struct AggregateHelper;
-
-template <typename Table>
-struct AggregateHelper<int64_t, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
+struct CollectionAggregateAdaptor {
+    const CollectionBase& list;
+    util::Optional<Mixed> min(ColKey)
     {
-        return table.minimum_int(col, obj);
+        return list.min();
     }
-    Mixed max(ColKey col, ObjKey* obj)
+    util::Optional<Mixed> max(ColKey)
     {
-        return table.maximum_int(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        return table.sum_int(col);
-    }
-    Mixed avg(ColKey col, size_t* count)
-    {
-        return table.average_int(col, count);
-    }
-};
-
-template <typename Table>
-struct AggregateHelper<double, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
-    {
-        return table.minimum_double(col, obj);
-    }
-    Mixed max(ColKey col, ObjKey* obj)
-    {
-        return table.maximum_double(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        return table.sum_double(col);
-    }
-    Mixed avg(ColKey col, size_t* count)
-    {
-        return table.average_double(col, count);
-    }
-};
-
-template <typename Table>
-struct AggregateHelper<float, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
-    {
-        return table.minimum_float(col, obj);
-    }
-    Mixed max(ColKey col, ObjKey* obj)
-    {
-        return table.maximum_float(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        return table.sum_float(col);
-    }
-    Mixed avg(ColKey col, size_t* count)
-    {
-        return table.average_float(col, count);
-    }
-};
-
-template <typename Table>
-struct AggregateHelper<Timestamp, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
-    {
-        return table.minimum_timestamp(col, obj);
-    }
-    Mixed max(ColKey col, ObjKey* obj)
-    {
-        return table.maximum_timestamp(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        throw Results::UnsupportedColumnTypeException{col, table, "sum"};
-    }
-    Mixed avg(ColKey col, size_t*)
-    {
-        throw Results::UnsupportedColumnTypeException{col, table, "avg"};
-    }
-};
-
-template <typename Table>
-struct AggregateHelper<Decimal128, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
-    {
-        return table.minimum_decimal(col, obj);
-    }
-    Mixed max(ColKey col, ObjKey* obj)
-    {
-        return table.maximum_decimal(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        return table.sum_decimal(col);
-    }
-    Mixed avg(ColKey col, size_t* count)
-    {
-        return table.average_decimal(col, count);
-    }
-};
-
-template <typename Table>
-struct AggregateHelper<Mixed, Table> {
-    Table& table;
-    Mixed min(ColKey col, ObjKey* obj)
-    {
-        return table.minimum_mixed(col, obj);
-    }
-    Mixed max(ColKey col, ObjKey* obj)
-    {
-        return table.maximum_mixed(col, obj);
-    }
-    Mixed sum(ColKey col)
-    {
-        return table.sum_mixed(col);
-    }
-    Mixed avg(ColKey col, size_t* count)
-    {
-        return table.average_mixed(col, count);
-    }
-};
-
-
-struct ListAggregateHelper {
-    CollectionBase& list;
-    util::Optional<Mixed> min(ColKey, size_t* ndx)
-    {
-        return list.min(ndx);
-    }
-    util::Optional<Mixed> max(ColKey, size_t* ndx)
-    {
-        return list.max(ndx);
+        return list.max();
     }
     util::Optional<Mixed> sum(ColKey)
     {
         return list.sum();
     }
-    util::Optional<Mixed> avg(ColKey, size_t* count)
+    util::Optional<Mixed> avg(ColKey)
     {
-        return list.avg(count);
-    }
-};
-
-template <>
-struct AggregateHelper<int64_t, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-};
-template <>
-struct AggregateHelper<double, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-};
-template <>
-struct AggregateHelper<float, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-};
-template <>
-struct AggregateHelper<Decimal128, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-};
-
-template <>
-struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-    Mixed sum(ColKey)
-    {
-        throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "sum"};
-    }
-    Mixed avg(ColKey, size_t*)
-    {
-        throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "avg"};
-    }
-};
-
-template <>
-struct AggregateHelper<Mixed, CollectionBase&> : ListAggregateHelper {
-    AggregateHelper(CollectionBase& l)
-        : ListAggregateHelper{l}
-    {
-    }
-};
-
-template <typename Table, typename Func>
-util::Optional<Mixed> call_with_helper(Func&& func, Table&& table, DataType type)
-{
-    switch (type) {
-        case type_Timestamp:
-            return func(AggregateHelper<Timestamp, Table>{table});
-        case type_Double:
-            return func(AggregateHelper<double, Table>{table});
-        case type_Float:
-            return func(AggregateHelper<Float, Table>{table});
-        case type_Int:
-            return func(AggregateHelper<Int, Table>{table});
-        case type_Decimal:
-            return func(AggregateHelper<Decimal128, Table>{table});
-        case type_Mixed:
-            return func(AggregateHelper<Mixed, Table>{table});
-        default:
-            REALM_COMPILER_HINT_UNREACHABLE();
-    }
-}
-
-struct ReturnIndexHelper {
-    ObjKey key;
-    size_t index = npos;
-    operator ObjKey*()
-    {
-        return &key;
-    }
-    operator size_t*()
-    {
-        return &index;
-    }
-    operator bool()
-    {
-        return key || index != npos;
+        return list.avg();
     }
 };
 } // anonymous namespace
@@ -839,49 +577,70 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
     if (!m_table && !m_collection)
         return none;
 
-    auto type = prepare_for_aggregate(column, name);
+    ensure_up_to_date();
+    std::optional<Mixed> ret;
     switch (m_mode) {
         case Mode::Table:
-            return call_with_helper(func, *m_table, type);
+            ret = func(*m_table);
+            break;
+        case Mode::Query:
+            ret = func(m_query);
+            break;
         case Mode::Collection:
-            return call_with_helper(func, *m_collection, type);
+            if (do_get_type() != PropertyType::Object)
+                ret = func(CollectionAggregateAdaptor{*m_collection});
+            else
+                ret = func(do_get_query());
+            break;
         default:
-            return call_with_helper(func, m_table_view, type);
+            ret = func(m_table_view);
+            break;
+    }
+
+    // `none` indicates that it's an unsupported operation for the column type.
+    // `some(null)` indicates that there's no rows in the thing being aggregated
+    // Any other value is just the result to return
+    if (ret) {
+        return ret->is_null() ? std::nullopt : std::optional(*ret);
+    }
+
+    // We need to report the column and table actually being aggregated on,
+    // which is the collection if it's not a link collection and the target
+    // of the links otherwise
+    if (m_mode == Mode::Collection && do_get_type() != PropertyType::Object) {
+        throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
+    }
+    else {
+        throw UnsupportedColumnTypeException{column, *m_table, name};
     }
 }
 
 util::Optional<Mixed> Results::max(ColKey column)
 {
-    ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "max", [&](auto&& helper) {
-        return helper.max(column, return_ndx);
+    return aggregate(column, "max", [column](auto&& helper) {
+        return helper.max(column);
     });
-    return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
-    ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "min", [&](auto&& helper) {
-        return helper.min(column, return_ndx);
+    return aggregate(column, "min", [column](auto&& helper) {
+        return helper.min(column);
     });
-    return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
-    return aggregate(column, "sum", [&](auto&& helper) {
+    return aggregate(column, "sum", [column](auto&& helper) {
         return helper.sum(column);
     });
 }
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
-    size_t value_count = 0;
-    auto results = aggregate(column, "avg", [&](auto&& helper) {
-        return helper.avg(column, &value_count);
+    return aggregate(column, "avg", [column](auto&& helper) {
+        return helper.avg(column);
     });
-    return value_count == 0 ? none : results;
 }
 
 void Results::clear()

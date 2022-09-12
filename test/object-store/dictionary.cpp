@@ -940,42 +940,54 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(dict.min(col_target_value), Results::UnsupportedColumnTypeException);
             REQUIRE_THROWS_AS(values_as_results.min(col_target_value), Results::UnsupportedColumnTypeException);
             return;
         }
+        REQUIRE(Mixed(TestType::min()) == dict.min(col_target_value));
         REQUIRE(Mixed(TestType::min()) == values_as_results.min(col_target_value));
         dict.remove_all();
+        REQUIRE(!dict.min(col_target_value));
         REQUIRE(!values_as_results.min(col_target_value));
     }
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(dict.max(col_target_value), Results::UnsupportedColumnTypeException);
             REQUIRE_THROWS_AS(values_as_results.max(col_target_value), Results::UnsupportedColumnTypeException);
             return;
         }
+        REQUIRE(Mixed(TestType::max()) == dict.max(col_target_value));
         REQUIRE(Mixed(TestType::max()) == values_as_results.max(col_target_value));
         dict.remove_all();
+        REQUIRE(!dict.max(col_target_value));
         REQUIRE(!values_as_results.max(col_target_value));
     }
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
+            REQUIRE_THROWS_AS(dict.sum(col_target_value), Results::UnsupportedColumnTypeException);
             REQUIRE_THROWS_AS(values_as_results.sum(col_target_value), Results::UnsupportedColumnTypeException);
             return;
         }
+        REQUIRE(cf::get<W>(dict.sum(col_target_value)) == TestType::sum());
         REQUIRE(cf::get<W>(*values_as_results.sum(col_target_value)) == TestType::sum());
         dict.remove_all();
+        REQUIRE(dict.sum(col_target_value) == 0);
         REQUIRE(values_as_results.sum(col_target_value) == 0);
     }
 
     SECTION("average()") {
         if (!TestType::can_average()) {
+            REQUIRE_THROWS_AS(dict.average(col_target_value), Results::UnsupportedColumnTypeException);
             REQUIRE_THROWS_AS(values_as_results.average(col_target_value), Results::UnsupportedColumnTypeException);
             return;
         }
+        REQUIRE(cf::get<typename TestType::AvgType>(*dict.average(col_target_value)) == TestType::average());
         REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average(col_target_value)) ==
                 TestType::average());
         dict.remove_all();
+        REQUIRE(!dict.average(col_target_value));
         REQUIRE(!values_as_results.average(col_target_value));
     }
 }
