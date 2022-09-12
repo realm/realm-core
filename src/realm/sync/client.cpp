@@ -813,10 +813,11 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            [&](const TransactionRef& tr) {
-                bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
+            [&](const TransactionRef& tr, size_t count) {
+                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, count);
             },
-            get_transact_reporter());
+            get_transact_reporter(), true);
         progress = *pending_batch.progress;
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
