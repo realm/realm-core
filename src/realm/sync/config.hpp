@@ -181,6 +181,11 @@ struct SyncConfig {
     std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_bootstrap_message_processed_hook;
 
+    // Called before each download message is integrated on the sync worker thread. For testing only.
+    std::function<void(size_t)> on_before_download_integration;
+    // Called after each download message is integrated on the sync worker thread. For testing only.
+    std::function<void(size_t)> on_after_download_integration;
+
     bool simulate_integration_error = false;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);

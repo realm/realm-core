@@ -753,6 +753,8 @@ void SyncSession::create_sync_session()
             return hook(anchor, progress, query_version, batch_state);
         };
     }
+    session_config.on_before_download_integration = sync_config.on_before_download_integration;
+    session_config.on_after_download_integration = sync_config.on_after_download_integration;
 
     {
         std::string sync_route = m_sync_manager->sync_route();

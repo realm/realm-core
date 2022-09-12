@@ -1394,8 +1394,10 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
+    before_download_integration_hook(received_changesets.size());
     history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
                                         download_batch_state, logger, {}, get_transact_reporter()); // Throws
+    after_download_integration_hook(received_changesets.size());
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
