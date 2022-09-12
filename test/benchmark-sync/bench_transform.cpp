@@ -312,7 +312,7 @@ int main()
     std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
     bench::results =
         std::make_unique<BenchmarkResults>(max_lead_text_width, "benchmark-sync", results_file_stem.c_str());
-    auto exit_status = test_all(nullptr, true);
+    auto exit_status = test_all();
     // Save to file when deallocated.
     bench::results.reset();
     return exit_status;
