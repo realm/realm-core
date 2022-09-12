@@ -1080,6 +1080,11 @@ bool Realm::compact()
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
+
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
+        throw InvalidConversationForFlxSyncRealm();
+    }
+
     if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();

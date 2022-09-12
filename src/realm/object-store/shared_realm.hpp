@@ -674,6 +674,14 @@ public:
     {
     }
 };
+
+class InvalidConversationForFlxSyncRealm : public std::logic_error {
+public:
+    InvalidConversationForFlxSyncRealm()
+        : std::logic_error("Realm cannot be converted if flx sync is enabled")
+    {
+    }
+};
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */

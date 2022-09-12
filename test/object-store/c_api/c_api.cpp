@@ -4746,6 +4746,19 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
     });
 
+    SECTION("fail to convert a flx sync realm") {
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            realm_t c_wrap_realm(realm);
+            TestFile dest_test_file;
+            auto dest_config = make_config(dest_test_file.path.c_str(), false);
+            dest_config->schema_version = 0;
+            auto res = realm_convert_with_config(&c_wrap_realm, dest_config.get(), false);
+            REQUIRE_FALSE(res);
+        });
+    }
+
+
     harness.do_with_new_realm([&](SharedRealm realm) {
         realm_t c_wrap_realm(realm);
 
