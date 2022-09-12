@@ -1079,6 +1079,8 @@ private:
     void check_for_upload_completion();
     void check_for_download_completion();
     void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
+    void before_download_integration_hook(size_t);
+    void after_download_integration_hook(size_t);
 
     friend class Connection;
 };

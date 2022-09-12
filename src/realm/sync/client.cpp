@@ -247,6 +247,9 @@ private:
     std::function<void(const SyncProgress&, int64_t, DownloadBatchState)> m_on_download_message_received_hook;
     std::function<bool(const SyncProgress&, int64_t, DownloadBatchState)> m_on_bootstrap_message_processed_hook;
 
+    std::function<void(size_t)> m_on_before_download_integration;
+    std::function<void(size_t)> m_on_after_download_integration;
+
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
@@ -868,6 +871,24 @@ void SessionImpl::receive_download_message_hook(const SyncProgress& progress, in
     m_wrapper.m_on_download_message_received_hook(progress, query_version, batch_state);
 }
 
+void SessionImpl::before_download_integration_hook(size_t num_changesets)
+{
+    if (REALM_LIKELY(!m_wrapper.m_on_before_download_integration)) {
+        return;
+    }
+
+    m_wrapper.m_on_before_download_integration(num_changesets);
+}
+
+void SessionImpl::after_download_integration_hook(size_t num_changesets)
+{
+    if (REALM_LIKELY(!m_wrapper.m_on_after_download_integration)) {
+        return;
+    }
+
+    m_wrapper.m_on_after_download_integration(num_changesets);
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
@@ -891,6 +912,8 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_on_download_message_received_hook(std::move(config.on_download_message_received_hook))
     , m_on_bootstrap_message_processed_hook(config.on_bootstrap_message_processed_hook)
+    , m_on_before_download_integration{std::move(config.on_before_download_integration)}
+    , m_on_after_download_integration{std::move(config.on_after_download_integration)}
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);
