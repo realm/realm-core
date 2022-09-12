@@ -80,7 +80,7 @@ public:
     void ignore() const noexcept {}
 
 private:
-    friend class SystemError;
+    friend struct SystemError;
     void set_std_error_code(std::error_code code)
     {
         m_error->m_std_error_code = code;
