@@ -230,8 +230,8 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
     return wrap_err([&]() {
         auto realm = existing_query->weak_realm.lock();
         auto table = existing_query->query.get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        Query combined = Query(existing_query->query).and_query(query);
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = existing_query->get_ordering();
         if (auto ordering = query.get_ordering())
@@ -246,7 +246,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
     return wrap_err([&]() {
         auto realm = list->get_realm();
         auto table = list->get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
         auto ordering = query.get_ordering();
         return new realm_query_t{std::move(query), std::move(ordering), realm};
     });
@@ -256,11 +256,15 @@ RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* resu
                                                      size_t num_args, const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
+        auto existing_query = results->get_query();
         auto realm = results->get_realm();
         auto table = results->get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        auto ordering = query.get_ordering();
-        return new realm_query_t{std::move(query), std::move(ordering), realm};
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = existing_query.and_query(query);
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
+        if (auto ordering = query.get_ordering())
+            ordering_copy->append(*ordering);
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
     });
 }
 
@@ -299,6 +303,27 @@ RLM_API realm_results_t* realm_query_find_all(realm_query_t* query)
         auto shared_realm = query->weak_realm.lock();
         REALM_ASSERT_RELEASE(shared_realm);
         return new realm_results{Results{shared_realm, query->query, query->get_ordering()}};
+    });
+}
+
+RLM_API realm_results_t* realm_list_to_results(realm_list_t* list)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{list->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_set_to_results(realm_set_t* set)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{set->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t* dictionary)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{dictionary->as_results()};
     });
 }
 

@@ -288,12 +288,9 @@ bool ListResultsNotifier::need_to_run()
 {
     REALM_ASSERT(m_info);
 
-    {
-        auto lock = lock_target();
-        // Don't run the query if the results aren't actually going to be used
-        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
-            return false;
-    }
+    // Don't run the query if the results aren't actually going to be used
+    if (!is_alive() || (!have_callbacks() && !m_results_were_used))
+        return false;
 
     return !has_run() || m_list->has_changed();
 }
@@ -363,8 +360,7 @@ void ListResultsNotifier::do_prepare_handover(Transaction& sg)
 
 bool ListResultsNotifier::prepare_to_deliver()
 {
-    auto lock = lock_target();
-    if (!get_realm()) {
+    if (!is_alive()) {
         return false;
     }
     if (!m_handover_indices)

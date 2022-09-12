@@ -2337,6 +2337,27 @@ RLM_API bool realm_query_find_first(realm_query_t*, realm_value_t* out_value, bo
 RLM_API realm_results_t* realm_query_find_all(realm_query_t*);
 
 /**
+ * Convert a list to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_list_to_results(realm_list_t*);
+
+/**
+ * Convert a set to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_set_to_results(realm_set_t*);
+
+/**
+ * Convert a dictionary to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t*);
+
+/**
  * Delete all objects matched by a query.
  */
 RLM_API bool realm_query_delete_all(const realm_query_t*);
