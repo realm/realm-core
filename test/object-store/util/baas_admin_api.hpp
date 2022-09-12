@@ -101,6 +101,7 @@ public:
         }
     };
     std::vector<Service> get_services(const std::string& app_id) const;
+    std::vector<std::string> get_errors(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;
     ServiceConfig get_config(const std::string& app_id, const Service& service) const;
     ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id,

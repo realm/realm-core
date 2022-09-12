@@ -27,11 +27,7 @@ unacceptable behavior to [community-conduct@mongodb.com](mailto:community-conduc
 
 ## License
 
-Realm Core is published under the Apache 2.0 license.  
-
-**This product is not being made available to any person located in Cuba, Iran,
-North Korea, Sudan, Syria or the Crimea region, or to any other person that is
-not eligible to receive the product under U.S. law.**
+Realm Core is published under the Apache 2.0 license. 
 
 Please also see THIRD-PARTY-NOTICES for and licenses related to included third party libraries.
 

@@ -558,6 +558,19 @@ std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::s
 }
 
 
+std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id) const
+{
+    auto endpoint = apps()[app_id]["logs"];
+    auto response = endpoint.get_json({{"errors_only", "true"}});
+    std::vector<std::string> errors;
+    const auto& logs = response["logs"];
+    std::transform(logs.begin(), logs.end(), std::back_inserter(errors), [](const auto& err) {
+        return err["error"];
+    });
+    return errors;
+}
+
+
 AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& app_id) const
 {
     auto services = get_services(app_id);

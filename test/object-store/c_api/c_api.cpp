@@ -2304,6 +2304,21 @@ TEST_CASE("C API", "[c_api]") {
                     cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE", 0, nullptr));
                 }
 
+                SECTION("combine results query") {
+                    realm_value_t int_arg = rlm_int_val(123);
+                    const size_t num_args = 1;
+                    realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &int_arg}};
+                    realm_query_arg_t* arg_list = &args[0];
+                    auto q_int =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "int == $0", num_args, arg_list));
+                    auto combined_result_q =
+                        cptr_checked(realm_query_parse_for_results(r.get(), q_int->get_description(), 0, nullptr));
+                    auto result = cptr_checked(realm_query_find_all(combined_result_q.get()));
+                    size_t count;
+                    CHECK(realm_results_count(result.get(), &count));
+                    CHECK(count == 1);
+                }
+
                 SECTION("empty results") {
                     auto empty_q = cptr_checked(realm_query_parse_for_results(r.get(), "FALSEPREDICATE", 0, nullptr));
                     auto empty_r = cptr_checked(realm_query_find_all(empty_q.get()));

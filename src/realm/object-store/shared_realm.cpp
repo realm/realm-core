@@ -267,8 +267,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     // synchronization. The latter is probably fixable, but making it
     // multi-process-safe requires some sort of multi-process exclusive lock
     m_transaction = nullptr;
-    m_coordinator->close();
-    util::File::remove(m_config.path);
+    m_coordinator->delete_and_reopen();
 
     m_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
