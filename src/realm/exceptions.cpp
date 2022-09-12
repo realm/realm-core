@@ -113,6 +113,8 @@ OutOfBounds::OutOfBounds(const std::string& msg, size_t idx, size_t sz)
     : InvalidArgument(ErrorCodes::OutOfBounds,
                       sz == 0 ? util::format("Requested index %1 calling %2 when empty", idx, msg)
                               : util::format("Requested index %1 calling %2 when max is %3", idx, msg, sz - 1))
+    , index(idx)
+    , size(sz)
 {
 }
 OutOfBounds::~OutOfBounds() noexcept = default;

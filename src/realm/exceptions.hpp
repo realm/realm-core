@@ -222,6 +222,8 @@ struct PropertyTypeMismatch : InvalidArgument {
 struct OutOfBounds : InvalidArgument {
     OutOfBounds(const std::string& msg, size_t idx, size_t sz);
     ~OutOfBounds() noexcept override;
+    size_t index;
+    size_t size;
 };
 
 struct InvalidEncryptionKey : InvalidArgument {
@@ -402,8 +404,6 @@ struct InvalidQueryArgError : InvalidArgument {
 };
 
 } // namespace query_parser
-
 } // namespace realm
-
 
 #endif // REALM_EXCEPTIONS_HPP
