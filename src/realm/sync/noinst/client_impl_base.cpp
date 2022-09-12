@@ -1396,7 +1396,8 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     }
     before_download_integration_hook(received_changesets.size());
     history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+                                        download_batch_state, logger, {}, get_transact_reporter(),
+                                        m_is_flx_sync_session); // Throws
     after_download_integration_hook(received_changesets.size());
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",

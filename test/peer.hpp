@@ -486,16 +486,20 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     }
 
     TransformHistoryImpl transform_hist{*this, remote_file_ident};
-    m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets, logger);
+    auto apply = [&](Changeset* c) -> bool {
+        sync::InstructionApplier applier{*transact};
+        applier.apply(*c, logger);
+
+        return true;
+    };
+    m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets,
+                                               std::move(apply), logger);
+
+    transact->verify();
 
     sync::ChangesetEncoder::Buffer assembled_transformed_changeset;
 
     for (size_t i = 0; i < num_changesets; ++i) {
-        sync::InstructionApplier applier{*transact};
-        applier.apply(changesets[i], logger);
-
-        transact->verify();
-
         sync::encode_changeset(changesets[i], assembled_transformed_changeset);
     }
 

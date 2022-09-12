@@ -1359,12 +1359,12 @@ struct Merge<A, B,
 ///
 ///  GET READY!
 ///
-///  Realm supports 12 instructions at the time of this writing. Each
+///  Realm supports 14 instructions at the time of this writing. Each
 ///  instruction type needs one rule for each other instruction type. We only
 ///  define one rule to handle each combination (A vs B and B vs A are handle by
 ///  a single rule).
 ///
-///  This gives (19 * (19 + 1)) / 2 = 78 merge rules below.
+///  This gives (14 * (14 + 1)) / 2 = 105 merge rules below.
 ///
 ///  Merge rules are ordered such that the second instruction type is always of
 ///  a lower enum value than the first.
@@ -2519,13 +2519,17 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 }
 
-void TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                  version_type current_local_version,
-                                                  util::Span<Changeset> parsed_changesets, util::Logger* logger)
+size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
+                                                    version_type current_local_version,
+                                                    util::Span<Changeset> parsed_changesets,
+                                                    util::UniqueFunction<bool(Changeset*)> changeset_applier,
+                                                    util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
     std::vector<Changeset*> our_changesets;
+
+    size_t applied_changesets_count = 0;
 
     try {
         // p points to the beginning of a range of changesets that share the same
@@ -2554,12 +2558,33 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
                 begin_version = version;
             }
 
+            bool must_apply_all = false;
+
             if (!our_changesets.empty()) {
                 merge_changesets(local_file_ident, &*p, same_base_range_end - p, our_changesets.data(),
                                  our_changesets.size(), logger); // Throws
+                // We need to apply all transformed changesets if at least one reciprocal changeset was modified
+                // during OT.
+                must_apply_all = std::find_if(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
+                                     return c->is_dirty();
+                                 }) != our_changesets.end();
             }
 
-            p = same_base_range_end;
+            while (p != same_base_range_end) {
+                bool continue_applying = changeset_applier(p);
+                ++applied_changesets_count;
+                // It is safe to stop applying the changesets if:
+                //      1. There are no reciprocal changesets
+                //      2. No reciprocal changeset was modified
+                if (!must_apply_all && !continue_applying) {
+                    break;
+                }
+                ++p;
+            }
+            if (p != same_base_range_end) {
+                break;
+            }
+
             our_changesets.clear(); // deliberately not releasing memory
         }
     }
@@ -2578,6 +2603,8 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
     // NOTE: Any exception thrown during flushing *MUST* lead to rollback of
     // the current transaction.
     flush_reciprocal_transform_cache(history); // Throws
+
+    return applied_changesets_count;
 }
 
 
@@ -2643,12 +2670,8 @@ void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset
     REALM_ASSERT(remote_changeset.remote_version != 0);
 
     ChunkedBinaryInputStream remote_in{remote_changeset.data};
-    try {
-        parse_changeset(remote_in, parsed_changeset); // Throws
-    }
-    catch (sync::BadChangesetError& e) {
-        throw TransformError(e.what());
-    }
+    parse_changeset(remote_in, parsed_changeset); // Throws
+
     parsed_changeset.version = remote_changeset.remote_version;
     parsed_changeset.last_integrated_remote_version = remote_changeset.last_integrated_local_version;
     parsed_changeset.origin_timestamp = remote_changeset.origin_timestamp;
