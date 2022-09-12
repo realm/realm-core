@@ -11,7 +11,7 @@
 * Fix one cause of QoS inversion warnings when performing writes on the main thread on Apple platforms. Waiting for async notifications to be ready is now done in a QoS-aware ways.
 * `Realm::refresh()` did not actually advance to the latest version in some cases. If there was a version newer than the current version which did not require blocking it would advance to that instead, contrary to the documented behavior.
 * Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
-* Throw exception if `Realm::Covert` is called while using flx sync. ([#5798](https://github.com/realm/realm-core/issues/5798)).
+* Throw exception if `Realm::Convert` is called while using flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798)).
 
 ### Breaking changes
 * None.

@@ -1082,7 +1082,7 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     verify_thread();
 
     if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
-        throw InvalidConversationForFlxSyncRealm();
+        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
     }
 
     if (merge_into_existing && util::File::exists(config.path)) {
