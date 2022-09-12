@@ -11,6 +11,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <future>
 
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
@@ -4302,6 +4303,198 @@ TEST(Sync_MergeLargeChangesets)
     CHECK(compare_groups(read_1, read_2));
     ConstTableRef table = group.get_table("class_table name");
     CHECK_EQUAL(table->size(), 2 * number_of_rows);
+}
+
+
+TEST(Sync_MergeMultipleChangesets)
+{
+    constexpr int number_of_changesets = 100;
+    constexpr int number_of_instructions = 10;
+
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        WriteTransaction wt(db_1);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(db_2);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_1);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_2);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j + 1);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(2, 1, dir, test_context);
+
+        Session session_1 = fixture.make_session(0, db_1);
+        fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
+        // Start server and upload changes of first client.
+        fixture.start_server(0);
+        fixture.start_client(0);
+        session_1.wait_for_upload_complete_or_client_stopped();
+        session_1.wait_for_download_complete_or_client_stopped();
+        // Stop first client.
+        fixture.stop_client(0);
+
+        // Start the second client and upload their changes.
+        // Wait to integrate changes from the first client.
+        fixture.start_client(1);
+        session_2.wait_for_upload_complete_or_client_stopped();
+        session_2.wait_for_download_complete_or_client_stopped();
+    }
+
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
+    const Group& group1 = read_1;
+    const Group& group2 = read_2;
+    ConstTableRef table1 = group1.get_table("class_table name");
+    ConstTableRef table2 = group2.get_table("class_table name");
+    CHECK_EQUAL(table1->size(), number_of_changesets * number_of_instructions);
+    CHECK_EQUAL(table2->size(), 2 * number_of_changesets * number_of_instructions);
+}
+
+TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
+{
+    constexpr int number_of_changesets = 10;
+    constexpr int number_of_instructions = 100;
+
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        WriteTransaction wt(db_1);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_String, "string column");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(db_2);
+        // Use different table name to avoid schema conflicts when merging changes from this client to the other
+        // client.
+        TableRef table = wt.add_table("class_table name2");
+        table->add_column(type_String, "string column");
+        wt.commit();
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_1);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("string column", std::string(1024, 'a' + (j % 26)));
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_2);
+            TableRef table = wt.get_table("class_table name2");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("string column", std::string(1000, char('a' + j % 26)));
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(2, 1, dir, test_context);
+
+        std::future<void> future;
+        version_type user_commit_version = UINT_FAST64_MAX;
+
+        Session::Config config;
+        config.on_before_download_integration = [&](size_t num_changesets) {
+            CHECK(num_changesets > 0);
+
+            future = std::async([&] {
+                auto write = db_1->start_write();
+                // Keep the transaction open until the sync client is waiting to acquire the write lock.
+                while (!db_1->waiting_for_write_lock()) {
+                    millisleep(1);
+                }
+                write->close();
+
+                // Sync client holds the write lock now, so commit a local change.
+                WriteTransaction wt(db_1);
+                TableRef table = wt.get_table("class_table name");
+                auto obj = table->create_object();
+                obj.set("string column", "foobar");
+                user_commit_version = wt.commit();
+            });
+        };
+        Session session_1 = fixture.make_session(0, db_1, std::move(config));
+        fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
+        // Start server and upload changes of second client.
+        fixture.start_server(0);
+        fixture.start_client(1);
+        session_2.wait_for_upload_complete_or_client_stopped();
+        session_2.wait_for_download_complete_or_client_stopped();
+        // Stop second client.
+        fixture.stop_client(1);
+
+        // Start the first client and upload their changes.
+        // Wait to integrate changes from the second client.
+        fixture.start_client(0);
+        session_1.wait_for_upload_complete_or_client_stopped();
+        session_1.wait_for_download_complete_or_client_stopped();
+
+        future.wait();
+
+        // Check that local change was commited before all remote changes were integrated.
+        ReadTransaction rt(db_1);
+        CHECK(user_commit_version < rt.get_version());
+    }
+
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
+    const Group& group_1 = read_1;
+    const Group& group_2 = read_1;
+    ConstTableRef table_1 = group_1.get_table("class_table name");
+    CHECK_EQUAL(table_1->size(), number_of_changesets * number_of_instructions + 1);
+    ConstTableRef table_2 = group_2.get_table("class_table name2");
+    CHECK_EQUAL(table_2->size(), number_of_changesets * number_of_instructions);
 }
 
 #endif // REALM_PLATFORM_WIN32
