@@ -6,8 +6,12 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix a data race on RealmCoordinator::m_sync_session which could occur if multiple threads performed the initial open of a Realm at once. (since v11.8.0).
+* If a SyncSession outlived the parent Realm and then was adopted by a new Realm for the same file, other processes would not get notified for sync writes on that file.
+* Fix one cause of QoS inversion warnings when performing writes on the main thread on Apple platforms. Waiting for async notifications to be ready is now done in a QoS-aware ways.
+* `Realm::refresh()` did not actually advance to the latest version in some cases. If there was a version newer than the current version which did not require blocking it would advance to that instead, contrary to the documented behavior.
 * Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
- 
+
 ### Breaking changes
 * None.
 
@@ -44,7 +48,6 @@
 * Fixed an exception "fcntl() with F_BARRIERFSYNC failed: Inappropriate ioctl for device" when running with MacOS on an exFAT drive. ([#5789](https://github.com/realm/realm-core/issues/5789) since 12.0.0) 
 * Syncing of a Decimal128 with big significand could result in a crash. ([#5728](https://github.com/realm/realm-core/issues/5728))
 * Recovery/discardLocal client reset modes will now wait for FLX sync realms to be fully synchronized before beginning recovery operations ([#5705](https://github.com/realm/realm-core/issues/5705))
-
 
 ### Breaking changes
 * None.
