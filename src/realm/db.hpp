@@ -408,6 +408,10 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+    /// Returs true if there are threads waiting to acquire the write mutex, false otherwise.
+    /// To be used only when already holding the mutex.
+    bool waiting_for_write_lock() const;
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
