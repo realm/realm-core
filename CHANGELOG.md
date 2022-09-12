@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
  
 ### Breaking changes
 * None.
