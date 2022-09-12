@@ -1844,11 +1844,11 @@ std::string Query::validate() const
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     std::string description;
-    if (root_node()) {
+    if (auto root = root_node()) {
         if (m_view) {
             throw SerialisationError("Serialisation of a query constrained by a view is not currently supported");
         }
-        description = root_node()->describe_expression(state);
+        description = root->describe_expression(state);
     }
     else {
         // An empty query returns all results and one way to indicate this

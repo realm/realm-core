@@ -171,7 +171,7 @@ std::string print_value(realm::ObjLink link, Group* g)
         return "NULL";
     }
     else {
-        TableRef target_table = g->get_table(link.get_table_key());
+        TableRef target_table = g ? g->get_table(link.get_table_key()) : TableRef();
         if (ColKey pk_col = target_table ? target_table->get_primary_key_column() : ColKey{}) {
             if (auto obj = target_table->try_get_object(link.get_obj_key())) {
                 auto pk_val = obj.get_any(pk_col);

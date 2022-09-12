@@ -1233,8 +1233,14 @@ public:
                 return util::serializer::print_value(val.get_type_of_value());
             }
             else if constexpr (std::is_same_v<T, ObjKey>) {
-                ObjLink link(state.taget_table->get_key(), val.template get<ObjKey>());
-                return util::serializer::print_value(link, state.group);
+                ObjKey obj_key = val.template get<ObjKey>();
+                if (state.target_table) {
+                    ObjLink link(state.target_table->get_key(), obj_key);
+                    return util::serializer::print_value(link, state.group);
+                }
+                else {
+                    return util::serializer::print_value(obj_key);
+                }
             }
             else if constexpr (std::is_same_v<T, ObjLink>) {
                 return util::serializer::print_value(val.template get<ObjLink>(), state.group);
@@ -4231,7 +4237,7 @@ public:
                                                  m_left->description(state));
         }
         else {
-            state.taget_table = m_left->get_target_table();
+            state.target_table = m_left->get_target_table();
             return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
         }
     }

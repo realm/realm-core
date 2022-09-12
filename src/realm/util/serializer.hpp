@@ -113,7 +113,7 @@ struct SerialisationState {
     std::vector<std::string> subquery_prefix_list;
     std::string class_prefix;
     Group* group;
-    ConstTableRef taget_table;
+    ConstTableRef target_table;
 };
 
 } // namespace serializer
