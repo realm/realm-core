@@ -23,16 +23,23 @@
 
 namespace realm {
 
-struct LinkTranslator {
+// This construct is used when code needs to handle all
+// possible link column types. Subclass and override all
+// methods to handle each type. A good example of where
+// this is useful is when following a backlink to its
+// origin column and modifying the outgoing link from
+// whatever container it came from.
+class LinkTranslator {
+public:
     LinkTranslator(Obj origin, ColKey origin_col_key);
     void run();
-    virtual void on_list_of_links(LnkLst list) = 0;
-    virtual void on_list_of_mixed(Lst<Mixed> list) = 0;
-    virtual void on_list_of_typedlink(Lst<ObjLink> list) = 0;
-    virtual void on_set_of_links(LnkSet set) = 0;
-    virtual void on_set_of_mixed(Set<Mixed> set) = 0;
-    virtual void on_set_of_typedlink(Set<ObjLink> set) = 0;
-    virtual void on_dictionary(Dictionary dict) = 0;
+    virtual void on_list_of_links(LnkLst& list) = 0;
+    virtual void on_list_of_mixed(Lst<Mixed>& list) = 0;
+    virtual void on_list_of_typedlink(Lst<ObjLink>& list) = 0;
+    virtual void on_set_of_links(LnkSet& set) = 0;
+    virtual void on_set_of_mixed(Set<Mixed>& set) = 0;
+    virtual void on_set_of_typedlink(Set<ObjLink>& set) = 0;
+    virtual void on_dictionary(Dictionary& dict) = 0;
     virtual void on_link_property(ColKey col) = 0;
     virtual void on_mixed_property(ColKey col) = 0;
     virtual void on_typedlink_property(ColKey col) = 0;

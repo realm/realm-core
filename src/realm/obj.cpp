@@ -723,13 +723,13 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
             , m_dest_obj(dest)
         {
         }
-        void on_list_of_links(LnkLst ll) final
+        void on_list_of_links(LnkLst& ll) final
         {
             auto i = ll.find_first(m_dest_obj.get_key());
             REALM_ASSERT(i != realm::npos);
             m_index = Mixed(int64_t(i));
         }
-        void on_dictionary(Dictionary dict) final
+        void on_dictionary(Dictionary& dict) final
         {
             for (auto it : dict) {
                 if (it.second.is_type(type_TypedLink) && it.second.get_link() == m_dest_obj.get_link()) {
@@ -739,23 +739,23 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
             }
             REALM_ASSERT(!m_index.is_null());
         }
-        void on_list_of_mixed(Lst<Mixed>) final
+        void on_list_of_mixed(Lst<Mixed>&) final
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_list_of_typedlink(Lst<ObjLink>) final
+        void on_list_of_typedlink(Lst<ObjLink>&) final
         {
             REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
         }
-        void on_set_of_links(LnkSet) final
+        void on_set_of_links(LnkSet&) final
         {
             REALM_UNREACHABLE(); // sets of embedded objects are not allowed at the schema level
         }
-        void on_set_of_mixed(Set<Mixed>) final
+        void on_set_of_mixed(Set<Mixed>&) final
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_set_of_typedlink(Set<ObjLink>) final
+        void on_set_of_typedlink(Set<ObjLink>&) final
         {
             REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
         }
@@ -1840,13 +1840,14 @@ inline void nullify_set(Obj& obj, ColKey origin_col_key, T target)
 }
 } // namespace
 
-template <class ArrayType, class ValueType>
+template <class ValueType>
 inline void Obj::nullify_single_link(ColKey col, ValueType target)
 {
     ColKey::Idx origin_col_ndx = col.get_index();
     Allocator& alloc = get_alloc();
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+    using ArrayType = typename ColumnTypeTraits<ValueType>::cluster_leaf_type;
     ArrayType links(alloc);
     links.set_parent(&fields, origin_col_ndx.val + 1);
     links.init_from_parent();
@@ -1870,31 +1871,31 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
             , m_target_link(target)
         {
         }
-        void on_list_of_links(LnkLst) final
+        void on_list_of_links(LnkLst&) final
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link.get_obj_key());
         }
-        void on_list_of_mixed(Lst<Mixed>) final
+        void on_list_of_mixed(Lst<Mixed>&) final
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
         }
-        void on_list_of_typedlink(Lst<ObjLink>) final
+        void on_list_of_typedlink(Lst<ObjLink>&) final
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link);
         }
-        void on_set_of_links(LnkSet) final
+        void on_set_of_links(LnkSet&) final
         {
             nullify_set(m_origin_obj, m_origin_col_key, m_target_link.get_obj_key());
         }
-        void on_set_of_mixed(Set<Mixed>) final
+        void on_set_of_mixed(Set<Mixed>&) final
         {
             nullify_set(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
         }
-        void on_set_of_typedlink(Set<ObjLink>) final
+        void on_set_of_typedlink(Set<ObjLink>&) final
         {
             nullify_set(m_origin_obj, m_origin_col_key, m_target_link);
         }
-        void on_dictionary(Dictionary dict) final
+        void on_dictionary(Dictionary& dict) final
         {
             Mixed val{m_target_link};
             for (auto it : dict) {
@@ -1905,15 +1906,15 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         }
         void on_link_property(ColKey origin_col_key) final
         {
-            m_origin_obj.nullify_single_link<ArrayKey, ObjKey>(origin_col_key, m_target_link.get_obj_key());
+            m_origin_obj.nullify_single_link<ObjKey>(origin_col_key, m_target_link.get_obj_key());
         }
         void on_mixed_property(ColKey origin_col_key) final
         {
-            m_origin_obj.nullify_single_link<ArrayMixed, Mixed>(origin_col_key, Mixed{m_target_link});
+            m_origin_obj.nullify_single_link<Mixed>(origin_col_key, Mixed{m_target_link});
         }
         void on_typedlink_property(ColKey origin_col_key) final
         {
-            m_origin_obj.nullify_single_link<ArrayTypedLink, ObjLink>(origin_col_key, m_target_link);
+            m_origin_obj.nullify_single_link<ObjLink>(origin_col_key, m_target_link);
         }
 
     private:
@@ -1999,13 +2000,13 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         , m_dest_replace(dest_replace)
     {
     }
-    void on_list_of_links(LnkLst list) final
+    void on_list_of_links(LnkLst& list) final
     {
         auto n = list.find_first(m_dest_orig.get_key());
         REALM_ASSERT(n != realm::npos);
         list.set(n, m_dest_replace.get_key());
     }
-    void on_dictionary(Dictionary dict) final
+    void on_dictionary(Dictionary& dict) final
     {
         auto pos = dict.find_any(m_dest_orig.get_link());
         REALM_ASSERT(pos != realm::npos);
@@ -2017,32 +2018,32 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         REALM_ASSERT(!m_origin_obj.get<ObjKey>(col) || m_origin_obj.get<ObjKey>(col) == m_dest_orig.get_key());
         m_origin_obj.set(col, m_dest_replace.get_key());
     }
-    void on_set_of_links(LnkSet) final
+    void on_set_of_links(LnkSet&) final
     {
         // this should never happen because sets of embedded objects are not allowed at the schema level
         REALM_UNREACHABLE();
     }
     // The following cases have support here but are expected to fail later on in the
     // migration due to core not yet supporting untyped Mixed links to embedded objects.
-    void on_set_of_mixed(Set<Mixed> set) final
+    void on_set_of_mixed(Set<Mixed>& set) final
     {
         auto did_erase_pair = set.erase(m_dest_orig.get_link());
         REALM_ASSERT(did_erase_pair.second);
         set.insert(m_dest_replace.get_link());
     }
-    void on_set_of_typedlink(Set<ObjLink> set) final
+    void on_set_of_typedlink(Set<ObjLink>& set) final
     {
         auto did_erase_pair = set.erase(m_dest_orig.get_link());
         REALM_ASSERT(did_erase_pair.second);
         set.insert(m_dest_replace.get_link());
     }
-    void on_list_of_mixed(Lst<Mixed> list) final
+    void on_list_of_mixed(Lst<Mixed>& list) final
     {
         auto n = list.find_any(m_dest_orig.get_link());
         REALM_ASSERT(n != realm::npos);
         list.insert_any(n, m_dest_replace.get_link());
     }
-    void on_list_of_typedlink(Lst<ObjLink> list) final
+    void on_list_of_typedlink(Lst<ObjLink>& list) final
     {
         auto n = list.find_any(m_dest_orig.get_link());
         REALM_ASSERT(n != realm::npos);
@@ -2149,7 +2150,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             , m_dest_replace(dest_replace)
         {
         }
-        void on_list_of_links(LnkLst) final
+        void on_list_of_links(LnkLst&) final
         {
             // using Lst<ObjKey> for direct access without hiding unresolved keys
             auto list = m_origin_obj.get_list<ObjKey>(m_origin_col_key);
@@ -2157,36 +2158,36 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             REALM_ASSERT(n != realm::npos);
             list.set(n, m_dest_replace.get_key());
         }
-        void on_list_of_mixed(Lst<Mixed> list) final
+        void on_list_of_mixed(Lst<Mixed>& list) final
         {
             auto n = list.find_first(m_dest_orig.get_link());
             REALM_ASSERT(n != realm::npos);
             list.set(n, m_dest_replace.get_link());
         }
-        void on_list_of_typedlink(Lst<ObjLink> list) final
+        void on_list_of_typedlink(Lst<ObjLink>& list) final
         {
             auto n = list.find_first(m_dest_orig.get_link());
             REALM_ASSERT(n != realm::npos);
             list.set(n, m_dest_replace.get_link());
         }
-        void on_set_of_links(LnkSet) final
+        void on_set_of_links(LnkSet&) final
         {
             // using Set<ObjKey> for direct access without hiding unresolved keys
             auto set = m_origin_obj.get_set<ObjKey>(m_origin_col_key);
             set.erase(m_dest_orig.get_key());
             set.insert(m_dest_replace.get_key());
         }
-        void on_set_of_mixed(Set<Mixed> set) final
+        void on_set_of_mixed(Set<Mixed>& set) final
         {
             set.erase(m_dest_orig.get_link());
             set.insert(m_dest_replace.get_link());
         }
-        void on_set_of_typedlink(Set<ObjLink> set) final
+        void on_set_of_typedlink(Set<ObjLink>& set) final
         {
             set.erase(m_dest_orig.get_link());
             set.insert(m_dest_replace.get_link());
         }
-        void on_dictionary(Dictionary dict) final
+        void on_dictionary(Dictionary& dict) final
         {
             Mixed val(m_dest_orig.get_link());
             for (auto it : dict) {
