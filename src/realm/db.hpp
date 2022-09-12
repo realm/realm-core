@@ -533,7 +533,7 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    void grab_read_lock(ReadLockInfo&, bool is_frozen, VersionID);
+    ReadLockInfo grab_read_lock(bool is_frozen, VersionID);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
@@ -589,7 +589,6 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked
         *locked_space = m_locked_space;
     }
 }
-
 
 
 class DisableReplication {

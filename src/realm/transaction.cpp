@@ -157,8 +157,7 @@ DB::version_type Transaction::commit()
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, false, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(false, version_id);
     db->release_read_lock(lock_after_commit);
 
     db->end_write_on_correct_thread();
@@ -214,11 +213,10 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // completed commit.
 
     try {
-        DB::ReadLockInfo new_read_lock;
         VersionID version_id = VersionID(); // Latest available snapshot
         // Grabbing the new lock before releasing the old one prevents m_transaction_count
         // from going shortly to zero
-        db->grab_read_lock(new_read_lock, false, version_id); // Throws
+        DB::ReadLockInfo new_read_lock = db->grab_read_lock(false, version_id); // Throws
 
         m_history = nullptr;
         set_transact_stage(DB::transact_Reading);
@@ -294,8 +292,7 @@ void Transaction::commit_and_continue_writing()
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, false, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(false, version_id);
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
     if (Replication* repl = db->get_replication()) {
@@ -711,7 +708,7 @@ void Transaction::complete_async_commit()
     // sync to disk:
     DB::ReadLockInfo read_lock;
     try {
-        db->grab_read_lock(read_lock, false, VersionID());
+        read_lock = db->grab_read_lock(false, VersionID());
         GroupWriter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback

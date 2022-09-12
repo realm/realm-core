@@ -499,12 +499,13 @@ public:
         return {m_info->readers.get(index).version, index};
     }
 
-    void release_read_lock(ReadLockInfo& read_lock)
+    void release_read_lock(const ReadLockInfo& read_lock)
     {
         std::lock_guard lock(m_mutex);
         // we should not need to call ensure_full_reader_mapping,
         // since releasing a read lock means it has been grabbed
-        // earlier - and hence must reside in mapped memory.
+        // earlier - and hence must reside in mapped memory:
+        REALM_ASSERT(read_lock.m_reader_idx < m_local_max_entry);
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
         if (read_lock.m_is_frozen) {
@@ -515,8 +516,9 @@ public:
         }
     }
 
-    void grab_read_lock(ReadLockInfo& read_lock, bool frozen, VersionID version_id = {})
+    ReadLockInfo grab_read_lock(bool frozen, VersionID version_id = {})
     {
+        ReadLockInfo read_lock;
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
         const bool pick_specific = version_id.version != VersionID().version;
@@ -542,6 +544,7 @@ public:
         read_lock.m_version = r.version;
         read_lock.m_top_ref = static_cast<ref_type>(r.current_top);
         read_lock.m_file_size = static_cast<size_t>(r.filesize);
+        return read_lock;
     }
 
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
@@ -577,9 +580,10 @@ private:
         auto index = m_info->readers.capacity() - 1;
         if (index >= m_local_max_entry) {
             // handle mapping expansion if required
-            m_local_max_entry = m_info->readers.capacity();
-            size_t info_size = sizeof(DB::SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry);
+            auto new_max_entry = m_info->readers.capacity();
+            size_t info_size = sizeof(DB::SharedInfo) + m_info->readers.compute_required_space(new_max_entry);
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
+            m_local_max_entry = new_max_entry;
             m_info = m_reader_map.get_addr();
         }
     }
@@ -1875,15 +1879,16 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 }
 
 
-void DB::grab_read_lock(ReadLockInfo& read_lock, bool is_frozen, VersionID version_id)
+DB::ReadLockInfo DB::grab_read_lock(bool is_frozen, VersionID version_id)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     REALM_ASSERT_RELEASE(is_attached());
-    m_version_manager->grab_read_lock(read_lock, is_frozen, version_id);
+    auto read_lock = m_version_manager->grab_read_lock(is_frozen, version_id);
 
     m_local_locks_held.emplace_back(read_lock);
     ++m_transaction_count;
     REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
+    return read_lock;
 }
 
 void DB::leak_read_lock(ReadLockInfo& read_lock) noexcept
@@ -2213,8 +2218,7 @@ TransactionRef DB::start_read(VersionID version_id)
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
     }
     else {
-        ReadLockInfo read_lock;
-        grab_read_lock(read_lock, false, version_id);
+        ReadLockInfo read_lock = grab_read_lock(false, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
@@ -2233,8 +2237,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
     }
     else {
-        ReadLockInfo read_lock;
-        grab_read_lock(read_lock, true, version_id);
+        ReadLockInfo read_lock = grab_read_lock(true, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
@@ -2266,10 +2269,9 @@ TransactionRef DB::start_write(bool nonblocking)
         }
         m_write_transaction_open = true;
     }
-    ReadLockInfo read_lock;
     TransactionRef tr;
     try {
-        grab_read_lock(read_lock, false, VersionID());
+        ReadLockInfo read_lock = grab_read_lock(false, VersionID());
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
