@@ -471,6 +471,7 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullabl
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    REALM_ASSERT(key_type != type_Mixed);
     attr.set(col_attr_Dictionary);
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);

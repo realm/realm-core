@@ -415,7 +415,7 @@ Dictionary::Iterator Dictionary::end() const
 
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
-    if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
+    if (key.get_type() != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
     if (value.is_null()) {
