@@ -306,6 +306,27 @@ RLM_API realm_results_t* realm_query_find_all(realm_query_t* query)
     });
 }
 
+RLM_API realm_results_t* realm_list_to_results(realm_list_t* list)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{list->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_set_to_results(realm_set_t* set)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{set->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t* dictionary)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{dictionary->as_results()};
+    });
+}
+
 RLM_API bool realm_results_count(realm_results_t* results, size_t* out_count)
 {
     return wrap_err([&]() {
