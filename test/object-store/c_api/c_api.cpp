@@ -4747,7 +4747,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     });
 
     SECTION("fail to convert a flx sync realm") {
-
         harness.do_with_new_realm([&](SharedRealm realm) {
             realm_t c_wrap_realm(realm);
             TestFile dest_test_file;
@@ -4757,7 +4756,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             REQUIRE_FALSE(res);
         });
     }
-
 
     harness.do_with_new_realm([&](SharedRealm realm) {
         realm_t c_wrap_realm(realm);
