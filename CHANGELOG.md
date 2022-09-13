@@ -1,6 +1,7 @@
 # NEXT MAJOR RELEASE
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* The realm file will be shrunk if the larger file size is no longer needed. (PR [#5755](https://github.com/realm/realm-core/pull/5755))
 
 ### Fixed
 * Set<Mixed> consider string and binary data equivilent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
