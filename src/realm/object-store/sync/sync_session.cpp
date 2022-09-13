@@ -1073,6 +1073,12 @@ SyncSession::State SyncSession::state() const
     return m_state;
 }
 
+bool SyncSession::is_active() const
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    return m_state == State::Active || m_state == State::WaitingForAccessToken;
+}
+
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
     util::CheckedUniqueLock lock(m_connection_state_mutex);

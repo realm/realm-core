@@ -123,6 +123,7 @@ public:
 
     ~SyncSession();
     State state() const REQUIRES(!m_state_mutex);
+    bool is_active() const REQUIRES(!m_state_mutex);
     ConnectionState connection_state() const REQUIRES(!m_connection_state_mutex);
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
