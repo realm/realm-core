@@ -2549,7 +2549,7 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(checked(realm_list_find(list, value, &index, &found)));
                     CHECK(index == 0);
                     CHECK(found);
-                    return (index >= 0 && index < list->size()) && found == true;
+                    return (index < list->size()) && found == true;
                 });
 
                 realm_value_t value;
