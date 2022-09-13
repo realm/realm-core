@@ -134,7 +134,7 @@ struct VersionList {
     {
         return get(newest);
     }
-    ReadCount& allocate_entry(uint64_t top, uint64_t size, uint64_t version)
+    ReadCount& allocate_entry(uint64_t top, uint64_t size, uint64_t version) noexcept
     {
         for (uint32_t i = 0; i < entries; ++i) {
             if (!data()[i].active) {
@@ -152,12 +152,12 @@ struct VersionList {
         REALM_ASSERT_RELEASE(false);
     }
 
-    int index_of(const ReadCount& rc)
+    int index_of(const ReadCount& rc) noexcept
     {
         return static_cast<int>(&rc - data());
     }
 
-    void free_entry(ReadCount* rc)
+    void free_entry(ReadCount* rc) noexcept
     {
         rc->current_top = rc->filesize = rc->version = -1ULL; // easy to recognize in debugger
         rc->active = false;
@@ -186,8 +186,7 @@ struct VersionList {
         return num_free == 0;
     }
 
-    void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
-                        bool& any_new_unreachables) noexcept
+    void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs, bool& any_new_unreachables)
     {
         oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
@@ -523,7 +522,7 @@ public:
         ensure_full_reader_mapping();
         const bool pick_specific = version_id.version != VersionID().version;
         read_lock.m_reader_idx = pick_specific ? version_id.index : m_info->readers.newest;
-        REALM_ASSERT(m_info->readers.newest >= 0);
+        REALM_ASSERT(m_info->readers.newest != VersionList::nil);
         bool picked_newest = read_lock.m_reader_idx == (unsigned)m_info->readers.newest;
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
@@ -1383,7 +1382,7 @@ DB::~DB() noexcept
 void DB::release_all_read_locks() noexcept
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
-    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_local_locks_held
     for (auto& read_lock : m_local_locks_held) {
         --m_transaction_count;
         m_version_manager->release_read_lock(read_lock);
@@ -1856,7 +1855,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
     // ignore if opened with immutable file (then we have no lockfile)
     if (m_fake_read_lock_if_immutable)
         return;
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
 
     bool found_match = false;
     // simple linear search and move-last-over if a match is found.
@@ -1881,7 +1880,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 DB::ReadLockInfo DB::grab_read_lock(bool is_frozen, VersionID version_id)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
     REALM_ASSERT_RELEASE(is_attached());
     auto read_lock = m_version_manager->grab_read_lock(is_frozen, version_id);
 
@@ -1893,7 +1892,7 @@ DB::ReadLockInfo DB::grab_read_lock(bool is_frozen, VersionID version_id)
 
 void DB::leak_read_lock(ReadLockInfo& read_lock) noexcept
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
     // simple linear search and move-last-over if a match is found.
     // common case should have only a modest number of transactions in play..
     for (size_t j = 0; j < m_local_locks_held.size(); ++j) {
@@ -2014,7 +2013,6 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
 {
     version_type current_version;
     {
-        std::lock_guard<std::recursive_mutex> lock(m_mutex);
         current_version = m_version_manager->get_newest_version();
     }
     version_type new_version = current_version + 1;
@@ -2044,7 +2042,6 @@ VersionID DB::get_version_id_of_latest_snapshot()
 {
     if (m_fake_read_lock_if_immutable)
         return {m_fake_read_lock_if_immutable->m_version, 0};
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_version_manager->get_version_id_of_latest_snapshot();
 }
 
@@ -2098,8 +2095,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_file_size() - m_free_space;
-        // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
-        //     << " Read lock at version " << oldest_version << std::endl;
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
