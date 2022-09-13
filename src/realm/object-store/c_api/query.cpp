@@ -252,7 +252,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         if (auto ordering = query.get_ordering())
             ordering_copy->append(*ordering);
-        return new realm_query_t{std::move(query), std::move(ordering_copy), realm};
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
     });
 }
 
