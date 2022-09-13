@@ -79,7 +79,8 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
     for (auto& session : sessions) {
         // The realm user session has been manually closed, don't try to wait for it to sync
         // The audit session is still active
-        if (auto state = session->state(); state != SyncSession::State::Inactive && state != SyncSession::State::Dying) {
+        if (auto state = session->state();
+            state != SyncSession::State::Inactive && state != SyncSession::State::Dying) {
             auto [promise, future] = util::make_promise_future<void>();
             session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
                 // Don't care if error occurred, just finish operation
