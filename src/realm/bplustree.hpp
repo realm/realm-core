@@ -203,7 +203,7 @@ public:
             m_root->bp_set_parent(parent, ndx_in_parent);
     }
 
-    virtual Mixed get_any(size_t) = 0;
+    virtual Mixed get_any(size_t) const = 0;
     virtual void erase(size_t) = 0;
     virtual void clear() = 0;
 
@@ -457,7 +457,7 @@ public:
         }
     }
 
-    Mixed get_any(size_t n) override
+    Mixed get_any(size_t n) const override
     {
         if constexpr (std::is_same_v<T, uint64_t>) {
             return Mixed(int64_t(get(n)));
