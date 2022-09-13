@@ -76,8 +76,17 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
     auto sync_manager = manager.app()->sync_manager();
     REALM_ASSERT(sync_manager);
     auto sessions = sync_manager->get_all_sessions();
+
     for (auto& session : sessions) {
-        session->wait_for_upload_completion();
+        auto [promise, future] = util::make_promise_future<void>();
+        // Make sure the session is active, otherwise wait_for_upload_completion will block
+        session->revive_if_needed();
+        session->wait_for_upload_completion([promise = std::move(promise)](
+                                                        std::error_code) mutable {
+            // Don't care if error occurred, just finish operation
+            promise.emplace_value();
+        });
+        future.get();
         session->shutdown_and_wait();
     }
     sync_manager->wait_for_sessions_to_terminate();
