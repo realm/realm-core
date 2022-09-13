@@ -1697,6 +1697,15 @@ RLM_API bool realm_list_get_property(const realm_list_t*, realm_property_info_t*
 RLM_API bool realm_list_get(const realm_list_t*, size_t index, realm_value_t* out_value);
 
 /**
+ * Find the value in the list passed as parameter.
+ * @param value to search in the list
+ * @param out_index the index where the value has been found
+ * @param out_found boolean that indicates whether the value is found or not
+ * @return true if no exception occurred.
+ */
+RLM_API bool realm_list_find(const realm_list_t*, const realm_value_t* value, size_t* out_index, bool* out_found);
+
+/**
  * Set the value at @a index.
  *
  * @param value The value to set.

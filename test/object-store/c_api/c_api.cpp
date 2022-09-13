@@ -2433,6 +2433,18 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(rlm_stdstr(a2) == "a");
                         CHECK(rlm_stdstr(b2) == "b");
                         CHECK(c2.type == RLM_TYPE_NULL);
+
+                        size_t out_index = -1;
+                        bool found;
+                        CHECK(checked(realm_list_find(strings.get(), &a2, &out_index, &found)));
+                        CHECK(out_index == 0);
+                        CHECK(found);
+                        CHECK(checked(realm_list_find(strings.get(), &b2, &out_index, &found)));
+                        CHECK(out_index == 1);
+                        CHECK(found);
+                        CHECK(checked(realm_list_find(strings.get(), &c2, &out_index, &found)));
+                        CHECK(out_index == 2);
+                        CHECK(found);
                     });
                 }
 
@@ -2531,49 +2543,77 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(realm_list_insert(nullable_uuid_list.get(), 1, null));
                 });
 
-                realm_value_t value;
+                auto find = ([&](auto* list, auto* value) {
+                    std::size_t index = -1;
+                    bool found = false;
+                    CHECK(checked(realm_list_find(list, value, &index, &found)));
+                    CHECK(index == 0);
+                    CHECK(found);
+                    return (index >= 0 && index < list->size()) && found == true;
+                });
 
+                realm_value_t value;
                 CHECK(realm_list_get(int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
                 CHECK(!realm_list_get_linked_object(int_list.get(), 0));
+                CHECK(find(int_list.get(), &value));
                 CHECK(realm_list_get(bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
+                CHECK(find(bool_list.get(), &value));
                 CHECK(realm_list_get(string_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, string));
+                CHECK(find(string_list.get(), &value));
                 CHECK(realm_list_get(binary_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, binary));
+                CHECK(find(binary_list.get(), &value));
                 CHECK(realm_list_get(timestamp_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, timestamp));
+                CHECK(find(timestamp_list.get(), &value));
                 CHECK(realm_list_get(float_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, fnum));
+                CHECK(find(float_list.get(), &value));
                 CHECK(realm_list_get(double_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, dnum));
+                CHECK(find(double_list.get(), &value));
                 CHECK(realm_list_get(decimal_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, decimal));
+                CHECK(find(decimal_list.get(), &value));
                 CHECK(realm_list_get(object_id_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, object_id));
+                CHECK(find(object_id_list.get(), &value));
                 CHECK(realm_list_get(uuid_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, uuid));
+                CHECK(find(uuid_list.get(), &value));
                 CHECK(realm_list_get(nullable_int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
+                CHECK(find(nullable_int_list.get(), &value));
                 CHECK(realm_list_get(nullable_bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
+                CHECK(find(nullable_bool_list.get(), &value));
                 CHECK(realm_list_get(nullable_string_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, string));
+                CHECK(find(nullable_string_list.get(), &value));
                 CHECK(realm_list_get(nullable_binary_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, binary));
+                CHECK(find(nullable_binary_list.get(), &value));
                 CHECK(realm_list_get(nullable_timestamp_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, timestamp));
+                CHECK(find(nullable_timestamp_list.get(), &value));
                 CHECK(realm_list_get(nullable_float_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, fnum));
+                CHECK(find(nullable_float_list.get(), &value));
                 CHECK(realm_list_get(nullable_double_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, dnum));
+                CHECK(find(nullable_double_list.get(), &value));
                 CHECK(realm_list_get(nullable_decimal_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, decimal));
+                CHECK(find(nullable_decimal_list.get(), &value));
                 CHECK(realm_list_get(nullable_object_id_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, object_id));
+                CHECK(find(nullable_object_id_list.get(), &value));
                 CHECK(realm_list_get(nullable_uuid_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, uuid));
+                CHECK(find(nullable_uuid_list.get(), &value));
 
                 write([&]() {
                     CHECK(realm_list_insert(nullable_int_list.get(), 0, null));
@@ -2624,6 +2664,13 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_list_size(bars.get(), &size)));
                     CHECK(size == 2);
+
+                    // type_TypedLink is not supported.
+                    bool found = true;
+                    size_t index = -1;
+                    CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
+                    CHECK(index == std::numeric_limits<std::size_t>::max());
+                    CHECK(!found);
                 });
 
                 SECTION("get") {
