@@ -40,6 +40,7 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include "sync/flx_sync_harness.hpp"
 #endif
 
 #include <realm/db.hpp>
@@ -1077,6 +1078,21 @@ TEST_CASE("SharedRealm: convert") {
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("cannot convert a local flx sync") {
+        using namespace realm::app;
+        auto make_schema = [] {
+            Schema schema{{"Obj",
+                           {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                            {"value", PropertyType::Int | PropertyType::Nullable}}}};
+
+            return FLXSyncTestHarness::ServerSchema{std::move(schema), {"value"}};
+        };
+        FLXSyncTestHarness harness("c_api_flx_sync_test", make_schema());
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            REQUIRE_THROWS(realm->convert(sync_config1));
+        });
     }
 
     SECTION("can copy a local realm to a local realm") {
