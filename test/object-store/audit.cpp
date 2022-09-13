@@ -81,8 +81,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
         auto [promise, future] = util::make_promise_future<void>();
         // Make sure the session is active, otherwise wait_for_upload_completion will block
         session->revive_if_needed();
-        session->wait_for_upload_completion([promise = std::move(promise)](
-                                                        std::error_code) mutable {
+        session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
             // Don't care if error occurred, just finish operation
             promise.emplace_value();
         });
