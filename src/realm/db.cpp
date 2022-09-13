@@ -257,12 +257,12 @@ struct VersionList {
         REALM_ASSERT(oldest_live_v != std::numeric_limits<uint64_t>::max());
     }
 
-    std::vector<std::pair<ref_type, uint64_t>> get_top_refs_for_live_versions_between(uint64_t begin_version,
-                                                                                      uint64_t end_version) noexcept
+    std::vector<std::pair<ReadCount*, uint_fast32_t>> get_versions_from(uint64_t begin_version,
+                                                                        uint64_t end_version) noexcept
     {
         bool did_find_begin = false;
         bool did_find_end = false;
-        std::vector<std::pair<ref_type, uint64_t>> top_refs;
+        std::vector<std::pair<ReadCount*, uint_fast32_t>> versions;
         for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (rc->is_active() && (rc->count_live || rc->count_frozen)) {
                 if (rc->version >= begin_version && rc->version <= end_version) {
@@ -272,14 +272,14 @@ struct VersionList {
                     else if (rc->version == begin_version) {
                         did_find_begin = true;
                     }
-                    top_refs.push_back({rc->current_top, rc->version});
+                    versions.push_back({rc, rc - data()});
                 }
             }
         }
         // begin and end versions must be found because this should be called with a read lock on both
         REALM_ASSERT_EX(did_find_begin, begin_version);
         REALM_ASSERT_EX(did_find_end, end_version);
-        return top_refs;
+        return versions;
     }
 
     constexpr static uint32_t nil = (uint32_t)-1;
@@ -550,12 +550,24 @@ public:
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
     }
 
-    std::vector<std::pair<ref_type, uint64_t>> get_top_refs_for_live_versions_between(version_type from,
-                                                                                      version_type to)
+    std::vector<ReadLockInfo> get_versions_from(version_type from, version_type to)
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        return m_info->readers.get_top_refs_for_live_versions_between(from, to);
+        std::vector<std::pair<VersionList::ReadCount*, uint_fast32_t>> versions =
+            m_info->readers.get_versions_from(from, to);
+        std::vector<ReadLockInfo> locked_versions;
+        for (auto& reader_pair : versions) {
+            ++reader_pair.first->count_live;
+            ReadLockInfo read_lock;
+            read_lock.m_reader_idx = reader_pair.second;
+            read_lock.m_type = ReadLockInfo::Type::Live;
+            read_lock.m_version = reader_pair.first->version;
+            read_lock.m_top_ref = static_cast<ref_type>(reader_pair.first->current_top);
+            read_lock.m_file_size = static_cast<size_t>(reader_pair.first->filesize);
+            locked_versions.push_back(read_lock);
+        }
+        return locked_versions;
     }
 
     version_type get_newest_version()
@@ -1475,23 +1487,22 @@ RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, Sla
     if (m_key) {
         // FIXME: we need read locks on all these versions since we are making accessors to their
         // free lists below
-        std::vector<std::pair<ref_type, version_type>> top_refs =
-            m_version_manager->get_top_refs_for_live_versions_between(from, to);
-        std::sort(top_refs.begin(), top_refs.end(), [](auto& a, auto& b) {
-            return a.second < b.second;
+        std::vector<ReadLockInfo> read_locks = m_version_manager->get_versions_from(from, to);
+        std::sort(read_locks.begin(), read_locks.end(), [](auto& a, auto& b) {
+            return a.m_version < b.m_version;
         });
         constexpr size_t top_array_size = Group::s_group_max_size;
         RefRanges ranges;
-        for (auto ref : top_refs) {
-            ranges.push_back(RefRange{ref.first, ref.first + top_array_size});
+        for (auto version : read_locks) {
+            ranges.push_back(RefRange{version.m_top_ref, version.m_top_ref + top_array_size});
         }
         alloc.refresh_encrypted_pages(ranges);
 
         Array prev_freelist_positions(alloc);
         Array prev_freelist_lengths(alloc);
-        for (auto& ref_pair : top_refs) {
-            ref_type top_ref = ref_pair.first;
-            version_type version = ref_pair.second;
+        for (auto& read_lock : read_locks) {
+            ref_type top_ref = read_lock.m_top_ref;
+            version_type version = read_lock.m_version;
             Array top_array(alloc), free_positions(alloc), free_lengths(alloc);
             top_array.init_from_ref(top_ref);
             REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), top_ref);
@@ -1515,7 +1526,7 @@ RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, Sla
             cur_freelist_lengths.init_from_ref(free_sizes_ref);
 
             auto print_freelist = [&]() {
-                std::cout << util::format("freelist for version: %1 has %2 entries.\n", ref_pair.first,
+                std::cout << util::format("freelist for version: %1 has %2 entries.\n", version,
                                           cur_freelist_posistions.size());
                 for (size_t i = 0; i < cur_freelist_posistions.size(); ++i) {
                     std::cout << util::format("{%1, %2}, ", cur_freelist_posistions.get(i),
@@ -1565,17 +1576,29 @@ RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, Sla
                     ++current_ndx;
                 }
                 else {
+                    // current block is equal to or contains the previous block
                     REALM_ASSERT_EX(cur_start <= prev_start && cur_end >= prev_end, cur_start, cur_end, prev_start,
                                     prev_end);
                     ++previous_ndx;
                     ++current_ndx;
                 }
             }
+            // if we exhausted the current freelist but not the previous one, then
+            // all remaining blocks in the previous list have been allocated
+            while (previous_ndx < prev_freelist_size) {
+                ref_type prev_start = prev_freelist_positions.get(previous_ndx);
+                ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
+                allocations.push_back(RefRange{prev_start, prev_end});
+                ++previous_ndx;
+            }
 
             alloc.refresh_encrypted_pages(allocations);
 
             prev_freelist_positions.init_from_ref(free_positions_ref);
             prev_freelist_lengths.init_from_ref(free_sizes_ref);
+        }
+        for (auto& read_lock : read_locks) {
+            m_version_manager->release_read_lock(read_lock);
         }
     }
     return {};
