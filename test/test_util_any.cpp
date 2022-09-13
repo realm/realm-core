@@ -28,99 +28,38 @@
 
 using namespace realm;
 
-TEST(Util_Any_CopyConstructor)
+TEST(Util_AnyCast_Basics)
 {
-    util::Any first_any(15);
-    util::Any second_any(first_any);
-    CHECK_EQUAL(util::any_cast<int>(first_any), util::any_cast<int>(second_any));
+    std::any any(15);
+    CHECK_EQUAL(util::any_cast<int>(any), 15);
+    CHECK_EQUAL(util::any_cast<int&>(any), 15);
+    CHECK_EQUAL(util::any_cast<int&&>(std::move(any)), 15);
+    CHECK_THROW(util::any_cast<bool>(any), std::bad_cast);
+    CHECK_THROW(util::any_cast<bool&>(any), std::bad_cast);
+    CHECK_THROW(util::any_cast<bool&&>(std::move(any)), std::bad_cast);
+
+    const std::any const_any(15);
+    CHECK_EQUAL(util::any_cast<const int>(any), 15);
+    CHECK_EQUAL(util::any_cast<const int&>(any), 15);
+    CHECK_EQUAL(util::any_cast<const int&&>(std::move(any)), 15);
+    CHECK_THROW(util::any_cast<const bool>(const_any), std::bad_cast);
+    CHECK_THROW(util::any_cast<const bool&>(const_any), std::bad_cast);
 }
 
-TEST(Util_Any_MoveConstructor)
+// Verify that the references we hand out are actually references to the correct
+// thing and not some dangling local
+TEST(Util_AnyCast_MutateViaReference)
 {
-    const int value = 15;
-    util::Any first_any(15);
-    util::Any second_any(std::move(first_any));
-    CHECK(!first_any.has_value());
-    CHECK(second_any.has_value());
-    CHECK_EQUAL(util::any_cast<int>(second_any), value);
-}
+    std::any any(std::string("a"));
+    util::any_cast<std::string&>(any) = "b";
+    CHECK_EQUAL(util::any_cast<const std::string&>(any), "b");
 
-TEST(Util_Any_CopyAssignment)
-{
-    auto first_any = util::Any(15);
-    auto second_any = util::Any(first_any);
-    CHECK_EQUAL(util::any_cast<int>(first_any), util::any_cast<int>(second_any));
+    // Set it to something which won't fit in the small-string buffer so that
+    // moving from it will mutate the source. This is of course not guaranteed
+    // to actually happen, but it'll work with any sensible implementation.
+    any = std::string('a', 100);
+    std::string str = util::any_cast<std::string&&>(std::move(any));
+    CHECK_EQUAL(str, std::string('a', 100));
+    CHECK_EQUAL(util::any_cast<std::string>(any), "");
 }
-
-TEST(Util_Any_MoveAssignment)
-{
-    const int value = 15;
-    util::Any first_any(15);
-    auto second_any = std::move(first_any);
-    CHECK(!first_any.has_value());
-    CHECK(second_any.has_value());
-    CHECK_EQUAL(util::any_cast<int>(second_any), value);
-}
-
-TEST(Util_Any_Reset)
-{
-    auto bool_any = util::Any(false);
-    CHECK(bool_any.has_value());
-    bool_any.reset();
-    CHECK(!bool_any.has_value());
-}
-
-TEST(Util_Any_Swap)
-{
-    const int first_value = 15;
-    const bool second_value = false;
-    auto first_any = util::Any(first_value);
-    auto second_any = util::Any(second_value);
-    first_any.swap(second_any);
-    CHECK_EQUAL(util::any_cast<int>(second_any), first_value);
-    CHECK_EQUAL(util::any_cast<bool>(first_any), second_value);
-}
-
-TEST(Util_Any_Bool)
-{
-    const bool bool_value = true;
-    auto bool_any = util::Any(bool_value);
-    CHECK_EQUAL(util::any_cast<bool>(bool_any), bool_value);
-}
-
-TEST(Util_Any_Long)
-{
-    const long long_value = 31415927;
-    auto long_any = util::Any(long_value);
-    CHECK_EQUAL(util::any_cast<long>(long_any), long_value);
-}
-
-TEST(Util_Any_String)
-{
-    const std::string str_value = "util::Any is a replacement for the 'any' type in C++17";
-    auto str_any = util::Any(str_value);
-    CHECK_EQUAL(util::any_cast<std::string>(str_any), str_value);
-}
-
-TEST(Util_Any_SharedPointer)
-{
-    const std::shared_ptr<bool> ptr_value = std::make_shared<bool>(true);
-    auto ptr_any = util::Any(ptr_value);
-    CHECK_EQUAL(util::any_cast<std::shared_ptr<bool>>(ptr_any), ptr_value);
-}
-
-TEST(Util_Any_ThrowOnError)
-{
-    const std::string str_value = "util::Any is a replacement for the 'any' type in C++17";
-    auto str_any = util::Any(str_value);
-    CHECK_THROW_ANY(util::any_cast<bool>(str_any));
-}
-
-TEST(Util_Any_ThrowOnEmpty)
-{
-    util::Any any(true);
-    any.reset();
-    CHECK_THROW_ANY(util::any_cast<bool>(any));
-}
-
 #endif // TEST_UTIL_ANY

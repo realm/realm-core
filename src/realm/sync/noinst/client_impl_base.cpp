@@ -1189,8 +1189,9 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
-                info.raw_error_code, info.try_again, session_ident); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4, error_action=%5)",
+                info.message, info.raw_error_code, info.try_again, session_ident,
+                info.server_requests_action); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
@@ -1492,9 +1493,9 @@ void Session::activate()
     m_download_progress = m_progress.download;
     REALM_ASSERT(m_last_version_available >= m_progress.upload.client_version);
 
-    logger.trace("last_version_available  = %1", m_last_version_available);           // Throws
-    logger.trace("progress_server_version = %1", m_progress.download.server_version); // Throws
-    logger.trace("progress_client_version = %1",
+    logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
+    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_client_version = %1",
                  m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
@@ -1783,7 +1784,7 @@ void Session::send_upload_message()
         protocol.make_upload_message_builder(logger); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
-        logger.trace("Fetching changeset for upload (client_version=%1, server_version=%2, "
+        logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
@@ -2167,8 +2168,8 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 // deactivated upon return.
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
-                info.raw_error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
+                info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {

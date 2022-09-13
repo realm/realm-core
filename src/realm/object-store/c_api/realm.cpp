@@ -11,6 +11,12 @@ realm_callback_token_schema::~realm_callback_token_schema()
     realm::c_api::CBindingContext::get(*m_realm).schema_changed_callbacks().remove(m_token);
 }
 
+realm_refresh_callback_token::~realm_refresh_callback_token()
+{
+    realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
+}
+
+
 namespace realm::c_api {
 
 
@@ -174,6 +180,27 @@ RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t* realm,
         realm, CBindingContext::get(*realm).realm_changed_callbacks().add(std::move(func)));
 }
 
+RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t* realm,
+                                                                         realm_on_realm_refresh_func_t callback,
+                                                                         realm_userdata_t userdata,
+                                                                         realm_free_userdata_func_t userdata_free)
+{
+    util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
+        callback(userdata.get());
+    };
+
+    if ((*realm)->is_frozen())
+        return nullptr;
+
+    const util::Optional<DB::version_type>& latest_snapshot_version = (*realm)->latest_snapshot_version();
+
+    if (!latest_snapshot_version)
+        return nullptr;
+
+    auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
+    return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
+}
+
 RLM_API bool realm_refresh(realm_t* realm)
 {
     return wrap_err([&]() {
@@ -221,12 +248,21 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
 CBindingContext& CBindingContext::get(SharedRealm realm)
 {
     if (!realm->m_binding_context) {
-        realm->m_binding_context.reset(new CBindingContext());
+        realm->m_binding_context.reset(new CBindingContext(realm));
     }
 
     CBindingContext* ctx = dynamic_cast<CBindingContext*>(realm->m_binding_context.get());
     REALM_ASSERT(ctx != nullptr);
     return *ctx;
+}
+
+void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool)
+{
+    if (auto ptr = realm.lock()) {
+        auto version_id = ptr->read_transaction_version();
+        m_realm_pending_refresh_callbacks.invoke(version_id.version);
+    }
+    m_realm_changed_callbacks.invoke();
 }
 
 } // namespace realm::c_api

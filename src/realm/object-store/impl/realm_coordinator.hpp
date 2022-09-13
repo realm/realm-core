@@ -233,8 +233,6 @@ private:
     // Will have a read transaction iff m_notifiers is non-empty
     std::shared_ptr<Transaction> m_notifier_sg;
 
-    std::exception_ptr m_async_error;
-
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
 
 #if REALM_ENABLE_SYNC

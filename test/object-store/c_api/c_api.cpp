@@ -1056,6 +1056,146 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
+    SECTION("realm refresh registering callback outside transaction") {
+        bool realm_refresh_callback_called = false;
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+        realm_begin_write(realm);
+        realm_commit(realm);
+        CHECK_FALSE(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh registering callback in transaction") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_write(realm);
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+        realm_commit(realm);
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh async pending") {
+        bool realm_refresh_callback_called = false;
+        // bool on_transaction_completed = false;
+        bool done = false;
+        auto wait_for_done = [&]() {
+            util::EventLoop::main().run_until([&] {
+                return done;
+            });
+            REQUIRE(done);
+        };
+        (*realm)->async_begin_transaction([&]() {
+            auto token = cptr(realm_add_realm_refresh_callback(
+                realm,
+                [](void* userdata) {
+                    *reinterpret_cast<bool*>(userdata) = true;
+                },
+                &realm_refresh_callback_called, [](void*) {}));
+
+            (*realm)->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+
+
+        wait_for_done();
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm async refresh - main use case") {
+        bool realm_refresh_callback_called = false;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+
+        realm_refresh(realm2.get());
+        CHECK(realm_refresh_callback_called);
+    }
+
+    SECTION("realm async refresh - main use case, multiple callbacks") {
+        std::atomic_int counter = 0;
+        auto config = make_config(test_file.path.c_str(), false);
+        auto realm2 = cptr(realm_open(config.get()));
+
+        realm_begin_read(realm2.get());
+
+        auto f = [](void* userdata) {
+            auto ptr = reinterpret_cast<std::atomic_int*>(userdata);
+            ptr->fetch_add(1);
+        };
+        auto token1 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        auto token2 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+
+        realm_refresh(realm2.get());
+        CHECK(counter.load() == 2);
+    }
+
+    SECTION("realm refresh read transaction frozen - register on unfrozen realm") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(!realm_refresh_callback_called);
+    }
+
+    SECTION("realm refresh read transaction frozen - register on frozen realm") {
+        bool realm_refresh_callback_called = false;
+        realm_begin_read(realm);
+
+        auto realm2 = cptr_checked(realm_freeze(realm));
+        CHECK(!realm_is_frozen(realm));
+        CHECK(realm_is_frozen(realm2.get()));
+        CHECK(realm != realm2.get());
+
+        auto token = cptr(realm_add_realm_refresh_callback(
+            realm2.get(),
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_refresh_callback_called, [](void*) {}));
+
+        realm_refresh(realm);
+        CHECK(token == nullptr);
+        CHECK(!realm_refresh_callback_called);
+    }
+
     SECTION("schema is set after opening") {
         const realm_class_info_t baz = {
             "baz",
@@ -1576,6 +1716,18 @@ TEST_CASE("C API", "[c_api]") {
             });
         }
 
+        SECTION("realm_object_add_int errors") {
+            SECTION("SUCCESS") {
+                realm_begin_write(realm);
+                CHECK(realm_object_add_int(obj1.get(), foo_int_key, 10));
+                realm_commit(realm);
+            }
+            SECTION("ERROR") {
+                CHECK(!realm_object_add_int(obj1.get(), foo_int_key, 10));
+                CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            }
+        }
+
         SECTION("get/set all property types") {
             realm_value_t null = rlm_null();
             realm_value_t integer = rlm_int_val(987);
@@ -1911,6 +2063,56 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(found_value.type == RLM_TYPE_LINK);
                 CHECK(found_value.link.target_table == class_foo.key);
                 CHECK(found_value.link.target == realm_object_get_key(obj1.get()));
+            }
+
+            SECTION("verify order realm_query_find_first()") {
+                realm_property_info_t info_string;
+                realm_property_info_t info_int;
+                bool found_string = false, found_int = false;
+                REQUIRE(realm_find_property(realm, class_foo.key, "string", &found_string, &info_string));
+                REQUIRE(realm_find_property(realm, class_foo.key, "int", &found_int, &info_int));
+                CHECK(info_string.key != RLM_INVALID_PROPERTY_KEY);
+                CHECK(info_int.key != RLM_INVALID_PROPERTY_KEY);
+                CPtr<realm_object_t> obj1, obj2;
+                checked(realm_begin_write(realm));
+                obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                obj2 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+                CHECK(obj2);
+                CHECK(checked(realm_set_value(obj1.get(), info_string.key, rlm_str_val("Test"), false)));
+                CHECK(checked(realm_set_value(obj2.get(), info_string.key, rlm_str_val("Test"), false)));
+                CHECK(checked(realm_set_value(obj1.get(), info_int.key, rlm_int_val(10), false)));
+                CHECK(checked(realm_set_value(obj2.get(), info_int.key, rlm_int_val(11), false)));
+                checked(realm_commit(realm));
+                checked(realm_refresh(realm));
+
+                size_t count = 0;
+                realm_value_t arg_data[1] = {rlm_str_val("Test")};
+                realm_query_arg_t args[1] = {realm_query_arg_t{1, false, &arg_data[0]}};
+                realm_query_arg_t* arg_list = &args[0];
+                auto q = cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", 1, arg_list));
+                CHECK(checked(realm_query_count(q.get(), &count)));
+                CHECK(count == 2);
+
+                auto q2 =
+                    cptr_checked(realm_query_append_query(q.get(), "string == $0 SORT(int ASCENDING)", 1, arg_list));
+                realm_value_t found_value = rlm_null();
+                bool found_sorted;
+                CHECK(checked(realm_query_find_first(q2.get(), &found_value, &found_sorted)));
+                CHECK(found_sorted);
+                CHECK(found_value.type == RLM_TYPE_LINK);
+                CHECK(found_value.link.target_table == class_foo.key);
+                CHECK(found_value.link.target == realm_object_get_key(obj1.get()));
+
+                auto q3 =
+                    cptr_checked(realm_query_append_query(q.get(), "string == $0 SORT(int DESCENDING)", 1, arg_list));
+                found_value = rlm_null();
+                found_sorted = false;
+                CHECK(checked(realm_query_find_first(q3.get(), &found_value, &found_sorted)));
+                CHECK(found_sorted);
+                CHECK(found_value.type == RLM_TYPE_LINK);
+                CHECK(found_value.link.target_table == class_foo.key);
+                CHECK(found_value.link.target == realm_object_get_key(obj2.get()));
             }
 
             SECTION("results") {
@@ -2484,11 +2686,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->called = true;
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_list_t> strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
 
                 auto str1 = rlm_str_val("a");
@@ -2496,8 +2693,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_list_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                   nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_list_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2508,7 +2705,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -2553,8 +2750,8 @@ TEST_CASE("C API", "[c_api]") {
                     realm_key_path_elem_t bar_strings[] = {{class_bar.key, bar_doubles_key}};
                     realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
                     realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
-                    auto token = cptr_checked(realm_list_add_notification_callback(
-                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error));
+                    auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                   &key_path_array, on_change));
                     checked(realm_refresh(realm));
 
                     state.called = false;
@@ -2991,11 +3188,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_set_t> strings =
                     cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
 
@@ -3004,8 +3196,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                  nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_set_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3016,7 +3208,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3513,11 +3705,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_dictionary_t> strings =
                     cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_string_dict"]));
 
@@ -3527,7 +3714,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error));
+                        strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3538,7 +3725,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3592,14 +3779,9 @@ TEST_CASE("C API", "[c_api]") {
                 state->called = true;
             };
 
-            auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                auto state = static_cast<State*>(userdata);
-                state->error = clone_cptr(err);
-            };
-
             auto require_change = [&]() {
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr,
-                                                                         on_change, on_error));
+                auto token =
+                    cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr, on_change));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -3643,8 +3825,8 @@ TEST_CASE("C API", "[c_api]") {
                 realm_key_path_elem_t origin_value[] = {{class_foo.key, foo_int_key}};
                 realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
                 realm_key_path_array_t key_path_array = {1, key_path_origin_value};
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array,
-                                                                         on_change, on_error));
+                auto token = cptr(
+                    realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array, on_change));
                 checked(realm_refresh(realm));
                 state.called = false;
                 write([&]() {
@@ -4200,6 +4382,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
+    local_config.sync_config = std::make_shared<realm_sync_config_t>(*local_config.sync_config);
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
 
     struct ResetRealmFiles {
@@ -4230,6 +4413,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
                 REQUIRE(sync_error.c_original_file_path_key);
                 REQUIRE(sync_error.c_recovery_file_path_key);
                 REQUIRE(sync_error.is_client_reset_requested);
+                REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
                 ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
                 baas_client_stop.store(true);
             },
@@ -4288,6 +4472,9 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
                     REQUIRE(sync_error.c_original_file_path_key);
                     REQUIRE(sync_error.c_recovery_file_path_key);
                     REQUIRE(sync_error.is_client_reset_requested);
+                    // Callback in `realm_sync_config_set_before_client_reset_handler` fails, so
+                    // a synthetic error is created with no action.
+                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_NO_ACTION);
                     ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
                     error_handler_counter.fetch_add(1);
                     baas_client_stop.store(true);
@@ -4520,11 +4707,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
 
     harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
+        Object::create(
+            c, realm, "Obj",
+            std::any(AnyDict{{"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
-                           {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
-        Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
+                       std::any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
     });
 

@@ -336,6 +336,46 @@ void LinkChain::add(ColKey ck)
 
 // -- Table ---------------------------------------------------------------------------------
 
+Table::Table(Allocator& alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
+    , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
+    , m_repl(&g_dummy_replication)
+    , m_own_ref(this, alloc.get_instance_version())
+{
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+
+    ref_type ref = create_empty_table(m_alloc); // Throws
+    ArrayParent* parent = nullptr;
+    size_t ndx_in_parent = 0;
+    init(ref, parent, ndx_in_parent, true, false);
+}
+
+Table::Table(Replication* const* repl, Allocator& alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
+    , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
+    , m_repl(repl)
+    , m_own_ref(this, alloc.get_instance_version())
+{
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_cookie = cookie_created;
+}
+
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
 {
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
@@ -1864,6 +1904,28 @@ void Table::finalize_migration(ColKey pk_col_key)
 
     REALM_ASSERT_RELEASE(!pk_col_key || valid_column(pk_col_key));
     do_set_primary_key_column(pk_col_key);
+}
+
+void Table::migrate_sets_and_dictionaries()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_dictionary() || (col.is_set() && col.get_type() == col_type_Mixed)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.is_set()) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migrate();
+                }
+                else if (col.is_dictionary()) {
+                }
+            }
+        }
+    }
 }
 
 StringData Table::get_name() const noexcept

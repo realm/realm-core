@@ -793,11 +793,9 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
     SECTION("notifications") {
         SectionedResultsChangeSet changes;
-        auto token =
-            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes = c;
-            });
+        auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
+            changes = c;
+        });
 
         coordinator->on_change();
         REQUIRE(algo_run_count == 0);
@@ -1043,11 +1041,9 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     SECTION("notifications ascending / decsending") {
         // Ascending
         SectionedResultsChangeSet changes;
-        auto token =
-            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes = c;
-            });
+        auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
+            changes = c;
+        });
 
         coordinator->on_change();
         algo_run_count = 0;
@@ -1099,8 +1095,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
             return v.prefix(1);
         });
 
-        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
             changes = c;
         });
 
@@ -1157,11 +1152,9 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         });
 
         SectionedResultsChangeSet changes;
-        auto token =
-            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes = c;
-            });
+        auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
+            changes = c;
+        });
 
         coordinator->on_change();
         algo_run_count = 0;
@@ -1206,8 +1199,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
                 return v.prefix(1);
             });
 
-        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
             changes = c;
         });
 
@@ -1255,8 +1247,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto section1 = sectioned_results[0];
         int section1_notification_calls = 0;
         SectionedResultsChangeSet section1_changes;
-        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
             section1_changes = c;
             ++section1_notification_calls;
         });
@@ -1264,8 +1255,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto section2 = sectioned_results[1];
         int section2_notification_calls = 0;
         SectionedResultsChangeSet section2_changes;
-        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
             section2_changes = c;
             ++section2_notification_calls;
         });
@@ -1364,8 +1354,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto section1 = sectioned_results[0]; // Refers to key 'a'
         int section1_notification_calls = 0;
         SectionedResultsChangeSet section1_changes;
-        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
             section1_changes = c;
             ++section1_notification_calls;
         });
@@ -1373,8 +1362,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto section2 = sectioned_results[1]; // Refers to key 'b'
         int section2_notification_calls = 0;
         SectionedResultsChangeSet section2_changes;
-        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
             section2_changes = c;
             ++section2_notification_calls;
         });
@@ -1666,11 +1654,9 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         });
 
         SectionedResultsChangeSet changes;
-        auto token =
-            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes = c;
-            });
+        auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
+            changes = c;
+        });
 
         coordinator->on_change();
         r->begin_transaction();
@@ -1695,12 +1681,10 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         auto section2 = sectioned_results[1];
 
         SectionedResultsChangeSet changes1, changes2;
-        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c) {
             changes1 = c;
         });
-        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c) {
             changes2 = c;
         });
 

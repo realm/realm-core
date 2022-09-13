@@ -467,7 +467,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 23, target_file_format_version);
 
     // DB::do_open() must ensure that only supported version are allowed.
     // It does that by asking backup if the current file format version is
@@ -596,37 +596,34 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // Ensure we have search index on all primary key columns. This is idempotent so no
-    // need to check on current_file_format_version
+    // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
-    for (auto k : table_keys) {
-        auto t = get_table(k);
-        if (auto col = t->get_primary_key_column()) {
-            t->do_add_search_index(col);
+    if (current_file_format_version < 22) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                t->do_add_search_index(col);
+            }
         }
     }
 
+    if (current_file_format_version == 22) {
+        // Check that asymmetric table are empty
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (t->is_asymmetric() && t->size() > 0) {
+                t->clear();
+            }
+        }
+    }
+    if (current_file_format_version >= 21 && current_file_format_version < 23) {
+        // Upgrade Set and Dictionary columns
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->migrate_sets_and_dictionaries();
+        }
+    }
     // NOTE: Additional future upgrade steps go here.
-}
-
-void Transaction::check_consistency()
-{
-    // For the time being, we only check if asymmetric table are empty
-    std::vector<TableKey> needs_fix;
-    auto table_keys = get_table_keys();
-    for (auto tk : table_keys) {
-        auto table = get_table(tk);
-        if (table->is_asymmetric() && table->size() > 0) {
-            needs_fix.push_back(tk);
-        }
-    }
-    if (!needs_fix.empty()) {
-        promote_to_write();
-        for (auto tk : needs_fix) {
-            get_table(tk)->clear();
-        }
-        commit();
-    }
 }
 
 void Transaction::promote_to_async()

@@ -34,7 +34,7 @@ using version_list_t = BackupHandler::version_list_t;
 using version_time_list_t = BackupHandler::version_time_list_t;
 
 // Note: accepted versions should have new versions added at front
-version_list_t BackupHandler::accepted_versions_ = {22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
+version_list_t BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.

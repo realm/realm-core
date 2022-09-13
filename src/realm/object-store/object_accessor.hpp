@@ -33,6 +33,7 @@
 #include <realm/object-store/shared_realm.hpp>
 
 #include <realm/util/assert.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/table_view.hpp>
 
 #include <string>

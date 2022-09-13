@@ -38,7 +38,7 @@
 #include <vector>
 
 using namespace realm;
-using realm::util::Any;
+using std::any;
 
 struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
@@ -50,7 +50,7 @@ struct TestContext : CppContext {
     {
     }
 
-    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
+    util::Optional<std::any> default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
@@ -63,11 +63,11 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any)
+    std::string print(std::any)
     {
         return "not implemented";
     }
-    bool allow_missing(util::Any)
+    bool allow_missing(std::any)
     {
         return false;
     }
@@ -149,8 +149,8 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
 
 TEST_CASE("Benchmark object", "[benchmark]") {
     using namespace std::string_literals;
-    using AnyVec = std::vector<util::Any>;
-    using AnyDict = std::map<std::string, util::Any>;
+    using AnyVec = std::vector<std::any>;
+    using AnyDict = std::map<std::string, std::any>;
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -210,7 +210,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         BENCHMARK("create object")
         {
             return Object::create(d, r, all_types,
-                                  util::Any(AnyDict{
+                                  std::any(AnyDict{
                                       {"pk", benchmark_pk++},
                                       {"bool", true},
                                       {"int", INT64_C(5)},
@@ -240,7 +240,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
         auto obj = Object::create(d, r, all_types,
-                                  util::Any(AnyDict{
+                                  std::any(AnyDict{
                                       {"pk", INT64_C(0)},
                                       {"bool", true},
                                       {"int", INT64_C(5)},
@@ -278,7 +278,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->begin_transaction();
             meter.measure([&d, &all_types, &update_int, &r] {
                 auto shadow = Object::create(d, r, all_types,
-                                             util::Any(AnyDict{
+                                             std::any(AnyDict{
                                                  {"pk", INT64_C(0)},
                                                  {"int", update_int},
                                              }),

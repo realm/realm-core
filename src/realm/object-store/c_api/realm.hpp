@@ -27,9 +27,21 @@ class CBindingContext : public BindingContext {
 public:
     static CBindingContext& get(SharedRealm realm);
 
+    CBindingContext() = default;
+    CBindingContext(SharedRealm realm)
+        : BindingContext()
+    {
+        this->realm = realm;
+    }
+
     CallbackRegistry<>& realm_changed_callbacks()
     {
         return m_realm_changed_callbacks;
+    }
+
+    CallbackRegistryWithVersion<>& realm_pending_refresh_callbacks()
+    {
+        return m_realm_pending_refresh_callbacks;
     }
 
     CallbackRegistry<const Schema&>& schema_changed_callbacks()
@@ -38,10 +50,7 @@ public:
     }
 
 protected:
-    void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) final
-    {
-        m_realm_changed_callbacks.invoke();
-    }
+    void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) final;
 
     void schema_did_change(const Schema& schema) final
     {
@@ -50,6 +59,7 @@ protected:
 
 private:
     CallbackRegistry<> m_realm_changed_callbacks;
+    CallbackRegistryWithVersion<> m_realm_pending_refresh_callbacks;
     CallbackRegistry<const Schema&> m_schema_changed_callbacks;
 };
 

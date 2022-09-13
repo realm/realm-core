@@ -83,12 +83,17 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         s.insert(Mixed("Hello"));
         CHECK_EQUAL(s.size(), 2);
+        s.insert(BinaryData("Hello", 5));
+        CHECK_EQUAL(s.size(), 3);
         auto ndx = s.find(Mixed("Hello"));
+        auto ndx2 = s.find(Mixed(BinaryData("Hello", 5)));
         CHECK_NOT_EQUAL(ndx, realm::npos);
+        CHECK_NOT_EQUAL(ndx2, realm::npos);
+        CHECK_NOT_EQUAL(ndx, ndx2);
         auto [erased_ndx, erased] = s.erase(Mixed("Hello"));
         CHECK(erased);
         CHECK_EQUAL(erased_ndx, 1);
-        CHECK_EQUAL(s.size(), 1);
+        CHECK_EQUAL(s.size(), 2);
     }
 }
 

@@ -109,6 +109,12 @@ if(REALM_TEST_SYNC_LOGGING)
     target_compile_definitions(ObjectStoreTests PRIVATE
         TEST_ENABLE_SYNC_LOGGING=1
     )
+
+    if(REALM_TEST_SYNC_LOGGING_LEVEL)
+        target_compile_definitions(ObjectStoreTests PRIVATE
+            TEST_ENABLE_SYNC_LOGGING_LEVEL=${REALM_TEST_SYNC_LOGGING_LEVEL}
+        )
+    endif()
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE
