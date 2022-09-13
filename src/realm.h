@@ -1409,6 +1409,12 @@ RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count
 RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class_key, realm_object_key_t obj_key);
 
 /**
+ * Get the parent object for the object passed as argument.
+ *  @return A non-NULL pointer if the parent object exists.
+ */
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
+
+/**
  * Find an object with a particular primary key value.
  *
  * @param out_found A pointer to a boolean that will be set to true or false if
