@@ -434,6 +434,12 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     if (!for_sync && table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
         exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in a local Realm", name));
     }
+
+    auto pbs_sync =
+        (validation_mode & SchemaValidationMode::SyncPBS) && !(validation_mode & SchemaValidationMode::SyncFLX);
+    if (pbs_sync && table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
+        exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in partition based sync", name));
+    }
 }
 
 namespace realm {
