@@ -319,8 +319,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // null-chacarcter, which is perfectly fine.
 
         wchar_t mapped_tmp[tmp_buffer_size];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp, tmp_buffer_size,
-                      nullptr, nullptr, 0);
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp,
+                      tmp_buffer_size, nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
         // to catch invalid UTF-8. Even though the documentation says
@@ -343,32 +343,75 @@ util::Optional<std::string> case_map(StringData source, bool upper)
 
     return result;
 #else
-    // FIXME: Implement this! Note that this is trivial in C++11 due
-    // to its built-in support for UTF-8. In C++03 it is trivial when
-    // __STDC_ISO_10646__ is defined. Also consider using ICU. Maybe
-    // GNU has something to offer too.
-
-    // For now we handle just the ASCII subset
+    size_t sz = source.size();
     typedef std::char_traits<char> traits;
-    if (upper) {
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x60, c) && traits::lt(c, 0x7B))
-                c = traits::to_char_type(traits::to_int_type(c) - 0x20);
-            result[i] = c;
-        }
-    }
-    else { // lower
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x40, c) && traits::lt(c, 0x5B))
-                c = traits::to_char_type(traits::to_int_type(c) + 0x20);
-            result[i] = c;
-        }
-    }
+    for (size_t i = 0; i < sz; ++i) {
+        char c = source[i];
+        auto int_val = traits::to_int_type(c);
 
+        auto copy_bytes = [&](size_t n) {
+            if (i + n > sz) {
+                return false;
+            }
+            for (size_t j = 1; j < n; j++) {
+                result[i++] = c;
+                c = source[i];
+                if ((c & 0xC0) != 0x80) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        if (int_val < 0x80) {
+            // Handle ASCII
+            if (upper && (c >= 'a' && c <= 'z')) {
+                c -= 0x20;
+            }
+            else if (!upper && (c >= 'A' && c <= 'Z')) {
+                c += 0x20;
+            }
+        }
+        else {
+            if ((int_val & 0xE0) == 0xc0) {
+                // 2 byte utf-8
+                if (i + 2 > sz) {
+                    return {};
+                }
+                c = source[i + 1];
+                if ((c & 0xC0) != 0x80) {
+                    return {};
+                }
+                auto u = ((int_val << 6) + (traits::to_int_type(c) & 0x3F)) & 0x7FF;
+                // Handle some Latin-1 supplement characters
+                if (upper && (u >= 0xE0 && u <= 0xFE && u != 0xF7)) {
+                    u -= 0x20;
+                }
+                else if (!upper && (u >= 0xC0 && u <= 0xDE && u != 0xD7)) {
+                    u += 0x20;
+                }
+
+                result[i++] = static_cast<char>((u >> 6) | 0xC0);
+                c = static_cast<char>((u & 0x3f) | 0x80);
+            }
+            else if ((int_val & 0xF0) == 0xE0) {
+                // 3 byte utf-8
+                if (!copy_bytes(3)) {
+                    return {};
+                }
+            }
+            else if ((int_val & 0xF8) == 0xF0) {
+                // 4 byte utf-8
+                if (!copy_bytes(4)) {
+                    return {};
+                }
+            }
+            else {
+                return {};
+            }
+        }
+        result[i] = c;
+    }
     return result;
 #endif
 }
