@@ -1241,21 +1241,14 @@ inline size_t LnkSet::find_any(Mixed value) const
     if (value.is_null())
         return not_found;
 
-    auto find_obj_key = [this](ObjKey objkey) {
-        size_t found = find(objkey);
-        if (found != not_found) {
-            found = real2virtual(found);
-        }
-        return found;
-    };
     const auto type = value.get_type();
     if (type == type_Link) {
-        return find_obj_key(value.get<ObjKey>());
+        return find(value.get<ObjKey>());
     }
     if (type == type_TypedLink) {
         auto link = value.get_link();
         if (link.get_table_key() == get_target_table()->get_key()) {
-            return find_obj_key(link.get_obj_key());
+            return find(link.get_obj_key());
         }
     }
     return not_found;
