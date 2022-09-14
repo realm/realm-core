@@ -244,15 +244,11 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
                                                   const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
-        auto existing_query = list->get_query();
         auto realm = list->get_realm();
         auto table = list->get_table();
         auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        auto combined = existing_query.and_query(query);
-        auto ordering_copy = util::make_bind<DescriptorOrdering>();
-        if (auto ordering = query.get_ordering())
-            ordering_copy->append(*ordering);
-        return new realm_query_t{std::move(query), std::move(ordering_copy), realm};
+        auto ordering = query.get_ordering();
+        return new realm_query_t{std::move(query), std::move(ordering), realm};
     });
 }
 
