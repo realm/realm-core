@@ -2697,6 +2697,14 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
                     CHECK(index == 0);
                     CHECK(found);
+
+                    realm_list_clear(bars.get());
+                    CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
+                    CHECK(index == realm::not_found);
+                    CHECK(!found);
+
+                    CHECK(checked(realm_list_insert(bars.get(), 0, bar_link_val)));
+                    CHECK(checked(realm_list_insert(bars.get(), 1, bar_link_val)));
                 });
 
                 SECTION("get") {

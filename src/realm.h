@@ -1705,7 +1705,7 @@ RLM_API bool realm_list_get(const realm_list_t*, size_t index, realm_value_t* ou
 /**
  * Find the value in the list passed as parameter.
  * @param value to search in the list
- * @param out_index the index where the value has been found
+ * @param out_index the index in the list where the value has been found or realm::not_found.
  * @param out_found boolean that indicates whether the value is found or not
  * @return true if no exception occurred.
  */
