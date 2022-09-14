@@ -6,6 +6,7 @@
 * Expose `realm_object_get_parent` in the C API (PR [#5851](https://github.com/realm/realm-core/pull/5851))
 * Expose `realm_list_find` in the C API (PR [#5848](https://github.com/realm/realm-core/pull/5848))
 * Expose `Group::remove_table` in the C API (PR [#5860](https://github.com/realm/realm-core/pull/5860))
+* Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

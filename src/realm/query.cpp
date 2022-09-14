@@ -1418,7 +1418,7 @@ ObjKey Query::find() const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->try_get_object(i);
+            const Obj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1457,7 +1457,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && ret.size() < limit; t++) {
-            const Obj obj = m_view->try_get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }

@@ -1124,14 +1124,6 @@ ObjKey DictionaryLinkValues::get_key(size_t ndx) const
     return {};
 }
 
-// In contrast to a link list and a link set, a dictionary can contain null links.
-// This is because the corresponding key may contain useful information by itself.
-bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
-{
-    Mixed val = m_source.get_any(ndx);
-    return val.is_type(type_TypedLink);
-}
-
 Obj DictionaryLinkValues::get_object(size_t row_ndx) const
 {
     Mixed val = m_source.get_any(row_ndx);

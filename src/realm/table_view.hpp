@@ -201,20 +201,12 @@ public:
         return m_key_values.get(ndx);
     }
 
-    bool is_obj_valid(size_t ndx) const noexcept final
+    bool is_obj_valid(size_t ndx) const noexcept
     {
         return m_table->is_valid(get_key(ndx));
     }
 
-    Obj get_object(size_t ndx) const final
-    {
-        REALM_ASSERT(ndx < size());
-        ObjKey key(m_key_values.get(ndx));
-        REALM_ASSERT(key);
-        return m_table->get_object(key);
-    }
-
-    Obj try_get_object(size_t ndx) const noexcept override
+    Obj get_object(size_t ndx) const noexcept final
     {
         REALM_ASSERT(ndx < size());
         ObjKey key(m_key_values.get(ndx));

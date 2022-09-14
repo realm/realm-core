@@ -1699,7 +1699,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get_object(0), realm::KeyNotFound);
+    CHECK_NOT(tv.get_object(0).is_valid());
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
