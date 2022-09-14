@@ -43,7 +43,6 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::m
     }
 }
 
-
 namespace reset_utils {
 
 Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId> primary_key,
@@ -60,8 +59,6 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId>
     return table->create_object_with_primary_key(primary_key ? *primary_key : ObjectId::gen(), std::move(values));
 }
 
-
-
 TestClientReset::TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config)
     : m_local_config(local_config)
     , m_remote_config(remote_config)
@@ -70,7 +67,7 @@ TestClientReset::TestClientReset(const Realm::Config& local_config, const Realm:
 TestClientReset::~TestClientReset()
 {
     // make sure we didn't forget to call run()
-//    REALM_ASSERT(m_did_run || !(m_make_local_changes || m_make_remote_changes || m_on_post_local || m_on_post_reset));
+    REALM_ASSERT(m_did_run || !(m_make_local_changes || m_make_remote_changes || m_on_post_local || m_on_post_reset));
 }
 
 TestClientReset* TestClientReset::setup(Callback&& on_setup)
@@ -114,6 +111,5 @@ void TestClientReset::disable_wait_for_reset_completion()
     m_wait_for_reset_completion = false;
 }
 
-}
-}
-
+} // namespace reset_utils
+} // namespace realm

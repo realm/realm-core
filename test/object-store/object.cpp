@@ -24,7 +24,7 @@
 
 #if REALM_ENABLE_SYNC
 #include "util/sync/sync_test_utils.hpp"
-#endif
+#endif // REALM_ENABLE_SYNC
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
@@ -41,7 +41,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 #include "sync/flx_sync_harness.hpp"
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
 
 #include <cstdint>
 

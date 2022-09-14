@@ -19,12 +19,9 @@
 #ifndef REALM_COMMON_UTILS_HPP
 #define REALM_COMMON_UTILS_HPP
 
-//#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/app.hpp>
-//#endif
-
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 
@@ -37,9 +34,6 @@
 #define TEST_ENABLE_SYNC_LOGGING_LEVEL off
 #endif // TEST_ENABLE_SYNC_LOGGING
 #endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
-
-//#if REALM_ENABLE_SYNC
-
 
 inline std::error_code wait_for_session(realm::Realm& realm,
                                         void (realm::SyncSession::*fn)(realm::util::UniqueFunction<void(std::error_code)>&&),
@@ -67,14 +61,8 @@ inline std::error_code wait_for_session(realm::Realm& realm,
 std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
-
-
 namespace realm {
-
 namespace reset_utils {
-
-
-
 
 struct Partition {
     std::string property_name;
@@ -117,11 +105,10 @@ protected:
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
                              std::chrono::milliseconds max_ms = std::chrono::seconds(30));
 
-
 template <typename Transport>
 const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 
-}
+} // namespace realm
 
 namespace {
 void inline set_app_config_defaults(realm::app::App::Config& app_config,
@@ -141,9 +128,6 @@ void inline set_app_config_defaults(realm::app::App::Config& app_config,
         app_config.local_app_version.emplace("A Local App Version");
 }
 } // anonymous namespace
-
-//#endif
-
 
 static inline std::string random_string(std::string::size_type length)
 {
