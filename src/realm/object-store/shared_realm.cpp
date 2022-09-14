@@ -445,6 +445,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
             auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            // block autorefresh for the old realm
+            old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
