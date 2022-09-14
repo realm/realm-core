@@ -528,9 +528,9 @@ Obj Obj::get_parent_object() const
         if (get_backlink_cnt(backlink_col_key) == 1) {
             auto obj_key = get_backlink(backlink_col_key, 0);
             obj = m_table->get_opposite_table(backlink_col_key)->get_object(obj_key);
-            return true;
+            return IteratorControl::Stop;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 
     return obj;
@@ -611,7 +611,7 @@ bool Obj::has_backlinks(bool only_strong_links) const
     }
 
     return m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
-        return get_backlink_cnt(backlink_col_key) != 0;
+        return get_backlink_cnt(backlink_col_key) != 0 ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
     });
 }
 
@@ -622,7 +622,7 @@ size_t Obj::get_backlink_count() const
     size_t cnt = 0;
     m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
         cnt += get_backlink_cnt(backlink_col_key);
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
     return cnt;
 }
@@ -785,9 +785,9 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
                 Mixed index = traverser.result();
                 obj.traverse_path(v, ps, path_length + 1);
                 v(obj, next_col_key, index);
-                return true; // early out
+                return IteratorControl::Stop; // early out
             }
-            return false; // try next column
+            return IteratorControl::AdvanceToNext; // try next column
         });
     }
     else {
@@ -2085,7 +2085,7 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
             migrator.run();
         }
         embedded_obj_tracker->process_pending();
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_table->for_each_backlink_column(copy_links);
 }
@@ -2230,7 +2230,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
     auto copy_links = [this, &other, nb_tombstones](ColKey col) {
         if (nb_tombstones != m_table->m_tombstones->size()) {
             // Object has been deleted - we are done
-            return true;
+            return IteratorControl::Stop;
         }
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
@@ -2240,7 +2240,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             LinkReplacer replacer{linking_obj, c, other, *this};
             replacer.run();
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_table->for_each_backlink_column(copy_links);
 }
