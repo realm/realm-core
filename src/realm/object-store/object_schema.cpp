@@ -329,7 +329,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
 }
 
 void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
-                            bool for_sync) const
+                            uint64_t validation_mode) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -416,6 +416,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
 
+    auto for_sync =
+        (validation_mode & SchemaValidationMode::SyncPBS) || (validation_mode & SchemaValidationMode::SyncFLX);
     if (for_sync && table_type != ObjectSchema::ObjectType::Embedded) {
         if (primary_key.empty()) {
             exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized "
