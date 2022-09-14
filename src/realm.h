@@ -1409,8 +1409,8 @@ RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count
 RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class_key, realm_object_key_t obj_key);
 
 /**
- * Get the parent object for the object passed as argument.
- *  @return A non-NULL pointer if the parent object exists.
+ * Get the parent object for the object passed as argument. Only works for embedded objects.
+ * @return true, if no errors occurred.
  */
 RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
 
