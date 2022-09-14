@@ -32,7 +32,8 @@ class Table;
 enum class PropertyType : unsigned short;
 struct ObjectSchemaValidationException;
 struct Property;
-enum SchemaValidationMode : uint64_t;
+
+enum SchemaValidationMode { Basic = 0, SyncPBS = 1, RejectEmbeddedOrphans = 2, SyncFLX = 4 };
 
 class ObjectSchema {
 public:
