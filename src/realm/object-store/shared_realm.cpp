@@ -393,7 +393,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
     }
 
-    schema.validate(validation_mode);
+    schema.validate(static_cast<SchemaValidationMode>(validation_mode));
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();

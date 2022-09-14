@@ -147,7 +147,7 @@ public:
 
     // Verify that this schema is internally consistent (i.e. all properties are
     // valid, links link to types that actually exist, etc.)
-    void validate(uint64_t validation_mode = SchemaValidationMode::Basic) const;
+    void validate(SchemaValidationMode validation_mode = SchemaValidationMode::Basic) const;
 
     // Get the changes which must be applied to this schema to produce the passed-in schema
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,

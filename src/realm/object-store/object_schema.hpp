@@ -32,6 +32,7 @@ class Table;
 enum class PropertyType : unsigned short;
 struct ObjectSchemaValidationException;
 struct Property;
+enum SchemaValidationMode : uint64_t;
 
 class ObjectSchema {
 public:
@@ -80,7 +81,7 @@ public:
     bool property_is_computed(Property const& property) const noexcept;
 
     void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
-                  uint64_t validation_mode) const;
+                  SchemaValidationMode validation_mode) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 

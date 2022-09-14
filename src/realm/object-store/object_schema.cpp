@@ -329,7 +329,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
 }
 
 void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
-                            uint64_t validation_mode) const
+                            SchemaValidationMode validation_mode) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
