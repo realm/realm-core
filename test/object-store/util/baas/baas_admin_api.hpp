@@ -241,6 +241,7 @@ struct AppSession {
     AppCreateConfig config;
 };
 
+#if REALM_ENABLE_AUTH_TESTS
 
 namespace reset_utils {
 
@@ -252,8 +253,6 @@ TableRef get_table(Realm& realm, StringData object_type)
 }
 
 } // anonymous namespace
-
-#if REALM_ENABLE_AUTH_TESTS
 
 static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const AppSession& app_session,
                                        const std::string& schema_name, const bson::BsonDocument& filter_bson)
@@ -555,8 +554,8 @@ std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config&
                                                             const Realm::Config& remote_config,
                                                             const TestAppSession& test_app_session);
 
-#endif // REALM_ENABLE_AUTH_TESTS
 } // namespace reset_utils
+#endif // REALM_ENABLE_AUTH_TESTS
 
 app::Response do_http_request(app::Request&& request);
 
