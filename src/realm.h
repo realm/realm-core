@@ -122,8 +122,9 @@ typedef enum realm_value_type {
 
 typedef enum realm_schema_validation_mode {
     RLM_SCHEMA_VALIDATION_BASIC = 0,
-    RLM_SCHEMA_VALIDATION_SYNC = 1,
-    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2
+    RLM_SCHEMA_VALIDATION_SYNC_PBS = 1,
+    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2,
+    RLM_SCHEMA_VALIDATION_SYNC_FLX = 4
 } realm_schema_validation_mode_e;
 
 /**
