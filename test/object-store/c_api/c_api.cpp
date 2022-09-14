@@ -762,6 +762,7 @@ bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_s
     static_cast<void>(old);
     static_cast<void>(new_);
     ++userdata->num_migrations;
+    REQUIRE_FALSE((*old)->auto_refresh());
     return true;
 }
 
