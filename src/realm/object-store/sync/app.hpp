@@ -44,7 +44,7 @@ class App;
 
 typedef std::shared_ptr<App> SharedApp;
 
-/// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
+/// The `App` has the fundamental set of methods for communicating with a Atlas App Services backend.
 ///
 /// This class provides access to login and authentication.
 ///
