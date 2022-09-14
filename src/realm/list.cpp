@@ -278,10 +278,9 @@ void Lst<ObjKey>::do_clear()
         ObjKey target_key = m_tree->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
-        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
-        if (num_remaining == 0) {
-            state.m_to_be_deleted.emplace_back(target_table_key, target_key);
-        }
+        // embedded objects should only have one incoming link
+        REALM_ASSERT_EX(target_obj.get_backlink_count() == 0, target_obj.get_backlink_count());
+        state.m_to_be_deleted.emplace_back(target_table_key, target_key);
     }
 
     m_tree->clear();
