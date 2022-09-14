@@ -13,6 +13,7 @@
 * `Realm::refresh()` did not actually advance to the latest version in some cases. If there was a version newer than the current version which did not require blocking it would advance to that instead, contrary to the documented behavior.
 * Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
 * Fixed `realm_query_parse_for_list` ignoring existing query ([#5850](https://github.com/realm/realm-core/pull/5850)).
+* Disable auto refresh for old realm instance after migration ([#5856](https://github.com/realm/realm-core/pull/5856)).
 
 ### Breaking changes
 * None.
