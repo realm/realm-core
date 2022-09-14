@@ -289,7 +289,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
     return nitems * size;
 }
 
-} // anonymous amespace
+} // namespace
 
 app::Response do_http_request(app::Request&& request)
 {

@@ -260,7 +260,6 @@ private:
 #if REALM_ENABLE_SYNC
 
 
-
 #endif // REALM_ENABLE_SYNC
 
 

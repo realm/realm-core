@@ -35,9 +35,10 @@
 #endif // TEST_ENABLE_SYNC_LOGGING
 #endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
 
-inline std::error_code wait_for_session(realm::Realm& realm,
-                                        void (realm::SyncSession::*fn)(realm::util::UniqueFunction<void(std::error_code)>&&),
-                                        std::chrono::seconds timeout)
+inline std::error_code
+wait_for_session(realm::Realm& realm,
+                 void (realm::SyncSession::*fn)(realm::util::UniqueFunction<void(std::error_code)>&&),
+                 std::chrono::seconds timeout)
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
@@ -100,7 +101,7 @@ protected:
     ObjectId m_pk_driving_reset = ObjectId::gen();
     bool m_wait_for_reset_completion = true;
 };
-} // reset_utils
+} // namespace reset_utils
 
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
                              std::chrono::milliseconds max_ms = std::chrono::seconds(30));

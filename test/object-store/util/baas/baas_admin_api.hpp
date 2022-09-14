@@ -242,7 +242,6 @@ struct AppSession {
 };
 
 
-
 namespace reset_utils {
 
 namespace {
@@ -557,7 +556,7 @@ std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config&
                                                             const TestAppSession& test_app_session);
 
 #endif // REALM_ENABLE_AUTH_TESTS
-}
+} // namespace reset_utils
 
 app::Response do_http_request(app::Request&& request);
 
