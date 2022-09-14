@@ -206,9 +206,8 @@ void Schema::validate(uint64_t validation_mode) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
-    const bool for_sync = validation_mode & SchemaValidationMode::Sync;
     for (auto const& object : *this) {
-        object.validate(*this, exceptions, for_sync);
+        object.validate(*this, exceptions, validation_mode);
     }
 
     // TODO: remove this client side check once the server supports it
