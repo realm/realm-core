@@ -2665,12 +2665,11 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(checked(realm_list_size(bars.get(), &size)));
                     CHECK(size == 2);
 
-                    // type_TypedLink is not supported.
                     bool found = true;
                     size_t index = -1;
                     CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
-                    CHECK(index == std::numeric_limits<std::size_t>::max());
-                    CHECK(!found);
+                    CHECK(index == 0);
+                    CHECK(found);
                 });
 
                 SECTION("get") {
