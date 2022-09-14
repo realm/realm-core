@@ -385,10 +385,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
+#if REALM_ENABLE_SYNC
     if (auto sync_config = m_config.sync_config) {
         validation_mode |=
             sync_config->flx_sync_requested ? SchemaValidationMode::SyncFLX : SchemaValidationMode::SyncPBS;
     }
+#endif
     if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
         validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
     }
