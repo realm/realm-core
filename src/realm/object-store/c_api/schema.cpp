@@ -58,7 +58,7 @@ RLM_API uint64_t realm_get_schema_version(const realm_t* realm)
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {
-        schema->ptr->validate(validation_mode);
+        schema->ptr->validate(static_cast<SchemaValidationMode>(validation_mode));
         return true;
     });
 }
