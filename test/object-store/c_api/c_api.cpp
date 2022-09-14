@@ -2472,6 +2472,11 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(checked(realm_list_find(strings.get(), &c2, &out_index, &found)));
                         CHECK(out_index == 2);
                         CHECK(found);
+
+                        realm_value_t dummy = rlm_str_val("c");
+                        CHECK(checked(realm_list_find(strings.get(), &dummy, &out_index, &found)));
+                        CHECK(!found);
+                        CHECK(out_index == realm::not_found);
                     });
                 }
 
