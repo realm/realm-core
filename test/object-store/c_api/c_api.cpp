@@ -2304,6 +2304,48 @@ TEST_CASE("C API", "[c_api]") {
                     cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE", 0, nullptr));
                 }
 
+                SECTION("lists append query") {
+                    auto list = cptr_checked(realm_get_list(obj1.get(), foo_properties["link_list"]));
+
+                    auto bar_link = realm_object_as_link(obj2.get());
+                    realm_value_t bar_link_val;
+                    bar_link_val.type = RLM_TYPE_LINK;
+                    bar_link_val.link = bar_link;
+
+                    write([&]() {
+                        CHECK(checked(realm_list_insert(list.get(), 0, bar_link_val)));
+                        CHECK(checked(realm_list_insert(list.get(), 1, bar_link_val)));
+                        CHECK(checked(realm_list_insert(list.get(), 2, bar_link_val)));
+                    });
+
+                    size_t n = 0;
+                    realm_list_size(list.get(), &n);
+                    CHECK(n == 3);
+                    auto query = cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE ", 0, nullptr));
+                    n = 0;
+                    realm_query_count(query.get(), &n);
+                    CHECK(n == 3);
+
+                    write([&]() {
+                        realm_list_clear(list.get());
+                    });
+                }
+
+                SECTION("combine results query") {
+                    realm_value_t int_arg = rlm_int_val(123);
+                    const size_t num_args = 1;
+                    realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &int_arg}};
+                    realm_query_arg_t* arg_list = &args[0];
+                    auto q_int =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "int == $0", num_args, arg_list));
+                    auto combined_result_q =
+                        cptr_checked(realm_query_parse_for_results(r.get(), q_int->get_description(), 0, nullptr));
+                    auto result = cptr_checked(realm_query_find_all(combined_result_q.get()));
+                    size_t count;
+                    CHECK(realm_results_count(result.get(), &count));
+                    CHECK(count == 1);
+                }
+
                 SECTION("empty results") {
                     auto empty_q = cptr_checked(realm_query_parse_for_results(r.get(), "FALSEPREDICATE", 0, nullptr));
                     auto empty_r = cptr_checked(realm_query_find_all(empty_q.get()));
