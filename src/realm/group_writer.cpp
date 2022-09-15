@@ -337,14 +337,11 @@ void GroupWriter::map_reachable()
 
 #if REALM_ALLOC_DEBUG
     std::cout << "  Reachable: ";
-    ref_type last = 0;
-    for (auto& i : collector.blocks) {
-        if (i.ref != last) {
-            last = i.ref;
-            std::cout << std::endl << "    " << i.ref << " - " << i.ref + i.size << " : " << i.released_at_version;
-        }
-        else {
-            std::cout << ", " << i.released_at_version;
+    // this really should be inverted, showing all versions pr entry instead of all entries pr version
+    for (auto& entry : m_top_ref_map) {
+        std::cout << std::endl << "    Version: " << entry.first;
+        for (auto& i : entry.second.reachable_blocks) {
+            std::cout << std::endl << "      " << i.pos << " - " << i.pos + i.size;
         }
     }
     std::cout << std::endl << "  Backdating:";
