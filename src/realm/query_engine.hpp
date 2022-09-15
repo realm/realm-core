@@ -1346,10 +1346,15 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
+        std::string value;
+        if (m_value.is_type(type_TypedLink)) {
+            value = util::serializer::print_value(m_value.get<ObjLink>(), state.group);
+        }
+        else {
+            value = util::serializer::print_value(m_value);
+        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + this->describe_condition() +
-               " " +
-               (m_value_is_null ? util::serializer::print_value(realm::null())
-                                : util::serializer::print_value(m_value));
+               " " + value;
     }
 
 protected:
@@ -2417,8 +2422,9 @@ public:
         REALM_ASSERT(m_condition_column_key);
         if (m_target_keys.size() > 1)
             throw SerialisationError("Serializing a query which links to multiple objects is currently unsupported.");
+        ObjLink link(m_table->get_opposite_table(m_condition_column_key)->get_key(), m_target_keys[0]);
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(m_target_keys[0]);
+               util::serializer::print_value(link, m_table->get_parent_group());
     }
 
 protected:
