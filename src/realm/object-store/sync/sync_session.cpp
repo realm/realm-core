@@ -954,9 +954,8 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Inactive: {
-            auto& sync_manager = *m_sync_manager;
+            // Don't do anything; 'become_inactive' was already called for state to be 'Inactive'.
             m_state_mutex.unlock(lock);
-            sync_manager.unregister_session(m_db->get_path());
             break;
         }
         case State::WaitingForAccessToken:
