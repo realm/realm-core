@@ -34,6 +34,7 @@ device=$(echo "$hdiutil_out" | head -n1 | cut -f1 | awk '{$1=$1};1')
 path=$(echo "$hdiutil_out" | tail -n1 | cut -f3)
 
 UNITTEST_ENABLE_SYNC_TO_DISK=1 "$build_prefix/realm-tests.app/Contents/MacOS/realm-tests" "$path/"
-UNITTEST_ENABLE_SYNC_TO_DISK=1 "$build_prefix/realm-sync-tests.app/Contents/MacOS/realm-sync-tests" "$path/"
+# one test runner because several sync tests make large uploads which if run together may exceed our 400MB space limit
+UNITTEST_THREADS=1 UNITTEST_ENABLE_SYNC_TO_DISK=1 "$build_prefix/realm-sync-tests.app/Contents/MacOS/realm-sync-tests" "$path/"
 echo "finished running tests"
 

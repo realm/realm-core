@@ -75,6 +75,7 @@ let notSyncServerSources: [String] = [
     "realm/history.cpp",
     "realm/impl",
     "realm/index_string.cpp",
+    "realm/link_translator.cpp",
     "realm/list.cpp",
     "realm/mixed.cpp",
     "realm/node.cpp",
