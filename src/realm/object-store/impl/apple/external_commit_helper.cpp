@@ -89,7 +89,7 @@ void ExternalCommitHelper::FdHolder::close()
 // signal the runloop source and wake up the target runloop, and when data is
 // written to the anonymous pipe the background thread removes the runloop
 // source from the runloop and and shuts down.
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
     : m_parent(parent)
 {
     m_kq = kqueue();
@@ -119,19 +119,18 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     // in correctness problems.
 
     std::string path;
-    std::string temp_dir = util::normalize_dir(parent.get_config().fifo_files_fallback_path);
+    std::string temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
     std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
-    path = DB::get_core_file(parent.get_path(), DB::CoreFileType::Note);
+    path = DB::get_core_file(config.path, DB::CoreFileType::Note);
     bool fifo_created = realm::util::try_create_fifo(path);
     if (!fifo_created && !temp_dir.empty()) {
-        path = DB::get_core_file(util::format("%1realm_%2", temp_dir, std::hash<std::string>()(parent.get_path())),
+        path = DB::get_core_file(util::format("%1realm_%2", temp_dir, std::hash<std::string>()(config.path)),
                                  DB::CoreFileType::Note);
         fifo_created = realm::util::try_create_fifo(path);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path =
-            DB::get_core_file(util::format("%1realm_%2", sys_temp_dir, std::hash<std::string>()(parent.get_path())),
-                              DB::CoreFileType::Note);
+        path = DB::get_core_file(util::format("%1realm_%2", sys_temp_dir, std::hash<std::string>()(config.path)),
+                                 DB::CoreFileType::Note);
         realm::util::create_fifo(path);
     }
 

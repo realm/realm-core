@@ -333,7 +333,6 @@ void LinkChain::add(ColKey ck)
     m_link_cols.push_back(ck);
 }
 
-
 // -- Table ---------------------------------------------------------------------------------
 
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
@@ -1115,14 +1114,33 @@ void Table::set_embedded(bool embedded)
     }
     else if (size() > 0) {
         for (auto object : *this) {
-            size_t backlink_count = object.get_backlink_count();
+            size_t backlink_count = 0;
+            for_each_backlink_column([&](ColKey backlink_col_key) {
+                size_t cur_backlinks = object.get_backlink_cnt(backlink_col_key);
+                if (cur_backlinks > 0) {
+                    // Make sure this link is not an untyped ObjLink which lacks core support in many places
+                    ColKey source_col = get_opposite_column(backlink_col_key);
+                    REALM_ASSERT(source_col); // backlink columns should always have a source
+                    TableRef source_table = get_opposite_table(backlink_col_key);
+                    ColKey forward_col_mapped = source_table->get_opposite_column(source_col);
+                    if (!forward_col_mapped) {
+                        throw std::logic_error(util::format("There is a dynamic/untyped link from a Mixed property "
+                                                            "'%1.%2' which prevents migrating class '%3' to embedded",
+                                                            source_table->get_name(),
+                                                            source_table->get_column_name(source_col), get_name()));
+                    }
+                }
+                backlink_count += cur_backlinks;
+                if (backlink_count > 1) {
+                    throw std::logic_error(
+                        util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
+                }
+                return false; // continue
+            });
+
             if (backlink_count == 0) {
                 throw std::logic_error(util::format(
                     "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
-            }
-            else if (backlink_count > 1) {
-                throw std::logic_error(
-                    util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
             }
         }
     }
@@ -3164,7 +3182,6 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
-
     return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 

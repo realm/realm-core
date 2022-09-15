@@ -436,7 +436,7 @@ void Connection::initiate_reconnect_wait()
     constexpr milliseconds_type min_delay = 1000;   // 1 second (barring deductions)
     constexpr milliseconds_type max_delay = 300000; // 5 minutes
 
-    // Delay must increase when scaled by a facter grater than 1.
+    // Delay must increase when scaled by a factor greater than 1.
     static_assert(min_delay > 0, "");
     static_assert(max_delay >= min_delay, "");
 
@@ -1410,8 +1410,18 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(!m_client_error && !m_error_to_send);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    m_conn.close_due_to_protocol_error(error.code(), error.what());
+
+    m_client_error = util::make_optional<IntegrationException>(error);
+    m_error_to_send = true;
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
 void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
@@ -1605,6 +1615,12 @@ void Session::send_message()
             send_ident_message(); // Throws
         return;
     }
+
+    if (m_error_to_send)
+        return send_json_error_message(); // Throws
+
+    if (m_connection_to_close)
+        return close_connection(); // Throws
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -1907,6 +1923,51 @@ void Session::send_unbind_message()
 }
 
 
+void Session::send_json_error_message()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_error_to_send);
+    REALM_ASSERT(m_client_error);
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    session_ident_type session_ident = get_ident();
+    std::error_code ec = m_client_error->code();
+    auto message = m_client_error->what();
+
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+                session_ident); // Throws
+
+    nlohmann::json error_body_json;
+    error_body_json["message"] = message;
+    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
+
+    m_conn.initiate_write_message(out, this); // Throws
+
+    m_error_to_send = false;
+    m_connection_to_close = true;
+
+    // Connection is waiting to be closed
+    enlist_to_send(); // Throws
+}
+
+
+void Session::close_connection()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_connection_to_close);
+    REALM_ASSERT(m_client_error);
+
+    m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
+    m_connection_to_close = false;
+    m_client_error = util::none;
+}
+
+
 std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident)
 {
     logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2)", client_file_ident.ident,
@@ -2176,6 +2237,10 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    // Ignore the error because the connection is going to be closed.
+    if (m_connection_to_close)
+        return std::error_code{}; // Success
+
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
         logger.error("Illegal message at this time");
@@ -2234,7 +2299,7 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
 
-    return {};
+    return std::error_code{}; // Success;
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)

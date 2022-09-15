@@ -472,116 +472,91 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("handling of results not ready") {
         make_remote_change();
+        auto initial_version = r->read_transaction_version().version;
 
-        SECTION("notify() does nothing") {
+        SECTION("notify() does nothing if no notifiers are ready") {
             r->notify();
             REQUIRE(notification_calls == 1);
+            REQUIRE(r->read_transaction_version().version == initial_version);
+
             coordinator->on_change();
             r->notify();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
         }
 
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the "
-                "newest at the time it is called") {
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                make_remote_change();
-                coordinator->on_change();
-                make_remote_change();
-            });
-            // advances to the version after the one it was waiting for, but still
-            // not the latest
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-
-            thread.join();
-            REQUIRE(notification_calls == 2);
-
-            // now advances to the latest
+        SECTION("notify() advances to a stale ready version") {
             coordinator->on_change();
-            r->refresh();
+            make_remote_change();
+
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+
+            coordinator->on_change();
+            r->notify();
             REQUIRE(notification_calls == 3);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
         }
 
-        SECTION("begin_transaction() blocks") {
+        SECTION("refresh() runs the stale notifiers") {
             REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
+            // note: no on_change()
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+        }
+
+        SECTION("refresh() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+        }
+
+        SECTION("begin_transaction() runs the stale notifiers") {
+            REQUIRE(notification_calls == 1);
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
             r->cancel_transaction();
         }
 
-        SECTION("refresh() does not block for results without callbacks") {
+        SECTION(
+            "begin_transaction() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+            r->cancel_transaction();
+        }
+
+        SECTION("refresh() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->refresh();
         }
 
-        SECTION("begin_transaction() does not block for results without callbacks") {
+        SECTION("begin_transaction() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->begin_transaction();
             r->cancel_transaction();
         }
 
-        SECTION("begin_transaction() does not block for Results for different Realms") {
+        SECTION("begin_transaction() does not run stale notifiers if they are for a different Realm") {
             // this would deadlock if beginning the write on the secondary Realm
             // waited for the primary Realm to be ready
+            auto lock = coordinator->block_notifier_execution();
             make_remote_change();
 
             // sanity check that the notifications never did run
             r->notify();
             REQUIRE(notification_calls == 1);
-        }
-    }
-
-    SECTION("handling of stale results") {
-        make_remote_change();
-        coordinator->on_change();
-        make_remote_change();
-
-        SECTION("notify() uses the older version") {
-            r->notify();
-            REQUIRE(notification_calls == 2);
-            coordinator->on_change();
-            r->notify();
-            REQUIRE(notification_calls == 3);
-            r->notify();
-            REQUIRE(notification_calls == 3);
-        }
-
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("begin_transaction() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->begin_transaction();
-            REQUIRE(notification_calls == 2);
-            r->cancel_transaction();
         }
     }
 

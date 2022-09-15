@@ -30,12 +30,15 @@ namespace sync {
 //
 //   6 Support for asymmetric tables.
 //
+//   7 Client takes the 'action' specified in the 'json_error' messages received
+//     from server. Client sends 'json_error' messages to the server.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 6;
+    return 7;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
