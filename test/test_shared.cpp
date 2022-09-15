@@ -1468,13 +1468,13 @@ namespace {
 
 void writer_threads_thread(TestContext& test_context, const DBRef& sg, ObjKey key)
 {
-
-    for (size_t i = 0; i < 100; ++i) {
+    auto tr = sg->start_read();
+    for (size_t i = 0; i < 10000; ++i) {
         // Increment cell
         {
-            WriteTransaction wt(sg);
-            wt.get_group().verify();
-            auto t1 = wt.get_table("test");
+            tr->promote_to_write();
+            tr->verify();
+            auto t1 = tr->get_table("test");
             auto cols = t1->get_column_keys();
             t1->get_object(key).add_int(cols[0], 1);
             // FIXME: For some reason this takes ages when running
@@ -1483,16 +1483,15 @@ void writer_threads_thread(TestContext& test_context, const DBRef& sg, ObjKey ke
             // here can produce a final database file size of more
             // than 1 GiB. Really! And that is a table with only 10
             // rows. It is about 1 MiB per transaction.
-            wt.commit();
+            tr->commit_and_continue_as_read();
         }
 
         // Verify in new transaction so that we interleave
         // read and write transactions
         {
-            ReadTransaction rt(sg);
-            // rt.get_group().verify(); // verify() is not supported on a read transaction
-            // concurrently with writes.
-            auto t = rt.get_table("test");
+            util::StderrLogger logger;
+            tr->verify_cluster(logger);
+            auto t = tr->get_table("test");
             auto cols = t->get_column_keys();
             int64_t v = t->get_object(key).get<Int>(cols[0]);
             int64_t expected = i + 1;
@@ -1508,13 +1507,12 @@ TEST(Shared_WriterThreads)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(make_in_realm_history(), path, DBOptions(crypt_key()));
 
         const int thread_count = 10;
         // Create first table in group
         {
             WriteTransaction wt(sg);
-            wt.get_group().verify();
             auto t1 = wt.add_table("test");
             test_table_add_columns(t1);
             for (int i = 0; i < thread_count; ++i)
@@ -1543,7 +1541,7 @@ TEST(Shared_WriterThreads)
 
             for (int i = 0; i < thread_count; ++i) {
                 int64_t v = t->get_object(ObjKey(i)).get<Int>(col);
-                CHECK_EQUAL(100, v);
+                CHECK_EQUAL(10000, v);
             }
         }
     }
