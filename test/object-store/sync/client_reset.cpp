@@ -1881,12 +1881,15 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     for (auto& pair : local_state) {
                         dict.insert(pair.first, pair.second);
                     }
-                    for (auto it = dict.begin(); it != dict.end(); ++it) {
+                    for (auto it = dict.begin(); it != dict.end();) {
                         auto found = std::any_of(local_state.begin(), local_state.end(), [&](auto pair) {
                             return Mixed{pair.first} == (*it).first && Mixed{pair.second} == (*it).second;
                         });
                         if (!found) {
-                            dict.erase(it);
+                            it = dict.erase(it);
+                        }
+                        else {
+                            ++it;
                         }
                     }
                 })
@@ -1899,12 +1902,15 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     for (auto& pair : remote_state) {
                         dict.insert(pair.first, pair.second);
                     }
-                    for (auto it = dict.begin(); it != dict.end(); ++it) {
+                    for (auto it = dict.begin(); it != dict.end();) {
                         auto found = std::any_of(remote_state.begin(), remote_state.end(), [&](auto pair) {
                             return Mixed{pair.first} == (*it).first && Mixed{pair.second} == (*it).second;
                         });
                         if (!found) {
-                            dict.erase(it);
+                            it = dict.erase(it);
+                        }
+                        else {
+                            ++it;
                         }
                     }
                 })
@@ -2982,9 +2988,12 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
             auto list = obj.get_linklist("array_of_objs");
             set_embedded_list(array_values, list);
             auto dict = obj.get_dictionary("embedded_dict");
-            for (auto it = dict.begin(); it != dict.end(); ++it) {
+            for (auto it = dict.begin(); it != dict.end();) {
                 if (dict_values.find((*it).first.get_string()) == dict_values.end()) {
-                    dict.erase(it);
+                    it = dict.erase(it);
+                }
+                else {
+                    ++it;
                 }
             }
             for (auto it : dict_values) {

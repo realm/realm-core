@@ -793,11 +793,11 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         Dictionary dict = obj.get_dictionary(col);
         size_t num_unresolved = 0;
-        for (auto value : dict) {
-            if (value.second.is_unresolved_link()) {
+        dict.for_all_values([&num_unresolved](Mixed val) {
+            if (val.is_unresolved_link()) {
                 ++num_unresolved;
             }
-        }
+        });
         return num_unresolved;
     }
     bool will_erase_removed_object_links() override
@@ -865,11 +865,11 @@ struct DictionaryOfMixedLinks : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         Dictionary dict = obj.get_dictionary(col);
         size_t num_unresolved = 0;
-        for (auto value : dict) {
-            if (value.second.is_unresolved_link()) {
+        dict.for_all_values([&num_unresolved](Mixed val) {
+            if (val.is_unresolved_link()) {
                 ++num_unresolved;
             }
-        }
+        });
         return num_unresolved;
     }
     bool will_erase_removed_object_links() override

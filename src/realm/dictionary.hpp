@@ -89,7 +89,7 @@ public:
     Iterator find(Mixed key) const noexcept;
 
     void erase(Mixed key);
-    void erase(Iterator it);
+    Iterator erase(Iterator it);
     bool try_erase(Mixed key);
 
     void nullify(Mixed);
@@ -157,6 +157,7 @@ private:
 
     bool init_from_parent(bool allow_create) const;
     Mixed do_get(size_t ndx) const;
+    void do_erase(size_t ndx, Mixed key);
     Mixed do_get_key(size_t ndx) const;
     size_t do_find_key(Mixed key) const noexcept;
     std::pair<size_t, Mixed> find_impl(Mixed key) const noexcept;

@@ -602,21 +602,7 @@ bool Dictionary::try_erase(Mixed key)
         return false;
     }
 
-    auto old_value = m_values->get(ndx);
-
-    CascadeState cascade_state(CascadeState::Mode::Strong);
-    bool recurse = clear_backlink(old_value, cascade_state);
-    if (recurse)
-        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
-
-    if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_erase(*this, ndx, key);
-    }
-
-    m_keys->erase(ndx);
-    m_values->erase(ndx);
-
-    bump_content_version();
+    do_erase(ndx, key);
 
     return true;
 }
@@ -629,9 +615,17 @@ void Dictionary::erase(Mixed key)
     }
 }
 
-void Dictionary::erase(Iterator it)
+auto Dictionary::erase(Iterator it) -> Iterator
 {
-    erase((*it).first);
+    auto pos = it.m_ndx;
+    if (pos >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+
+    do_erase(pos, do_get_key(pos));
+    if (pos < size())
+        pos++;
+    return {this, pos};
 }
 
 void Dictionary::nullify(Mixed key)
@@ -782,6 +776,25 @@ Mixed Dictionary::do_get(size_t ndx) const
         }
     }
     return val;
+}
+
+void Dictionary::do_erase(size_t ndx, Mixed key)
+{
+    auto old_value = m_values->get(ndx);
+
+    CascadeState cascade_state(CascadeState::Mode::Strong);
+    bool recurse = clear_backlink(old_value, cascade_state);
+    if (recurse)
+        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_erase(*this, ndx, key);
+    }
+
+    m_keys->erase(ndx);
+    m_values->erase(ndx);
+
+    bump_content_version();
 }
 
 Mixed Dictionary::do_get_key(size_t ndx) const
