@@ -197,8 +197,7 @@ void DictionaryClusterTree::do_accumulate(size_t* return_ndx, AggregateType& agg
             }
         }
         start_ndx += e;
-        // Continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 
     if (return_ndx)
@@ -375,12 +374,11 @@ size_t Dictionary::find_any(Mixed value) const
             for (size_t i = 0; i < e; i++) {
                 if (leaf.get(i) == value) {
                     ret = start_ndx + i;
-                    return true;
+                    return IteratorControl::Stop;
                 }
             }
             start_ndx += e;
-            // Continue
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 

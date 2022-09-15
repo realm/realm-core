@@ -727,6 +727,11 @@ public:
         return {};
     }
 
+    virtual ConstTableRef get_target_table() const
+    {
+        return {};
+    }
+
     virtual DataType get_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1217,14 +1222,36 @@ public:
     {
     }
 
-    std::string value_to_string(size_t ndx) const
+    std::string value_to_string(size_t ndx, util::serializer::SerialisationState& state) const
     {
         auto val = get(ndx);
         if (val.is_null())
             return "NULL";
         else {
+            static_cast<void>(state);
             if constexpr (std::is_same_v<T, TypeOfValue>) {
                 return util::serializer::print_value(val.get_type_of_value());
+            }
+            else if constexpr (std::is_same_v<T, ObjKey>) {
+                ObjKey obj_key = val.template get<ObjKey>();
+                if (state.target_table) {
+                    ObjLink link(state.target_table->get_key(), obj_key);
+                    return util::serializer::print_value(link, state.group);
+                }
+                else {
+                    return util::serializer::print_value(obj_key);
+                }
+            }
+            else if constexpr (std::is_same_v<T, ObjLink>) {
+                return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+            }
+            else if constexpr (std::is_same_v<T, Mixed>) {
+                if (val.is_type(type_TypedLink)) {
+                    return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+                }
+                else {
+                    return util::serializer::print_value(val);
+                }
             }
             else {
                 return util::serializer::print_value(val.template get<T>());
@@ -1241,13 +1268,13 @@ public:
                 if (i != 0) {
                     desc += ", ";
                 }
-                desc += value_to_string(i);
+                desc += value_to_string(i, state);
             }
             desc += "}";
             return desc;
         }
         else if (sz == 1) {
-            return value_to_string(0);
+            return value_to_string(0, state);
         }
         return "";
     }
@@ -2589,6 +2616,11 @@ public:
         return type_Link;
     }
 
+    ConstTableRef get_target_table() const override
+    {
+        return link_map().get_target_table();
+    }
+
     bool has_multiple_values() const override
     {
         return m_is_list || !m_link_map.only_unary_links();
@@ -2735,6 +2767,10 @@ public:
     ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
+    }
+    ConstTableRef get_target_table() const override
+    {
+        return m_link_map.get_target_table()->get_opposite_table(m_column_key);
     }
 
     Allocator& get_alloc() const
@@ -3786,7 +3822,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state(state.class_prefix);
+        util::serializer::SerialisationState empty_state(state.class_prefix, state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4201,8 +4237,8 @@ public:
                                                  m_left->description(state));
         }
         else {
-            return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
-                                                 m_right->description(state));
+            state.target_table = m_left->get_target_table();
+            return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
         }
     }
 

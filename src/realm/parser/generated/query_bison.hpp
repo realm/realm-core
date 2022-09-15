@@ -430,6 +430,7 @@ namespace yy {
       char dummy1[sizeof (AggrNode*)];
 
       // constant
+      // primary_key
       char dummy2[sizeof (ConstantNode*)];
 
       // distinct
@@ -503,6 +504,7 @@ namespace yy {
       // "like"
       // "between"
       // "in"
+      // "obj"
       // "sort"
       // "distinct"
       // "limit"
@@ -604,14 +606,15 @@ namespace yy {
     TOK_LIKE = 299,                // "like"
     TOK_BETWEEN = 300,             // "between"
     TOK_IN = 301,                  // "in"
-    TOK_SORT = 302,                // "sort"
-    TOK_DISTINCT = 303,            // "distinct"
-    TOK_LIMIT = 304,               // "limit"
-    TOK_ASCENDING = 305,           // "ascending"
-    TOK_DESCENDING = 306,          // "descending"
-    TOK_SIZE = 307,                // "@size"
-    TOK_TYPE = 308,                // "@type"
-    TOK_KEY_VAL = 309              // "key or value"
+    TOK_OBJ = 302,                 // "obj"
+    TOK_SORT = 303,                // "sort"
+    TOK_DISTINCT = 304,            // "distinct"
+    TOK_LIMIT = 305,               // "limit"
+    TOK_ASCENDING = 306,           // "ascending"
+    TOK_DESCENDING = 307,          // "descending"
+    TOK_SIZE = 308,                // "@size"
+    TOK_TYPE = 309,                // "@type"
+    TOK_KEY_VAL = 310              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -628,7 +631,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 67, ///< Number of tokens.
+        YYNTOKENS = 68, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -677,55 +680,57 @@ namespace yy {
         SYM_LIKE = 44,                           // "like"
         SYM_BETWEEN = 45,                        // "between"
         SYM_IN = 46,                             // "in"
-        SYM_SORT = 47,                           // "sort"
-        SYM_DISTINCT = 48,                       // "distinct"
-        SYM_LIMIT = 49,                          // "limit"
-        SYM_ASCENDING = 50,                      // "ascending"
-        SYM_DESCENDING = 51,                     // "descending"
-        SYM_SIZE = 52,                           // "@size"
-        SYM_TYPE = 53,                           // "@type"
-        SYM_KEY_VAL = 54,                        // "key or value"
-        SYM_55_ = 55,                            // '+'
-        SYM_56_ = 56,                            // '-'
-        SYM_57_ = 57,                            // '*'
-        SYM_58_ = 58,                            // '/'
-        SYM_59_ = 59,                            // '('
-        SYM_60_ = 60,                            // ')'
-        SYM_61_ = 61,                            // '['
-        SYM_62_ = 62,                            // ']'
-        SYM_63_ = 63,                            // '.'
-        SYM_64_ = 64,                            // ','
-        SYM_65_ = 65,                            // '{'
-        SYM_66_ = 66,                            // '}'
-        SYM_YYACCEPT = 67,                       // $accept
-        SYM_final = 68,                          // final
-        SYM_query = 69,                          // query
-        SYM_compare = 70,                        // compare
-        SYM_expr = 71,                           // expr
-        SYM_value = 72,                          // value
-        SYM_prop = 73,                           // prop
-        SYM_simple_prop = 74,                    // simple_prop
-        SYM_subquery = 75,                       // subquery
-        SYM_post_query = 76,                     // post_query
-        SYM_distinct = 77,                       // distinct
-        SYM_distinct_param = 78,                 // distinct_param
-        SYM_sort = 79,                           // sort
-        SYM_sort_param = 80,                     // sort_param
-        SYM_limit = 81,                          // limit
-        SYM_direction = 82,                      // direction
-        SYM_list = 83,                           // list
-        SYM_list_content = 84,                   // list_content
-        SYM_constant = 85,                       // constant
-        SYM_boolexpr = 86,                       // boolexpr
-        SYM_comp_type = 87,                      // comp_type
-        SYM_post_op = 88,                        // post_op
-        SYM_aggr_op = 89,                        // aggr_op
-        SYM_equality = 90,                       // equality
-        SYM_relational = 91,                     // relational
-        SYM_stringop = 92,                       // stringop
-        SYM_path = 93,                           // path
-        SYM_path_elem = 94,                      // path_elem
-        SYM_id = 95                              // id
+        SYM_OBJ = 47,                            // "obj"
+        SYM_SORT = 48,                           // "sort"
+        SYM_DISTINCT = 49,                       // "distinct"
+        SYM_LIMIT = 50,                          // "limit"
+        SYM_ASCENDING = 51,                      // "ascending"
+        SYM_DESCENDING = 52,                     // "descending"
+        SYM_SIZE = 53,                           // "@size"
+        SYM_TYPE = 54,                           // "@type"
+        SYM_KEY_VAL = 55,                        // "key or value"
+        SYM_56_ = 56,                            // '+'
+        SYM_57_ = 57,                            // '-'
+        SYM_58_ = 58,                            // '*'
+        SYM_59_ = 59,                            // '/'
+        SYM_60_ = 60,                            // '('
+        SYM_61_ = 61,                            // ')'
+        SYM_62_ = 62,                            // '['
+        SYM_63_ = 63,                            // ']'
+        SYM_64_ = 64,                            // '.'
+        SYM_65_ = 65,                            // ','
+        SYM_66_ = 66,                            // '{'
+        SYM_67_ = 67,                            // '}'
+        SYM_YYACCEPT = 68,                       // $accept
+        SYM_final = 69,                          // final
+        SYM_query = 70,                          // query
+        SYM_compare = 71,                        // compare
+        SYM_expr = 72,                           // expr
+        SYM_value = 73,                          // value
+        SYM_prop = 74,                           // prop
+        SYM_simple_prop = 75,                    // simple_prop
+        SYM_subquery = 76,                       // subquery
+        SYM_post_query = 77,                     // post_query
+        SYM_distinct = 78,                       // distinct
+        SYM_distinct_param = 79,                 // distinct_param
+        SYM_sort = 80,                           // sort
+        SYM_sort_param = 81,                     // sort_param
+        SYM_limit = 82,                          // limit
+        SYM_direction = 83,                      // direction
+        SYM_list = 84,                           // list
+        SYM_list_content = 85,                   // list_content
+        SYM_constant = 86,                       // constant
+        SYM_primary_key = 87,                    // primary_key
+        SYM_boolexpr = 88,                       // boolexpr
+        SYM_comp_type = 89,                      // comp_type
+        SYM_post_op = 90,                        // post_op
+        SYM_aggr_op = 91,                        // aggr_op
+        SYM_equality = 92,                       // equality
+        SYM_relational = 93,                     // relational
+        SYM_stringop = 94,                       // stringop
+        SYM_path = 95,                           // path
+        SYM_path_elem = 96,                      // path_elem
+        SYM_id = 97                              // id
       };
     };
 
@@ -765,6 +770,7 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
         value.move< ConstantNode* > (std::move (that.value));
         break;
 
@@ -853,6 +859,7 @@ namespace yy {
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
@@ -1136,6 +1143,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
         value.template destroy< ConstantNode* > ();
         break;
 
@@ -1224,6 +1232,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
@@ -2113,6 +2122,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_OBJ (std::string v)
+      {
+        return symbol_type (token::TOK_OBJ, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_OBJ (const std::string& v)
+      {
+        return symbol_type (token::TOK_OBJ, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_SORT (std::string v)
       {
         return symbol_type (token::TOK_SORT, std::move (v));
@@ -2558,9 +2582,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 429,     ///< Last index in yytable_.
-      yynnts_ = 29,  ///< Number of nonterminal symbols.
-      yyfinal_ = 45 ///< Termination state number.
+      yylast_ = 455,     ///< Last index in yytable_.
+      yynnts_ = 30,  ///< Number of nonterminal symbols.
+      yyfinal_ = 48 ///< Termination state number.
     };
 
 
@@ -2584,15 +2608,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      59,    60,    57,    55,    64,    56,    63,    58,     2,     2,
+      60,    61,    58,    56,    65,    57,    64,    59,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    61,     2,    62,     2,     2,     2,     2,     2,     2,
+       2,    62,     2,    63,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    65,     2,    66,     2,     2,     2,     2,
+       2,     2,     2,    66,     2,    67,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2610,10 +2634,11 @@ switch (yykind)
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
-      45,    46,    47,    48,    49,    50,    51,    52,    53,    54
+      45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
+      55
     };
     // Last valid token kind.
-    const int code_max = 309;
+    const int code_max = 310;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2636,6 +2661,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
         value.copy< ConstantNode* > (YY_MOVE (that.value));
         break;
 
@@ -2724,6 +2750,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
@@ -2773,6 +2800,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_constant: // constant
+      case symbol_kind::SYM_primary_key: // primary_key
         value.move< ConstantNode* > (YY_MOVE (s.value));
         break;
 
@@ -2861,6 +2889,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"

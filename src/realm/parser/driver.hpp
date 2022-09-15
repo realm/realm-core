@@ -146,8 +146,13 @@ public:
         , m_comp_type(comp_type)
     {
     }
+    void add_table(std::string table_name)
+    {
+        target_table = table_name.substr(1, table_name.size() - 2);
+    }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
     util::Optional<ExpressionComparisonType> m_comp_type;
+    std::string target_table;
 };
 
 class ListNode : public ParserNode {
