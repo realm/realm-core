@@ -91,15 +91,25 @@ struct VersionList {
         uint64_t current_top;
         uint32_t count_live;
         uint32_t count_frozen;
-        bool active;
+        bool is_active()
+        {
+            return version != 0;
+        }
+        void deactivate()
+        {
+            version = 0;
+        }
+        void activate(uint64_t v)
+        {
+            version = v;
+        }
     };
 
     void reserve(uint32_t size) noexcept
     {
         for (auto i = entries; i < size; ++i)
-            data()[i].active = false;
+            data()[i].deactivate();
         if (size > entries) {
-            num_free += size - entries;
             entries = size;
         }
     }
@@ -107,7 +117,6 @@ struct VersionList {
     VersionList() noexcept
     {
         newest = nil; // empty
-        num_free = 0; // empty
         entries = 0;
         reserve(init_readers_size);
     }
@@ -134,34 +143,34 @@ struct VersionList {
     {
         return get(newest);
     }
-    ReadCount& allocate_entry(uint64_t top, uint64_t size, uint64_t version) noexcept
+    // throws bad_alloc if all entries are in use
+    ReadCount& try_allocate_entry(uint64_t top, uint64_t size, uint64_t version)
     {
         for (uint32_t i = 0; i < entries; ++i) {
-            if (!data()[i].active) {
-                num_free--;
+            // when allocating != newest we're "healing" from a crash during an earlier allocation
+            if (!data()[i].is_active() || (allocating != newest && allocating == i)) {
                 auto& rc = data()[i];
+                allocating = i;
                 rc.count_frozen = rc.count_live = 0;
                 rc.current_top = top;
                 rc.filesize = size;
-                rc.version = version;
-                rc.active = true;
+                rc.activate(version);
                 newest = i;
                 return rc;
             }
         }
-        REALM_ASSERT_RELEASE(false);
+        throw std::bad_alloc();
     }
 
-    int index_of(const ReadCount& rc) noexcept
+    uint32_t index_of(const ReadCount& rc) noexcept
     {
         return static_cast<int>(&rc - data());
     }
 
     void free_entry(ReadCount* rc) noexcept
     {
-        rc->current_top = rc->filesize = rc->version = -1ULL; // easy to recognize in debugger
-        rc->active = false;
-        num_free++;
+        rc->current_top = rc->filesize = -1ULL; // easy to recognize in debugger
+        rc->deactivate();
     }
 
     // This method resets the version list to an empty state, then allocates an entry.
@@ -174,16 +183,12 @@ struct VersionList {
     ReadCount& init_versioning(uint64_t top, uint64_t filesize, uint64_t version) noexcept
     {
         newest = nil;
+        allocating = 0;
         auto t_free = entries;
-        entries = num_free = 0;
+        entries = 0;
         reserve(t_free);
-        ReadCount& r = allocate_entry(top, filesize, version);
+        ReadCount& r = try_allocate_entry(top, filesize, version);
         return r;
-    }
-
-    bool is_full() const noexcept
-    {
-        return num_free == 0;
     }
 
     void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs, bool& any_new_unreachables)
@@ -191,7 +196,7 @@ struct VersionList {
         oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
         for (auto* rc = data(); rc < data() + entries; ++rc) {
-            if (rc->active) {
+            if (rc->is_active()) {
                 if (rc->count_live != 0) {
                     if (rc->version < oldest_live_v)
                         oldest_live_v = rc->version;
@@ -214,12 +219,11 @@ struct VersionList {
         REALM_ASSERT(oldest_live_v != std::numeric_limits<uint64_t>::max());
     }
 
-    uint32_t entries;
-    int32_t newest;
-    int32_t num_free;
-
-    constexpr static int nil = -1;
+    constexpr static uint32_t nil = (uint32_t)-1;
     const static int init_readers_size = 32;
+    uint32_t entries;
+    std::atomic<uint32_t> allocating;
+    std::atomic<uint32_t> newest;
 
     // IMPORTANT: The actual data comprising the version list MUST BE PLACED LAST in
     // the VersionList structure, as the data area is extended at run time.
@@ -521,8 +525,8 @@ public:
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
         const bool pick_specific = version_id.version != VersionID().version;
-        read_lock.m_reader_idx = pick_specific ? version_id.index : m_info->readers.newest;
-        REALM_ASSERT(m_info->readers.newest != VersionList::nil);
+        read_lock.m_reader_idx = pick_specific ? version_id.index : m_info->readers.newest.load();
+        REALM_ASSERT(m_info->readers.newest.load() != VersionList::nil);
         bool picked_newest = read_lock.m_reader_idx == (unsigned)m_info->readers.newest;
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
@@ -549,7 +553,10 @@ public:
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
         std::lock_guard lock(m_mutex);
-        if (m_info->readers.is_full()) {
+        try {
+            m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
+        }
+        catch (std::bad_alloc&) {
             // buffer expansion
             auto entries = m_info->readers.capacity();
             auto new_entries = entries + 32;
@@ -560,8 +567,8 @@ public:
             m_info = m_reader_map.get_addr();
             m_local_max_entry = new_entries;
             m_info->readers.reserve(new_entries);
+            m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
         }
-        m_info->readers.allocate_entry(new_top_ref, new_file_size, new_version);
     }
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
