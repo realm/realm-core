@@ -1087,8 +1087,7 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     verify_thread();
 
 #if REALM_ENABLE_SYNC
-    if ((m_config.sync_config && m_config.sync_config->flx_sync_requested) ||
-        (config.sync_config && config.sync_config->flx_sync_requested)) {
+    if (config.sync_config && config.sync_config->flx_sync_requested) {
         throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
     }
 #endif
