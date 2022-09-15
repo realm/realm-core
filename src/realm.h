@@ -1136,6 +1136,14 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
 /**
+ * Find and delete the table passed as parementer for the realm instance passed to this function.
+ * @param table_name for the table the user wants to delete
+ * @param table_deleted in order to indicate if the table was actually deleted from realm
+ * @return true if no error has occured, false otherwise
+ */
+RLM_API bool realm_remove_table(realm_t*, const char* table_name, bool* table_deleted);
+
+/**
  * Create a new schema from classes and their properties.
  *
  * Note: This function does not validate the schema.
