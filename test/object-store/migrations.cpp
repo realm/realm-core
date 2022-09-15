@@ -697,6 +697,105 @@ TEST_CASE("migration: Automatic") {
                     parent_object.set_property_value(context, "child_property", std::any(child_object));
                 }));
         }
+
+        SECTION("Migrations to embedded object with untyped Mixed links") {
+            auto setup_mixed_link = [&](PropertyType type) -> SharedRealm {
+                InMemoryTestFile config;
+                config.automatic_handle_backlicks_in_migrations = true;
+                Schema schema = {
+                    {
+                        "child_table",
+                        {{"value", PropertyType::Int}},
+                    },
+                    {"parent_table",
+                     {
+                         {"child_property", type},
+                     }},
+                };
+                auto realm = Realm::get_shared_realm(config);
+                realm->update_schema(schema, 1);
+                realm->begin_transaction();
+                auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+                Obj child_object = child_table->create_object();
+                child_object.set("value", 42);
+                auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+                auto parent_object = parent_table->create_object();
+                auto child_object_key = child_object.get_key();
+                ColKey child_col_key = parent_table->get_column_key("child_property");
+
+                REALM_ASSERT(child_col_key.get_type() == col_type_Mixed);
+                Mixed child_link = ObjLink{child_table->get_key(), child_object_key};
+                if (child_col_key.is_set()) {
+                    auto set = parent_object.get_set<Mixed>(child_col_key);
+                    set.insert(child_link);
+                }
+                else if (child_col_key.is_list()) {
+                    auto list = parent_object.get_list<Mixed>(child_col_key);
+                    list.insert(0, child_link);
+                    list.insert(1, child_link);
+                }
+                else if (child_col_key.is_dictionary()) {
+                    auto dict = parent_object.get_dictionary(child_col_key);
+                    dict.insert("foo", child_link);
+                    dict.insert("bar", child_link);
+                }
+                else {
+                    REALM_ASSERT(!child_col_key.is_collection());
+                    parent_object.set_any(child_col_key, child_link);
+                }
+                realm->commit_transaction();
+                REQUIRE(parent_table->size() == 1);
+                REQUIRE(child_table->size() == 1);
+                REQUIRE_FALSE(child_table->is_embedded());
+                REQUIRE_FALSE(parent_table->is_embedded());
+                return realm;
+            };
+            auto post_check_failed_migration = [](SharedRealm realm) {
+                auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+                auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+                REQUIRE(realm->schema_version() == 1);
+                REQUIRE(parent_table->size() == 1);
+                REQUIRE(child_table->size() == 1);
+                REQUIRE(!child_table->is_embedded());
+            };
+            const std::string expected_message =
+                "There is a dynamic/untyped link from a Mixed property 'class_parent_table.child_property' which "
+                "prevents migrating class 'class_child_table' to embedded";
+
+            SECTION("List<Mixed>") {
+                auto realm = setup_mixed_link(PropertyType::Mixed | PropertyType::Nullable | PropertyType::Array);
+                REQUIRE_THROWS_CONTAINING(
+                    realm->update_schema(set_table_type(realm->schema(), "child_table", ObjectType::Embedded), 2,
+                                         [](auto, auto, auto&) {}),
+                    expected_message);
+                post_check_failed_migration(realm);
+            }
+            SECTION("Set<Mixed>") {
+                auto realm = setup_mixed_link(PropertyType::Mixed | PropertyType::Nullable | PropertyType::Set);
+                REQUIRE_THROWS_CONTAINING(
+                    realm->update_schema(set_table_type(realm->schema(), "child_table", ObjectType::Embedded), 2,
+                                         [](auto, auto, auto&) {}),
+                    expected_message);
+                post_check_failed_migration(realm);
+            }
+            SECTION("Dictionary<Mixed>") {
+                auto realm =
+                    setup_mixed_link(PropertyType::Mixed | PropertyType::Nullable | PropertyType::Dictionary);
+                REQUIRE_THROWS_CONTAINING(
+                    realm->update_schema(set_table_type(realm->schema(), "child_table", ObjectType::Embedded), 2,
+                                         [](auto, auto, auto&) {}),
+                    expected_message);
+                post_check_failed_migration(realm);
+            }
+            SECTION("Mixed property") {
+                auto realm = setup_mixed_link(PropertyType::Mixed | PropertyType::Nullable);
+                REQUIRE_THROWS_CONTAINING(
+                    realm->update_schema(set_table_type(realm->schema(), "child_table", ObjectType::Embedded), 2,
+                                         [](auto, auto, auto&) {}),
+                    expected_message);
+                post_check_failed_migration(realm);
+            }
+        }
     }
 
     SECTION("valid migrations") {

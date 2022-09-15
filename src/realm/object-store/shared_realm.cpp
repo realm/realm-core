@@ -401,14 +401,17 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
-    if (m_config.sync_config) {
-        validation_mode |= SchemaValidationMode::Sync;
+#if REALM_ENABLE_SYNC
+    if (auto sync_config = m_config.sync_config) {
+        validation_mode |=
+            sync_config->flx_sync_requested ? SchemaValidationMode::SyncFLX : SchemaValidationMode::SyncPBS;
     }
+#endif
     if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
         validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
     }
 
-    schema.validate(validation_mode);
+    schema.validate(static_cast<SchemaValidationMode>(validation_mode));
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -461,6 +464,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
             auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            // block autorefresh for the old realm
+            old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 

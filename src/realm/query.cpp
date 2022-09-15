@@ -992,8 +992,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
                     st.m_key_offset = cluster->get_offset();
                     st.m_key_values = cluster->get_key_array();
                     aggregate_internal(node, &st, 0, e, &leaf);
-                    // Continue
-                    return false;
+                    return IteratorControl::AdvanceToNext;
                 };
 
                 m_table.unchecked_ptr()->traverse_clusters(f);
@@ -1005,7 +1004,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
                     st.m_key_offset = obj.get_key().value;
                     st.match(realm::npos, obj.get<T>(column_key));
                 }
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
         }
     }
@@ -1436,10 +1435,9 @@ ObjKey Query::find() const
             if (res != not_found) {
                 key = cluster->get_real_key(res);
                 // We should just find one - we're done
-                return true;
+                return IteratorControl::Stop;
             }
-            // Continue
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         m_table->traverse_clusters(f);
@@ -1477,7 +1475,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                     refs.add(ObjKey(key_values->get(i) + offset));
                     --limit;
                 }
-                return limit == 0;
+                return limit == 0 ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
             };
 
             m_table->traverse_clusters(f);
@@ -1524,7 +1522,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 st.m_key_values = cluster->get_key_array();
                 aggregate_internal(node, &st, 0, e, nullptr);
                 // Stop if limit is reached
-                return st.match_count() == st.limit();
+                return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
             };
 
             m_table->traverse_clusters(f);
@@ -1570,7 +1568,7 @@ size_t Query::do_count(size_t limit) const
             if (eval_object(obj)) {
                 cnt++;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
     else {
@@ -1612,7 +1610,7 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
-            return st.match_count() == st.limit();
+            return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
         };
 
         m_table->traverse_clusters(f);
@@ -1827,28 +1825,14 @@ void* Query::query_thread(void* arg)
 
 #endif // REALM_MULTITHREADQUERY
 
-std::string Query::validate() const
-{
-    if (!m_groups.size())
-        return "";
-
-    if (error_code != "") // errors detected by QueryInterface
-        return error_code;
-
-    if (!root_node())
-        return "Syntax error";
-
-    return root_node()->validate(); // errors detected by QueryEngine
-}
-
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     std::string description;
-    if (root_node()) {
+    if (auto root = root_node()) {
         if (m_view) {
             throw SerializationError("Serialization of a query constrained by a view is not currently supported");
         }
-        description = root_node()->describe_expression(state);
+        description = root->describe_expression(state);
     }
     else {
         // An empty query returns all results and one way to indicate this
@@ -1874,7 +1858,7 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description(const std::string& class_prefix) const
 {
-    util::serializer::SerialisationState state(class_prefix);
+    util::serializer::SerialisationState state(class_prefix, m_table->get_parent_group());
     return get_description(state);
 }
 

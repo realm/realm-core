@@ -31,22 +31,18 @@ static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type
 
 using ProtocolError = realm::sync::ProtocolError;
 
-SyncError::SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-                     util::Optional<std::string> serverLog,
+static const constexpr std::string_view s_middle(" Logs: ");
+
+SyncError::SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
+                     util::Optional<std::string_view> serverLog,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : SystemError(std::move(error_code), std::move(msg))
+    : SystemError(error_code, serverLog ? util::format("%1%2%3", msg, s_middle, *serverLog) : std::string(msg))
     , is_fatal(is_fatal)
+    , simple_message(std::string_view(what(), msg.size()))
     , compensating_writes_info(std::move(compensating_writes))
 {
     if (serverLog) {
-        size_t msg_length = message.size();
-        static constexpr std::string_view middle(" Logs: ");
-        message = util::format("%1%2%3", message, middle, *serverLog);
-        simple_message = std::string_view(message.data(), msg_length);
-        logURL = std::string_view(message.data() + msg_length + middle.size(), serverLog->size());
-    }
-    else {
-        simple_message = message;
+        logURL = std::string_view(what() + msg.size() + s_middle.size(), serverLog->size());
     }
 }
 

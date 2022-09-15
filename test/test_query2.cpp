@@ -864,54 +864,6 @@ TEST(Query_FindAllContainsUnicode)
     CHECK_EQUAL(3, tv2[3].get<Int>(col_id));
 }
 
-TEST(Query_SyntaxCheck)
-{
-    Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    table.add_column(type_String, "2");
-
-    std::string s;
-
-    table.create_object().set_all(1, "a");
-    table.create_object().set_all(2, "a");
-    table.create_object().set_all(3, "X");
-
-    Query q1 = table.where().equal(col_int, 2).end_group();
-    s = q1.validate();
-    CHECK(s != "");
-
-    Query q2 = table.where().group().group().equal(col_int, 2).end_group();
-    s = q2.validate();
-    CHECK(s != "");
-
-    Query q3 = table.where().equal(col_int, 2).Or();
-    s = q3.validate();
-    CHECK(s != "");
-
-    Query q4 = table.where().Or().equal(col_int, 2);
-    s = q4.validate();
-    CHECK(s != "");
-
-    Query q5 = table.where().equal(col_int, 2);
-    s = q5.validate();
-    CHECK(s == "");
-
-    Query q6 = table.where().group().equal(col_int, 2);
-    s = q6.validate();
-    CHECK(s != "");
-
-    // FIXME: Work is currently underway to fully support locale
-    // independent case folding as defined by Unicode. Reenable this test
-    // when is becomes available.
-    /*
-    Query q7 = ttt.where().equal(1, "\xa0", false);
-#ifdef REALM_DEBUG
-    s = q7.verify();
-    CHECK(s != "");
-#endif
-    */
-}
-
 TEST(Query_TestTV_where)
 {
     // When using .where(&tv), tv can have any order, and the resulting view will retain its order

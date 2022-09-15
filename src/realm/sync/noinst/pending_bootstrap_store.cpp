@@ -139,7 +139,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     auto incomplete_bootstraps = Query(bootstrap_table).not_equal(m_query_version, query_version).find_all();
     incomplete_bootstraps.for_each([&](Obj obj) {
         m_logger->debug("Clearing incomplete bootstrap for query version %1", obj.get<int64_t>(m_query_version));
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
     incomplete_bootstraps.clear();
 

@@ -191,7 +191,7 @@ std::unordered_set<std::string> get_embedded_object_orphans(const Schema& schema
 
 } // end anonymous namespace
 
-void Schema::validate(uint64_t validation_mode) const
+void Schema::validate(SchemaValidationMode validation_mode) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -207,9 +207,8 @@ void Schema::validate(uint64_t validation_mode) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
-    const bool for_sync = validation_mode & SchemaValidationMode::Sync;
     for (auto const& object : *this) {
-        object.validate(*this, exceptions, for_sync);
+        object.validate(*this, exceptions, validation_mode);
     }
 
     // TODO: remove this client side check once the server supports it

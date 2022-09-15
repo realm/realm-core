@@ -878,7 +878,7 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-            self->m_logger->error("Audit: Received sync error: %1 (ec=%2)", error.message,
+            self->m_logger->error("Audit: Received sync error: %1 (ec=%2)", error.what(),
                                   error.get_system_error().value());
         }
         if (error_handler) {

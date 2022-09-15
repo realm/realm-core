@@ -46,8 +46,7 @@ void Table::aggregate(QueryStateBase& st, ColKey column_key) const
             auto v = leaf.get(local_index);
             cont = st.match(local_index, v);
         }
-        // We should continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);

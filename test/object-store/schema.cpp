@@ -372,7 +372,8 @@ TEST_CASE("Schema") {
                  ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
-            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::Sync));
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::SyncFLX));
+            REQUIRE_THROWS(schema.validate(SchemaValidationMode::SyncPBS));
         }
 
         SECTION("asymmetric tables not allowed in local realm") {
@@ -392,7 +393,7 @@ TEST_CASE("Schema") {
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
             };
             REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::Sync),
+                schema.validate(SchemaValidationMode::SyncFLX),
                 "Property 'object.link' of type 'object' cannot be a link to an asymmetric object.");
         }
 
@@ -403,7 +404,7 @@ TEST_CASE("Schema") {
                  {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", {{"value", PropertyType::Int}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(SchemaValidationMode::Sync),
+            REQUIRE_THROWS_CONTAINING(schema.validate(SchemaValidationMode::SyncFLX),
                                       "Asymmetric table with property 'object.link' of type 'object' cannot have a "
                                       "non-embedded object type.");
         }
@@ -416,7 +417,7 @@ TEST_CASE("Schema") {
                   {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
             };
-            schema.validate(SchemaValidationMode::Sync);
+            schema.validate(SchemaValidationMode::SyncFLX);
         }
 
         SECTION("rejects array properties with no target object") {

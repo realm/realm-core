@@ -51,8 +51,6 @@ struct SyncError : public SystemError {
     enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
 
     bool is_fatal;
-    /// A consolidated explanation of the error, including a link to the server logs if applicable.
-    std::string message;
     // Just the minimal error message, without any log URL.
     std::string_view simple_message;
     // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
@@ -72,8 +70,8 @@ struct SyncError : public SystemError {
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
-    SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-              util::Optional<std::string> serverLog = util::none,
+    SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
+              util::Optional<std::string_view> serverLog = util::none,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
@@ -95,13 +93,13 @@ struct SyncError : public SystemError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ReconnectMode {
-    /// This is the mode that should always be used in production. In this
+    /// This is the mode that should always be used by SDKs. In this
     /// mode the client uses a scheme for determining a reconnect delay that
     /// prevents it from creating too many connection requests in a short
     /// amount of time (i.e., a server hammering protection mechanism).
     normal,
 
-    /// For testing purposes only.
+    /// For internal sync-client testing purposes only.
     ///
     /// Never reconnect automatically after the connection is closed due to
     /// an error. Allow immediate reconnect if the connection was closed
@@ -132,8 +130,7 @@ enum class ClientResyncMode : unsigned char {
 };
 
 struct SyncConfig {
-    struct FLXSyncEnabled {
-    };
+    struct FLXSyncEnabled {};
 
     struct ProxyConfig {
         using port_type = sync::port_type;
@@ -184,6 +181,7 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
+    SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

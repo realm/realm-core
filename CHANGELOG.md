@@ -3,16 +3,25 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Convert object_store::Collection types into Results (PR [#5845](https://github.com/realm/realm-core/pull/5845))
+* Expose `realm_object_get_parent` in the C API (PR [#5851](https://github.com/realm/realm-core/pull/5851))
+* Expose `realm_list_find` in the C API (PR [#5848](https://github.com/realm/realm-core/pull/5848))
+* Expose `Group::remove_table` in the C API (PR [#5860](https://github.com/realm/realm-core/pull/5860))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Prevent migrations to an embedded object type when there are incoming links from Mixed/TypedLink properties until we can support them. ([#5796](https://github.com/realm/realm-core/pull/5796))
 * Fix a data race on RealmCoordinator::m_sync_session which could occur if multiple threads performed the initial open of a Realm at once. (since v11.8.0).
 * If a SyncSession outlived the parent Realm and then was adopted by a new Realm for the same file, other processes would not get notified for sync writes on that file.
 * Fix one cause of QoS inversion warnings when performing writes on the main thread on Apple platforms. Waiting for async notifications to be ready is now done in a QoS-aware ways.
 * `Realm::refresh()` did not actually advance to the latest version in some cases. If there was a version newer than the current version which did not require blocking it would advance to that instead, contrary to the documented behavior.
+* If you set a subscription on a link in flexible sync, the server would not know how to handle it ([#5409](https://github.com/realm/realm-core/issues/5409))
 * Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
-* Calling Results::sum/min/max on a RealmList field returns its memory address. ([#5137](https://github.com/realm/realm-core/issues/5137))
+* Calling Results::sum/min/max on a collection field throws an exception rather than aggregating on the underlying memory addresses. ([#5137](https://github.com/realm/realm-core/issues/5137))
+* Fixed `realm_query_parse_for_list` ignoring existing query ([#5850](https://github.com/realm/realm-core/pull/5850)).
+* Fixed not allowing asymmetric tables in partition based sync ([#5691](https://github.com/realm/realm-core/issues/5691)).
+* Disable auto refresh for old realm instance passed to migration callbacks. ([#5856](https://github.com/realm/realm-core/pull/5856)).
+* If a case insensitive query searched for a string including an 4-byte UTF8 character, the program would crash ([#5825](https://github.com/realm/realm-core/issues/5825), since v2.3.0)
 
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
@@ -23,7 +32,7 @@
 -----------
 
 ### Internals
-* None.
+* Traversal functions use a typed IteratorControl value rather than true/false. ([#5857](https://github.com/realm/realm-core/issues/5857))
 
 ----------------------------------------------
 

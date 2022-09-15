@@ -191,7 +191,7 @@ class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscriba
     friend class SyncSession;
 
 public:
-    enum class State : std::size_t {
+    enum class State {
         LoggedOut,
         LoggedIn,
         Removed,

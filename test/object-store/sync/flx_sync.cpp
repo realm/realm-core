@@ -610,7 +610,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto config_copy = config_local;
             auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
             config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
-                REALM_ASSERT_EX(!err.is_fatal, err.message);
+                REALM_ASSERT_EX(!err.is_fatal, err.what());
                 CHECK(err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
@@ -815,7 +815,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             if (!error_promise) {
                 std::cerr << util::format(
                                  "An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                 err.message)
+                                 err.what())
                           << std::endl;
                 abort();
             }
@@ -1403,12 +1403,8 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
         return static_cast<bool>(sync_error);
     });
 
-<<<<<<< HEAD
     CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
-=======
-    CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
->>>>>>> master
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
@@ -1557,7 +1553,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         auto realm = Realm::get_shared_realm(interrupted_realm_config);
         const auto& error = error_pf.future.get();
         REQUIRE(error.is_fatal);
-        REQUIRE(error.error_code == make_error_code(sync::ClientError::bad_changeset));
+        REQUIRE(error.get_system_error() == make_error_code(sync::ClientError::bad_changeset));
     }
 
     SECTION("interrupted before final bootstrap message") {
@@ -1956,6 +1952,21 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
         });
+    }
+
+    SECTION("asymmetric table not allowed in PBS") {
+        Schema schema{
+            {"Asymmetric2",
+             ObjectSchema::ObjectType::TopLevelAsymmetric,
+             {
+                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"location", PropertyType::Int},
+                 {"reading", PropertyType::Int},
+             }},
+        };
+
+        SyncTestFile config(harness->app(), bson::Bson{}, schema);
+        REQUIRE_THROWS(Realm::get_shared_realm(config));
     }
 
     // Add any new test sections above this point

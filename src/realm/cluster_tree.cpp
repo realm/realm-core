@@ -692,7 +692,7 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
         if (child_is_leaf) {
             Cluster leaf(offs, m_alloc, m_tree_top);
             leaf.init(mem);
-            if (func(&leaf)) {
+            if (func(&leaf) == IteratorControl::Stop) {
                 return true;
             }
         }
@@ -994,7 +994,7 @@ bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const 
 bool ClusterTree::traverse(TraverseFunction func) const
 {
     if (m_root->is_leaf()) {
-        return func(static_cast<Cluster*>(m_root.get()));
+        return func(static_cast<Cluster*>(m_root.get())) == IteratorControl::Stop;
     }
     else {
         return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
@@ -1016,7 +1016,7 @@ void ClusterTree::verify() const
 #ifdef REALM_DEBUG
     traverse([](const Cluster* cluster) {
         cluster->verify();
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 #endif
 }

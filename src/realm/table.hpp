@@ -477,14 +477,14 @@ public:
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
     // Iterate through (subset of) columns. The supplied function may abort iteration
-    // by returning 'true' (early out).
+    // by returning 'IteratorControl::Stop' (early out).
     template <typename Func>
     bool for_each_and_every_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;
@@ -497,7 +497,7 @@ public:
                 continue;
             if (col_key.get_type() == col_type_BackLink)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;
@@ -511,7 +511,7 @@ public:
                 continue;
             if (col_key.get_type() != col_type_BackLink)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;

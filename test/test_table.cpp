@@ -3327,7 +3327,7 @@ TEST(Table_object_forward_iterator)
     size_t tree_size = 0;
     auto f = [&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     table.traverse_clusters(f);
     CHECK_EQUAL(tree_size, size_t(nb_rows));

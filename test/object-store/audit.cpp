@@ -48,6 +48,7 @@
 
 using namespace realm;
 using namespace std::string_literals;
+using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
 #ifndef AUDIT_LOG_LEVEL
@@ -1661,7 +1662,7 @@ TEST_CASE("audit integration tests") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1694,7 +1695,7 @@ TEST_CASE("audit integration tests") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1763,8 +1764,8 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE(error.message.find(
-                        "client connected using partition based sync when app is using flexible sync") == 0);
+            REQUIRE_THAT(error.what(),
+                         StartsWith("client connected using partition based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);
         }
 

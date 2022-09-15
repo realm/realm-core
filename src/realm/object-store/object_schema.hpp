@@ -35,6 +35,8 @@ struct ObjectSchemaValidationException;
 }
 struct Property;
 
+enum SchemaValidationMode { Basic = 0, SyncPBS = 1, RejectEmbeddedOrphans = 2, SyncFLX = 4 };
+
 class ObjectSchema {
 public:
     /// The type of tables supported by a realm.
@@ -82,7 +84,7 @@ public:
     bool property_is_computed(Property const& property) const noexcept;
 
     void validate(Schema const& schema, std::vector<schema::ObjectSchemaValidationException>& exceptions,
-                  bool for_sync) const;
+                  SchemaValidationMode validation_mode) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 

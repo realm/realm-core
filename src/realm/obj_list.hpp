@@ -76,7 +76,7 @@ public:
         auto sz = size();
         for (size_t i = 0; i < sz; i++) {
             auto o = try_get_object(i);
-            if (o && func(o))
+            if (o && func(o) == IteratorControl::Stop)
                 return;
         }
     }

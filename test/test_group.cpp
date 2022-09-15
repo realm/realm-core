@@ -1359,7 +1359,7 @@ TEST(Group_ChangeEmbeddedness)
     // Now obj2 has 2 parents
     CHECK_EQUAL(obj2.get_backlink_count(), 2);
     CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
-    CHECK_EQUAL(message, "At least one object in 'table' does have multiple backlinks.");
+    CHECK_EQUAL(message, "At least one object in 'table' has multiple backlinks.");
     CHECK_NOT(t->is_embedded());
 }
 
