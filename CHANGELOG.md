@@ -16,8 +16,8 @@
 * Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841)).
 * Fixed `realm_query_parse_for_list` ignoring existing query ([#5850](https://github.com/realm/realm-core/pull/5850)).
 * Fixed not allowing asymmetric tables in partition based sync ([#5691](https://github.com/realm/realm-core/issues/5691)).
-* Throw exception if `Realm::Convert` tries to convert to flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798)).
 * Disable auto refresh for old realm instance passed to migration callbacks. ([#5856](https://github.com/realm/realm-core/pull/5856)).
+* Throw exception if `Realm::Convert` tries to convert to flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798)).
 
 ### Breaking changes
 * None.
