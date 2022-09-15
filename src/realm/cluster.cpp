@@ -1489,7 +1489,7 @@ void Cluster::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) 
     auto cluster_sz = node_size();
     path.push_back(0);
     auto col_keys = m_tree_top.get_owning_table()->get_column_keys();
-    for (size_t i = 1; i < Array::size(); i++) {
+    for (unsigned i = 1; i < Array::size(); i++) {
         path.back() = i;
         auto val = Array::get(i);
         if (val & 7) {

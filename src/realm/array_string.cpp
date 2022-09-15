@@ -487,7 +487,7 @@ bool ArrayString::verify_cluster(util::Logger& logger, std::vector<unsigned>& pa
 
     if (top.has_refs()) {
         path.push_back(0);
-        for (size_t i = 0; i < top.size(); i++) {
+        for (unsigned i = 0; i < top.size(); i++) {
             path.back() = i;
             auto val = top.get(i);
             if (val & 7) {

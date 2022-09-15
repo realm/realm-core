@@ -31,8 +31,6 @@ namespace realm {
 class StringData;
 namespace util {
 
-std::ostream& operator<<(std::ostream& ostr, std::vector<unsigned> vec);
-
 class Printable {
 public:
     constexpr Printable(bool value)

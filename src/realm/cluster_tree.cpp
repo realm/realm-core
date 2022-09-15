@@ -1081,7 +1081,7 @@ void ClusterTree::verify() const
 #endif
 }
 
-void ClusterTree::verify_cluster(util::Logger& logger, std::vector<unsigned> path) const
+void ClusterTree::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const
 {
     m_root->verify_cluster(logger, path);
 }
