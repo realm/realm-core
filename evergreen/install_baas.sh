@@ -33,7 +33,7 @@ case $(uname -s) in
             STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_0bdbed3d42ea136e166b3aad8f6fd09f336b1668_22_03_29_14_36_02/assisted_agg"
             # Testing
-            GO_URL="https://go.dev/dl/go1.18.6.darwin-amd.tar.gz"
+            GO_URL="https://go.dev/dl/go1.18.6.darwin-amd64.tar.gz"
             # GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.2.darwin-amd64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
         fi
