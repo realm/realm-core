@@ -283,8 +283,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     // synchronization. The latter is probably fixable, but making it
     // multi-process-safe requires some sort of multi-process exclusive lock
     m_transaction = nullptr;
-    m_coordinator->close();
-    util::File::remove(m_config.path);
+    m_coordinator->delete_and_reopen();
 
     m_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
@@ -311,7 +310,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
-            return false;
+            return m_schema_version == ObjectStore::NotVersioned;
 
         case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
@@ -452,7 +451,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
@@ -475,11 +475,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
-                                          required_changes, wrapper);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations,
+                                          wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes);
+                                          required_changes, m_config.automatic_handle_backlicks_in_migrations);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
@@ -625,6 +626,7 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
+    REALM_ASSERT(m_transaction);
     return m_transaction->get_version_of_current_transaction();
 }
 
@@ -653,6 +655,16 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
+    }
+    return ret;
+}
+
+// Get the version of the latest snapshot
+util::Optional<DB::version_type> Realm::latest_snapshot_version() const
+{
+    util::Optional<DB::version_type> ret;
+    if (m_transaction) {
+        ret = m_transaction->get_version_of_latest_snapshot();
     }
     return ret;
 }

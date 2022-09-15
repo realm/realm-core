@@ -45,6 +45,7 @@ set(REALM_SOURCES
     node.cpp
     mixed.cpp
     obj.cpp
+    object_converter.cpp
     global_key.cpp
     query_engine.cpp
     query_expression.cpp

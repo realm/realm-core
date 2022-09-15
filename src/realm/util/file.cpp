@@ -1073,10 +1073,10 @@ void File::barrier()
 #if REALM_PLATFORM_APPLE
     if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
         return;
-    throw std::system_error(errno, std::system_category(), "fcntl() with F_BARRIERFSYNC failed");
-#else
-    sync();
+        // If fcntl fails, we fallback to full sync.
+        // This is known to occur on exFAT which does not support F_BARRIERSYNC.
 #endif
+    sync();
 }
 
 #ifndef _WIN32
@@ -1723,7 +1723,7 @@ void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags,
     m_size = m_reservation_size = size;
     m_fd = f.m_fd;
     m_offset = offset;
-    m_a = a;
+    m_access_mode = a;
 }
 
 
@@ -1762,7 +1762,7 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
         return false;
     m_addr = addr;
     REALM_ASSERT(m_size == 0);
-    m_a = a;
+    m_access_mode = a;
     m_reservation_size = size;
     m_fd = file.get_descriptor();
     m_offset = offset;
@@ -1798,8 +1798,8 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     }
 #endif
     try {
-        void* got_addr =
-            util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_a, extension_start_offset, nullptr);
+        void* got_addr = util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_access_mode,
+                                          extension_start_offset, nullptr);
         if (got_addr == extension_start_addr) {
             m_size = size;
             return true;

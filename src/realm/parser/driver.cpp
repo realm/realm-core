@@ -419,7 +419,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type == type_Link && right_type == type_TypedLink && right->has_constant_evaluation()) {
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_single_value()) {
         if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
             if (right->get_mixed().is_null()) {
                 right_type = ColumnTypeTraits<realm::null>::id;
@@ -466,7 +466,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (right->has_constant_evaluation() && (left_type == right_type || left_type == type_Mixed)) {
+    if (right->has_single_value() && (left_type == right_type || left_type == type_Mixed)) {
         Mixed val = right->get_mixed();
         if (prop && !prop->links_exist()) {
             auto col_key = prop->column_key();
@@ -575,8 +575,8 @@ Query RelationalNode::visit(ParserDriver* drv)
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
-    const bool right_type_is_null = right->has_constant_evaluation() && right->get_mixed().is_null();
-    const bool left_type_is_null = left->has_constant_evaluation() && left->get_mixed().is_null();
+    const bool right_type_is_null = right->has_single_value() && right->get_mixed().is_null();
+    const bool left_type_is_null = left->has_single_value() && left->get_mixed().is_null();
     REALM_ASSERT(!(left_type_is_null && right_type_is_null));
 
     if (left_type == type_Link || left_type == type_TypeOfValue) {
@@ -592,7 +592,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+    if (prop && !prop->links_exist() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         switch (left->get_type()) {
@@ -651,7 +651,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
 
     verify_only_string_types(right_type, opstr[op]);
 
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+    if (prop && !prop->links_exist() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {
@@ -1055,16 +1055,14 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
             decode_buffer.resize(*decoded_size); // truncate
-            drv->m_args.buffer_space.push_back(OwnedData{decode_buffer.data(), decode_buffer.size()});
-            const char* data = drv->m_args.buffer_space.back().data();
             if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Binary) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Mixed) {
-                ret = std::make_unique<Value<BinaryData>>(BinaryData(data, decode_buffer.size()));
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             break;
         }
@@ -1292,29 +1290,14 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
         }
     }
 
-    std::unique_ptr<Value<Mixed>> ret = std::make_unique<Value<Mixed>>();
-    constexpr bool is_list = true;
-    ret->init(is_list, elements.size());
+    auto ret = std::make_unique<ConstantMixedList>(elements.size());
     ret->set_comparison_type(m_comp_type);
     size_t ndx = 0;
     for (auto constant : elements) {
         auto evaulated_constant = constant->visit(drv, hint);
         if (auto value = dynamic_cast<const ValueBase*>(evaulated_constant.get())) {
             REALM_ASSERT_EX(value->size() == 1, value->size());
-            Mixed mixed = value->get(0);
-            if (mixed.is_type(type_String)) {
-                StringData str = mixed.get_string();
-                drv->m_args.buffer_space.push_back(OwnedData{str.data(), str.size()});
-                ret->set(ndx++, StringData(drv->m_args.buffer_space.back().data(), str.size()));
-            }
-            else if (mixed.is_type(type_Binary)) {
-                BinaryData bin = mixed.get_binary();
-                drv->m_args.buffer_space.push_back(OwnedData{bin.data(), bin.size()});
-                ret->set(ndx++, BinaryData(drv->m_args.buffer_space.back().data(), bin.size()));
-            }
-            else {
-                ret->set(ndx++, value->get(0));
-            }
+            ret->set(ndx++, value->get(0));
         }
         else {
             throw InvalidQueryError("Invalid constant inside constant list");
@@ -1425,7 +1408,7 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
                                              left->description(state), right->description(state)));
     }
     if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
-        if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {
+        if (link_column->has_multiple_values() && right->has_single_value() && right->get_mixed().is_null()) {
             throw InvalidQueryError(
                 util::format("Cannot compare linklist ('%1') with NULL", left->description(state)));
         }

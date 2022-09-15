@@ -612,22 +612,28 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     config2.schema = config.schema;
 
     std::mutex mutex;
-    SECTION("can open synced Realms that don't already exist") {
+
+    auto async_open_realm = [&](const Realm::Config& config) {
         ThreadSafeReference realm_ref;
-        bool called = false;
+        std::exception_ptr error;
         auto task = Realm::get_synchronized_realm(config);
-        task->start(realm::util::EventLoopDispatcher([&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(!error);
-            called = true;
+        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+            std::lock_guard lock(mutex);
             realm_ref = std::move(ref);
-        }));
-        util::EventLoop::main().run_until([&] {
-            return called;
+            error = e;
         });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-        REQUIRE(realm_ref);
-        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard lock(mutex);
+            return realm_ref || error;
+        });
+        return std::pair(std::move(realm_ref), error);
+    };
+
+    SECTION("can open synced Realms that don't already exist") {
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
     }
 
     SECTION("can write a realm file without client file id") {
@@ -645,18 +651,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         // Create realm file without client file id
         {
-            auto task = Realm::get_synchronized_realm(config2);
-            task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
-                std::lock_guard<std::mutex> lock(mutex);
-                REQUIRE(!error);
-                realm_ref = std::move(ref);
-            });
-            util::EventLoop::main().run_until([&] {
-                std::lock_guard<std::mutex> lock(mutex);
-                return bool(realm_ref);
-            });
+            auto [ref, error] = async_open_realm(config);
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
             // Write some data
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
             realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
             realm->commit_transaction();
@@ -694,113 +693,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
     }
 
-    SECTION("can copy a synced realm to a synced realm") {
-        SyncTestFile sync_realm_config1(init_sync_manager.app(), "default");
-        sync_realm_config1.schema = config.schema;
-
-        // Create some content
-        auto sync_realm1 = Realm::get_shared_realm(sync_realm_config1);
-        sync_realm1->begin_transaction();
-        sync_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
-        sync_realm1->commit_transaction();
-        wait_for_upload(*sync_realm1);
-        wait_for_download(*sync_realm1);
-
-        // Copy to a new sync config
-        SyncTestFile sync_realm_config2(init_sync_manager.app(), "default");
-        sync_realm_config2.schema = config.schema;
-
-        sync_realm1->convert(sync_realm_config2);
-
-        auto sync_realm2 = Realm::get_shared_realm(sync_realm_config2);
-
-        // Check that the data also exists in the new realm
-        REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 1);
-
-        // Verify that sync works and objects created in the new copy will get
-        // synchronized to the old copy
-        sync_realm2->begin_transaction();
-        sync_realm2->read_group().get_table("class_object")->create_object_with_primary_key(1);
-        sync_realm2->commit_transaction();
-        wait_for_upload(*sync_realm2);
-        wait_for_download(*sync_realm1);
-
-        sync_realm1->refresh();
-        REQUIRE(sync_realm1->read_group().get_table("class_object")->size() == 2);
-    }
-
-    SECTION("can convert a synced realm to a local realm") {
-        SyncTestFile sync_realm_config(init_sync_manager.app(), "default");
-        sync_realm_config.schema = config.schema;
-
-        // Create some content
-        auto sync_realm = Realm::get_shared_realm(sync_realm_config);
-        sync_realm->begin_transaction();
-        sync_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
-        sync_realm->commit_transaction();
-        wait_for_upload(*sync_realm);
-        wait_for_download(*sync_realm);
-
-        // Copy to a new sync config
-        TestFile local_realm_config;
-        local_realm_config.schema = config.schema;
-        local_realm_config.schema_version = sync_realm_config.schema_version;
-
-        sync_realm->convert(local_realm_config);
-
-        auto local_realm = Realm::get_shared_realm(local_realm_config);
-
-        // Check that the data also exists in the new realm
-        REQUIRE(local_realm->read_group().get_table("class_object")->size() == 1);
-    }
-
-    SECTION("can convert a local realm to a synced realm") {
-        TestFile local_realm_config;
-        local_realm_config.schema = config.schema;
-
-        // Create some content
-        auto local_realm = Realm::get_shared_realm(local_realm_config);
-        local_realm->begin_transaction();
-        local_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
-        local_realm->commit_transaction();
-
-        // Copy to a new sync config
-        SyncTestFile sync_realm_config(init_sync_manager.app(), "default");
-        sync_realm_config.schema = config.schema;
-        sync_realm_config.cache = false;
-
-        local_realm->convert(sync_realm_config);
-
-        auto sync_realm = Realm::get_shared_realm(sync_realm_config);
-
-        // Check that the data also exists in the new realm
-        REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
-    }
-
-
-    SECTION("can copy a local realm to a local realm") {
-        TestFile local_realm_config1;
-        local_realm_config1.schema = config.schema;
-
-        // Create some content
-        auto local_realm1 = Realm::get_shared_realm(local_realm_config1);
-        local_realm1->begin_transaction();
-        local_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
-        local_realm1->commit_transaction();
-
-        // Copy to a new sync config
-        TestFile local_realm_config2;
-        local_realm_config2.schema = config.schema;
-
-
-        local_realm1->convert(local_realm_config2);
-
-        auto local_realm2 = Realm::get_shared_realm(local_realm_config2);
-
-        // Check that the data also exists in the new realm
-        REQUIRE(local_realm2->read_group().get_table("class_object")->size() == 1);
-    }
-
     SECTION("downloads Realms which exist on the server") {
         {
             auto realm = Realm::get_shared_realm(config2);
@@ -810,21 +702,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        ThreadSafeReference realm_ref;
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-            realm_ref = std::move(ref);
-        });
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
     }
 
     SECTION("progress notifiers of a task are cancelled if the task is cancelled") {
@@ -897,20 +778,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
-        });
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
     }
 
     SECTION("can download multiple Realms at a time") {
@@ -999,47 +870,235 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(got_error);
     }
 
-    SECTION("can observe an added class in read-only mode") {
+    SECTION("read-only mode sets the schema version") {
         {
             SharedRealm realm = Realm::get_shared_realm(config);
             wait_for_upload(*realm);
             realm->close();
         }
 
-        Schema with_added_object = Schema{object_schema,
-                                          {"added",
-                                           {
-                                               {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                                           }}};
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->schema_version() == 1);
+    }
 
-        {
-            config2.schema = with_added_object;
-            auto realm = Realm::get_shared_realm(config2);
-            realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
-            realm->read_group().get_table("class_added")->create_object_with_primary_key(0);
-            realm->commit_transaction();
-            wait_for_upload(*realm);
-        }
+    Schema with_added_object = Schema{object_schema,
+                                      {"added",
+                                       {
+                                           {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                       }}};
 
+    SECTION("read-only mode applies remote schema changes") {
+        // Create the local file without "added"
+        Realm::get_shared_realm(config2);
+
+        // Add the table server-side
+        config.schema = with_added_object;
+        config2.schema = with_added_object;
         {
-            config.schema = with_added_object;
-            config.schema_mode = SchemaMode::ReadOnly;
             SharedRealm realm = Realm::get_shared_realm(config);
-            REQUIRE(!realm->read_group().get_table("class_added"));
             wait_for_upload(*realm);
-            wait_for_download(*realm);
-            realm->refresh();
-            TableRef added = realm->read_group().get_table("class_added");
-            REQUIRE(added);
-            Results results(realm, added);
-            NotificationToken token =
-                results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
             realm->close();
         }
+
+        // Verify that the table gets added when reopening
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm->schema().find("added") != realm->schema().end());
+        REQUIRE(realm->read_group().get_table("class_added"));
+    }
+
+    SECTION("read-only mode does not create tables not present on the server") {
+        // Create the local file without "added"
+        Realm::get_shared_realm(config2);
+
+        config2.schema = with_added_object;
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm->schema().find("added") != realm->schema().end());
+        REQUIRE_FALSE(realm->read_group().get_table("class_added"));
+    }
+
+    SECTION("adding a property to a newly downloaded read-only Realm reports an error") {
+        // Create the Realm on the server
+        wait_for_upload(*Realm::get_shared_realm(config2));
+
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                    {"value", PropertyType::Int},
+                                    {"value2", PropertyType::Int},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE_FALSE(ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+    }
+
+    SECTION("adding a property to an existing read-only Realm reports an error") {
+        Realm::get_shared_realm(config);
+
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                    {"value", PropertyType::Int},
+                                    {"value2", PropertyType::Int},
+                                }}};
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "Property 'object.value2' has been added.");
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE_FALSE(ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "Property 'object.value2' has been added.");
+    }
+
+    SECTION("removing a property from a newly downloaded read-only Realm leaves the column in place") {
+        // Create the Realm on the server
+        wait_for_upload(*Realm::get_shared_realm(config2));
+
+        // Remove the "value" property from the schema
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))
+                    ->read_group()
+                    .get_table("class_object")
+                    ->get_column_key("value") != ColKey{});
+    }
+
+    SECTION("removing a property from a existing read-only Realm leaves the column in place") {
+        Realm::get_shared_realm(config);
+
+        // Remove the "value" property from the schema
+        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema = Schema{{"object",
+                                {
+                                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                }}};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))
+                    ->read_group()
+                    .get_table("class_object")
+                    ->get_column_key("value") != ColKey{});
     }
 }
-#endif
+
+TEST_CASE("SharedRealm: convert") {
+    TestSyncManager tsm;
+    ObjectSchema object_schema = {"object",
+                                  {
+                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                      {"value", PropertyType::Int},
+                                  }};
+    Schema schema{object_schema};
+
+    SyncTestFile sync_config1(tsm.app(), "default");
+    sync_config1.schema = schema;
+    TestFile local_config1;
+    local_config1.schema = schema;
+    local_config1.schema_version = sync_config1.schema_version;
+
+    SECTION("can copy a synced realm to a synced realm") {
+        auto sync_realm1 = Realm::get_shared_realm(sync_config1);
+        sync_realm1->begin_transaction();
+        sync_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        sync_realm1->commit_transaction();
+        wait_for_upload(*sync_realm1);
+        wait_for_download(*sync_realm1);
+
+        // Copy to a new sync config
+        SyncTestFile sync_config2(tsm.app(), "default");
+        sync_config2.schema = schema;
+
+        sync_realm1->convert(sync_config2);
+
+        auto sync_realm2 = Realm::get_shared_realm(sync_config2);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 1);
+
+        // Verify that sync works and objects created in the new copy will get
+        // synchronized to the old copy
+        sync_realm2->begin_transaction();
+        sync_realm2->read_group().get_table("class_object")->create_object_with_primary_key(1);
+        sync_realm2->commit_transaction();
+        wait_for_upload(*sync_realm2);
+        wait_for_download(*sync_realm1);
+
+        sync_realm1->refresh();
+        REQUIRE(sync_realm1->read_group().get_table("class_object")->size() == 2);
+    }
+
+    SECTION("can convert a synced realm to a local realm") {
+        auto sync_realm = Realm::get_shared_realm(sync_config1);
+        sync_realm->begin_transaction();
+        sync_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        sync_realm->commit_transaction();
+        wait_for_upload(*sync_realm);
+        wait_for_download(*sync_realm);
+
+        sync_realm->convert(local_config1);
+
+        auto local_realm = Realm::get_shared_realm(local_config1);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(local_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("can convert a local realm to a synced realm") {
+        auto local_realm = Realm::get_shared_realm(local_config1);
+        local_realm->begin_transaction();
+        local_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        local_realm->commit_transaction();
+
+        // Copy to a new sync config
+        local_realm->convert(sync_config1);
+
+        auto sync_realm = Realm::get_shared_realm(sync_config1);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("can copy a local realm to a local realm") {
+        auto local_realm1 = Realm::get_shared_realm(local_config1);
+        local_realm1->begin_transaction();
+        local_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        local_realm1->commit_transaction();
+
+        // Copy to a new local config
+        TestFile local_config2;
+        local_config2.schema = schema;
+        local_config2.schema_version = local_config1.schema_version;
+        local_realm1->convert(local_config2);
+
+        auto local_realm2 = Realm::get_shared_realm(local_config2);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(local_realm2->read_group().get_table("class_object")->size() == 1);
+    }
+}
+#endif // REALM_ENABLE_SYNC
 
 TEST_CASE("SharedRealm: async writes") {
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -2374,9 +2433,9 @@ TEST_CASE("SharedRealm: close()") {
         List list(realm, obj.get_linklist("list"));
         Object object(realm, obj);
 
-        auto obj_token = object.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
-        auto list_token = list.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
-        auto results_token = results.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+        auto obj_token = object.add_notification_callback([](CollectionChangeSet) {});
+        auto list_token = list.add_notification_callback([](CollectionChangeSet) {});
+        auto results_token = results.add_notification_callback([](CollectionChangeSet) {});
 
         // Perform a dummy transaction to ensure the notifiers actually acquire
         // resources that need to be closed
@@ -2400,7 +2459,7 @@ TEST_CASE("Realm::delete_files()") {
     // We need to create some additional files that might not be present
     // for a freshly opened realm but need to be tested for as the will
     // be created during a Realm's life cycle.
-    util::File(path + ".log", util::File::mode_Write);
+    (void)util::File(path + ".log", util::File::mode_Write);
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
@@ -2541,7 +2600,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     SECTION("did_change with async results") {
         r1->m_binding_context.reset(new Context());
         Results results(r1, table->where());
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             // Should not be called.
             REQUIRE(false);
         });
@@ -3100,7 +3159,7 @@ TEST_CASE("SharedRealm: compact on launch") {
 
         // Registering for a collection notification shouldn't crash when compact on launch is used.
         Results results(r, r->read_group().get_table("class_object"));
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
         r->close();
 #endif
     }
@@ -3293,13 +3352,11 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
         Results results1(r, table->where().greater_equal(col, 0));
         Results results2(r, table->where().less(col, 10));
 
-        auto token1 = results1.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token1 = results1.add_notification_callback([&](CollectionChangeSet) {
             ++notification_calls;
         });
 
-        auto token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet) {
             ++notification_calls;
         });
 
@@ -3352,7 +3409,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
     SECTION("did_send() is skipped if the Realm is closed first") {
         Results results(r, table->where());
         bool do_close = true;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             if (do_close)
                 r->close();
         });
@@ -3449,75 +3506,6 @@ TEST_CASE("Statistics on Realms") {
 #endif
 }
 
-#if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
-TEST_CASE("BindingContext is notified in case of notifier errors") {
-    _impl::RealmCoordinator::assert_no_open_realms();
-
-    class OpenFileLimiter {
-    public:
-        OpenFileLimiter()
-        {
-            // Set the max open files to zero so that opening new files will fail
-            getrlimit(RLIMIT_NOFILE, &m_old);
-            rlimit rl = m_old;
-            rl.rlim_cur = 0;
-            setrlimit(RLIMIT_NOFILE, &rl);
-        }
-
-        ~OpenFileLimiter()
-        {
-            setrlimit(RLIMIT_NOFILE, &m_old);
-        }
-
-    private:
-        rlimit m_old;
-    };
-
-    InMemoryTestFile config;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {{"value", PropertyType::Int}}},
-    });
-
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
-    Results results(r, *r->read_group().get_table("class_object"));
-    static int binding_context_start_notify_calls = 0;
-    static int binding_context_end_notify_calls = 0;
-    static bool error_called = false;
-    struct Context : BindingContext {
-        void will_send_notifications() override
-        {
-            REQUIRE_FALSE(error_called);
-            ++binding_context_start_notify_calls;
-        }
-
-        void did_send_notifications() override
-        {
-            REQUIRE(error_called);
-            ++binding_context_end_notify_calls;
-        }
-    };
-    r->m_binding_context.reset(new Context());
-
-    SECTION("realm on background thread could not be opened") {
-        OpenFileLimiter limiter;
-
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE(err);
-            REQUIRE_FALSE(error_called);
-            error_called = true;
-        });
-        advance_and_notify(*r);
-        REQUIRE(error_called);
-        REQUIRE(binding_context_start_notify_calls == 1);
-        REQUIRE(binding_context_end_notify_calls == 1);
-    }
-}
-#endif
-
 TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     TestFile config;
     config.cache = true;
@@ -3545,7 +3533,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto realm = Realm::get_shared_realm(std::move(ref));
         Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
         bool called = false;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {
             called = true;
         });
         util::EventLoop::main().run_until([&] {

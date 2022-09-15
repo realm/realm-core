@@ -57,8 +57,7 @@ public:
     {
     }
 
-    void before(CollectionChangeSet const&) {}
-    void after(CollectionChangeSet const& c)
+    void operator()(CollectionChangeSet const& c)
     {
         auto convert_indices = [&](const IndexSet& indices,
                                    const std::vector<std::pair<size_t, size_t>>& rows_to_index_path) {
@@ -172,23 +171,17 @@ public:
 
             if (should_notify || m_section_filter_should_deliver_initial_notification) {
                 m_cb(SectionedResultsChangeSet{filtered_insertions, filtered_modifications, filtered_deletions,
-                                               filtered_sections_to_insert, filtered_sections_to_delete},
-                     {});
+                                               filtered_sections_to_insert, filtered_sections_to_delete});
                 m_section_filter_should_deliver_initial_notification = false;
             }
         }
         else {
             m_cb(SectionedResultsChangeSet{converted_insertions, converted_modifications, converted_deletions,
-                                           section_changes.first, section_changes.second},
-                 {});
+                                           section_changes.first, section_changes.second});
         }
 
         REALM_ASSERT(m_sectioned_results.m_results.is_valid());
         m_prev_row_to_index_path = m_sectioned_results.m_row_to_index_path;
-    }
-    void error(std::exception_ptr ptr)
-    {
-        m_cb({}, ptr);
     }
 
     std::pair<IndexSet, IndexSet> calculate_sections_to_insert_and_delete() REQUIRES(m_sectioned_results.m_mutex)

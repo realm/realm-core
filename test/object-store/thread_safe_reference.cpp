@@ -48,7 +48,7 @@ static TableRef get_table(Realm& realm, StringData object_name)
 static Object create_object(SharedRealm const& realm, StringData object_type, AnyDict value)
 {
     CppContext ctx(realm);
-    return Object::create(ctx, realm, object_type, util::Any(value));
+    return Object::create(ctx, realm, object_type, std::any(value));
 }
 
 TEST_CASE("thread safe reference") {

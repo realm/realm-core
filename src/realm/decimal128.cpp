@@ -46,8 +46,8 @@ BID_UINT128 to_BID_UINT128(const Decimal128& val)
 } // namespace
 
 Decimal128::Decimal128()
+    : Decimal128(0)
 {
-    from_int64_t(0);
 }
 
 /**
@@ -1411,27 +1411,22 @@ Decimal128::Decimal128(double val, RoundTo rounding_precision)
     }
 }
 
-void Decimal128::from_int64_t(int64_t val)
+Decimal128::Decimal128(int val)
+    : Decimal128(static_cast<int64_t>(val))
+{
+}
+
+Decimal128::Decimal128(int64_t val)
 {
     constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << DECIMAL_COEFF_HIGH_BITS;
     if (val < 0) {
         m_value.w[1] = expon | MASK_SIGN;
-        m_value.w[0] = ~val + 1;
+        m_value.w[0] = val == std::numeric_limits<int64_t>::lowest() ? val : ~val + 1;
     }
     else {
         m_value.w[1] = expon;
         m_value.w[0] = val;
     }
-}
-
-Decimal128::Decimal128(int val)
-{
-    from_int64_t(static_cast<int64_t>(val));
-}
-
-Decimal128::Decimal128(int64_t val)
-{
-    from_int64_t(val);
 }
 
 Decimal128::Decimal128(uint64_t val)

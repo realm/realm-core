@@ -57,8 +57,8 @@ blank   [ \t\r]
 (?i:sort)                   return yy::parser::make_SORT(yytext);
 (?i:distinct)               return yy::parser::make_DISTINCT(yytext);
 (?i:limit)                  return yy::parser::make_LIMIT(yytext);
-(?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING();
-(?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING();
+(?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING(yytext);
+(?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING(yytext);
 (?i:subquery)               return yy::parser::make_SUBQUERY();
 ("@size"|"@count")          return yy::parser::make_SIZE(yytext);
 "@max"                      return yy::parser::make_MAX    ();

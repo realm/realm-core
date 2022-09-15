@@ -226,33 +226,34 @@ public:
 
     Ringbuffer() noexcept
     {
-        entries = init_readers_size;
+        m_entries = init_readers_size;
         for (int i = 0; i < init_readers_size; i++) {
-            data[i].version = 1;
-            data[i].count.store(1, std::memory_order_relaxed);
-            data[i].current_top = 0;
-            data[i].filesize = 0;
-            data[i].next = i + 1;
+            m_data[i].version = 1;
+            m_data[i].count.store(1, std::memory_order_relaxed);
+            m_data[i].current_top = 0;
+            m_data[i].filesize = 0;
+            m_data[i].next = i + 1;
         }
-        old_pos = 0;
-        data[0].count.store(0, std::memory_order_relaxed);
-        data[init_readers_size - 1].next = 0;
-        put_pos.store(0, std::memory_order_release);
+        m_old_pos = 0;
+        m_data[0].count.store(0, std::memory_order_relaxed);
+        m_data[init_readers_size - 1].next = 0;
+        m_put_pos.store(0, std::memory_order_release);
     }
 
     void dump()
     {
-        uint_fast32_t i = old_pos;
+        ReadCount* data = this->data();
+        uint_fast32_t i = m_old_pos;
         std::cout << "--- " << std::endl;
-        while (i != put_pos.load()) {
+        while (i != m_put_pos.load()) {
             std::cout << "  used " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
+            i = m_data[i].next;
         }
         std::cout << "  LAST " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-        i = data[i].next;
-        while (i != old_pos) {
+        i = m_data[i].next;
+        while (i != m_old_pos) {
             std::cout << "  free " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
+            i = m_data[i].next;
         }
         std::cout << "--- Done" << std::endl;
     }
@@ -261,16 +262,17 @@ public:
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
-        for (uint32_t i = entries; i < new_entries; i++) {
+        ReadCount* data = this->data();
+        for (uint32_t i = m_entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
-        data[new_entries - 1].next = old_pos;
-        data[put_pos.load(std::memory_order_relaxed)].next = entries;
-        entries = uint32_t(new_entries);
+        data[new_entries - 1].next = m_old_pos;
+        data[m_put_pos.load(std::memory_order_relaxed)].next = m_entries;
+        m_entries = uint32_t(new_entries);
         // dump();
     }
 
@@ -284,17 +286,17 @@ public:
 
     uint_fast32_t get_num_entries() const noexcept
     {
-        return entries;
+        return m_entries;
     }
 
     uint_fast32_t last() const noexcept
     {
-        return put_pos.load(std::memory_order_acquire);
+        return m_put_pos.load(std::memory_order_acquire);
     }
 
     const ReadCount& get(uint_fast32_t idx) const noexcept
     {
-        return data[idx];
+        return data()[idx];
     }
 
     const ReadCount& get_last() const noexcept
@@ -311,7 +313,7 @@ public:
     // It is most likely not suited for any other use.
     ReadCount& reinit_last() noexcept
     {
-        ReadCount& r = data[last()];
+        ReadCount& r = data()[last()];
         // r.count is an atomic<> due to other usage constraints. Right here, we're
         // operating under mutex protection, so the use of an atomic store is immaterial
         // and just forced on us by the type of r.count.
@@ -323,13 +325,13 @@ public:
 
     const ReadCount& get_oldest() const noexcept
     {
-        return get(old_pos.load(std::memory_order_relaxed));
+        return get(m_old_pos.load(std::memory_order_relaxed));
     }
 
     bool is_full() const noexcept
     {
         uint_fast32_t idx = get(last()).next;
-        return idx == old_pos.load(std::memory_order_relaxed);
+        return idx == m_old_pos.load(std::memory_order_relaxed);
     }
 
     uint_fast32_t next() const noexcept
@@ -342,13 +344,13 @@ public:
     ReadCount& get_next() noexcept
     {
         REALM_ASSERT(!is_full());
-        return data[next()];
+        return data()[next()];
     }
 
     void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store(uint32_t(next()), std::memory_order_release);
+        m_put_pos.store(uint32_t(next()), std::memory_order_release);
     }
 
     void cleanup() noexcept
@@ -356,20 +358,20 @@ public:
         // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
-        while (old_pos.load(std::memory_order_relaxed) != put_pos.load(std::memory_order_relaxed)) {
-            const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
+        while (m_old_pos.load(std::memory_order_relaxed) != m_put_pos.load(std::memory_order_relaxed)) {
+            const ReadCount& r = get(m_old_pos.load(std::memory_order_relaxed));
             if (!atomic_one_if_zero(r.count))
                 break;
-            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next_ndx, std::memory_order_relaxed);
+            auto next_ndx = get(m_old_pos.load(std::memory_order_relaxed)).next;
+            m_old_pos.store(next_ndx, std::memory_order_relaxed);
         }
     }
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint32_t entries;
-    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
+    uint32_t m_entries;
+    std::atomic<uint32_t> m_put_pos; // only changed under lock, but accessed outside lock
+    std::atomic<uint32_t> m_old_pos; // only changed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -379,7 +381,17 @@ private:
     // IMPORTANT II:
     // To ensure proper alignment across all platforms, the SharedInfo structure
     // should NOT have a stricter alignment requirement than the ReadCount structure.
-    ReadCount data[init_readers_size];
+    ReadCount m_data[init_readers_size];
+
+    // Silence UBSan errors about out-of-bounds reads on m_data by casting to a pointer
+    ReadCount* data() noexcept
+    {
+        return m_data;
+    }
+    const ReadCount* data() const noexcept
+    {
+        return m_data;
+    }
 };
 
 // Using lambda rather than function so that shared_ptr shared state doesn't need to hold a function pointer.

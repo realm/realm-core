@@ -1384,13 +1384,25 @@ Query& Query::Or()
 }
 
 
-ObjKey Query::find()
+ObjKey Query::find() const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
 
     init();
+
+    // ordering could change the way in which objects are returned, in this case we need to run find_all()
+    if (m_ordering && (m_ordering->will_apply_sort() || m_ordering->will_apply_distinct())) {
+        auto table = find_all();
+        if (table.size() > 0) {
+            // we just need to find the first.
+            return table.get_key(0);
+        }
+        else {
+            return null_key;
+        }
+    }
 
     // User created query with no criteria; return first
     if (!has_conditions()) {
@@ -1520,7 +1532,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     }
 }
 
-TableView Query::find_all(size_t limit)
+TableView Query::find_all(size_t limit) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
@@ -1619,7 +1631,7 @@ size_t Query::count() const
     return do_count();
 }
 
-TableView Query::find_all(const DescriptorOrdering& descriptor)
+TableView Query::find_all(const DescriptorOrdering& descriptor) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
@@ -1652,7 +1664,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
     return ret;
 }
 
-size_t Query::count(const DescriptorOrdering& descriptor)
+size_t Query::count(const DescriptorOrdering& descriptor) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
@@ -1677,7 +1689,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
 }
 
 // todo, not sure if start, end and limit could be useful for delete.
-size_t Query::remove()
+size_t Query::remove() const
 {
     TableView tv = find_all();
     size_t rows = tv.size();
@@ -1815,7 +1827,7 @@ void* Query::query_thread(void* arg)
 
 #endif // REALM_MULTITHREADQUERY
 
-std::string Query::validate()
+std::string Query::validate() const
 {
     if (!m_groups.size())
         return "";

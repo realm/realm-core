@@ -307,12 +307,15 @@ typedef enum realm_property_flags {
 /* Notification types */
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
+typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
-typedef void (*realm_callback_error_func_t)(realm_userdata_t userdata, const realm_async_error_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
+typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
+typedef void (*realm_async_begin_write_func_t)(realm_userdata_t userdata);
+typedef void (*realm_async_commit_func_t)(realm_userdata_t userdata, bool error, const char* desc);
 
 /**
  * Callback for realm schema changed notifications.
@@ -764,6 +767,11 @@ RLM_API void realm_config_set_cached(realm_config_t*, bool cached) RLM_API_NOEXC
 RLM_API bool realm_config_get_cached(realm_config_t*) RLM_API_NOEXCEPT;
 
 /**
+ * Allow realm to manage automatically embedded objects when a migration from TopLevel to Embedded takes place.
+ */
+RLM_API void realm_config_set_automatic_backlink_handling(realm_config_t*, bool) RLM_API_NOEXCEPT;
+
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param notify Function which will be called whenever the scheduler has work
@@ -861,22 +869,31 @@ RLM_API realm_t* realm_open(const realm_config_t* config);
 /**
  * Copy or convert a Realm using a config.
  *
- * If the file already exists, data will be copied over object per object.
+ * If the file already exists and merge_with_existing is true, data will be copied over object per object.
+ * When merging, all classes must have a pk called '_id" otherwise an exception is thrown.
+ * If the file exists and merge_with_existing is false, an exception is thrown.
  * If the file does not exist, the realm file will be exported to the new location and if the
  * configuration object contains a sync part, a sync history will be synthesized.
  *
  * @param config The realm configuration that should be used to create a copy.
  *               This can be a local or a synced Realm, encrypted or not.
+ * @param merge_with_existing If this is true and the destination file exists, data will be copied over object by
+ * object. Otherwise, if this is false and the destination file exists, an exception is thrown.
  */
-RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config);
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config, bool merge_with_existing);
 /**
  * Copy a Realm using a path.
  *
  * @param path The path the realm should be copied to. Local realms will remain local, synced
  *             realms will remain synced realms.
  * @param encryption_key The optional encryption key for the new realm.
+ * @param merge_with_existing If this is true and the destination file exists, data will be copied over object by
+ object.
+ *  Otherwise, if this is false and the destination file exists, an exception is thrown.
+
  */
-RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key);
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key,
+                                     bool merge_with_existing);
 
 /**
  * Deletes the following files for the given `realm_file_path` if they exist:
@@ -993,6 +1010,25 @@ RLM_API bool realm_commit(realm_t*);
 RLM_API bool realm_rollback(realm_t*);
 
 /**
+ * start a new write transaction asynchronously for the realm passed as argument.
+ */
+RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t,
+                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                             bool notify_only);
+
+/**
+ * commit a transaction asynchronously for the realm passed as argument.
+ */
+RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t, realm_userdata_t userdata,
+                                        realm_free_userdata_func_t userdata_free, bool allow_grouping);
+
+/**
+ * Cancel the transaction referenced by the token passed as argument and set the optional boolean flag in order to
+ * inform the caller if the transaction was cancelled.
+ */
+RLM_API bool realm_async_cancel(realm_t* realm, unsigned int token, bool* cancelled);
+
+/**
  * Add a callback that will be invoked every time the view of this file is updated.
  *
  * This callback is guaranteed to be invoked before any object or collection change
@@ -1003,6 +1039,15 @@ RLM_API bool realm_rollback(realm_t*);
 RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
+
+/**
+ * Add a callback that will be invoked the first time that the given realm is refreshed to the version which is the
+ * latest version at the time when this is called.
+ * @return a refresh token to remove the callback
+ */
+RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t*, realm_on_realm_refresh_func_t,
+                                                                         realm_userdata_t userdata,
+                                                                         realm_free_userdata_func_t userdata_free);
 
 /**
  * Refresh the view of the realm file.
@@ -1370,6 +1415,15 @@ RLM_API bool realm_object_delete(realm_object_t*);
 RLM_API bool realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm,
                                      realm_object_t** resolved);
 
+/**
+ * Increment atomically property specified as parameter by value, for the object passed as argument.
+ * @param object valid ptr to an object store in the database
+ * @param property_key id of the property to change
+ * @param value increment for the property passed as argument
+ * @return True if not exception occurred.
+ */
+RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t property_key, int64_t value);
+
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
@@ -1411,8 +1465,7 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
 RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t*, realm_userdata_t userdata,
                                                                            realm_free_userdata_func_t userdata_free,
                                                                            realm_key_path_array_t*,
-                                                                           realm_on_object_change_func_t on_change,
-                                                                           realm_callback_error_func_t on_error);
+                                                                           realm_on_object_change_func_t on_change);
 
 /**
  * Get an object from a thread-safe reference, potentially originating in a
@@ -1663,8 +1716,7 @@ RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_
 RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t*, realm_userdata_t userdata,
                                                                          realm_free_userdata_func_t userdata_free,
                                                                          realm_key_path_array_t*,
-                                                                         realm_on_collection_change_func_t on_change,
-                                                                         realm_callback_error_func_t on_error);
+                                                                         realm_on_collection_change_func_t on_change);
 
 /**
  * Get an list from a thread-safe reference, potentially originating in a
@@ -1940,8 +1992,7 @@ RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t 
 RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, realm_userdata_t userdata,
                                                                         realm_free_userdata_func_t userdata_free,
                                                                         realm_key_path_array_t*,
-                                                                        realm_on_collection_change_func_t on_change,
-                                                                        realm_callback_error_func_t on_error);
+                                                                        realm_on_collection_change_func_t on_change);
 /**
  * Get an set from a thread-safe reference, potentially originating in a
  * different `realm_t` instance
@@ -2106,9 +2157,10 @@ RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, cons
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_dictionary_add_notification_callback(
-    realm_dictionary_t*, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
-    realm_on_collection_change_func_t on_change, realm_callback_error_func_t on_error);
+RLM_API realm_notification_token_t*
+realm_dictionary_add_notification_callback(realm_dictionary_t*, realm_userdata_t userdata,
+                                           realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
+                                           realm_on_collection_change_func_t on_change);
 
 /**
  * Get an dictionary from a thread-safe reference, potentially originating in a
@@ -2225,6 +2277,27 @@ RLM_API bool realm_query_find_first(realm_query_t*, realm_value_t* out_value, bo
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_results_t* realm_query_find_all(realm_query_t*);
+
+/**
+ * Convert a list to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_list_to_results(realm_list_t*);
+
+/**
+ * Convert a set to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_set_to_results(realm_set_t*);
+
+/**
+ * Convert a dictionary to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t*);
 
 /**
  * Delete all objects matched by a query.
@@ -2377,10 +2450,11 @@ RLM_API bool realm_results_sum(realm_results_t*, realm_property_key_t, realm_val
 RLM_API bool realm_results_average(realm_results_t*, realm_property_key_t, realm_value_t* out_average,
                                    bool* out_found);
 
-RLM_API realm_notification_token_t*
-realm_results_add_notification_callback(realm_results_t*, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
-                                        realm_on_collection_change_func_t, realm_callback_error_func_t);
+RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*,
+                                                                            realm_userdata_t userdata,
+                                                                            realm_free_userdata_func_t userdata_free,
+                                                                            realm_key_path_array_t*,
+                                                                            realm_on_collection_change_func_t);
 
 /**
  * Get an results object from a thread-safe reference, potentially originating
@@ -3090,6 +3164,17 @@ typedef enum realm_sync_error_category {
     RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
 } realm_sync_error_category_e;
 
+typedef enum realm_sync_error_action {
+    RLM_SYNC_ERROR_ACTION_NO_ACTION,
+    RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
+    RLM_SYNC_ERROR_ACTION_APPLICATION_BUG,
+    RLM_SYNC_ERROR_ACTION_WARNING,
+    RLM_SYNC_ERROR_ACTION_TRANSIENT,
+    RLM_SYNC_ERROR_ACTION_DELETE_REALM,
+    RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
+    RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+} realm_sync_error_action_e;
+
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
 
@@ -3121,6 +3206,7 @@ typedef struct realm_sync_error {
     bool is_fatal;
     bool is_unrecognized_by_client;
     bool is_client_reset_requested;
+    realm_sync_error_action_e server_requests_action;
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
@@ -3446,7 +3532,6 @@ RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
                                                                          uint64_t token) RLM_API_NOEXCEPT;
-
 /**
  * Get the sync session for a specific realm.
  *

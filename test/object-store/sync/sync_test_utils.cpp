@@ -394,13 +394,14 @@ struct BaasClientReset : public TestClientReset {
             std::string pk_col_name = table->get_column_name(table->get_primary_key_column());
             obj.set(col, 1);
             obj.set(col, 2);
-            obj.set(col, 3);
+            constexpr int64_t last_synced_value = 3;
+            obj.set(col, last_synced_value);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
             wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
-                                       {{pk_col_name, m_pk_driving_reset}});
+                                       {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
 
             session->log_out();
 
@@ -418,7 +419,9 @@ struct BaasClientReset : public TestClientReset {
         auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+        });
         app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
@@ -524,7 +527,9 @@ struct BaasFLXClientReset : public TestClientReset {
         auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+        });
         app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
         REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
         if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset

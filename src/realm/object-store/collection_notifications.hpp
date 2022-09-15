@@ -45,6 +45,10 @@ struct NotificationToken {
     NotificationToken(NotificationToken const&) = delete;
     NotificationToken& operator=(NotificationToken const&) = delete;
 
+    // Stop sending notifications for the callback associated with this token.
+    // This is equivalent to (*this) = {};
+    void unregister();
+
     void suppress_next();
 
 private:
@@ -109,9 +113,9 @@ struct CollectionChangeSet {
 
 // A type-erasing wrapper for the callback for collection notifications. Can be
 // constructed with either any callable compatible with the signature
-// `void (CollectionChangeSet, std::exception_ptr)`, an object with member
+// `void (CollectionChangeSet)`, an object with member
 // functions `void before(CollectionChangeSet)`, `void after(CollectionChangeSet)`,
-// `void error(std::exception_ptr)`, or a pointer to such an object. If a pointer
+// or a pointer to such an object. If a pointer
 // is given, the caller is responsible for ensuring that the pointed-to object
 // outlives the collection.
 class CollectionChangeCallback {
@@ -145,10 +149,6 @@ public:
     {
         m_impl->after(c);
     }
-    void error(std::exception_ptr e)
-    {
-        m_impl->error(e);
-    }
 
     explicit operator bool() const
     {
@@ -160,11 +160,9 @@ private:
         virtual ~Base() {}
         virtual void before(CollectionChangeSet const&) = 0;
         virtual void after(CollectionChangeSet const&) = 0;
-        virtual void error(std::exception_ptr) = 0;
     };
 
-    template <typename Callback,
-              typename = decltype(std::declval<Callback>()(CollectionChangeSet(), std::exception_ptr()))>
+    template <typename Callback, typename = decltype(std::declval<Callback>()(CollectionChangeSet()))>
     std::shared_ptr<Base> make_impl(Callback cb)
     {
         return std::make_shared<Impl<Callback>>(std::move(cb));
@@ -194,11 +192,7 @@ private:
         void before(CollectionChangeSet const&) override {}
         void after(CollectionChangeSet const& change) override
         {
-            impl(change, {});
-        }
-        void error(std::exception_ptr error) override
-        {
-            impl({}, error);
+            impl(change);
         }
     };
     template <typename T>
@@ -216,10 +210,6 @@ private:
         {
             impl.after(c);
         }
-        void error(std::exception_ptr error) override
-        {
-            impl.error(error);
-        }
     };
     template <typename T>
     struct Impl3 : public Base {
@@ -235,10 +225,6 @@ private:
         void after(CollectionChangeSet const& c) override
         {
             impl->after(c);
-        }
-        void error(std::exception_ptr error) override
-        {
-            impl->error(error);
         }
     };
 

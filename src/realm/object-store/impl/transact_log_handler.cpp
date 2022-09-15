@@ -584,12 +584,12 @@ void advance_with_notifications(BindingContext* context, const std::shared_ptr<T
         auto new_version = sg->get_version_of_current_transaction();
         if (context && old_version != new_version)
             context->did_change({}, {});
-        // did_change() could close the Realm. Just return if it does.
+        // Each of these places where we call back to the user could close the
+        // Realm. Just return early if that happens.
         if (sg->get_transact_stage() == DB::transact_Ready)
             return;
         if (context)
             context->will_send_notifications();
-        // will_send_notifications() could close the Realm. Just return if it does.
         if (sg->get_transact_stage() == DB::transact_Ready)
             return;
         notifiers.after_advance();
@@ -631,7 +631,7 @@ void advance(Transaction& tr, BindingContext*, VersionID version)
     tr.advance_read(&validator, version);
 }
 
-void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
+void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage&& notifiers)
 {
     advance_with_notifications(
         context, tr,
@@ -641,7 +641,7 @@ void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, No
         notifiers);
 }
 
-void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
+void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage&& notifiers)
 {
     advance_with_notifications(
         context, tr,

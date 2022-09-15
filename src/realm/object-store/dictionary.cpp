@@ -298,9 +298,7 @@ public:
     {
     }
 
-    void before(CollectionChangeSet const&) {}
-
-    void after(CollectionChangeSet const& c)
+    void operator()(CollectionChangeSet const& c)
     {
         size_t max_keys = c.deletions.count() + c.insertions.count() + c.modifications.count();
         DictionaryChangeSet changes(max_keys);
@@ -327,13 +325,7 @@ public:
             m_prev_rt->advance_read(current_tr->get_version_of_current_transaction());
         }
 
-        m_cb(std::move(changes), {});
-    }
-
-    void error(std::exception_ptr ptr)
-    {
-        m_prev_rt = nullptr;
-        m_cb({}, ptr);
+        m_cb(std::move(changes));
     }
 
 private:

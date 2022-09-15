@@ -75,6 +75,24 @@ static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::up
 static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::download) ==
               RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD);
 
+
+namespace {
+using namespace realm::sync;
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::NoAction) == RLM_SYNC_ERROR_ACTION_NO_ACTION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ProtocolViolation) ==
+              RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ApplicationBug) ==
+              RLM_SYNC_ERROR_ACTION_APPLICATION_BUG);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Warning) == RLM_SYNC_ERROR_ACTION_WARNING);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::Transient) == RLM_SYNC_ERROR_ACTION_TRANSIENT);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::DeleteRealm) ==
+              RLM_SYNC_ERROR_ACTION_DELETE_REALM);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) ==
+              RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
+              RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
+} // namespace
+
 static realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
@@ -270,6 +288,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
+        c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
         c_error.c_original_file_path_key = error.c_original_file_path_key;
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 

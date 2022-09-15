@@ -1134,8 +1134,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 template <class cond, size_t bitwidth>
 bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
-    return static_cast<const ArrayWithFind*>(this)->find_optimized<cond, bitwidth>(value, start, end, baseindex,
-                                                                                   state, nullptr);
+    return ArrayWithFind(*this).find_optimized<cond, bitwidth>(value, start, end, baseindex, state, nullptr);
 }
 
 
@@ -1347,7 +1346,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    return static_cast<const ArrayWithFind*>(this)->find_first<Equal>(value, start, end);
+    return find_first<Equal>(value, start, end);
 }
 
 
