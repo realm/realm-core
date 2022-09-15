@@ -282,6 +282,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
             migration_called = true;
+            REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
             REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
         };
@@ -298,6 +299,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         };
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
+            REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
             REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
             if (!migration_called) {

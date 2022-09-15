@@ -31,7 +31,7 @@ class StringData;
 struct TableKey;
 struct Property;
 
-enum SchemaValidationMode : uint64_t { Basic = 0, Sync = 1, RejectEmbeddedOrphans = 2 };
+enum SchemaValidationMode : uint64_t { Basic = 0, SyncPBS = 1, RejectEmbeddedOrphans = 2, SyncFLX = 4 };
 
 // How to handle update_schema() being called on a file which has
 // already been initialized with a different schema
@@ -147,7 +147,7 @@ public:
 
     // Verify that this schema is internally consistent (i.e. all properties are
     // valid, links link to types that actually exist, etc.)
-    void validate(uint64_t validation_mode = SchemaValidationMode::Basic) const;
+    void validate(SchemaValidationMode validation_mode = SchemaValidationMode::Basic) const;
 
     // Get the changes which must be applied to this schema to produce the passed-in schema
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,

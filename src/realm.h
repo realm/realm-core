@@ -122,8 +122,9 @@ typedef enum realm_value_type {
 
 typedef enum realm_schema_validation_mode {
     RLM_SCHEMA_VALIDATION_BASIC = 0,
-    RLM_SCHEMA_VALIDATION_SYNC = 1,
-    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2
+    RLM_SCHEMA_VALIDATION_SYNC_PBS = 1,
+    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2,
+    RLM_SCHEMA_VALIDATION_SYNC_FLX = 4
 } realm_schema_validation_mode_e;
 
 /**
@@ -1409,6 +1410,12 @@ RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count
 RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class_key, realm_object_key_t obj_key);
 
 /**
+ * Get the parent object for the object passed as argument. Only works for embedded objects.
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
+
+/**
  * Find an object with a particular primary key value.
  *
  * @param out_found A pointer to a boolean that will be set to true or false if
@@ -1695,6 +1702,15 @@ RLM_API bool realm_list_get_property(const realm_list_t*, realm_property_info_t*
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_get(const realm_list_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Find the value in the list passed as parameter.
+ * @param value to search in the list
+ * @param out_index the index in the list where the value has been found or realm::not_found.
+ * @param out_found boolean that indicates whether the value is found or not
+ * @return true if no exception occurred.
+ */
+RLM_API bool realm_list_find(const realm_list_t*, const realm_value_t* value, size_t* out_index, bool* out_found);
 
 /**
  * Set the value at @a index.

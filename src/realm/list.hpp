@@ -1047,6 +1047,12 @@ inline size_t LnkLst::find_any(Mixed value) const
     else if (value.get_type() == type_Link) {
         return find_first(value.get<ObjKey>());
     }
+    else if (value.get_type() == type_TypedLink) {
+        auto link = value.get_link();
+        if (link.get_table_key() == get_target_table()->get_key()) {
+            return find_first(link.get_obj_key());
+        }
+    }
     return realm::not_found;
 }
 
