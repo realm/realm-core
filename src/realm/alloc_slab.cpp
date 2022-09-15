@@ -888,8 +888,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
 
     reset_free_space_tracking();
-    RefRanges nothing_to_refresh;
-    update_reader_view(size, nothing_to_refresh);
+    update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
     m_data = m_mappings[0].primary_mapping.get_addr();
     realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
@@ -1115,12 +1114,11 @@ inline bool randomly_false_in_debug(bool x)
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
  */
-void SlabAlloc::update_reader_view(size_t file_size, const RefRanges& ranges_to_refresh)
+void SlabAlloc::update_reader_view(size_t file_size)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     if (file_size <= old_baseline) {
-        refresh_encrypted_pages(ranges_to_refresh);
         return;
     }
     REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
@@ -1210,7 +1208,6 @@ void SlabAlloc::update_reader_view(size_t file_size, const RefRanges& ranges_to_
             e.ref_end += ref_displacement;
         }
     }
-    refresh_encrypted_pages(ranges_to_refresh);
 
     rebuild_freelists_from_slab();
 
@@ -1234,11 +1231,23 @@ void SlabAlloc::update_reader_view(size_t file_size, const RefRanges& ranges_to_
 
 void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
 {
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
             for (auto& r : ranges) {
                 encryption_mark_for_refresh(m, r.begin, r.end);
             }
+        }
+    }
+    verify();
+}
+
+void SlabAlloc::refresh_all_encrypted_pages()
+{
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    for (auto& e : m_mappings) {
+        if (auto m = e.primary_mapping.get_encrypted_mapping()) {
+            encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());
         }
     }
     verify();

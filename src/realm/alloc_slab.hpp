@@ -293,7 +293,7 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    void update_reader_view(size_t file_size, const RefRanges& refs_to_refresh);
+    void update_reader_view(size_t file_size);
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
     void init_mapping_management(uint64_t currently_live_version);
 
@@ -337,6 +337,7 @@ public:
     bool is_all_free() const;
     void print() const;
 #endif
+    void refresh_all_encrypted_pages();
 
 protected:
     MemRef do_alloc(const size_t size) override;

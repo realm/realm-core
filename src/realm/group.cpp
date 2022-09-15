@@ -458,10 +458,10 @@ Group::~Group() noexcept
         m_local_alloc->detach();
 }
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable,
-                                  const RefRanges& ranges_to_refresh)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
-    m_alloc.update_reader_view(new_file_size, ranges_to_refresh); // Throws
+    // FIXME: refresh encrypted mappings?
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
@@ -595,14 +595,14 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
-                          const RefRanges& ranges_to_refresh)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size, ranges_to_refresh); // Throws
+    // FIXME: refresh encrypted mappings?
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure

@@ -1481,12 +1481,10 @@ void DB::release_all_read_locks() noexcept
     REALM_ASSERT(m_transaction_count == 0);
 }
 
-RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, SlabAlloc& alloc) noexcept
+void DB::refresh_encrypted_mappings(version_type from, version_type to, SlabAlloc& alloc) noexcept
 {
     // FIXME: don't refresh the same page more than once!
     if (m_key) {
-        // FIXME: we need read locks on all these versions since we are making accessors to their
-        // free lists below
         std::vector<ReadLockInfo> read_locks = m_version_manager->get_versions_from(from, to);
         std::sort(read_locks.begin(), read_locks.end(), [](auto& a, auto& b) {
             return a.m_version < b.m_version;
@@ -1601,7 +1599,6 @@ RefRanges DB::get_ranges_needing_refresh(version_type from, version_type to, Sla
             m_version_manager->release_read_lock(read_lock);
         }
     }
-    return {};
 }
 
 // Note: close() and close_internal() may be called from the DB::~DB().
@@ -2482,6 +2479,7 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockInfo read_lock = grab_read_lock(ReadLockInfo::Live, VersionID());
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
+
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;

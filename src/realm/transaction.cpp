@@ -111,8 +111,12 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    RefRanges ranges; // FIXME: db->get_ranges_needing_refresh(m_read_lock.m_version) ?
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version, ranges);
+
+    // FIXME: is there a better way?
+    //    VersionID::version_type last_up_to_date_version = _db->get_locked_version_previous_to(rli.m_version);
+    //    _db->refresh_encrypted_mappings(last_up_to_date_version, rli.m_version, m_alloc);
+    m_alloc.refresh_all_encrypted_pages();
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
 }
 
 Transaction::~Transaction()
@@ -262,9 +266,10 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
             }
         }
 
-        // Remap file if it has grown, and update refs in underlying node structure
-        const RefRanges empty_ranges; // a writer already has the latest pages (assumes serialized commits)
-        remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false, empty_ranges); // Throws
+        // Remap file if it has grown, and update refs in underlying node structure.
+        // A writer already has the latest encrypted pages (assumes serialized commits)
+        // so no need to refresh_encrypted_mappings here.
+        remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
     catch (...) {
@@ -300,8 +305,9 @@ void Transaction::commit_and_continue_writing()
     }
 
     bool writable = true;
-    RefRanges empty_ranges; // a writer already has the latest pages in memory (assumes serialized commits)
-    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, empty_ranges); // Throws
+    // A writer already has the latest pages in memory (assumes serialized commits)
+    // so no need to refresh_encrypted_mappings here.
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
 }
 
 TransactionRef Transaction::freeze()
