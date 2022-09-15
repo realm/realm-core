@@ -826,7 +826,7 @@ TEST(Parser_StringOperations)
     TableRef t = g.add_table("person");
     ColKey name_col = t->add_column(type_String, "name", true);
     ColKey link_col = t->add_column(*t, "father");
-    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel", "Unicorn🦄"};
     std::vector<ObjKey> people_keys;
     t->create_objects(names.size(), people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
@@ -836,16 +836,17 @@ TEST(Parser_StringOperations)
     }
     t->create_object(); // null
     t->get_object(people_keys[4]).set_null(link_col);
+    size_t nb_names = names.size();
 
     verify_query(test_context, t, "name == 'Bob'", 1);
     verify_query(test_context, t, "father.name == 'Bob'", 1);
     verify_query(test_context, t, "name ==[c] 'Bob'", 1);
     verify_query(test_context, t, "father.name ==[c] 'Bob'", 1);
 
-    verify_query(test_context, t, "name != 'Bob'", 5);
-    verify_query(test_context, t, "father.name != 'Bob'", 5);
-    verify_query(test_context, t, "name !=[c] 'bOB'", 5);
-    verify_query(test_context, t, "father.name !=[c] 'bOB'", 5);
+    verify_query(test_context, t, "name != 'Bob'", nb_names);
+    verify_query(test_context, t, "father.name != 'Bob'", nb_names);
+    verify_query(test_context, t, "name !=[c] 'bOB'", nb_names);
+    verify_query(test_context, t, "father.name !=[c] 'bOB'", nb_names);
 
     verify_query(test_context, t, "name contains \"oe\"", 2);
     verify_query(test_context, t, "father.name contains \"oe\"", 2);
@@ -867,23 +868,25 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name like[c] \"?O?\"", 2);
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 
+    verify_query(test_context, t, "name ==[c] 'unicorn🦄'", 1);
+
     verify_query(test_context, t, "name == NULL", 1);
     verify_query(test_context, t, "name == nil", 1);
     verify_query(test_context, t, "NULL == name", 1);
-    verify_query(test_context, t, "name != NULL", 5);
-    verify_query(test_context, t, "NULL != name", 5);
+    verify_query(test_context, t, "name != NULL", nb_names);
+    verify_query(test_context, t, "NULL != name", nb_names);
     verify_query(test_context, t, "name ==[c] NULL", 1);
     verify_query(test_context, t, "NULL ==[c] name", 1);
-    verify_query(test_context, t, "name !=[c] NULL", 5);
-    verify_query(test_context, t, "NULL !=[c] name", 5);
+    verify_query(test_context, t, "name !=[c] NULL", nb_names);
+    verify_query(test_context, t, "NULL !=[c] name", nb_names);
 
     // for strings 'NULL' is also a synonym for the null string
-    verify_query(test_context, t, "name CONTAINS NULL", 6);
-    verify_query(test_context, t, "name CONTAINS[c] NULL", 6);
-    verify_query(test_context, t, "name BEGINSWITH NULL", 6);
-    verify_query(test_context, t, "name BEGINSWITH[c] NULL", 6);
-    verify_query(test_context, t, "name ENDSWITH NULL", 6);
-    verify_query(test_context, t, "name ENDSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name CONTAINS NULL", t->size());
+    verify_query(test_context, t, "name CONTAINS[c] NULL", t->size());
+    verify_query(test_context, t, "name BEGINSWITH NULL", t->size());
+    verify_query(test_context, t, "name BEGINSWITH[c] NULL", t->size());
+    verify_query(test_context, t, "name ENDSWITH NULL", t->size());
+    verify_query(test_context, t, "name ENDSWITH[c] NULL", t->size());
     verify_query(test_context, t, "name LIKE NULL", 1);
     verify_query(test_context, t, "name LIKE[c] NULL", 1);
 
