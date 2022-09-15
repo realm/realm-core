@@ -15,7 +15,7 @@ case $(uname -s) in
             export GOARCH=arm64
             STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-master-nightly/stitch-support/macos-arm64/796351fa200293a91413699c8da073eb314ac2cd/stitch-support-6.1.0-alpha-527-g796351f.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_f323e4411e1b2d9011b88d7f6855654c8432f2ee_6179e0e92a60ed55e5ecc820_21_10_27_23_30_03/assisted_agg"
-            GO_URL="https://go.dev/dl/go1.18.3.darwin-arm64.tar.gz"
+            GO_URL="https://go.dev/dl/go1.18.6.darwin-arm64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
             MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
 
@@ -32,7 +32,9 @@ case $(uname -s) in
             export GOARCH=amd64
             STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_0bdbed3d42ea136e166b3aad8f6fd09f336b1668_22_03_29_14_36_02/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.2.darwin-amd64.tar.gz"
+            # Testing
+            GO_URL="https://go.dev/dl/go1.18.6.darwin-amd.tar.gz"
+            # GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.2.darwin-amd64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
         fi
 
