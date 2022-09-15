@@ -57,7 +57,8 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
     : m_source_column_key(src.m_source_column_key)
 {
     bool was_in_sync = src.is_in_sync();
-    m_query = Query(src.m_query, tr, policy_mode);
+    if (src.m_query)
+        m_query = Query(*src.m_query, tr, policy_mode);
     m_table = tr->import_copy_of(src.m_table);
 
     if (policy_mode == PayloadPolicy::Stay)
@@ -319,8 +320,8 @@ bool TableView::depends_on_deleted_object() const
     if (m_source_column_key && !m_linked_obj.is_valid()) {
         return true;
     }
-    else if (m_query.m_source_table_view) {
-        return m_query.m_source_table_view->depends_on_deleted_object();
+    else if (m_query && m_query->m_source_table_view) {
+        return m_query->m_source_table_view->depends_on_deleted_object();
     }
     return false;
 }
@@ -333,8 +334,8 @@ void TableView::get_dependencies(TableVersions& ret) const
             ret.emplace_back(linked_table->get_key(), linked_table->get_content_version());
         }
     }
-    else if (m_query.m_table) {
-        m_query.get_outside_versions(ret);
+    else if (m_query) {
+        m_query->get_outside_versions(ret);
     }
     else {
         // This TableView was created by Table::get_distinct_view() or get_sorted_view() on collections
@@ -362,8 +363,9 @@ void TableView::sync_if_needed() const
 
 void TableView::update_query(const Query& q)
 {
-    REALM_ASSERT(m_query.m_table);
-    REALM_ASSERT(m_query.m_table == q.m_table);
+    REALM_ASSERT(m_query);
+    REALM_ASSERT(m_query->m_table);
+    REALM_ASSERT(m_query->m_table == q.m_table);
 
     m_query = q;
     do_sync();
@@ -472,7 +474,8 @@ void TableView::do_sync()
     }
     // FIXME: Unimplemented for link to a column
     else {
-        m_query.m_table.check();
+        REALM_ASSERT(m_query);
+        m_query->m_table.check();
 
         // valid query, so clear earlier results and reexecute it.
         if (m_key_values.is_attached())
@@ -480,9 +483,9 @@ void TableView::do_sync()
         else
             m_key_values.create();
 
-        if (m_query.m_view)
-            m_query.m_view->sync_if_needed();
-        m_query.do_find_all(*const_cast<TableView*>(this), m_limit);
+        if (m_query->m_view)
+            m_query->m_view->sync_if_needed();
+        m_query->do_find_all(*const_cast<TableView*>(this), m_limit);
     }
 
     do_sort(m_descriptor_ordering);
@@ -549,11 +552,11 @@ bool TableView::is_in_table_order() const
     else if (m_source_column_key) {
         return false;
     }
-    else if (!m_query.m_table) {
+    else if (!m_query) {
         return false;
     }
     else {
-        m_query.m_table.check();
-        return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
+        m_query->m_table.check();
+        return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
 }

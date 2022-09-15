@@ -742,11 +742,9 @@ Query Results::do_get_query() const
             if (const_cast<Query&>(m_query).get_table())
                 return m_query;
 
-            // A TableView has an associated Query if it was produced by Query::find_all. This is indicated
-            // by TableView::get_query returning a Query with a non-null table.
-            Query query = m_table_view.get_query();
-            if (query.get_table()) {
-                return query;
+            // A TableView has an associated Query if it was produced by Query::find_all
+            if (auto& query = m_table_view.get_query()) {
+                return *query;
             }
 
             // The TableView has no associated query so create one with no conditions that is restricted
@@ -754,7 +752,7 @@ Query Results::do_get_query() const
             if (m_update_policy == UpdatePolicy::Auto) {
                 m_table_view.sync_if_needed();
             }
-            return Query(m_table, std::unique_ptr<TableView>(new TableView(m_table_view)));
+            return Query(m_table, std::make_unique<TableView>(m_table_view));
         }
         case Mode::Collection:
             if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
