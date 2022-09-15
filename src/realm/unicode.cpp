@@ -285,12 +285,12 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     result.resize(source.size());
 
 #if defined(_WIN32)
-    constexpr size_t tmp_buffer_size = 32;
+    constexpr int tmp_buffer_size = 32;
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
     while (begin != end) {
-        size_t n = end - begin;
+        auto n = end - begin;
         if (n > tmp_buffer_size) {
             // Break the input string into chunks - but don't break in the middle of a multibyte character
             const char* p = begin;
@@ -308,7 +308,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
 
         wchar_t tmp[tmp_buffer_size];
 
-        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, tmp_buffer_size);
+        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, int(n), tmp, tmp_buffer_size);
         if (n2 == 0)
             return util::none;
 
