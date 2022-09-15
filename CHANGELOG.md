@@ -30,7 +30,7 @@
 -----------
 
 ### Internals
-* None.
+* Traversal functions use a typed IteratorControl value rather than true/false. ([#5857](https://github.com/realm/realm-core/issues/5857))
 
 ----------------------------------------------
 
