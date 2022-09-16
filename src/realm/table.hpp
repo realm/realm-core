@@ -381,28 +381,13 @@ public:
     size_t count_double(ColKey col_key, double value) const;
     size_t count_decimal(ColKey col_key, Decimal128 value) const;
 
-    int64_t sum_int(ColKey col_key) const;
-    double sum_float(ColKey col_key) const;
-    double sum_double(ColKey col_key) const;
-    Decimal128 sum_decimal(ColKey col_key) const;
-    Decimal128 sum_mixed(ColKey col_key) const;
-    int64_t maximum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    float maximum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    double maximum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Decimal128 maximum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Mixed maximum_mixed(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    int64_t minimum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    float minimum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    double minimum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Decimal128 minimum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Mixed minimum_mixed(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    Timestamp minimum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
-    double average_int(ColKey col_key, size_t* value_count = nullptr) const;
-    double average_float(ColKey col_key, size_t* value_count = nullptr) const;
-    double average_double(ColKey col_key, size_t* value_count = nullptr) const;
-    Decimal128 average_decimal(ColKey col_key, size_t* value_count = nullptr) const;
-    Decimal128 average_mixed(ColKey col_key, size_t* value_count = nullptr) const;
+    // Aggregates return nullopt if the operation is not supported on the given column
+    // Everything but `sum` returns `some(null)` if there are no non-null values
+    // Sum returns `some(0)` if there are no non-null values.
+    std::optional<Mixed> sum(ColKey col_key) const;
+    std::optional<Mixed> min(ColKey col_key, ObjKey* = nullptr) const;
+    std::optional<Mixed> max(ColKey col_key, ObjKey* = nullptr) const;
+    std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
@@ -827,10 +812,9 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
+
     template <typename T>
     void aggregate(QueryStateBase& st, ColKey col_key) const;
-    template <typename T>
-    double average(ColKey col_key, size_t* resultcount) const;
 
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
@@ -858,13 +842,11 @@ private:
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
-    friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
     friend class metrics::QueryInfo;
     template <class>
     friend class SimpleQuerySupport;
-    friend class LangBindHelper;
     friend class TableView;
     template <class T>
     friend class Columns;
@@ -883,6 +865,8 @@ private:
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;
+    template <class T>
+    friend class AggregateHelper;
 };
 
 inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)

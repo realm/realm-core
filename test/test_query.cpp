@@ -3201,39 +3201,39 @@ TEST(Query_Float3)
     t.create_object().set_all(float(1.9), double(2.9), 9);
 
     Query q1 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
-    int64_t a1 = q1.sum_int(col_int);
+    auto a1 = q1.sum(col_int);
     CHECK_EQUAL(15, a1);
 
     Query q2 = t.where().less(col_double, 2.65).greater(col_float, 1.35f);
-    int64_t a2 = q2.sum_int(col_int);
+    auto a2 = q2.sum(col_int);
     CHECK_EQUAL(15, a2);
 
     Query q3 = t.where().less(col_double, 2.65).greater(col_float, 1.35f);
-    double a3 = q3.sum_float(col_float);
+    auto a3 = q3.sum(col_float);
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
     Query q4 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
-    double a4 = q4.sum_float(col_float);
+    auto a4 = q4.sum(col_float);
     CHECK_EQUAL(sum3, a4);
 
     Query q5 = t.where().greater_equal(col_int, 4).less(col_double, 2.65);
-    double a5 = q5.sum_float(col_float);
+    auto a5 = q5.sum(col_float);
     CHECK_EQUAL(sum3, a5);
 
     Query q6 = t.where().less(col_double, 2.65).greater_equal(col_int, 4);
-    double a6 = q6.sum_float(col_float);
+    auto a6 = q6.sum(col_float);
     CHECK_EQUAL(sum3, a6);
 
     Query q7 = t.where().greater(col_int, 3).less(col_int, 7);
-    int64_t a7 = q7.sum_int(col_int);
+    auto a7 = q7.sum(col_int);
     CHECK_EQUAL(15, a7);
     Query q8 = t.where().greater(col_int, 3).less(col_int, 7);
-    int64_t a8 = q8.sum_int(col_int);
+    auto a8 = q8.sum(col_int);
     CHECK_EQUAL(15, a8);
 
     q8 = t.where().greater(col_int, 3);
-    float f = float(q8.sum_float(col_float));
+    float f = float(q8.sum(col_float)->get_double());
     CHECK_EQUAL(8.1f, f);
 }
 
@@ -3259,40 +3259,40 @@ TEST(Query_Float3_where)
     TableView v = t.where().find_all();
 
     Query q1 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
-    int64_t a1 = q1.sum_int(col_int);
+    auto a1 = q1.sum(col_int);
     CHECK_EQUAL(15, a1);
 
     ObjKey k;
-    a1 = q1.maximum_int(col_int, &k);
+    a1 = q1.max(col_int, &k);
     CHECK_EQUAL(k.value, 0xc001ede1b0);
     CHECK_EQUAL(a1, 6);
 
     Query q2 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
-    int64_t a2 = q2.sum_int(col_int);
+    auto a2 = q2.sum(col_int);
     CHECK_EQUAL(15, a2);
 
     Query q3 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
-    double a3 = q3.sum_float(col_float);
+    auto a3 = q3.sum(col_float)->get_double();
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
     Query q4 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
-    double a4 = q4.sum_float(col_float);
+    auto a4 = q4.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a4);
 
     Query q5 = t.where(&v).greater_equal(col_int, 4).less(col_double, 2.65);
-    double a5 = q5.sum_float(col_float);
+    auto a5 = q5.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a5);
 
     Query q6 = t.where(&v).less(col_double, 2.65).greater_equal(col_int, 4);
-    double a6 = q6.sum_float(col_float);
+    auto a6 = q6.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a6);
 
     Query q7 = t.where(&v).greater(col_int, 3).less(col_int, 7);
-    int64_t a7 = q7.sum_int(col_int);
+    auto a7 = q7.sum(col_int);
     CHECK_EQUAL(15, a7);
     Query q8 = t.where(&v).greater(col_int, 3).less(col_int, 7);
-    int64_t a8 = q8.sum_int(col_int);
+    auto a8 = q8.sum(col_int);
     CHECK_EQUAL(15, a8);
 }
 
@@ -3308,13 +3308,12 @@ TEST(Query_TableViewSum)
 
     Query q1 = t.where().between(col_int, 5, 9);
     TableView tv1 = q1.find_all();
-    int64_t s = tv1.sum_int(col_int);
-    CHECK_EQUAL(5 + 6 + 7 + 8 + 9, s);
+    CHECK_EQUAL(5 + 6 + 7 + 8 + 9, *tv1.sum(col_int));
 }
 
 TEST(Query_JavaMinimumCrash)
 {
-    // Test that triggers a bug that was discovered through Java intnerface and has been fixed
+    // Test that triggers a bug that was discovered through Java interface and has been fixed
     Table ttt;
 
     auto col_str = ttt.add_column(type_String, "1");
@@ -3326,8 +3325,7 @@ TEST(Query_JavaMinimumCrash)
     ttt.create_object().set_all("Bob", "Hanson", 3);
 
     Query q1 = ttt.where().equal(col_str, "Joe").Or().equal(col_str, "Bob");
-    int64_t m = q1.minimum_int(col_int);
-    CHECK_EQUAL(1, m);
+    CHECK_EQUAL(1, *q1.min(col_int));
 }
 
 
@@ -3344,15 +3342,15 @@ TEST(Query_Float4)
     t.create_object().set_all(12345.0f, 12345.0, 11111);
 
     Query q1 = t.where();
-    float a1 = q1.maximum_float(col_float);
-    double a2 = q1.maximum_double(col_double);
+    auto a1 = q1.max(col_float)->get_float();
+    auto a2 = q1.max(col_double)->get_double();
     CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
     CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
 
 
     Query q2 = t.where();
-    float a3 = q1.minimum_float(col_float);
-    double a4 = q1.minimum_double(col_double);
+    auto a3 = q1.min(col_float);
+    auto a4 = q1.min(col_double);
     CHECK_EQUAL(12345.0, a3);
     CHECK_EQUAL(12345.0, a4);
 }
@@ -3402,64 +3400,64 @@ TEST(Query_Float)
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().sum(col_double)->get_double(), 10 * epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
-    double res = t.where().sum_float(col_float);
+    double res = t.where().sum(col_float)->get_double();
     CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10 * epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
     Query q2 = t.where().between(col_float, 1.13f, 1.20f).not_equal(col_double, 2.22);
-    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.sum_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.sum(col_float)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.sum(col_double)->get_double(), 10 * epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().avg(col_float)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().avg(col_double)->get_double(), 10 * epsilon);
     // ... with conditions
-    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.avg(col_float)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.avg(col_double)->get_double(), 10 * epsilon);
 
     // -------- Test minimum(), maximum()
 
     ObjKey ndx;
 
     // ... NO conditions
-    CHECK_EQUAL(1.20f, t.where().maximum_float(col_float));
-    t.where().maximum_float(col_float, &ndx);
+    CHECK_EQUAL(1.20f, t.where().max(col_float));
+    t.where().max(col_float, &ndx);
     CHECK_EQUAL(k4, ndx);
 
-    CHECK_EQUAL(1.10f, t.where().minimum_float(col_float));
-    t.where().minimum_float(col_float, &ndx);
+    CHECK_EQUAL(1.10f, t.where().min(col_float));
+    t.where().min(col_float, &ndx);
     CHECK_EQUAL(k0, ndx);
 
-    CHECK_EQUAL(3.20, t.where().maximum_double(col_double));
-    CHECK_EQUAL(3.20, t.where().maximum_double(col_double, &ndx));
+    CHECK_EQUAL(3.20, t.where().max(col_double));
+    CHECK_EQUAL(3.20, t.where().max(col_double, &ndx));
 
-    CHECK_EQUAL(2.20, t.where().minimum_double(col_double));
-    t.where().minimum_double(col_double, &ndx);
+    CHECK_EQUAL(2.20, t.where().min(col_double));
+    t.where().min(col_double, &ndx);
 
     // ... with conditions
-    CHECK_EQUAL(1.20f, q2.maximum_float(col_float));
-    q2.maximum_float(col_float, &ndx);
+    CHECK_EQUAL(1.20f, q2.max(col_float));
+    q2.max(col_float, &ndx);
     CHECK_EQUAL(k4, ndx);
 
-    CHECK_EQUAL(1.13f, q2.minimum_float(col_float));
-    q2.minimum_float(col_float, &ndx);
+    CHECK_EQUAL(1.13f, q2.min(col_float));
+    q2.min(col_float, &ndx);
     CHECK_EQUAL(k1, ndx);
 
-    CHECK_EQUAL(3.20, q2.maximum_double(col_double));
-    q2.maximum_double(col_double, &ndx);
+    CHECK_EQUAL(3.20, q2.max(col_double));
+    q2.max(col_double, &ndx);
     CHECK_EQUAL(k4, ndx);
 
-    CHECK_EQUAL(2.21, q2.minimum_double(col_double));
-    q2.minimum_double(col_double, &ndx);
+    CHECK_EQUAL(2.21, q2.min(col_double));
+    q2.min(col_double, &ndx);
     CHECK_EQUAL(k1, ndx);
 }
 
@@ -3514,13 +3512,13 @@ TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
 
     ttt.add_search_index(col_str);
 
-    int64_t s = ttt.where().equal(col_str, "a").sum_int(col_int);
+    auto s = *ttt.where().equal(col_str, "a").sum(col_int);
     CHECK_EQUAL(10 * 11, s);
 
-    s = ttt.where().equal(col_str, "a").equal(col_int, 10).sum_int(col_int);
+    s = *ttt.where().equal(col_str, "a").equal(col_int, 10).sum(col_int);
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().equal(col_int, 10).equal(col_str, "a").sum_int(col_int);
+    s = *ttt.where().equal(col_int, 10).equal(col_str, "a").sum(col_int);
     CHECK_EQUAL(100, s);
 
     TableView tv = ttt.where().equal(col_str, "a").find_all();
@@ -3591,7 +3589,7 @@ TEST(Query_SumMinMaxAvgForeignCol)
     t.create_object().set_all(2, 30);
     t.create_object().set_all(4, 40);
 
-    CHECK_EQUAL(50, t.where().equal(col_int0, 2).sum_int(col_int1));
+    CHECK_EQUAL(50, t.where().equal(col_int0, 2).sum(col_int1));
 }
 
 TEST(Query_AggregateSingleCond)
@@ -3606,16 +3604,16 @@ TEST(Query_AggregateSingleCond)
     t.create_object().set(col_int, 3);
     t.create_object().set(col_int, 4);
 
-    int64_t s = t.where().equal(col_int, 2).sum_int(col_int);
+    auto s = t.where().equal(col_int, 2).sum(col_int);
     CHECK_EQUAL(4, s);
 
-    s = t.where().greater(col_int, 2).sum_int(col_int);
+    s = t.where().greater(col_int, 2).sum(col_int);
     CHECK_EQUAL(10, s);
 
-    s = t.where().less(col_int, 3).sum_int(col_int);
+    s = t.where().less(col_int, 3).sum(col_int);
     CHECK_EQUAL(5, s);
 
-    s = t.where().not_equal(col_int, 3).sum_int(col_int);
+    s = t.where().not_equal(col_int, 3).sum(col_int);
     CHECK_EQUAL(9, s);
 }
 
@@ -5109,7 +5107,7 @@ TEST(Query_Sort_And_Requery_FindFirst)
 
     // 3, 2, 3, 2
     ObjKey k = ttt.where(&tv).equal(col_int0, 3).find();
-    int64_t s = ttt.where(&tv).not_equal(col_int1, 40).sum_int(col_int0);
+    auto s = ttt.where(&tv).not_equal(col_int1, 40).sum(col_int0);
     CHECK_EQUAL(k, ObjKey(5));
     CHECK_EQUAL(s, 7);
 }
@@ -5564,7 +5562,7 @@ NONCONCURRENT_TEST(Query_IntPerformance)
     auto t3 = steady_clock::now();
 
     for (size_t t = 0; t < nb_reps; t++) {
-        auto sum = q2.sum_int(col_2);
+        auto sum = q2.sum(col_2);
         CHECK_EQUAL(sum, 1998);
     }
 

@@ -257,28 +257,14 @@ public:
     size_t count() const;
     TableView find_all(const DescriptorOrdering& descriptor) const;
     size_t count(const DescriptorOrdering& descriptor) const;
-    int64_t sum_int(ColKey column_key) const;
-    double average_int(ColKey column_key, size_t* resultcount = nullptr) const;
-    int64_t maximum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    int64_t minimum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    double sum_float(ColKey column_key) const;
-    double average_float(ColKey column_key, size_t* resultcount = nullptr) const;
-    float maximum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    float minimum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    double sum_double(ColKey column_key) const;
-    double average_double(ColKey column_key, size_t* resultcount = nullptr) const;
-    double maximum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    double minimum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
-    Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
-    Decimal128 sum_decimal128(ColKey column_key) const;
-    Decimal128 maximum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    Decimal128 minimum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    Decimal128 average_decimal128(ColKey column_key, size_t* resultcount = nullptr) const;
-    Decimal128 sum_mixed(ColKey column_key) const;
-    Mixed maximum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    Mixed minimum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
-    Decimal128 average_mixed(ColKey column_key, size_t* resultcount = nullptr) const;
+
+    // Aggregates return nullopt if the operation is not supported on the given column
+    // Everything but `sum` returns `some(null)` if there are no non-null values
+    // Sum returns `some(0)` if there are no non-null values.
+    std::optional<Mixed> sum(ColKey col_key) const;
+    std::optional<Mixed> min(ColKey col_key, ObjKey* = nullptr) const;
+    std::optional<Mixed> max(ColKey col_key, ObjKey* = nullptr) const;
+    std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Deletion
     size_t remove() const;
@@ -358,13 +344,8 @@ private:
     template <typename TConditionFunction>
     Query& add_size_condition(ColKey column_key, int64_t value);
 
-    template <typename T,
-              typename R = typename aggregate_operations::Average<typename util::RemoveOptional<T>::type>::ResultType>
-    R average(ColKey column_key, size_t* resultcount = nullptr) const;
-
     template <typename T>
-    void aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount = nullptr,
-                   ObjKey* return_ndx = nullptr) const;
+    void aggregate(QueryStateBase& st, ColKey column_key) const;
 
     size_t find_best_node(ParentNode* pn) const;
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
@@ -391,6 +372,8 @@ private:
     friend class SubQueryCount;
     friend class PrimitiveListCount;
     friend class metrics::QueryInfo;
+    template <class>
+    friend class AggregateHelper;
 
     std::string error_code;
 
