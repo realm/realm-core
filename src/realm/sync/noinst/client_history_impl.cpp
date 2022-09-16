@@ -324,7 +324,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
     const auto sync_history_size = arrays.changesets.size();
     const auto sync_history_base_version = rt->get_version() - sync_history_size;
 
-    std::size_t accum_byte_size_soft_limit = 0x20000;  // 128 KB
+    std::size_t accum_byte_size_soft_limit = 131072;   // 128 KB
     std::size_t accum_byte_size_hard_limit = 16777216; // server-imposed limit
     std::size_t accum_byte_size = 0;
 
@@ -380,10 +380,9 @@ void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
     util::Logger& logger, util::UniqueFunction<void(const TransactionRef&, size_t)> run_in_write_tr,
-    SyncTransactReporter* transact_reporter, bool is_flx_sync_connection)
+    SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
-    REALM_ASSERT(is_flx_sync_connection || batch_state == DownloadBatchState::LastInBatch);
     std::vector<Changeset> changesets;
     changesets.resize(incoming_changesets.size()); // Throws
 
@@ -401,13 +400,14 @@ void ClientHistory::integrate_server_changesets(
     }
 
     VersionID new_version{0, 0};
-    constexpr std::size_t commit_byte_size_limit = 0x19000; // 100 KB
+    constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
+    auto num_changesets = incoming_changesets.size();
+    util::Span<Changeset> changesets_to_integrate(changesets);
 
-    // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times,
-    // depending on how many times the sync client needs to yield the write lock to allow
-    // the user to commit their changes.
-    // In each iteration, at least one changeset is transformed and committed.
-    for (size_t changeset_ndx = 0; changeset_ndx < incoming_changesets.size();) {
+    // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times, depending on how
+    // many times the sync client needs to yield the write lock to allow the user to commit their changes. In each
+    // iteration, at least one changeset is transformed and committed.
+    while (!changesets_to_integrate.empty()) {
         TransactionRef transact = m_db->start_write(); // Throws
         VersionID old_version = transact->get_version_of_current_transaction();
         version_type local_version = old_version.version;
@@ -421,9 +421,8 @@ void ClientHistory::integrate_server_changesets(
         size_t changesets_transformed_count = 0;
 
         try {
-            for (std::size_t i = changeset_ndx; i < incoming_changesets.size(); ++i) {
-                const RemoteChangeset& changeset = incoming_changesets[i];
-                REALM_ASSERT(changeset.last_integrated_local_version <= local_version);
+            for (auto& changeset : changesets_to_integrate) {
+                REALM_ASSERT(changeset.last_integrated_remote_version <= local_version);
                 REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != sync_file_id);
 
                 // It is possible that the synchronization history has been trimmed
@@ -436,34 +435,35 @@ void ClientHistory::integrate_server_changesets(
                 // when this situation occurs.
                 //
                 // See trim_sync_history() for further details.
-                if (changesets[i].last_integrated_remote_version < m_sync_history_base_version)
-                    changesets[i].last_integrated_remote_version = m_sync_history_base_version;
+                if (changeset.last_integrated_remote_version < m_sync_history_base_version)
+                    changeset.last_integrated_remote_version = m_sync_history_base_version;
             }
 
             if (m_replication.apply_server_changes()) {
                 Transformer& transformer = get_transformer(); // Throws
-                auto changeset_applier = [&](Changeset* transformed_changeset) -> bool {
+                auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
                     InstructionApplier applier{*transact};
                     {
                         TempShortCircuitReplication tscr{m_replication};
                         applier.apply(*transformed_changeset, &logger); // Throws
                     }
 
-                    return !(m_db->waiting_for_write_lock() && transact->get_commit_size() >= commit_byte_size_limit);
+                    return !(m_db->other_writers_waiting_for_lock() &&
+                             transact->get_commit_size() >= commit_byte_size_limit);
                 };
-                changesets_transformed_count = transformer.transform_remote_changesets(
-                    *this, sync_file_id, local_version,
-                    util::Span{changesets.data() + changeset_ndx, changesets.size() - changeset_ndx},
-                    std::move(changeset_applier), &logger); // Throws
+                auto it = transformer.transform_remote_changesets(*this, sync_file_id, local_version,
+                                                                  changesets_to_integrate,
+                                                                  std::move(changeset_applier), &logger); // Throws
+                changesets_transformed_count = std::distance(changesets_to_integrate.begin(), it);
             }
             else {
                 // Skip over all changesets if they don't need to be transformed and applied.
-                changesets_transformed_count = incoming_changesets.size();
+                changesets_transformed_count = changesets_to_integrate.size();
             }
 
             // Compute downloaded bytes only after we know how many remote changesets are going to be commited in this
             // transaction.
-            for (std::size_t i = changeset_ndx; i < changeset_ndx + changesets_transformed_count; ++i) {
+            for (std::size_t i = 0; i < changesets_transformed_count; ++i) {
                 downloaded_bytes_in_transaction += incoming_changesets[i].original_changeset_size;
             }
         }
@@ -476,7 +476,7 @@ void ClientHistory::integrate_server_changesets(
                                        util::format("Failed to transform received changeset: %1", e.what()));
         }
 
-        changeset_ndx += changesets_transformed_count;
+        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
 
         // downloaded_bytes always contains the total number of downloaded bytes
         // from the Realm. downloaded_bytes must be persisted in the Realm, since
@@ -488,16 +488,17 @@ void ClientHistory::integrate_server_changesets(
         downloaded_bytes += downloaded_bytes_in_transaction;
         root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
 
-        const RemoteChangeset& last_changeset = incoming_changesets[changeset_ndx - 1];
+        const RemoteChangeset& last_changeset = incoming_changesets[changesets_transformed_count - 1];
+        changesets_to_integrate = changesets_to_integrate.sub_span(changesets_transformed_count);
+        incoming_changesets = incoming_changesets.sub_span(changesets_transformed_count);
 
         // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
         // synthetic server version that represents synthetic changesets generated from state on the server.
-        if (is_flx_sync_connection && batch_state == DownloadBatchState::LastInBatch &&
-            changeset_ndx == incoming_changesets.size()) {
+        if (batch_state == DownloadBatchState::LastInBatch && changesets_to_integrate.empty()) {
             update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
-        // Always update progress in PBS.
-        else if (!is_flx_sync_connection) {
+        // Always update progress for download messages from steady state.
+        else if (batch_state == DownloadBatchState::SteadyState) {
             auto partial_progress = progress;
             partial_progress.download.server_version = last_changeset.remote_version;
             partial_progress.download.last_integrated_client_version = last_changeset.last_integrated_local_version;

@@ -1387,18 +1387,15 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
-        if (download_batch_state != DownloadBatchState::LastInBatch) {
+        if (download_batch_state == DownloadBatchState::MoreToCome) {
             throw IntegrationException(ClientError::bad_progress,
                                        "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    before_download_integration_hook(received_changesets.size());
     history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter(),
-                                        m_is_flx_sync_session); // Throws
-    after_download_integration_hook(received_changesets.size());
+                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -2084,6 +2081,10 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    if (is_steady_state_download_message(batch_state, query_version)) {
+        batch_state = DownloadBatchState::SteadyState;
+    }
+
     logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
                  "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
@@ -2091,7 +2092,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state == DownloadBatchState::LastInBatch, query_version, received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2151,7 +2152,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook(progress, query_version, batch_state);
+    receive_download_message_hook(progress, query_version, batch_state, received_changesets.size());
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();
@@ -2159,6 +2160,8 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
+
+    download_message_integrated_hook(progress, query_version, batch_state, received_changesets.size());
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.

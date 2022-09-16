@@ -1178,7 +1178,7 @@ TEST_CASE("SharedRealm: async writes") {
                     sema.add_stone();
 
                     // Wait until the main thread is waiting for the lock.
-                    while (!db->waiting_for_write_lock()) {
+                    while (!db->other_writers_waiting_for_lock()) {
                         millisleep(1);
                     }
                     write->close();

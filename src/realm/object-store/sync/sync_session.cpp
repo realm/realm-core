@@ -740,9 +740,10 @@ void SyncSession::create_sync_session()
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     if (sync_config.on_download_message_received_hook) {
         session_config.on_download_message_received_hook =
-            [hook = sync_config.on_download_message_received_hook, anchor = weak_from_this()](
-                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
-                hook(anchor, progress, query_version, batch_state);
+            [hook = sync_config.on_download_message_received_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
             };
     }
     if (sync_config.on_bootstrap_message_processed_hook) {
@@ -753,8 +754,14 @@ void SyncSession::create_sync_session()
             return hook(anchor, progress, query_version, batch_state);
         };
     }
-    session_config.on_before_download_integration = sync_config.on_before_download_integration;
-    session_config.on_after_download_integration = sync_config.on_after_download_integration;
+    if (sync_config.on_download_message_integrated_hook) {
+        session_config.on_download_message_integrated_hook =
+            [hook = sync_config.on_download_message_integrated_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
+            };
+    }
 
     {
         std::string sync_route = m_sync_manager->sync_route();

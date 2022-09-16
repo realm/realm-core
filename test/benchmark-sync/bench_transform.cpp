@@ -65,14 +65,20 @@ void transform_transactions(TestContext& test_context)
         Timer t{Timer::type_RealTime};
 
         Session::Config session_config;
-        session_config.on_before_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            t.reset();
-        };
-        session_config.on_after_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            results->submit(ident.c_str(), t.get_elapsed_time());
-        };
+        session_config.on_download_message_received_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                t.reset();
+            };
+        session_config.on_download_message_integrated_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                results->submit(ident.c_str(), t.get_elapsed_time());
+            };
 
         Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
         fixture.bind_session(session_1, 0, "/test");
@@ -135,14 +141,20 @@ void transform_instructions(TestContext& test_context)
         Timer t{Timer::type_RealTime};
 
         Session::Config session_config;
-        session_config.on_before_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            t.reset();
-        };
-        session_config.on_after_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            results->submit(ident.c_str(), t.get_elapsed_time());
-        };
+        session_config.on_download_message_received_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                t.reset();
+            };
+        session_config.on_download_message_integrated_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                results->submit(ident.c_str(), t.get_elapsed_time());
+            };
         Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
         fixture.bind_session(session_1, 0, "/test");
         Session session_2 = fixture.make_session(1, db_2);
@@ -202,14 +214,20 @@ void connected_objects(TestContext& test_context)
         Timer t{Timer::type_RealTime};
 
         Session::Config session_config;
-        session_config.on_before_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            t.reset();
-        };
-        session_config.on_after_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
-            results->submit(ident.c_str(), t.get_elapsed_time());
-        };
+        session_config.on_download_message_received_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                t.reset();
+            };
+        session_config.on_download_message_integrated_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
+                results->submit(ident.c_str(), t.get_elapsed_time());
+            };
         Session session_1 = fixture.make_session(0, db_1, std::move(session_config));
         fixture.bind_session(session_1, 0, "/test");
         Session session_2 = fixture.make_session(1, db_2);

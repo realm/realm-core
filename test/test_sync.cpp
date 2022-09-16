@@ -4442,25 +4442,28 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
         version_type user_commit_version = UINT_FAST64_MAX;
 
         Session::Config config;
-        config.on_before_download_integration = [&](size_t num_changesets) {
-            CHECK(num_changesets > 0);
+        config.on_download_message_integrated_hook =
+            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
+                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+                if (num_changesets == 0)
+                    return;
 
-            future = std::async([&] {
-                auto write = db_1->start_write();
-                // Keep the transaction open until the sync client is waiting to acquire the write lock.
-                while (!db_1->waiting_for_write_lock()) {
-                    millisleep(1);
-                }
-                write->close();
+                future = std::async([&] {
+                    auto write = db_1->start_write();
+                    // Keep the transaction open until the sync client is waiting to acquire the write lock.
+                    while (!db_1->other_writers_waiting_for_lock()) {
+                        millisleep(1);
+                    }
+                    write->close();
 
-                // Sync client holds the write lock now, so commit a local change.
-                WriteTransaction wt(db_1);
-                TableRef table = wt.get_table("class_table name");
-                auto obj = table->create_object();
-                obj.set("string column", "foobar");
-                user_commit_version = wt.commit();
-            });
-        };
+                    // Sync client holds the write lock now, so commit a local change.
+                    WriteTransaction wt(db_1);
+                    TableRef table = wt.get_table("class_table name");
+                    auto obj = table->create_object();
+                    obj.set("string column", "foobar");
+                    user_commit_version = wt.commit();
+                });
+            };
         Session session_1 = fixture.make_session(0, db_1, std::move(config));
         fixture.bind_session(session_1, 0, "/test");
         Session session_2 = fixture.make_session(1, db_2);
@@ -6803,7 +6806,7 @@ TEST(Sync_NonIncreasingServerVersions)
     VersionInfo version_info;
     util::StderrLogger logger;
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::LastInBatch, logger);
+                                        DownloadBatchState::SteadyState, logger);
 }
 
 TEST(Sync_InvalidChangesetFromServer)

@@ -127,6 +127,8 @@ class Transformer {
 public:
     class RemoteChangeset;
 
+    using iterator = util::Span<Changeset>::iterator;
+
     /// Produce operationally transformed versions of the specified changesets,
     /// which are assumed to be received from a particular remote peer, P,
     /// represented by the specified transform history. Note that P is not
@@ -167,17 +169,18 @@ public:
     /// \param changeset_applier Called to to apply each transformed changeset.
     /// Returns true if it can continue applying the changests, false otherwise.
     ///
-    /// \return The number of changesets that have been transformed and applied.
+    /// \return Iterator to the next changeset that needs to be transformed and
+    /// applied, or `end()` if there is no changeset left.
     ///
     /// \throw TransformError Thrown if operational transformation fails due to
     /// a problem with the specified changeset.
     ///
     /// FIXME: Consider using std::error_code instead of throwing
     /// TransformError.
-    virtual size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
-                                               version_type current_local_version, util::Span<Changeset> changesets,
-                                               util::UniqueFunction<bool(Changeset*)> changeset_applier,
-                                               util::Logger* = nullptr) = 0;
+    virtual iterator transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
+                                                 version_type current_local_version, util::Span<Changeset> changesets,
+                                                 util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                                 util::Logger* = nullptr) = 0;
 
     virtual ~Transformer() noexcept {}
 };
@@ -197,11 +200,12 @@ public:
     using Instruction = sync::Instruction;
     using TransformHistory = sync::TransformHistory;
     using version_type = sync::version_type;
+    using iterator = sync::Transformer::iterator;
 
     TransformerImpl();
 
-    size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
-                                       util::UniqueFunction<bool(Changeset*)>, util::Logger*) override;
+    iterator transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
+                                         util::UniqueFunction<bool(const Changeset*)>, util::Logger*) override;
 
     struct Side;
     struct MajorSide;

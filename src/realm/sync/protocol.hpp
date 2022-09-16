@@ -134,6 +134,7 @@ struct DownloadCursor {
 enum class DownloadBatchState {
     MoreToCome,
     LastInBatch,
+    SteadyState,
 };
 
 /// Checks that `dc.last_integrated_client_version` is zero if

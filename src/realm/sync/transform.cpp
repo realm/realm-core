@@ -2519,23 +2519,21 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 }
 
-size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                    version_type current_local_version,
-                                                    util::Span<Changeset> parsed_changesets,
-                                                    util::UniqueFunction<bool(Changeset*)> changeset_applier,
-                                                    util::Logger* logger)
+TransformerImpl::iterator TransformerImpl::transform_remote_changesets(
+    TransformHistory& history, file_ident_type local_file_ident, version_type current_local_version,
+    util::Span<Changeset> parsed_changesets, util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+    util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
     std::vector<Changeset*> our_changesets;
 
-    size_t applied_changesets_count = 0;
+    // p points to the beginning of a range of changesets that share the same
+    // "base", i.e. are based on the same local version.
+    auto p = parsed_changesets.begin();
+    auto parsed_changesets_end = parsed_changesets.end();
 
     try {
-        // p points to the beginning of a range of changesets that share the same
-        // "base", i.e. are based on the same local version.
-        auto p = parsed_changesets.begin();
-        auto parsed_changesets_end = parsed_changesets.end();
         while (p != parsed_changesets_end) {
             // Find the range of incoming changesets that share the same
             // last_integrated_local_version, which means we can merge them in one go.
@@ -2565,24 +2563,16 @@ size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, f
                                  our_changesets.size(), logger); // Throws
                 // We need to apply all transformed changesets if at least one reciprocal changeset was modified
                 // during OT.
-                must_apply_all = std::find_if(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
-                                     return c->is_dirty();
-                                 }) != our_changesets.end();
+                must_apply_all = std::any_of(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
+                    return c->is_dirty();
+                });
             }
 
-            while (p != same_base_range_end) {
-                bool continue_applying = changeset_applier(p);
-                ++applied_changesets_count;
+            for (auto continue_applying = true; p != same_base_range_end && continue_applying; ++p) {
                 // It is safe to stop applying the changesets if:
                 //      1. There are no reciprocal changesets
                 //      2. No reciprocal changeset was modified
-                if (!must_apply_all && !continue_applying) {
-                    break;
-                }
-                ++p;
-            }
-            if (p != same_base_range_end) {
-                break;
+                continue_applying = changeset_applier(p) || must_apply_all;
             }
 
             our_changesets.clear(); // deliberately not releasing memory
@@ -2604,7 +2594,7 @@ size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, f
     // the current transaction.
     flush_reciprocal_transform_cache(history); // Throws
 
-    return applied_changesets_count;
+    return p;
 }
 
 

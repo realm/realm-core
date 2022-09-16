@@ -1190,7 +1190,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         version_type current_server_version = get_server_version();
         Group& group = *m_group;
         Transaction& transaction = dynamic_cast<Transaction&>(group);
-        auto apply = [&](Changeset* c) -> bool {
+        auto apply = [&](const Changeset* c) -> bool {
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
             InstructionApplier applier{transaction};
             applier.apply(*c, &logger);
