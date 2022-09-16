@@ -77,7 +77,7 @@ struct SyncClientConfig {
     LoggerFactory logger_factory;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
-    ReconnectMode reconnect_mode = ReconnectMode::normal;
+    ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
     bool multiplex_sessions = false;
 
     // Optional information about the binding/application that is sent as part of the User-Agent

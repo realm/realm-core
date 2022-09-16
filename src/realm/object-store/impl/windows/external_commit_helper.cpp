@@ -48,21 +48,21 @@ static std::string create_condvar_sharedmemory_name(std::string realm_path)
     return name;
 }
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
     : m_parent(parent)
-    , m_shared_part(create_condvar_sharedmemory_name(parent.get_path()))
+    , m_shared_part(create_condvar_sharedmemory_name(config.path))
 {
     auto unneeded = InterprocessMutex::SharedPart();
-    m_mutex.set_shared_part(unneeded, normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+    m_mutex.set_shared_part(unneeded, normalize_realm_path_for_windows_kernel_object_name(config.path),
                             "ExternalCommitHelper_ControlMutex");
 
     m_commit_available.set_shared_part(
-        m_shared_part->cv, normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+        m_shared_part->cv, normalize_realm_path_for_windows_kernel_object_name(config.path),
         "ExternalCommitHelper_CommitCondVar",
         normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().string()));
 
     {
-        auto lock = std::unique_lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         m_last_count = m_shared_part->num_signals;
     }
 
@@ -74,7 +74,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 ExternalCommitHelper::~ExternalCommitHelper()
 {
     {
-        std::lock_guard<InterprocessMutex> lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         m_keep_listening = false;
         m_commit_available.notify_all();
     }
@@ -85,7 +85,7 @@ ExternalCommitHelper::~ExternalCommitHelper()
 
 void ExternalCommitHelper::notify_others()
 {
-    std::lock_guard<InterprocessMutex> lock(m_mutex);
+    std::lock_guard lock(m_mutex);
     m_shared_part->num_signals++;
     m_commit_available.notify_all();
 }

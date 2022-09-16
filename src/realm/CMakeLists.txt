@@ -41,6 +41,7 @@ set(REALM_SOURCES
     impl/simulated_failure.cpp
     impl/transact_log.cpp
     index_string.cpp
+    link_translator.cpp
     list.cpp
     node.cpp
     mixed.cpp

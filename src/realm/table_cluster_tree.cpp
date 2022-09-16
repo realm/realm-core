@@ -72,8 +72,7 @@ void TableClusterTree::clear(CascadeState& state)
             for (size_t i = 0; i < sz; i++) {
                 repl->remove_object(m_owner, cluster->get_real_key(i));
             }
-            // Continue
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 
@@ -102,7 +101,7 @@ void TableClusterTree::enumerate_string_column(ColKey col_key)
             }
         }
 
-        return false; // Continue
+        return IteratorControl::AdvanceToNext;
     };
 
     auto upgrade = [col_key, &keys](Cluster* cluster) {
@@ -171,7 +170,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
             // Furthermore it is a prerequisite for using 'traverse' that the tree
             // is not modified
             if (get_owning_table()->links_to_self(col_key)) {
-                return false;
+                return IteratorControl::AdvanceToNext;
             }
             auto col_type = col_key.get_type();
             if (col_key.is_list() || col_key.is_set()) {
@@ -247,8 +246,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                                     links.push_back(mix.get<ObjLink>());
                                 }
                             }
-                            // Continue
-                            return false;
+                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {
@@ -303,11 +301,10 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                     }
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
         m_owner->for_each_and_every_column(remove_link_from_column);
-        // Continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     // Go through all clusters

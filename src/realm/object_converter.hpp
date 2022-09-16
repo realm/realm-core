@@ -19,7 +19,10 @@
 #ifndef REALM_OBJECT_CONVERTER_HPP
 #define REALM_OBJECT_CONVERTER_HPP
 
+#include <realm/mixed.hpp>
 #include <realm/obj.hpp>
+
+#include <memory>
 
 namespace realm::converters {
 
@@ -81,4 +84,4 @@ private:
 
 } // namespace realm::converters
 
-#endif /* REALM_OBJECT_CONVERTER_HPP */
+#endif // REALM_OBJECT_CONVERTER_HPP

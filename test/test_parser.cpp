@@ -737,18 +737,17 @@ TEST(Parser_LinksToDifferentTable)
         obj.set(discount_active_col, discount_info[i].second);
     }
 
-    TableRef items = g.add_table("class_Items");
-    ColKey item_name_col = items->add_column(type_String, "name");
+    TableRef items = g.add_table_with_primary_key("class_Items", type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_discount_col = items->add_column(*discounts, "discount");
     using item_t = std::pair<std::string, double>;
-    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    std::vector<item_t> item_info = {
+        {"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"coffee", 17.5}};
     std::vector<ObjKey> item_keys;
-    items->create_objects(item_info.size(), item_keys);
-    for (size_t i = 0; i < item_keys.size(); ++i) {
-        Obj obj = items->get_object(item_keys[i]);
-        obj.set(item_name_col, StringData(item_info[i].first));
-        obj.set(item_price_col, item_info[i].second);
+    for (auto& item : item_info) {
+        Obj obj = items->create_object_with_primary_key(item.first);
+        obj.set(item_price_col, item.second);
+        item_keys.push_back(obj.get_key());
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
@@ -781,6 +780,9 @@ TEST(Parser_LinksToDifferentTable)
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
 
+    verify_query(test_context, t, "items = obj('Items', 'coffee')", 0); // nobody buys coffee
+    verify_query(test_context, t, "items = obj('Items', 'milk')", 2);   // but milk
+    verify_query(test_context, t, "items = O0", 2);                     // how many people bought milk?
     verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
     verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
@@ -824,7 +826,7 @@ TEST(Parser_StringOperations)
     TableRef t = g.add_table("person");
     ColKey name_col = t->add_column(type_String, "name", true);
     ColKey link_col = t->add_column(*t, "father");
-    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel", "Unicorn🦄"};
     std::vector<ObjKey> people_keys;
     t->create_objects(names.size(), people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
@@ -834,16 +836,17 @@ TEST(Parser_StringOperations)
     }
     t->create_object(); // null
     t->get_object(people_keys[4]).set_null(link_col);
+    size_t nb_names = names.size();
 
     verify_query(test_context, t, "name == 'Bob'", 1);
     verify_query(test_context, t, "father.name == 'Bob'", 1);
     verify_query(test_context, t, "name ==[c] 'Bob'", 1);
     verify_query(test_context, t, "father.name ==[c] 'Bob'", 1);
 
-    verify_query(test_context, t, "name != 'Bob'", 5);
-    verify_query(test_context, t, "father.name != 'Bob'", 5);
-    verify_query(test_context, t, "name !=[c] 'bOB'", 5);
-    verify_query(test_context, t, "father.name !=[c] 'bOB'", 5);
+    verify_query(test_context, t, "name != 'Bob'", nb_names);
+    verify_query(test_context, t, "father.name != 'Bob'", nb_names);
+    verify_query(test_context, t, "name !=[c] 'bOB'", nb_names);
+    verify_query(test_context, t, "father.name !=[c] 'bOB'", nb_names);
 
     verify_query(test_context, t, "name contains \"oe\"", 2);
     verify_query(test_context, t, "father.name contains \"oe\"", 2);
@@ -865,23 +868,25 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name like[c] \"?O?\"", 2);
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 
+    verify_query(test_context, t, "name ==[c] 'unicorn🦄'", 1);
+
     verify_query(test_context, t, "name == NULL", 1);
     verify_query(test_context, t, "name == nil", 1);
     verify_query(test_context, t, "NULL == name", 1);
-    verify_query(test_context, t, "name != NULL", 5);
-    verify_query(test_context, t, "NULL != name", 5);
+    verify_query(test_context, t, "name != NULL", nb_names);
+    verify_query(test_context, t, "NULL != name", nb_names);
     verify_query(test_context, t, "name ==[c] NULL", 1);
     verify_query(test_context, t, "NULL ==[c] name", 1);
-    verify_query(test_context, t, "name !=[c] NULL", 5);
-    verify_query(test_context, t, "NULL !=[c] name", 5);
+    verify_query(test_context, t, "name !=[c] NULL", nb_names);
+    verify_query(test_context, t, "NULL !=[c] name", nb_names);
 
     // for strings 'NULL' is also a synonym for the null string
-    verify_query(test_context, t, "name CONTAINS NULL", 6);
-    verify_query(test_context, t, "name CONTAINS[c] NULL", 6);
-    verify_query(test_context, t, "name BEGINSWITH NULL", 6);
-    verify_query(test_context, t, "name BEGINSWITH[c] NULL", 6);
-    verify_query(test_context, t, "name ENDSWITH NULL", 6);
-    verify_query(test_context, t, "name ENDSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name CONTAINS NULL", t->size());
+    verify_query(test_context, t, "name CONTAINS[c] NULL", t->size());
+    verify_query(test_context, t, "name BEGINSWITH NULL", t->size());
+    verify_query(test_context, t, "name BEGINSWITH[c] NULL", t->size());
+    verify_query(test_context, t, "name ENDSWITH NULL", t->size());
+    verify_query(test_context, t, "name ENDSWITH[c] NULL", t->size());
     verify_query(test_context, t, "name LIKE NULL", 1);
     verify_query(test_context, t, "name LIKE[c] NULL", 1);
 
@@ -3362,7 +3367,7 @@ TEST(Parser_BacklinksIndex)
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;
-    util::serializer::SerialisationState test_state("");
+    util::serializer::SerialisationState test_state("", nullptr);
 
     TableRef test_table = g.add_table("test");
 
@@ -4102,7 +4107,7 @@ TEST(Parser_Object)
 
     Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get_object(0));
     std::string description = q0.get_description(); // shouldn't throw
-    CHECK(description.find("O0") != std::string::npos);
+    CHECK(description.find("L0:0") != std::string::npos);
 
     Query q1 = table->column<Link>(link_col) == realm::null();
     description = q1.get_description(); // shouldn't throw
@@ -4994,6 +4999,8 @@ TEST(Parser_DictionaryObjects)
     CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "pets.@values.age > 4", 1);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
@@ -5509,6 +5516,91 @@ TEST(Parser_Between)
     CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
+}
+
+TEST(Parser_PrimaryKey)
+{
+    UUID u1("3b241101-e2bb-4255-8caf-4136c566a961");
+    ObjectId o1 = ObjectId::gen();
+    Group g;
+    auto table_int = g.add_table_with_primary_key("class_Int", type_Int, "_id");
+    auto table_string = g.add_table_with_primary_key("class_String", type_String, "_id");
+    auto table_oid = g.add_table_with_primary_key("class_Oid", type_ObjectId, "_id");
+    auto table_uuid = g.add_table_with_primary_key("class_Uuid", type_UUID, "_id");
+
+    auto origin = g.add_table("origin");
+    auto col_int = origin->add_column(*table_int, "int");
+    auto col_string = origin->add_column(*table_string, "string");
+    auto col_oid = origin->add_column(*table_oid, "oid");
+    auto col_uuid = origin->add_column(*table_uuid, "uuid");
+    auto col_any = origin->add_column(type_Mixed, "mixed");
+
+
+    auto linking = g.add_table("linking");
+    auto col_link = linking->add_column(*origin, "link");
+
+    auto target = table_int->create_object_with_primary_key(1);
+    origin->create_object().set(col_int, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_string->create_object_with_primary_key("first");
+    origin->create_object().set(col_string, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_oid->create_object_with_primary_key(o1);
+    origin->create_object().set(col_oid, target.get_key()).set(col_any, Mixed(target.get_link()));
+    target = table_uuid->create_object_with_primary_key(u1);
+    origin->create_object().set(col_uuid, target.get_key()).set(col_any, Mixed(target.get_link()));
+
+    for (auto o : *origin) {
+        linking->create_object().set(col_link, o.get_key());
+    }
+
+    std::string query_string = "int == obj(\"class_Int\",1)";
+    Query q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "mixed == obj(\"class_Int\",1)";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "string == obj(\"class_String\",\"first\")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "oid == obj(\"class_Oid\"," + util::serializer::print_value(o1) + ")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "uuid == obj(\"class_Uuid\"," + util::serializer::print_value(u1) + ")";
+    q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.int == obj(\"class_Int\",1)";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.mixed == obj(\"class_Int\",1)";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.string == obj(\"class_String\",\"first\")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.oid == obj(\"class_Oid\"," + util::serializer::print_value(o1) + ")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "link.uuid == obj(\"class_Uuid\"," + util::serializer::print_value(u1) + ")";
+    q = linking->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
 }
 
 #endif // TEST_PARSER

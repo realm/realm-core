@@ -1256,16 +1256,18 @@ inline size_t LnkSet::find_any(Mixed value) const
 {
     if (value.is_null())
         return not_found;
-    if (value.get_type() == type_Link) {
-        return find_first(value.get<ObjKey>());
+
+    const auto type = value.get_type();
+    if (type == type_Link) {
+        return find(value.get<ObjKey>());
     }
-    if (value.get_type() == type_TypedLink) {
+    if (type == type_TypedLink) {
         auto link = value.get_link();
         if (link.get_table_key() == get_target_table()->get_key()) {
-            return find_first(value.get<ObjKey>());
+            return find(link.get_obj_key());
         }
     }
-    return realm::not_found;
+    return not_found;
 }
 
 inline bool LnkSet::is_obj_valid(size_t) const noexcept

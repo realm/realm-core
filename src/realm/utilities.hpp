@@ -393,6 +393,8 @@ typedef int FileDesc;
 #endif
 
 
+enum class IteratorControl { AdvanceToNext, Stop };
+
 } // namespace realm
 
 #endif // REALM_UTILITIES_HPP

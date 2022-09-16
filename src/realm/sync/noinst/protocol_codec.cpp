@@ -52,6 +52,13 @@ void ClientProtocol::make_query_change_message(OutputBuffer& out, session_ident_
     REALM_ASSERT(!out.fail());
 }
 
+void ClientProtocol::make_json_error_message(OutputBuffer& out, session_ident_type session, int error_code,
+                                             std::string_view error_body)
+{
+    out << "json_error " << error_code << " " << error_body.size() << " " << session << "\n" << error_body; // throws
+    REALM_ASSERT(!out.fail());
+}
+
 ClientProtocol::UploadMessageBuilder::UploadMessageBuilder(
     util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
     util::compression::CompressMemoryArena& compress_memory_arena)
