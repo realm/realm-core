@@ -677,7 +677,9 @@ void Dictionary::clear()
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    if (!m_dictionary_top) {
+    auto ref = m_obj._get<int64_t>(m_col_key.get_index());
+
+    if ((ref || allow_create) && !m_dictionary_top) {
         m_dictionary_top.reset(new Array(m_obj.get_alloc()));
         m_dictionary_top->set_parent(const_cast<Dictionary*>(this), m_obj.get_row_ndx());
         switch (m_key_type) {
@@ -698,8 +700,15 @@ bool Dictionary::init_from_parent(bool allow_create) const
         m_values->set_parent(m_dictionary_top.get(), 1);
     }
 
-    if (m_obj._get<int64_t>(m_col_key.get_index()) == 0) {
+    if (ref) {
+        m_dictionary_top->init_from_parent();
+        m_keys->init_from_parent();
+        m_values->init_from_parent();
+    }
+    else {
+        // dictionary detached
         if (!allow_create) {
+            m_dictionary_top.reset();
             return false;
         }
 
@@ -708,11 +717,6 @@ bool Dictionary::init_from_parent(bool allow_create) const
         m_values->create();
         m_keys->create();
         m_dictionary_top->update_parent();
-    }
-    else {
-        m_dictionary_top->init_from_parent();
-        m_keys->init_from_parent();
-        m_values->init_from_parent();
     }
 
     return true;
