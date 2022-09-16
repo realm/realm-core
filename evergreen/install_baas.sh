@@ -15,7 +15,7 @@ case $(uname -s) in
             export GOARCH=arm64
             STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-master-nightly/stitch-support/macos-arm64/796351fa200293a91413699c8da073eb314ac2cd/stitch-support-6.1.0-alpha-527-g796351f.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://go.dev/dl/go1.18.6.darwin-arm64.tar.gz"
+            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.18.6.darwin-arm64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
             MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
 
@@ -33,8 +33,7 @@ case $(uname -s) in
             STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
             # Testing
-            GO_URL="https://go.dev/dl/go1.18.6.darwin-amd64.tar.gz"
-            # GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.2.darwin-amd64.tar.gz"
+            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.18.6.darwin-amd64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
         fi
 
@@ -42,7 +41,7 @@ case $(uname -s) in
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.2.linux-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.18.6.linux-amd64.tar.gz"
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
         NODE_URL="https://nodejs.org/dist/v14.17.0/node-v14.17.0-linux-x64.tar.gz"
 
