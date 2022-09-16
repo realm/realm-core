@@ -1968,11 +1968,7 @@ static void set_app_config_defaults(app::App::Config& app_config,
 
 TEST_CASE("app: sync integration", "[sync][app]") {
     auto logger = std::make_unique<util::StderrLogger>();
-#if TEST_ENABLE_SYNC_LOGGING
-    logger->set_level_threshold(util::Logger::Level::all);
-#else
-    logger->set_level_threshold(util::Logger::Level::off);
-#endif
+    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
 
@@ -2082,11 +2078,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
         sc_config.base_file_path = base_file_path;
-        sc_config.log_level = TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off;
+        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
-        std::shared_ptr<realm::app::App> redir_app = app::App::get_uncached_app(app_config, sc_config);
+        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
@@ -2144,7 +2140,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
                 else if (request_count == 1) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    REQUIRE(!request.max_redirects);
+                    REQUIRE(!request.redirect_count);
                     redir_transport->simulated_response = {
                         301,
                         0,
@@ -2181,8 +2177,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(request.url.find(redirect_url) != std::string::npos);
                     redir_transport->simulated_response = util::none;
                     // Validate the retry count tracked in the original message
-                    REQUIRE(request.max_redirects);
-                    REQUIRE(*(request.max_redirects) == 2);
+                    REQUIRE(request.redirect_count == 2);
                     request_count++;
                 }
             };
@@ -2241,7 +2236,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](Request&) -> bool {
+        transport->request_hook = [&](Request&) {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto& session : user->all_sessions()) {

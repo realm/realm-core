@@ -170,7 +170,7 @@ const static std::string sync_path = "/realm-sync";
 const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
-const static size_t max_http_redirects = 20;
+const static int max_http_redirects = 20;
 static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
 std::mutex s_apps_mutex;
 
@@ -893,30 +893,26 @@ void App::handle_redirect_response(Request&& request, const Response& response,
         return completion(std::move(error)); // early return
     }
 
-    if (request.max_redirects) {
-        // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
-        if (*(request.max_redirects) > max_http_redirects) {
-            Response error;
-            error.http_status_code = response.http_status_code;
-            error.custom_status_code = 0;
-            error.client_error_code = ClientErrorCode::too_many_redirects;
-            error.body = util::format("number of redirections exceeded %1", max_http_redirects);
-            return completion(std::move(error)); // early return
-        }
-        *(request.max_redirects) += 1;
-    }
-    else {
-        request.max_redirects = 1;
+    // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
+    if (++request.redirect_count > max_http_redirects) {
+        Response error;
+        error.http_status_code = response.http_status_code;
+        error.custom_status_code = 0;
+        error.client_error_code = ClientErrorCode::too_many_redirects;
+        error.body = util::format("number of redirections exceeded %1", max_http_redirects);
+        return completion(std::move(error)); // early return
     }
 
-    // Update the metadata using the new location and replay the request with the updated hostname
-    // Trim off any trailing path/anchor/query string
-    constexpr size_t https_len = std::char_traits<char>::length("https://");
+    // Update the metadata from the new location after trimming the url (limit to `scheme://host[:port]`)
     auto new_url = location->second;
-    size_t split = new_url.find_first_of("/#?", https_len);
-    if (split != std::string::npos) {
+    // Find the end of the scheme/protocol part (e.g. 'https://', 'http://')
+    auto scheme_end = new_url.find("://");
+    scheme_end = scheme_end != std::string::npos ? scheme_end + std::char_traits<char>::length("://") : 0;
+    // Trim off any trailing path/anchor/query string after the host/port
+    if (auto split = new_url.find_first_of("/#?", scheme_end); split != std::string::npos) {
         new_url.erase(split);
     }
+
     update_metadata_and_resend(std::move(request), std::move(completion), new_url);
 }
 

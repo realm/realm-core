@@ -200,7 +200,7 @@ struct Request {
     /**
      * A recursion counter to prevent too many redirects
      */
-    util::Optional<size_t> max_redirects;
+    int redirect_count = 0;
 };
 
 /**
