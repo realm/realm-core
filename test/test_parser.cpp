@@ -5053,6 +5053,31 @@ TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal1
     verify_query_sub(test_context, link_table, "link.dict.@sum == $0", &arg, 1, 2);
 }
 
+TEST_TYPES(Parser_ListAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
+{
+    using type = typename TEST_TYPE::type;
+
+    std::array<type, 3> values = {type(1.1), type(2.2), type(3.3)};
+
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column_list(TEST_TYPE::data_type, "list");
+    auto obj = table->create_object();
+    Lst<type> list = obj.get_list<type>(col);
+    list.add(values[0]);
+    list.add(values[1]);
+    list.add(values[2]);
+
+    Any arg = values[0];
+    verify_query_sub(test_context, table, "list.@min == $0", &arg, 1, 1);
+    arg = values[2];
+    verify_query_sub(test_context, table, "list.@max == $0", &arg, 1, 1);
+    arg = values[0] + values[1] + values[2];
+    verify_query_sub(test_context, table, "list.@sum == $0", &arg, 1, 1);
+    arg = (values[0] + values[1] + values[2]) / 3;
+    verify_query_sub(test_context, table, "list.@avg == $0", &arg, 1, 1);
+}
+
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,
            Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
            Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>,

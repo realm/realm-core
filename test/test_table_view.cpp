@@ -126,7 +126,7 @@ TEST(TableView_FloatsFindAndAggregations)
     float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =       ^^^^            ^^^^
-    double sum_f = 0.0;
+    float sum_f = 0.0;
     double sum_d = 0.0;
     std::vector<ObjKey> keys;
     table.create_objects(6, keys);
@@ -156,13 +156,11 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // TODO: add for float as well
 
-    double epsilon = std::numeric_limits<double>::epsilon();
-
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
+    CHECK_EQUAL(sum_d, v_all.sum_double(col_double));
+    CHECK_EQUAL(sum_f, v_all.sum_float(col_float));
+    CHECK_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double));
+    CHECK_EQUAL(1.2f + -1.1f, v_some.sum_float(col_float));
 
     ObjKey key;
 
@@ -204,10 +202,10 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(ObjKey(3), key);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(col_float), 10 * epsilon);
+    CHECK_EQUAL(sum_d / 6.0, v_all.average_double(col_double));
+    CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double));
+    CHECK_EQUAL(sum_f / 6.0f, v_all.average_float(col_float));
+    CHECK_EQUAL((1.2f + -1.1f) / 2, v_some.average_float(col_float));
 
     CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
     CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
@@ -251,7 +249,7 @@ TEST(TableView_Average)
     CHECK_EQUAL(5, v.size());
 
     double sum = v.average_int(c0);
-    CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
+    CHECK_EQUAL(2., sum);
 }
 
 TEST(TableView_SumNegative)

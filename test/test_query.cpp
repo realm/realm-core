@@ -3209,20 +3209,20 @@ TEST(Query_Float3)
     CHECK_EQUAL(15, a2);
 
     Query q3 = t.where().less(col_double, 2.65).greater(col_float, 1.35f);
-    double a3 = q3.sum_float(col_float);
-    double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
+    float a3 = q3.sum_float(col_float);
+    float sum3 = 1.4f + 1.5f + 1.6f;
     CHECK_EQUAL(sum3, a3);
 
     Query q4 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
-    double a4 = q4.sum_float(col_float);
+    float a4 = q4.sum_float(col_float);
     CHECK_EQUAL(sum3, a4);
 
     Query q5 = t.where().greater_equal(col_int, 4).less(col_double, 2.65);
-    double a5 = q5.sum_float(col_float);
+    float a5 = q5.sum_float(col_float);
     CHECK_EQUAL(sum3, a5);
 
     Query q6 = t.where().less(col_double, 2.65).greater_equal(col_int, 4);
-    double a6 = q6.sum_float(col_float);
+    float a6 = q6.sum_float(col_float);
     CHECK_EQUAL(sum3, a6);
 
     Query q7 = t.where().greater(col_int, 3).less(col_int, 7);
@@ -3234,7 +3234,7 @@ TEST(Query_Float3)
 
     q8 = t.where().greater(col_int, 3);
     float f = float(q8.sum_float(col_float));
-    CHECK_EQUAL(8.1f, f);
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f + 1.7f + 1.9f, f);
 }
 
 
@@ -3404,27 +3404,25 @@ TEST(Query_Float)
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
     CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().sum_double(col_double), 10 * epsilon);
 
-    // Note: sum of float is calculated by having a double aggregate to where each float is added
-    // (thereby getting casted to double).
-    double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
-    double res = t.where().sum_float(col_float);
-    CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10 * epsilon);
+    float sum1_f = 1.10f + 1.13f + 1.13f + 1.10f + 1.20f;
+    float res = t.where().sum_float(col_float);
+    CHECK_EQUAL(sum1_f, res);
 
     // ... with conditions
-    double sum2_f = double(1.13f) + double(1.20f);
+    float sum2_f = 1.13f + 1.20f;
     double sum2_d = 2.21 + 3.20;
     Query q2 = t.where().between(col_float, 1.13f, 1.20f).not_equal(col_double, 2.22);
-    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.sum_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.sum_double(col_double), 10 * epsilon);
+    CHECK_EQUAL(sum2_f, q2.sum_float(col_float));
+    CHECK_EQUAL(sum2_d, q2.sum_double(col_double));
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().average_double(col_double), 10 * epsilon);
+    CHECK_EQUAL(sum1_f / 5, t.where().average_float(col_float));
+    CHECK_EQUAL(sum1_d / 5, t.where().average_double(col_double));
     // ... with conditions
-    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.average_double(col_double), 10 * epsilon);
+    CHECK_EQUAL(sum2_f / 2, q2.average_float(col_float));
+    CHECK_EQUAL(sum2_d / 2, q2.average_double(col_double));
 
     // -------- Test minimum(), maximum()
 

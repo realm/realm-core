@@ -3459,66 +3459,66 @@ TEST(Query_MaximumSumAverage)
 
             // Those that have criterias include all rows, also those with null
             d = table1->where().average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = table1->where().average_int(c1);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             // Criteria on same column as average
             d = table1->where().not_equal(c0, 1234).average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             // Criteria on other column than average (triggers different code paths)
             d = table1->where().not_equal(c0, 1234).average_int(c1);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             // Average of double, criteria on integer
             d = table1->where().not_equal(c0, 1234).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = table1->where().not_equal(c2, 1234.).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = (table1->column<Int>(c0) == null()).average_int(c0);
             CHECK_EQUAL(d, 0);
 
             d = (table1->column<Int>(c0) != null()).average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             // Those with criteria now only include some rows, whereof none are null
             d = table1->where().average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = table1->where().average_int(c1);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             // Criteria on same column as average
             d = table1->where().equal(c0, 3).average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+            CHECK_EQUAL(d, 3.);
 
             // Criteria on other column than average (triggers different code paths)
             d = table1->where().equal(c0, 3).average_int(c1);
-            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+            CHECK_EQUAL(d, 3.);
 
             // Average of double, criteria on integer
             d = table1->where().not_equal(c0, 3).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 4., 0.001);
+            CHECK_EQUAL(d, 4.);
 
             d = table1->where().equal(c2, 3.).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+            CHECK_EQUAL(d, 3.);
 
             // Now using null as criteria
             d = (table1->column<Int>(c0) != null()).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = (table1->column<Double>(c2) != null()).average_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = (table1->column<Int>(c0) != null()).average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
 
             d = (table1->column<Int>(c1) != null()).average_int(c0);
-            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+            CHECK_EQUAL(d, 7. / 2.);
         }
 
 
@@ -3675,7 +3675,7 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(dbl, 7.);
 
             dbl = table1->where().not_equal(c2, 1234.).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            CHECK_EQUAL(dbl, 7.);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -3695,17 +3695,17 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(c0, 3).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 4., 0.001);
+            CHECK_EQUAL(dbl, 4.);
 
             dbl = table1->where().equal(c2, 3.).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 3., 0.001);
+            CHECK_EQUAL(dbl, 3.);
 
             // Now using null as criteria
             dbl = (table1->column<Int>(c0) != null()).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            CHECK_EQUAL(dbl, 7.);
 
             dbl = (table1->column<Double>(c2) != null()).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            CHECK_EQUAL(dbl, 7.);
 
             d = (table1->column<Int>(c0) != null()).sum_int(c0);
             CHECK_EQUAL(d, 7);

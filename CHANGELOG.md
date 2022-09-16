@@ -567,6 +567,7 @@
 * A client reset in DiscardLocal mode would revert to Manual mode on the next restart of the session. ([#5050](https://github.com/realm/realm-core/issues/5050), since v11.5.0)
 * A client reset in DiscardLocal mode would assert if the server added embedded object tables. ([#5069](https://github.com/realm/realm-core/issues/5069), since v11.5.0)
 * `@sum` and `@avg` queries on Dictionaries of floats or doubles used too much precision for intermediates, resulting in incorrect rounding (since v10.2.0).
+* `@sum` and `@avg` queries on Lists and Sets of floats used too much precision for intermediates, resulting in incorrect rounding (since b20).
 * Change the exception message for calling refresh on an immutable Realm from "Continuous transaction through DB object without history information." to "Can't refresh a read-only Realm." ([#5061](https://github.com/realm/realm-core/issues/5061), old exception message was since 10.7.2 via https://github.com/realm/realm-core/pull/4688).
 * The client reset callbacks have changed so that the pre and post Realm state are passed to the 'after' callback and thee 'before' callback only has the local state. ([#5066](https://github.com/realm/realm-core/issues/5066), since 11.5.0).
 * In the C-API, query `count()` did not apply descriptors such as limit/distinct. ([#5073](https://github.com/realm/realm-core/issues/5073), since the beginning of the C-API in v10.4.0)
