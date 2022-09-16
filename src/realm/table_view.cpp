@@ -235,7 +235,7 @@ Timestamp TableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) con
             best_value = ts;
             best_key = obj.get_key();
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
     if (return_key)
         *return_key = best_key;

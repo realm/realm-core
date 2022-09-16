@@ -94,13 +94,13 @@ struct SyncError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ReconnectMode {
-    /// This is the mode that should always be used in production. In this
+    /// This is the mode that should always be used by SDKs. In this
     /// mode the client uses a scheme for determining a reconnect delay that
     /// prevents it from creating too many connection requests in a short
     /// amount of time (i.e., a server hammering protection mechanism).
     normal,
 
-    /// For testing purposes only.
+    /// For internal sync-client testing purposes only.
     ///
     /// Never reconnect automatically after the connection is closed due to
     /// an error. Allow immediate reconnect if the connection was closed
@@ -183,6 +183,7 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
+    SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

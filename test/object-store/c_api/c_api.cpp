@@ -766,6 +766,18 @@ bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_s
     return true;
 }
 
+bool migrate_schema_delete_old_table(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t*)
+{
+    auto userdata = static_cast<ConfigUserdata*>(userdata_p);
+    static_cast<void>(old);
+    static_cast<void>(new_);
+    ++userdata->num_migrations;
+    bool table_deleted = false;
+    CHECK(checked(realm_remove_table(new_, "Foo", &table_deleted)));
+    CHECK(table_deleted);
+    return table_deleted;
+}
+
 bool migrate_schema_rename_prop(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t* schema)
 {
     auto userdata = static_cast<ConfigUserdata*>(userdata_p);
@@ -835,6 +847,70 @@ TEST_CASE("C API", "[c_api]") {
             realm_config_set_migration_function(config2.get(), migrate_schema, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
+        }
+
+        SECTION("migrate schema and delete old table") {
+            TestFile test_file_3;
+            ConfigUserdata userdata;
+
+            realm_config_set_migration_function(config.get(), migrate_schema_delete_old_table, &userdata, nullptr);
+            const realm_class_info_t foo_class[1] = {{
+                "Foo",
+                "int",
+                1,
+                0,
+                RLM_INVALID_CLASS_KEY,
+                RLM_CLASS_NORMAL,
+            }};
+            const realm_class_info_t bar_class[1] = {{
+                "Bar",
+                "int",
+                1,
+                0,
+                RLM_INVALID_CLASS_KEY,
+                RLM_CLASS_NORMAL,
+            }};
+            const realm_property_info_t properties[1] = {
+                {
+                    "int",
+                    "",
+                    RLM_PROPERTY_TYPE_INT,
+                    RLM_COLLECTION_TYPE_NONE,
+                    "",
+                    "",
+                    RLM_INVALID_PROPERTY_KEY,
+                    RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
+                },
+            };
+            const realm_property_info_t* props[1] = {properties};
+            auto schema = cptr(realm_schema_new(foo_class, 1, props));
+            auto new_schema = cptr(realm_schema_new(bar_class, 1, props));
+            CHECK(checked(schema.get()));
+            CHECK(checked(new_schema.get()));
+            REQUIRE(checked(realm_schema_validate(schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            REQUIRE(checked(realm_schema_validate(new_schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            // realm with schema containing Foo
+            auto config = cptr(realm_config_new());
+            realm_config_set_path(config.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config.get(), 0);
+            realm_config_set_schema(config.get(), schema.get());
+            auto realm = cptr_checked(realm_open(config.get()));
+            CHECK(userdata.num_migrations == 0);
+            realm.reset();
+            // migrate schema basically changing Foo into Bar
+            auto config2 = cptr(realm_config_new());
+            realm_config_set_path(config2.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config2.get(), 999);
+            realm_config_set_schema(config2.get(), new_schema.get());
+            realm_config_set_migration_function(config2.get(), migrate_schema_delete_old_table, &userdata, nullptr);
+            auto realm2 = cptr_checked(realm_open(config2.get()));
+            CHECK(userdata.num_migrations == 1);
+            auto new_db_schema = realm_get_schema(realm2.get());
+            CHECK(realm_equals(new_db_schema, new_schema.get()));
+            realm2.reset();
+            realm_release(new_db_schema);
         }
 
         SECTION("migration callback rename property") {
@@ -1386,6 +1462,13 @@ TEST_CASE("C API", "[c_api]") {
         bool did_compact = false;
         CHECK(checked(realm_compact(realm, &did_compact)));
         CHECK(did_compact);
+    }
+
+    SECTION("realm_remove_table()") {
+        bool table_deleted = true;
+        CHECK(!realm_remove_table(realm, "Foo", &table_deleted));
+        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK(!table_deleted);
     }
 
     SECTION("realm_get_class_keys()") {
