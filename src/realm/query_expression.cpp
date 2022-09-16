@@ -160,8 +160,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                             }
                         }
                     }
-                    // Continue
-                    return false;
+                    return IteratorControl::AdvanceToNext;
                 });
             }
         }
@@ -344,8 +343,7 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
                     destination.set(n, leaf.get(i));
                     n++;
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
         }
     }
@@ -482,8 +480,7 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
                     destination.set(n, leaf.get(i));
                     n++;
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
         }
     }

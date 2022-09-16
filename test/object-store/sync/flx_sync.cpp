@@ -23,6 +23,7 @@
 #include "flx_sync_harness.hpp"
 #include "sync/sync_test_utils.hpp"
 #include "util/test_file.hpp"
+#include "realm/object-store/binding_context.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/object-store/impl/realm_coordinator.hpp"
 #include "realm/object-store/schema.hpp"
@@ -34,29 +35,16 @@
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 #include "realm/sync/noinst/pending_bootstrap_store.hpp"
+#include "realm/sync/noinst/server/access_token.hpp"
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/util/future.hpp"
 #include "realm/util/logger.hpp"
 #include "util/test_file.hpp"
-#include <realm/sync/noinst/server/access_token.hpp>
 
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
-
-namespace realm {
-
-class TestHelper {
-public:
-    static bool can_advance(const SharedRealm& realm)
-    {
-        auto& coord = Realm::Internal::get_coordinator(*realm);
-        return coord.can_advance(*realm);
-    }
-};
-
-} // namespace realm
 
 namespace realm::app {
 
@@ -117,37 +105,54 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
     return ret;
 }
 
-void wait_for_advance(const SharedRealm& realm)
+void wait_for_advance(Realm& realm)
 {
+    struct Context : BindingContext {
+        Realm& realm;
+        DB::version_type target_version;
+        bool& done;
+        Context(Realm& realm, bool& done)
+            : realm(realm)
+            , target_version(*realm.latest_snapshot_version())
+            , done(done)
+        {
+        }
+
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
+        }
+    };
+
+    bool done = false;
+    realm.m_binding_context = std::make_unique<Context>(realm, done);
     timed_wait_for([&] {
-        return !TestHelper::can_advance(realm);
+        return done;
     });
+    realm.m_binding_context = nullptr;
 }
 
+void wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
+{
 // TODO: Re-enable it in RCORE-1241.
 #if 0
-// Returns true if `err` is among the erros received from the server, false otherwise.
-bool wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
-{
-    bool error_found = false;
     timed_sleeping_wait_for(
         [&]() -> bool {
             auto errors = app_session.admin_api.get_errors(app_session.server_app_id);
-            auto it = std::find_if(errors.begin(), errors.end(), [&err](const auto& error) {
-                return err == error;
-            });
-
+            auto it = std::find(errors.begin(), errors.end(), err);
             if (it == errors.end()) {
                 millisleep(500); // don't spam the server too much
             }
-            error_found = it != errors.end();
-            return error_found;
+            return it != errors.end();
         },
         std::chrono::minutes(10));
-
-    return error_found;
-}
+#else
+    static_cast<void>(app_session);
+    static_cast<void>(err);
 #endif
+}
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -192,7 +197,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         wait_for_download(*realm);
         {
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
             Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -210,7 +215,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 2);
         }
@@ -228,7 +233,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -244,7 +249,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
@@ -857,7 +862,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
             REQUIRE(top_level_table->is_empty());
@@ -901,7 +906,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
 
             obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
             embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
@@ -917,7 +922,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
             obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
             embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
             REQUIRE(util::any_cast<std::string&&>(embedded_obj.get_property_value<std::any>(c, "str_field")) ==
@@ -960,7 +965,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             validate_sync_error(std::move(error_future).get(), invalid_obj,
                                 "object is outside of the current query view");
 
-            wait_for_advance(realm);
+            wait_for_advance(*realm);
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
             REQUIRE(top_level_table->size() == 1);
@@ -1060,7 +1065,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         realm->close();
     }
 
-    _impl::RealmCoordinator::clear_all_caches();
+    _impl::RealmCoordinator::assert_no_open_realms();
 
     {
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
@@ -1078,7 +1083,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     wait_for_upload(*realm);
     wait_for_download(*realm);
 
-    wait_for_advance(realm);
+    wait_for_advance(*realm);
     REQUIRE(table->size() == obj_ids_at_end.size());
     for (auto& id : obj_ids_at_end) {
         REQUIRE(table->find_primary_key(Mixed{id}));
@@ -1476,7 +1481,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     auto mutate_realm = [&] {
         harness.load_initial_data([&](SharedRealm realm) {
             auto table = realm->read_group().get_table("class_TopLevel");
-            wait_for_advance(realm);
             Results res(realm, Query(table).greater(table->get_column_key("queryable_int_field"), int64_t(10)));
             REQUIRE(res.size() == 2);
             res.clear();
@@ -1518,7 +1522,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             realm->close();
         }
 
-        _impl::RealmCoordinator::clear_all_caches();
+        _impl::RealmCoordinator::assert_no_open_realms();
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -1583,7 +1587,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             realm->close();
         }
 
-        _impl::RealmCoordinator::clear_all_caches();
+        _impl::RealmCoordinator::assert_no_open_realms();
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -1614,7 +1618,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        wait_for_advance(realm);
+        wait_for_advance(*realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
         REQUIRE(table->size() == expected_obj_ids.size());
@@ -1658,7 +1662,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             realm->close();
         }
 
-        _impl::RealmCoordinator::clear_all_caches();
+        _impl::RealmCoordinator::assert_no_open_realms();
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -1683,7 +1687,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         auto [saw_valid_state_promise, saw_valid_state_future] = util::make_promise_future<void>();
         auto shared_saw_valid_state_promise =
             std::make_shared<decltype(saw_valid_state_promise)>(std::move(saw_valid_state_promise));
-        SharedRealm realm;
         // This hook will let us check what the state of the realm is before it's integrated any new download
         // messages from the server. This should be the full 5 object bootstrap that was received before we
         // called mutate_realm().
@@ -1718,7 +1721,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             };
 
         // Finally re-open the realm whose bootstrap we interrupted and just wait for it to finish downloading.
-        realm = Realm::get_shared_realm(interrupted_realm_config);
+        auto realm = Realm::get_shared_realm(interrupted_realm_config);
         saw_valid_state_future.get();
         auto table = realm->read_group().get_table("class_TopLevel");
         realm->get_latest_subscription_set()
@@ -1726,7 +1729,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             .get();
         wait_for_upload(*realm);
         wait_for_download(*realm);
-        wait_for_advance(realm);
+        wait_for_advance(*realm);
 
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
@@ -1894,13 +1897,10 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
 
-// TODO: Re-enable it in RCORE-1241.
-#if 0
-        REQUIRE(wait_for_error_to_persist(
+        REQUIRE_NOTHROW(wait_for_error_to_persist(
             harness->session().app_session(),
             "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
             "on one side, but not on the other. (ProtocolErrorCode=112)"));
-#endif
     }
 
     SECTION("basic embedded object construction") {
@@ -1948,6 +1948,21 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
         });
+    }
+
+    SECTION("asymmetric table not allowed in PBS") {
+        Schema schema{
+            {"Asymmetric2",
+             ObjectSchema::ObjectType::TopLevelAsymmetric,
+             {
+                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"location", PropertyType::Int},
+                 {"reading", PropertyType::Int},
+             }},
+        };
+
+        SyncTestFile config(harness->app(), bson::Bson{}, schema);
+        REQUIRE_THROWS(Realm::get_shared_realm(config));
     }
 
     // Add any new test sections above this point
@@ -2002,8 +2017,6 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
 }
 #endif
 
-// TODO: Re-enable it in RCORE-1241.
-#if 0
 TEST_CASE("flx: send client error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_client_error");
 
@@ -2021,9 +2034,9 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
 
     error_future.get();
 
-    REQUIRE(wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
+    REQUIRE_NOTHROW(
+        wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
 }
-#endif
 
 } // namespace realm::app
 

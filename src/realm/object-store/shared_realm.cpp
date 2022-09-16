@@ -269,8 +269,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     // synchronization. The latter is probably fixable, but making it
     // multi-process-safe requires some sort of multi-process exclusive lock
     m_transaction = nullptr;
-    m_coordinator->close();
-    util::File::remove(m_config.path);
+    m_coordinator->delete_and_reopen();
 
     m_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
@@ -388,14 +387,17 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
-    if (m_config.sync_config) {
-        validation_mode |= SchemaValidationMode::Sync;
+#if REALM_ENABLE_SYNC
+    if (auto sync_config = m_config.sync_config) {
+        validation_mode |=
+            sync_config->flx_sync_requested ? SchemaValidationMode::SyncFLX : SchemaValidationMode::SyncPBS;
     }
+#endif
     if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
         validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
     }
 
-    schema.validate(validation_mode);
+    schema.validate(static_cast<SchemaValidationMode>(validation_mode));
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -448,6 +450,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
             auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
+            // block autorefresh for the old realm
+            old_realm->m_auto_refresh = false;
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
@@ -1083,6 +1087,13 @@ bool Realm::compact()
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
+
+#if REALM_ENABLE_SYNC
+    if (config.sync_config && config.sync_config->flx_sync_requested) {
+        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
+    }
+#endif
+
     if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();

@@ -112,8 +112,7 @@ public:
                 for (size_t i = 0; i < e; i++) {
                     f(leaf.get(i));
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
             m_clusters->traverse(trv_func);
         }
@@ -132,8 +131,7 @@ public:
                 for (size_t i = 0; i < e; i++) {
                     f(leaf.get(i));
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
             m_clusters->traverse(trv_func);
         }

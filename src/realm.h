@@ -122,8 +122,9 @@ typedef enum realm_value_type {
 
 typedef enum realm_schema_validation_mode {
     RLM_SCHEMA_VALIDATION_BASIC = 0,
-    RLM_SCHEMA_VALIDATION_SYNC = 1,
-    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2
+    RLM_SCHEMA_VALIDATION_SYNC_PBS = 1,
+    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2,
+    RLM_SCHEMA_VALIDATION_SYNC_FLX = 4
 } realm_schema_validation_mode_e;
 
 /**
@@ -1135,6 +1136,14 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
 /**
+ * Find and delete the table passed as parementer for the realm instance passed to this function.
+ * @param table_name for the table the user wants to delete
+ * @param table_deleted in order to indicate if the table was actually deleted from realm
+ * @return true if no error has occured, false otherwise
+ */
+RLM_API bool realm_remove_table(realm_t*, const char* table_name, bool* table_deleted);
+
+/**
  * Create a new schema from classes and their properties.
  *
  * Note: This function does not validate the schema.
@@ -1407,6 +1416,12 @@ RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count
  * @return A non-NULL pointer if no exception occurred.
  */
 RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class_key, realm_object_key_t obj_key);
+
+/**
+ * Get the parent object for the object passed as argument. Only works for embedded objects.
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
 
 /**
  * Find an object with a particular primary key value.
@@ -1695,6 +1710,15 @@ RLM_API bool realm_list_get_property(const realm_list_t*, realm_property_info_t*
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_get(const realm_list_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Find the value in the list passed as parameter.
+ * @param value to search in the list
+ * @param out_index the index in the list where the value has been found or realm::not_found.
+ * @param out_found boolean that indicates whether the value is found or not
+ * @return true if no exception occurred.
+ */
+RLM_API bool realm_list_find(const realm_list_t*, const realm_value_t* value, size_t* out_index, bool* out_found);
 
 /**
  * Set the value at @a index.
@@ -2335,6 +2359,27 @@ RLM_API bool realm_query_find_first(realm_query_t*, realm_value_t* out_value, bo
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_results_t* realm_query_find_all(realm_query_t*);
+
+/**
+ * Convert a list to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_list_to_results(realm_list_t*);
+
+/**
+ * Convert a set to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_set_to_results(realm_set_t*);
+
+/**
+ * Convert a dictionary to results.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t*);
 
 /**
  * Delete all objects matched by a query.

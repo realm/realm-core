@@ -613,7 +613,7 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     std::string links_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(links_description, "O0"), 1);
+    CHECK_EQUAL(find_count(links_description, "L0:0"), 1);
     CHECK_EQUAL(find_count(links_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(links_description, "=="), 1);
 

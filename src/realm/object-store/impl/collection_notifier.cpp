@@ -355,6 +355,7 @@ template <typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     util::CheckedUniqueLock callback_lock(m_callback_mutex);
+    // If this fails then package_for_delivery() was not called or returned false
     REALM_ASSERT_DEBUG(m_callback_count <= m_callbacks.size());
     for (m_callback_index = 0; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
@@ -412,37 +413,26 @@ NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>
 {
 }
 
-// Clang TSE seems to not like returning a unique_lock from a function
-void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
-    NO_THREAD_SAFETY_ANALYSIS
+NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers)
+    : m_notifiers(std::move(notifiers))
+{
+    set_version();
+}
+
+void NotifierPackage::package_and_wait(VersionID::version_type target_version)
 {
     if (!m_coordinator || !*this)
         return;
 
-    auto lock = m_coordinator->wait_for_notifiers([&] {
-        if (!target_version)
-            return true;
-        return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
-            return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
-        });
-    });
-
-    // Package the notifiers for delivery and remove any which don't have anything to deliver
-    auto package = [&](auto& notifier) {
-        if (notifier->has_run() && notifier->package_for_delivery()) {
-            m_version = notifier->version();
-            return false;
-        }
-        return true;
-    };
-    m_notifiers.erase(std::remove_if(begin(m_notifiers), end(m_notifiers), package), end(m_notifiers));
-    if (m_version && target_version && m_version->version < *target_version) {
-        m_notifiers.clear();
+    m_coordinator->package_notifiers(m_notifiers, target_version);
+    set_version();
+    if (m_version && m_version->version < target_version)
         m_version = util::none;
-    }
-    REALM_ASSERT(m_version || m_notifiers.empty());
+}
 
-    m_coordinator = nullptr;
+void NotifierPackage::set_version()
+{
+    m_version = m_notifiers.empty() ? util::none : std::make_optional(m_notifiers.front()->version());
 }
 
 void NotifierPackage::before_advance()
