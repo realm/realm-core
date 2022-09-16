@@ -155,7 +155,7 @@ struct VersionList {
                 rc.current_top = top;
                 rc.filesize = size;
                 rc.activate(version);
-                newest = i;
+                newest.store(i);
                 return rc;
             }
         }
@@ -203,7 +203,6 @@ struct VersionList {
                 }
                 if (rc->count_frozen == 0 && rc->count_live == 0) { // unreachable
                     REALM_ASSERT(index_of(*rc) != newest);
-                    rc->version = 0;
                     free_entry(rc);
                     any_new_unreachables = true;
                 }
