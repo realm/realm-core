@@ -31,8 +31,6 @@ class StringData;
 struct TableKey;
 struct Property;
 
-enum SchemaValidationMode : uint64_t { Basic = 0, SyncPBS = 1, RejectEmbeddedOrphans = 2, SyncFLX = 4 };
-
 // How to handle update_schema() being called on a file which has
 // already been initialized with a different schema
 enum class SchemaMode : uint8_t {
