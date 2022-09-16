@@ -40,7 +40,6 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include "sync/flx_sync_harness.hpp"
 #endif
 
 #include <realm/db.hpp>
@@ -1080,18 +1079,6 @@ TEST_CASE("SharedRealm: convert") {
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
-    }
-
-    SECTION("cannot convert from local realm to flx sync") {
-        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
-        auto local_realm = Realm::get_shared_realm(local_config1);
-        REQUIRE_THROWS(local_realm->convert(sync_config));
-    }
-
-    SECTION("convert from flx sync realm to local") {
-        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
-        auto flx_sync_realm = Realm::get_shared_realm(sync_config);
-        REQUIRE_NOTHROW(flx_sync_realm->convert(local_config1));
     }
 
     SECTION("can copy a local realm to a local realm") {
