@@ -118,7 +118,7 @@ private:
     uint64_t m_current_version = 0;
     uint64_t m_oldest_reachable_version;
     TopRefMap m_top_ref_map;
-    int m_any_new_unreachables;
+    bool m_any_new_unreachables;
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
