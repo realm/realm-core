@@ -321,15 +321,15 @@ void GroupWriter::map_reachable()
         std::vector<Reachable>& m_reachable;
     };
     // collect reachable blocks in all reachable versions
-    for (auto& entry : m_top_ref_map) {
-        Collector collector(entry.second.reachable_blocks);
+    for (auto& [version, info] : m_top_ref_map) {
+        Collector collector(info.reachable_blocks);
         // skip any empty entries
-        if (entry.second.top_ref == 0)
+        if (info.top_ref == 0)
             continue;
         Array array(m_alloc);
-        array.init_from_ref(entry.second.top_ref);
+        array.init_from_ref(info.top_ref);
         array.report_memory_usage(collector);
-        std::sort(entry.second.reachable_blocks.begin(), entry.second.reachable_blocks.end(),
+        std::sort(info.reachable_blocks.begin(), info.reachable_blocks.end(),
                   [](const Reachable& a, const Reachable& b) {
                       return a.pos < b.pos;
                   });
@@ -338,9 +338,9 @@ void GroupWriter::map_reachable()
 #if REALM_ALLOC_DEBUG
     std::cout << "  Reachable: ";
     // this really should be inverted, showing all versions pr entry instead of all entries pr version
-    for (auto& entry : m_top_ref_map) {
-        std::cout << std::endl << "    Version: " << entry.first;
-        for (auto& i : entry.second.reachable_blocks) {
+    for (auto& [version, info] : m_top_ref_map) {
+        std::cout << std::endl << "    Version: " << version;
+        for (auto& i : info.reachable_blocks) {
             std::cout << std::endl << "      " << i.pos << " - " << i.pos + i.size;
         }
     }
@@ -374,11 +374,10 @@ void GroupWriter::backdate()
     using FreeListMap = std::vector<std::unique_ptr<FreeList>>;
     FreeListMap old_freelists;
     old_freelists.reserve(m_top_ref_map.size());
-    for (auto& entry : m_top_ref_map) {
-        if (entry.first < m_oldest_reachable_version)
+    for (auto& [version, info] : m_top_ref_map) {
+        if (version < m_oldest_reachable_version)
             continue;
-        auto e =
-            std::make_unique<FreeList>(m_alloc, entry.second.top_ref, entry.second.logical_file_size, entry.first);
+        auto e = std::make_unique<FreeList>(m_alloc, info.top_ref, info.logical_file_size, version);
         old_freelists.push_back(std::move(e));
     }
 
@@ -462,18 +461,17 @@ void GroupWriter::backdate()
         ALLOC_DBG_COUT << std::endl
                        << "    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
                        << " {";
-        for (auto& e : m_top_ref_map) {
+        for (auto& [version, info] : m_top_ref_map) {
             auto pred = [](const Reachable& a, const size_t& val) {
                 return val > a.pos;
             };
-            auto it =
-                std::lower_bound(e.second.reachable_blocks.begin(), e.second.reachable_blocks.end(), entry.ref, pred);
-            if (it != e.second.reachable_blocks.end()) {
-                if (it != e.second.reachable_blocks.begin())
+            auto it = std::lower_bound(info.reachable_blocks.begin(), info.reachable_blocks.end(), entry.ref, pred);
+            if (it != info.reachable_blocks.end()) {
+                if (it != info.reachable_blocks.begin())
                     --it;
-                while (it != e.second.reachable_blocks.end() && it->pos < entry.ref + entry.size) {
+                while (it != info.reachable_blocks.end() && it->pos < entry.ref + entry.size) {
                     if (it->pos + it->size > entry.ref) {
-                        ALLOC_DBG_COUT << e.first << " ";
+                        ALLOC_DBG_COUT << version << " ";
                         referenced = true;
                         break;
                     }

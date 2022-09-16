@@ -201,9 +201,9 @@ struct VersionList {
         return *try_allocate_entry(top, filesize, version);
     }
 
-    void purge_versions(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs, bool& any_new_unreachables)
+    void purge_versions(uint64_t& oldest_live_v, TopRefMap& top_refs, bool& any_new_unreachables)
     {
-        oldest_v = oldest_live_v = std::numeric_limits<uint64_t>::max();
+        oldest_live_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
 
         // collect reachable versions and determine oldest live reachable version
@@ -223,7 +223,7 @@ struct VersionList {
         // we must have found at least one reachable version
         REALM_ASSERT(top_refs.size());
         // free unreachable entries and determine if we want to trigger backdating
-        oldest_v = top_refs.begin()->first;
+        uint64_t oldest_v = top_refs.begin()->first;
         for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (!rc->is_active())
                 continue;
@@ -503,12 +503,11 @@ public:
         REALM_ASSERT(sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry) == size);
     }
 
-    void cleanup_versions(uint64_t& oldest_version, uint64_t& oldest_live_version, TopRefMap& top_refs,
-                          bool& any_new_unreachables)
+    void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        m_info->readers.purge_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
+        m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
     }
 
     version_type get_newest_version()
@@ -2090,8 +2089,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     bool any_new_unreachables;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, any_new_unreachables);
-
+        m_version_manager->cleanup_versions(oldest_live_version, top_refs, any_new_unreachables);
+        oldest_version = top_refs.begin()->first;
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest *live* bound snapshot.
         if (auto hist = transaction.get_history()) {
@@ -2108,7 +2107,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 #endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
-    out.set_versions(new_version, oldest_version, top_refs, any_new_unreachables);
+    out.set_versions(new_version, top_refs, any_new_unreachables);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
