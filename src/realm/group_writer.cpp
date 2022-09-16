@@ -383,7 +383,7 @@ void GroupWriter::backdate()
     }
 
 
-    // little helper: get a youngest version older than given
+    // little helper: get the youngest version older than given
     auto get_earlier = [&](uint64_t version) -> FreeList* {
         auto it = std::lower_bound(old_freelists.begin(), old_freelists.end(), version,
                                    [](const std::unique_ptr<FreeList>& e, uint64_t v) {
@@ -490,7 +490,7 @@ void GroupWriter::backdate()
     };
 
     auto backdate_single_entry = [&](FreeSpaceEntry& entry) -> void {
-        auto referenced = is_referenced(entry);
+        const auto referenced = is_referenced(entry);
         // early out if the reference is to the most recent version
         if (entry.released_at_version == m_current_version) {
             REALM_ASSERT_DEBUG(!referenced);
