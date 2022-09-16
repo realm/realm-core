@@ -928,7 +928,7 @@ void Dictionary::migrate()
             return false;
         });
         REALM_ASSERT(size() == nb_elements);
-        Array::destroy_deep(dict_ref, m_obj.get_alloc());
+        Array::destroy_deep(to_ref(dict_ref), m_obj.get_alloc());
     }
 }
 
