@@ -30,9 +30,9 @@ class Cluster;
 class ClusterTree {
 public:
     class Iterator;
-    using TraverseFunction = util::FunctionRef<bool(const Cluster*)>;
+    using TraverseFunction = util::FunctionRef<IteratorControl(const Cluster*)>;
     using UpdateFunction = util::FunctionRef<void(Cluster*)>;
-    using ColIterateFunction = util::FunctionRef<bool(ColKey)>;
+    using ColIterateFunction = util::FunctionRef<IteratorControl(ColKey)>;
 
     ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree);
     virtual ~ClusterTree();
@@ -176,7 +176,7 @@ public:
     size_t get_ndx(ObjKey k) const noexcept;
     // Find the leaf containing the requested object
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
-    // Visit all leaves and call the supplied function. Stop when function returns true.
+    // Visit all leaves and call the supplied function. Stop when function returns IteratorControl::Stop.
     // Not allowed to modify the tree
     bool traverse(TraverseFunction func) const;
     // Visit all leaves and call the supplied function. The function can modify the leaf.

@@ -109,7 +109,7 @@ public:
                 for (size_t i = 0; i < sz; i++) {
                     f(leaf->get(i));
                 }
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
 
             values.traverse(func);
@@ -128,7 +128,7 @@ public:
                 for (size_t i = 0; i < sz; i++) {
                     f(leaf->get(i));
                 }
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
 
             keys.traverse(func);

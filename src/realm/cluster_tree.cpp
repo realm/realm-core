@@ -696,7 +696,7 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
         if (child_is_leaf) {
             Cluster leaf(offs, m_alloc, m_tree_top);
             leaf.init(mem);
-            if (func(&leaf)) {
+            if (func(&leaf) == IteratorControl::Stop) {
                 return true;
             }
         }
@@ -858,8 +858,7 @@ void ClusterTree::clear(CascadeState& state)
             for (size_t i = 0; i < sz; i++) {
                 repl->remove_object(m_owner, cluster->get_real_key(i));
             }
-            // Continue
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 
@@ -896,7 +895,7 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
             }
         }
 
-        return false; // Continue
+        return IteratorControl::AdvanceToNext;
     };
 
     auto upgrade = [col_key, &keys](Cluster* cluster) {
@@ -1062,7 +1061,7 @@ bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const 
 bool ClusterTree::traverse(TraverseFunction func) const
 {
     if (m_root->is_leaf()) {
-        return func(static_cast<Cluster*>(m_root.get()));
+        return func(static_cast<Cluster*>(m_root.get())) == IteratorControl::Stop;
     }
     else {
         return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
@@ -1107,7 +1106,7 @@ void ClusterTree::verify() const
 #ifdef REALM_DEBUG
     traverse([](const Cluster* cluster) {
         cluster->verify();
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 #endif
 }
@@ -1134,7 +1133,7 @@ void ClusterTree::remove_all_links(CascadeState& state)
             // Furthermore it is a prerequisite for using 'traverse' that the tree
             // is not modified
             if (get_owning_table()->links_to_self(col_key)) {
-                return false;
+                return IteratorControl::AdvanceToNext;
             }
             auto col_type = col_key.get_type();
             if (col_key.is_list() || col_key.is_set()) {
@@ -1215,8 +1214,7 @@ void ClusterTree::remove_all_links(CascadeState& state)
                                     links.push_back(mix.get<ObjLink>());
                                 }
                             }
-                            // Continue
-                            return false;
+                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {
@@ -1271,11 +1269,10 @@ void ClusterTree::remove_all_links(CascadeState& state)
                     }
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
         m_owner->for_each_and_every_column(remove_link_from_column);
-        // Continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     // Go through all clusters

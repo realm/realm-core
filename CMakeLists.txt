@@ -327,6 +327,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
 elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
 endif()
+set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
 
 add_subdirectory(external/catch EXCLUDE_FROM_ALL)
 

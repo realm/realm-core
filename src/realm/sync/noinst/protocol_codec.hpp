@@ -30,7 +30,6 @@ struct ProtocolCodecException : public std::runtime_error {
 };
 class HeaderLineParser {
 public:
-    HeaderLineParser() = default;
     explicit HeaderLineParser(std::string_view line)
         : m_sv(line)
     {
@@ -176,6 +175,8 @@ public:
                                 const SyncProgress& progress, int64_t query_version, std::string_view query_body);
 
     void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
+
+    void make_json_error_message(OutputBuffer&, session_ident_type, int error_code, std::string_view error_body);
 
     class UploadMessageBuilder {
     public:
@@ -741,6 +742,14 @@ public:
                 auto session_ident = msg.read_next<session_ident_type>('\n');
 
                 connection.receive_unbind_message(session_ident); // Throws
+            }
+            else if (message_type == "json_error") {
+                auto error_code = msg.read_next<int>();
+                auto message_size = msg.read_next<size_t>();
+                auto session_ident = msg.read_next<session_ident_type>('\n');
+                auto json_raw = msg.read_sized_data<std::string_view>(message_size);
+
+                connection.receive_error_message(session_ident, error_code, json_raw);
             }
             else {
                 return report_error(Error::unknown_message, "unknown message type %1", message_type);

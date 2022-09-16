@@ -132,7 +132,7 @@ void Cluster::create()
             arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.update_parent();
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
         switch (type) {
             case col_type_Int:
@@ -191,7 +191,7 @@ void Cluster::create()
             default:
                 throw LogicError(LogicError::illegal_type);
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_tree_top.m_owner->for_each_and_every_column(column_initialize);
 
@@ -372,7 +372,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             arr.set_parent(this, col_ndx.val + s_first_col_index);
             arr.init_from_parent();
             arr.insert(ndx, 0);
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
 
         bool nullable = attr.test(col_attr_Nullable);
@@ -433,7 +433,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 REALM_ASSERT(false);
                 break;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_tree_top.m_owner->for_each_and_every_column(insert_in_column);
 }
@@ -463,7 +463,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
         if (attr.test(col_attr_Collection)) {
             do_move<ArrayRef>(ndx, col_key, new_leaf);
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
 
         switch (type) {
@@ -522,7 +522,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 REALM_ASSERT(false);
                 break;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_tree_top.m_owner->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
@@ -877,7 +877,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             values.erase(ndx);
 
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
 
         switch (col_type) {
@@ -941,7 +941,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 REALM_ASSERT(false);
                 break;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     m_tree_top.m_owner->for_each_and_every_column(erase_in_column);
 
@@ -1002,7 +1002,7 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
         values.copy_on_write();
         values.nullify_fwd_links(ndx, state);
 
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     m_tree_top.get_owning_table()->for_each_backlink_column(nullify_fwd_links);
@@ -1164,7 +1164,7 @@ void Cluster::verify() const
                     // FIXME: Nullable primitives
                     break;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
         else if (attr.test(col_attr_Dictionary)) {
             ArrayRef arr(get_alloc());
@@ -1183,7 +1183,7 @@ void Cluster::verify() const
                     dict.verify();
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
         else if (attr.test(col_attr_Set)) {
             ArrayRef arr(get_alloc());
@@ -1239,7 +1239,7 @@ void Cluster::verify() const
                     // FIXME: Nullable primitives
                     break;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         }
 
         switch (col_type) {
@@ -1290,7 +1290,7 @@ void Cluster::verify() const
             default:
                 break;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     m_tree_top.m_owner->for_each_and_every_column(verify_column);
@@ -1336,7 +1336,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     }
                 }
                 std::cout << "}";
-                return false;
+                return IteratorControl::AdvanceToNext;
             }
 
             switch (col.get_type()) {
@@ -1388,7 +1388,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                         std::cout << ", " << *val;
                     else
                         std::cout << ", null";
-                    break;
                     break;
                 }
                 case col_type_String: {
@@ -1474,7 +1473,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", Error";
                     break;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
         std::cout << std::endl;
     }

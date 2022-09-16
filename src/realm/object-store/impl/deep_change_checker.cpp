@@ -82,7 +82,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
                 })) {
                 backlinks->backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 

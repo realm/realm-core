@@ -183,7 +183,7 @@ void Dictionary::do_accumulate(size_t* return_ndx, AggregateType& agg) const
             }
         }
         // Continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 
     if (return_ndx)
@@ -924,7 +924,7 @@ void Dictionary::migrate()
                     static_cast<BPlusTree<StringData>*>(m_keys.get())->insert(ndx, key);
                     m_values->insert(ndx, values.get(i));
                 }
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
             REALM_ASSERT(size() == nb_elements);
             Array::destroy_deep(to_ref(dict_ref), m_obj.get_alloc());
