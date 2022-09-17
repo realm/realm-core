@@ -771,6 +771,11 @@ AppCreateConfig default_app_config(const std::string& base_url)
                              realm::Property("breed", PropertyType::String | PropertyType::Nullable),
                              realm::Property("name", PropertyType::String),
                              realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto cat_schema =
+        ObjectSchema("Cat", {realm::Property("_id", PropertyType::String | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
     const auto person_schema =
         ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
                                 realm::Property("age", PropertyType::Int),
@@ -778,7 +783,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
                                 realm::Property("firstName", PropertyType::String),
                                 realm::Property("lastName", PropertyType::String),
                                 realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    realm::Schema default_schema({dog_schema, person_schema});
+    realm::Schema default_schema({dog_schema, cat_schema, person_schema});
 
     Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 

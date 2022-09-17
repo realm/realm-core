@@ -792,6 +792,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto db = remote_client.db(get_runtime_app_session("").config.mongo_dbname);
     auto dog_collection = db["Dog"];
+    auto cat_collection = db["Cat"];
     auto person_collection = db["Person"];
 
     bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
@@ -803,6 +804,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         {"_id", dog3_object_id},
         {"name", "petunia"},
         {"breed", "french bulldog"},
+    };
+
+    auto cat_id_string = ObjectId::gen().to_string();
+    bson::BsonDocument cat_document{
+        {"_id", cat_id_string},
+        {"name", "luna"},
+        {"breed", "scottish fold"},
     };
 
     bson::BsonDocument person_document{
@@ -855,7 +863,17 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(static_cast<ObjectId>(bson["insertedId"]) == dog3_object_id);
         });
 
+        cat_collection.insert_one_bson(cat_document, [&](Optional<bson::Bson> value, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            auto bson = static_cast<bson::BsonDocument>(*value);
+            CHECK(static_cast<std::string>(bson["insertedId"]) == cat_id_string);
+        });
+
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_one(cat_document, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -882,6 +900,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(static_cast<ObjectId>(*object_id) == dog3_object_id);
         });
 
+        cat_collection.insert_one(cat_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(object_id->type() == bson::Bson::Type::String);
+            CHECK(static_cast<std::string>(*object_id) == cat_id_string);
+        });
+
         person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id});
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
@@ -889,6 +913,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
 
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_one(cat_document, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -1220,7 +1248,18 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                       CHECK(!result.upserted_id);
                                   });
 
+        cat_collection.update_one({}, cat_document, true,
+                                  [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
+                                      REQUIRE_FALSE(error);
+                                      CHECK(result.upserted_id->type() == bson::Bson::Type::String);
+                                      CHECK(result.upserted_id == cat_id_string);
+                                  });
+
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -1238,6 +1277,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                            auto document = static_cast<bson::BsonDocument>(*bson);
                                            auto foundUpsertedId = document.find("upsertedId") != document.end();
                                            REQUIRE(!foundUpsertedId);
+                                       });
+
+        cat_collection.update_one_bson({}, cat_document, true,
+                                       [&](Optional<bson::Bson> bson, Optional<AppError> error) {
+                                           REQUIRE_FALSE(error);
+                                           auto upserted_id = static_cast<bson::BsonDocument>(*bson)["upsertedId"];
+                                           REQUIRE(upserted_id.type() == bson::Bson::Type::String);
+                                           REQUIRE(upserted_id == cat_id_string);
                                        });
 
         person_document["dogs"] = bson::BsonArray();
