@@ -2574,6 +2574,9 @@ TransformerImpl::iterator TransformerImpl::transform_remote_changesets(
                 //      2. No reciprocal changeset was modified
                 continue_applying = changeset_applier(p) || must_apply_all;
             }
+            if (p != same_base_range_end) {
+                break;
+            }
 
             our_changesets.clear(); // deliberately not releasing memory
         }

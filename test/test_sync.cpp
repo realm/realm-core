@@ -4442,7 +4442,7 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
         version_type user_commit_version = UINT_FAST64_MAX;
 
         Session::Config config;
-        config.on_download_message_integrated_hook =
+        config.on_download_message_received_hook =
             [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
                 CHECK(batch_state == sync::DownloadBatchState::SteadyState);
                 if (num_changesets == 0)
