@@ -34,6 +34,7 @@
 
 ### Internals
 * Traversal functions use a typed IteratorControl value rather than true/false. ([#5857](https://github.com/realm/realm-core/issues/5857))
+* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862))
 
 ----------------------------------------------
 
@@ -57,7 +58,7 @@
 * Fix all UBSan failures hit by tests. It is unclear if any of these manifested as visible bugs. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
 * Fix sorting order for `realm_query_find_first` in the C API.([#5720](https://github.com/realm/realm-core/issues/5720))
 * Upload completion callbacks may have called before the download message that completed them was fully integrated. ([#4865](https://github.com/realm/realm-core/issues/4865)).
-* Fixed an exception "fcntl() with F_BARRIERFSYNC failed: Inappropriate ioctl for device" when running with MacOS on an exFAT drive. ([#5789](https://github.com/realm/realm-core/issues/5789) since 12.0.0) 
+* Fixed an exception "fcntl() with F_BARRIERFSYNC failed: Inappropriate ioctl for device" when running with MacOS on an exFAT drive. ([#5789](https://github.com/realm/realm-core/issues/5789) since 12.0.0)
 * Syncing of a Decimal128 with big significand could result in a crash. ([#5728](https://github.com/realm/realm-core/issues/5728))
 * Recovery/discardLocal client reset modes will now wait for FLX sync realms to be fully synchronized before beginning recovery operations ([#5705](https://github.com/realm/realm-core/issues/5705))
 
