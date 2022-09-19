@@ -1,6 +1,6 @@
 # NEXT MAJOR RELEASE
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Full text index supported. ([#5872](https://github.com/realm/realm-core/pull/5872))
 
 ### Fixed
 * Set<Mixed> consider string and binary data equivilent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
