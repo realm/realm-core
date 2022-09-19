@@ -257,7 +257,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                 auto sz = arr.size();
                 REALM_ASSERT(sz >= 2);
                 m_evacuation_limit = size_t(arr.get(0));
-                m_backoff = size_t(arr.get(1));
+                m_backoff = int(arr.get(1));
                 for (size_t i = 2; i < sz; i++)
                     m_evacuation_progress.push_back(size_t(arr.get(i)));
             }
