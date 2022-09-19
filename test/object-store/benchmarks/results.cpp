@@ -375,7 +375,7 @@ TEST_CASE("aggregates") {
 
     const auto value_count = GENERATE(0, 100, 1'000'000);
     for (int i = 0; i < value_count; ++i) {
-        auto key = table->create_object().set_all(1LL).get_key();
+        auto key = table->create_object().set_all(int64_t(1)).get_key();
         obj_list.add(key);
         obj_set.insert(key);
         obj_dict.insert(std::to_string(i), key);
