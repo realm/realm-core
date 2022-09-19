@@ -2450,6 +2450,15 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
 RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
 
 /**
+ * Find the index for the value passed as parameter inside realm results pointer passed a input parameter.
+ *  @param value the value to find inside the realm results
+ *  @param out_index the index where the object has been found, or realm::not_found
+ *  @param out_found boolean indicating if the value has been found or not
+ *  @return true if no error occured, false otherwise
+ */
+RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* out_index, bool* out_found);
+
+/**
  * Get the matching object at @a index in the results.
  *
  * If the result is "live" (not a snapshot), this may rerun the query if things

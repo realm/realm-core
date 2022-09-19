@@ -2242,6 +2242,11 @@ TEST_CASE("C API", "[c_api]") {
                     realm_value_t value = rlm_null();
                     CHECK(!realm_results_get(r2.get(), 0, &value));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find(r2.get(), &value, &index, &found));
+                    CHECK(index == realm::not_found);
+                    CHECK(found == false);
                 }
 
                 SECTION("realm_results_get()") {
@@ -2250,9 +2255,13 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(value.type == RLM_TYPE_LINK);
                     CHECK(value.link.target_table == class_foo.key);
                     CHECK(value.link.target == realm_object_get_key(obj1.get()));
-
                     CHECK(!realm_results_get(r.get(), 1, &value));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find(r.get(), &value, &index, &found));
+                    CHECK(index == realm::not_found);
+                    CHECK(found == false);
                 }
 
                 SECTION("realm_results_get_object()") {
@@ -2561,6 +2570,18 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(checked(realm_list_find(strings.get(), &dummy, &out_index, &found)));
                         CHECK(!found);
                         CHECK(out_index == realm::not_found);
+
+                        // verify that conversion to results works
+                        auto results = cptr_checked(realm_list_to_results(strings.get()));
+                        CHECK(checked(realm_results_find(results.get(), &a2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 0);
+                        CHECK(checked(realm_results_find(results.get(), &b2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 1);
+                        CHECK(checked(realm_results_find(results.get(), &c2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 2);
                     });
                 }
 
