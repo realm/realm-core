@@ -99,6 +99,11 @@ else()
         add_cxx_flag_if_supported(-Wno-deprecated-declarations)
     endif()
 
+    # By default GCC warns that it changed how it passes bitfields by value as
+    # function arguments on arm64 every time this happens. This warning is just
+    # an FYI and not pointing out a problem, so just disable it.
+    add_cxx_flag_if_supported(-Wno-psabi)
+
     add_cxx_flag_if_supported(-Wpartial-availability)
 
     # This warning is too agressive. It warns about moves that are not redundant on older
