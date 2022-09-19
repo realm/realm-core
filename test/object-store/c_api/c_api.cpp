@@ -2268,9 +2268,17 @@ TEST_CASE("C API", "[c_api]") {
                     auto p = cptr_checked(realm_results_get_object(r.get(), 0));
                     CHECK(p.get());
                     CHECK(realm_equals(p.get(), obj1.get()));
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find_object(r.get(), p.get(), &index, &found));
+                    CHECK(found == true);
+                    CHECK(index == 0);
 
                     CHECK(!realm_results_get_object(r.get(), 1));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    CHECK(realm_results_find_object(r.get(), obj2.get(), &index, &found));
+                    CHECK(found == false);
+                    CHECK(index == realm::not_found);
                 }
 
                 SECTION("realm_results_filter()") {

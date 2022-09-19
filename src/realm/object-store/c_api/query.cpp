@@ -419,6 +419,29 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
     });
 }
 
+RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
+                                       bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&]() {
+        if (out_index) {
+            for (size_t i = 0; i < results->size(); ++i) {
+                auto obj1 = results->get<Obj>(i);
+                if (value->obj() == obj1) {
+                    *out_index = i;
+                    if (out_found)
+                        *out_found = true;
+                }
+            }
+        }
+        return true;
+    });
+}
+
 RLM_API bool realm_results_delete_all(realm_results_t* results)
 {
     return wrap_err([&]() {
