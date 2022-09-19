@@ -19,10 +19,14 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
+#include "realm/array_key.hpp"
+#include "realm/array_integer.hpp"
 #include "realm/array_backlink.hpp"
+#include "realm/array_typed_link.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/array_fixed_bytes.hpp"
 
 #include <iostream>
@@ -692,7 +696,7 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
         if (child_is_leaf) {
             Cluster leaf(offs, m_alloc, m_tree_top);
             leaf.init(mem);
-            if (func(&leaf)) {
+            if (func(&leaf) == IteratorControl::Stop) {
                 return true;
             }
         }
@@ -753,8 +757,10 @@ int64_t ClusterNodeInner::get_last_key_value() const
     }
 }
 
-ClusterTree::ClusterTree(Allocator& alloc)
+ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree)
     : m_alloc(alloc)
+    , m_owner(owner)
+    , m_top_position_for_cluster_tree(top_position_for_cluster_tree)
 {
 }
 
@@ -835,8 +841,27 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ArrayParent* parent, size_t n
     return node;
 }
 
-void ClusterTree::clear()
+void ClusterTree::clear(CascadeState& state)
 {
+    m_owner->clear_indexes();
+
+    if (state.m_group) {
+        remove_all_links(state); // This will also delete objects loosing their last strong link
+    }
+
+    // We no longer have "clear table" instruction, so we have to report the removal of each
+    // object individually
+    if (Replication* repl = m_owner->get_repl()) {
+        // Go through all clusters
+        traverse([repl, this](const Cluster* cluster) {
+            auto sz = cluster->node_size();
+            for (size_t i = 0; i < sz; i++) {
+                repl->remove_object(m_owner, cluster->get_real_key(i));
+            }
+            return IteratorControl::AdvanceToNext;
+        });
+    }
+
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
@@ -847,6 +872,45 @@ void ClusterTree::clear()
     bump_storage_version();
 
     m_size = 0;
+}
+
+void ClusterTree::enumerate_string_column(ColKey col_key)
+{
+    Allocator& alloc = get_alloc();
+
+    ArrayString keys(alloc);
+    ArrayString leaf(alloc);
+    keys.create();
+
+    auto collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t sz = leaf.size();
+        size_t key_size = keys.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto v = leaf.get(i);
+            size_t pos = keys.lower_bound(v);
+            if (pos == key_size || keys.get(pos) != v) {
+                keys.insert(pos, v); // Throws
+                key_size++;
+            }
+        }
+
+        return IteratorControl::AdvanceToNext;
+    };
+
+    auto upgrade = [col_key, &keys](Cluster* cluster) {
+        cluster->upgrade_string_to_enum(col_key, keys);
+    };
+
+    // Populate 'keys' array
+    traverse(collect_strings);
+
+    // Store key strings in spec
+    size_t spec_ndx = m_owner->colkey2spec_ndx(col_key);
+    const_cast<Spec*>(&m_owner->m_spec)->upgrade_string_to_enum(spec_ndx, keys.get_ref());
+
+    // Replace column in all clusters
+    update(upgrade);
 }
 
 void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
@@ -892,17 +956,26 @@ void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterN
     m_size++;
 }
 
-ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& init_values)
+Obj ClusterTree::insert(ObjKey k, const FieldValues& init_values)
 {
     ClusterNode::State state;
 
     insert_fast(k, init_values, state);
-    update_indexes(k, init_values);
+    m_owner->update_indexes(k, init_values);
 
     bump_content_version();
     bump_storage_version();
 
-    return state;
+    // Replicate setting of values
+    if (Replication* repl = m_owner->get_repl()) {
+        auto pk_col = m_owner->get_primary_key_column();
+        for (const auto& v : init_values) {
+            if (v.col_key != pk_col)
+                repl->set(m_owner, v.col_key, k, v.value, v.is_default ? _impl::instr_SetDefault : _impl::instr_Set);
+        }
+    }
+
+    return Obj(get_table_ref(), state.mem, k, state.index);
 }
 
 bool ClusterTree::is_valid(ObjKey k) const noexcept
@@ -912,13 +985,6 @@ bool ClusterTree::is_valid(ObjKey k) const noexcept
 
     ClusterNode::State state;
     return m_root->try_get(k, state);
-}
-
-ClusterNode::State ClusterTree::get(ObjKey k) const
-{
-    ClusterNode::State state;
-    m_root->get(k, state);
-    return state;
 }
 
 ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
@@ -946,7 +1012,8 @@ size_t ClusterTree::get_ndx(ObjKey k) const noexcept
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
-    cleanup_key(k);
+    m_owner->free_local_id_after_hash_collision(k);
+    m_owner->erase_from_search_indexes(k);
     if (!k.is_unresolved()) {
         if (auto table = get_owning_table()) {
             if (Replication* repl = table->get_repl()) {
@@ -994,7 +1061,7 @@ bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const 
 bool ClusterTree::traverse(TraverseFunction func) const
 {
     if (m_root->is_leaf()) {
-        return func(static_cast<Cluster*>(m_root.get()));
+        return func(static_cast<Cluster*>(m_root.get())) == IteratorControl::Stop;
     }
     else {
         return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
@@ -1011,12 +1078,35 @@ void ClusterTree::update(UpdateFunction func)
     }
 }
 
+void ClusterTree::set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const
+{
+    // Check for owner. This function may be called in context of DictionaryClusterTree
+    // in which case m_owner is null (and spec never needed).
+    if (m_owner) {
+        auto spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
+        arr.set_spec(&m_owner->m_spec, spec_ndx);
+    }
+}
+
+TableRef ClusterTree::get_table_ref() const
+{
+    REALM_ASSERT(m_owner != nullptr);
+    // as safe as storing the TableRef locally in the ClusterTree,
+    // because the cluster tree and the table is basically one object :-O
+    return m_owner->m_own_ref;
+}
+
+std::unique_ptr<ClusterNode> ClusterTree::get_root_from_parent()
+{
+    return create_root_from_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
+}
+
 void ClusterTree::verify() const
 {
 #ifdef REALM_DEBUG
     traverse([](const Cluster* cluster) {
         cluster->verify();
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 #endif
 }
@@ -1025,6 +1115,170 @@ void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
+}
+
+bool ClusterTree::is_string_enum_type(ColKey::Idx col_ndx) const
+{
+    size_t spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
+    return m_owner->m_spec.is_string_enum_type(spec_ndx);
+}
+
+void ClusterTree::remove_all_links(CascadeState& state)
+{
+    Allocator& alloc = get_alloc();
+    // This function will add objects that should be deleted to 'state'
+    auto func = [this, &state, &alloc](const Cluster* cluster) {
+        auto remove_link_from_column = [&](ColKey col_key) {
+            // Prevent making changes to table that is going to be removed anyway
+            // Furthermore it is a prerequisite for using 'traverse' that the tree
+            // is not modified
+            if (get_owning_table()->links_to_self(col_key)) {
+                return IteratorControl::AdvanceToNext;
+            }
+            auto col_type = col_key.get_type();
+            if (col_key.is_list() || col_key.is_set()) {
+                if (col_type == col_type_LinkList)
+                    col_type = col_type_Link;
+                if (col_type == col_type_Link) {
+                    ArrayInteger values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    BPlusTree<ObjKey> links(alloc);
+                    for (size_t i = 0; i < sz; i++) {
+                        if (ref_type ref = values.get_as_ref(i)) {
+                            links.init_from_ref(ref);
+                            if (links.size() > 0) {
+                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
+                            }
+                        }
+                    }
+                }
+                else if (col_type == col_type_TypedLink) {
+                    ArrayInteger values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    BPlusTree<ObjLink> links(alloc);
+                    for (size_t i = 0; i < sz; i++) {
+                        if (ref_type ref = values.get_as_ref(i)) {
+                            links.init_from_ref(ref);
+                            if (links.size() > 0) {
+                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
+                            }
+                        }
+                    }
+                }
+                else if (col_type == col_type_Mixed) {
+                    ArrayInteger values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    BPlusTree<Mixed> mix_arr(alloc);
+                    for (size_t i = 0; i < sz; i++) {
+                        if (ref_type ref = values.get_as_ref(i)) {
+                            mix_arr.init_from_ref(ref);
+                            auto sz = mix_arr.size();
+                            std::vector<ObjLink> links;
+                            for (size_t j = 0; j < sz; j++) {
+                                auto mix = mix_arr.get(j);
+                                if (mix.is_type(type_TypedLink)) {
+                                    links.push_back(mix.get<ObjLink>());
+                                }
+                            }
+                            if (links.size())
+                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links, state);
+                        }
+                    }
+                }
+            }
+            else if (col_key.is_dictionary()) {
+                ArrayInteger values(alloc);
+                cluster->init_leaf(col_key, &values);
+                size_t sz = values.size();
+                for (size_t i = 0; i < sz; i++) {
+                    if (values.get_as_ref(i)) {
+                        std::vector<ObjLink> links;
+
+                        Array top(alloc);
+                        top.set_parent(&values, i);
+                        top.init_from_parent();
+                        BPlusTree<Mixed> values(alloc);
+                        values.set_parent(&top, 1);
+                        values.init_from_parent();
+
+                        // Iterate through values and insert all link values
+                        values.traverse([&](BPlusTreeNode* node, size_t) {
+                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+                            auto sz = bplustree_leaf->size();
+                            for (size_t i = 0; i < sz; i++) {
+                                auto mix = bplustree_leaf->get(i);
+                                if (mix.is_type(type_TypedLink)) {
+                                    links.push_back(mix.get<ObjLink>());
+                                }
+                            }
+                            return IteratorControl::AdvanceToNext;
+                        });
+
+                        if (links.size() > 0) {
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, links, state);
+                        }
+                    }
+                }
+            }
+            else {
+                if (col_type == col_type_Link) {
+                    ArrayKey values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    for (size_t i = 0; i < sz; i++) {
+                        if (ObjKey key = values.get(i)) {
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjKey>{key},
+                                                      state);
+                        }
+                    }
+                }
+                else if (col_type == col_type_TypedLink) {
+                    ArrayTypedLink values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    for (size_t i = 0; i < sz; i++) {
+                        if (ObjLink link = values.get(i)) {
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjLink>{link},
+                                                      state);
+                        }
+                    }
+                }
+                else if (col_type == col_type_Mixed) {
+                    ArrayMixed values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    size_t sz = values.size();
+                    for (size_t i = 0; i < sz; i++) {
+                        Mixed mix = values.get(i);
+                        if (mix.is_type(type_TypedLink)) {
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_key,
+                                                      std::vector<ObjLink>{mix.get<ObjLink>()}, state);
+                        }
+                    }
+                }
+                else if (col_type == col_type_BackLink) {
+                    ArrayBacklink values(alloc);
+                    cluster->init_leaf(col_key, &values);
+                    values.set_parent(const_cast<Cluster*>(cluster),
+                                      col_key.get_index().val + Cluster::s_first_col_index);
+                    size_t sz = values.size();
+                    for (size_t i = 0; i < sz; i++) {
+                        values.nullify_fwd_links(i, state);
+                    }
+                }
+            }
+            return IteratorControl::AdvanceToNext;
+        };
+        m_owner->for_each_and_every_column(remove_link_from_column);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    // Go through all clusters
+    traverse(func);
+
+    const_cast<Table*>(get_owning_table())->remove_recursive(state);
 }
 
 /**************************  ClusterTree::Iterator  **************************/
@@ -1196,6 +1450,15 @@ ClusterTree::Iterator& ClusterTree::Iterator::operator+=(ptrdiff_t adj)
     }
     m_leaf_invalid = !m_key;
     return *this;
+}
+
+ClusterTree::Iterator::pointer ClusterTree::Iterator::operator->() const
+{
+    if (update() || m_key != m_obj.get_key()) {
+        new (&m_obj) Obj(m_tree.get_table_ref(), m_leaf.get_mem(), m_key, m_state.m_current_index);
+    }
+
+    return &m_obj;
 }
 
 } // namespace realm

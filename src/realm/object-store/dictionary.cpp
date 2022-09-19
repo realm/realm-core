@@ -185,7 +185,7 @@ Obj Dictionary::insert_embedded(StringData key)
 std::pair<size_t, bool> Dictionary::insert_any(StringData key, Mixed value)
 {
     auto [it, inserted] = dict().insert(key, value);
-    return std::make_pair(it.get_position(), inserted);
+    return std::make_pair(it.index(), inserted);
 }
 
 void Dictionary::erase(StringData key)

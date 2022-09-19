@@ -333,7 +333,6 @@ void LinkChain::add(ColKey ck)
     m_link_cols.push_back(ck);
 }
 
-
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc)
@@ -511,6 +510,7 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullabl
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    REALM_ASSERT(key_type != type_Mixed);
     attr.set(col_attr_Dictionary);
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
@@ -709,7 +709,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -1145,7 +1145,7 @@ void Table::set_embedded(bool embedded)
     bool has_backlink_columns = false;
     for_each_backlink_column([&has_backlink_columns](ColKey) {
         has_backlink_columns = true;
-        return true;
+        return IteratorControl::Stop;
     });
     if (!has_backlink_columns) {
         throw std::logic_error(
@@ -1155,14 +1155,33 @@ void Table::set_embedded(bool embedded)
     }
     else if (size() > 0) {
         for (auto object : *this) {
-            size_t backlink_count = object.get_backlink_count();
+            size_t backlink_count = 0;
+            for_each_backlink_column([&](ColKey backlink_col_key) {
+                size_t cur_backlinks = object.get_backlink_cnt(backlink_col_key);
+                if (cur_backlinks > 0) {
+                    // Make sure this link is not an untyped ObjLink which lacks core support in many places
+                    ColKey source_col = get_opposite_column(backlink_col_key);
+                    REALM_ASSERT(source_col); // backlink columns should always have a source
+                    TableRef source_table = get_opposite_table(backlink_col_key);
+                    ColKey forward_col_mapped = source_table->get_opposite_column(source_col);
+                    if (!forward_col_mapped) {
+                        throw std::logic_error(util::format("There is a dynamic/untyped link from a Mixed property "
+                                                            "'%1.%2' which prevents migrating class '%3' to embedded",
+                                                            source_table->get_name(),
+                                                            source_table->get_column_name(source_col), get_name()));
+                    }
+                }
+                backlink_count += cur_backlinks;
+                if (backlink_count > 1) {
+                    throw std::logic_error(
+                        util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
+                }
+                return IteratorControl::AdvanceToNext; // continue
+            });
+
             if (backlink_count == 0) {
                 throw std::logic_error(util::format(
                     "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
-            }
-            else if (backlink_count > 1) {
-                throw std::logic_error(
-                    util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
             }
         }
     }
@@ -1576,7 +1595,7 @@ void Table::create_columns()
     size_t cnt;
     auto get_column_cnt = [&cnt](const Cluster* cluster) {
         cnt = cluster->nb_columns();
-        return true;
+        return IteratorControl::Stop;
     };
     traverse_clusters(get_column_cnt);
 
@@ -1922,6 +1941,8 @@ void Table::migrate_sets_and_dictionaries()
                     set.migrate();
                 }
                 else if (col.is_dictionary()) {
+                    auto dict = obj.get_dictionary(col);
+                    dict.migrate();
                 }
             }
         }
@@ -2048,11 +2069,11 @@ void Table::ensure_graveyard()
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
         MemRef mem = Cluster::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
-        m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 }
@@ -2185,7 +2206,7 @@ size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
                 cnt++;
             }
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
@@ -2407,7 +2428,7 @@ Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
                 ret_key = cluster->get_real_key(i);
             }
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
@@ -2465,9 +2486,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
-            return true;
+            return IteratorControl::Stop;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
@@ -2909,7 +2930,7 @@ void Table::refresh_accessor_tree()
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -2960,7 +2981,9 @@ bool Table::is_cross_table_link_target() const noexcept
     auto is_cross_link = [this](ColKey col_key) {
         auto t = col_key.get_type();
         // look for a backlink with a different target than ourselves
-        return (t == col_type_BackLink && get_opposite_table_key(col_key) != get_key());
+        return (t == col_type_BackLink && get_opposite_table_key(col_key) != get_key())
+                   ? IteratorControl::Stop
+                   : IteratorControl::AdvanceToNext;
     };
     return for_each_backlink_column(is_cross_link);
 }
@@ -3226,7 +3249,6 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
-
     return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 
@@ -3597,9 +3619,9 @@ Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
         if (origin_table->get_name() == origin_table_name &&
             origin_table->get_column_name(origin_link_col) == origin_col_name) {
             ret = BacklinkOrigin{{origin_table, origin_link_col}};
-            return true;
+            return IteratorControl::Stop;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     this->for_each_backlink_column(f);
     return ret;
@@ -3634,7 +3656,7 @@ std::vector<std::pair<TableKey, ColKey>> Table::get_incoming_link_columns() cons
         auto origin_table_key = get_opposite_table_key(backlink_col_key);
         auto origin_link_col = get_opposite_column(backlink_col_key);
         origins.emplace_back(origin_table_key, origin_link_col);
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     this->for_each_backlink_column(f);
     return origins;
@@ -4018,10 +4040,10 @@ bool Table::has_any_embedded_objects()
                 auto target_table = get_parent_group()->get_table(target_table_key);
                 if (target_table->is_embedded()) {
                     m_has_any_embedded_objects = true;
-                    return true; // early out
+                    return IteratorControl::Stop; // early out
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
     return *m_has_any_embedded_objects;

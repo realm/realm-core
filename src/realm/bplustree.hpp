@@ -50,8 +50,8 @@ public:
     // Erase element at erase_pos. May cause nodes to be merged
     using EraseFunc = util::FunctionRef<size_t(BPlusTreeNode*, size_t erase_pos)>;
     // Function to be called for all leaves in the tree until the function
-    // returns 'true'. 'offset' gives index of the first element in the leaf.
-    using TraverseFunc = util::FunctionRef<bool(BPlusTreeNode*, size_t offset)>;
+    // returns 'IteratorControl::Stop'. 'offset' gives index of the first element in the leaf.
+    using TraverseFunc = util::FunctionRef<IteratorControl(BPlusTreeNode*, size_t offset)>;
 
     BPlusTreeNode(BPlusTreeBase* tree)
         : m_tree(tree)
@@ -203,6 +203,9 @@ public:
             m_root->bp_set_parent(parent, ndx_in_parent);
     }
 
+    virtual void erase(size_t) = 0;
+    virtual void clear() = 0;
+
     void create();
     void destroy();
     void verify() const
@@ -271,6 +274,7 @@ template <class T>
 class BPlusTree : public BPlusTreeBase {
 public:
     using LeafArray = typename LeafTypeTrait<T>::type;
+    using value_type = T;
 
     /**
      * Actual class for the leaves. Maps the abstract interface defined
@@ -392,7 +396,7 @@ public:
             for (size_t i = 0; i < sz; i++) {
                 all_values.push_back(leaf->get(i));
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         m_root->bptree_traverse(func);
@@ -452,7 +456,7 @@ public:
         }
     }
 
-    void erase(size_t n)
+    void erase(size_t n) override
     {
         auto func = [](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
@@ -464,7 +468,7 @@ public:
         m_size--;
     }
 
-    void clear()
+    void clear() override
     {
         if (m_root->is_leaf()) {
             LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
@@ -497,9 +501,9 @@ public:
             auto i = leaf->find_first(value, 0, sz);
             if (i < sz) {
                 result = i + offset;
-                return true;
+                return IteratorControl::Stop;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         m_root->bptree_traverse(func);
@@ -516,7 +520,7 @@ public:
             while ((i = leaf->find_first(value, i + 1, sz)) < sz) {
                 callback(i + offset);
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         m_root->bptree_traverse(func);
@@ -532,7 +536,7 @@ public:
             for (size_t i = 0; i < sz; i++) {
                 o << indent << leaf->get(i) << std::endl;
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         m_root->bptree_traverse(func);
@@ -593,7 +597,7 @@ typename SumAggType<T>::ResultType bptree_sum(const BPlusTree<T>& tree, size_t* 
             auto val = leaf->get(i);
             agg.accumulate(val);
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     tree.traverse(func);
@@ -625,7 +629,7 @@ util::Optional<typename util::RemoveOptional<T>::type> bptree_min_max(const BPlu
                 *return_ndx = i + offset;
             }
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     tree.traverse(func);

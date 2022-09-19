@@ -24,6 +24,7 @@
 #include <chrono>
 #include <set>
 // #include <valgrind/callgrind.h>
+// valgrind --tool=callgrind --instr-atstart=no ./realm-tests
 
 using namespace std::chrono;
 
@@ -409,27 +410,34 @@ NONCONCURRENT_TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false, type_Int);
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
     std::vector<int64_t> random_idx(nb_reps);
+    std::vector<std::string> random_str(nb_reps);
     std::iota(random_idx.begin(), random_idx.end(), 0);
     std::shuffle(random_idx.begin(), random_idx.end(), std::mt19937(unit_test_random_seed));
 
-    auto t1 = steady_clock::now();
-    CALLGRIND_START_INSTRUMENTATION;
+    std::transform(random_idx.begin(), random_idx.end(), random_str.begin(), [](int64_t i) {
+        return std::string("s") + util::to_string(i);
+    });
 
-    for (auto i : random_idx) {
-        dict.insert(i, i);
+    auto t1 = steady_clock::now();
+
+    int64_t i = 0;
+    for (auto& str : random_str) {
+        dict.insert(str, i++);
     }
 
-    CALLGRIND_STOP_INSTRUMENTATION;
     auto t2 = steady_clock::now();
 
-    for (auto i : random_idx) {
-        CHECK_EQUAL(dict.get(i), Mixed(i));
+    CALLGRIND_START_INSTRUMENTATION;
+    i = 0;
+    for (auto& str : random_str) {
+        CHECK_EQUAL(dict.get(str), Mixed(i++));
     }
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     auto t3 = steady_clock::now();
 
@@ -460,7 +468,7 @@ TEST(Dictionary_Tombstones)
     a.invalidate();
 
     CHECK_EQUAL(dict.size(), 2);
-    CHECK((*dict.find("a")).second.is_unresolved_link());
+    CHECK((*dict.find("a")).second.is_null());
 
     CHECK(dict.find("b") != dict.end());
 
@@ -491,7 +499,6 @@ TEST(Dictionary_UseAfterFree)
 NONCONCURRENT_TEST(Dictionary_HashCollision)
 {
     constexpr int64_t nb_entries = 100;
-    auto mask = Dictionary::set_hash_mask(0xFF);
     Group g;
     auto foos = g.add_table("Foo");
     ColKey col_dict = foos->add_column_dictionary(type_Int, "dict");
@@ -595,7 +602,6 @@ NONCONCURRENT_TEST(Dictionary_HashCollision)
             CHECK_EQUAL(dict[key_j].get_int(), nb_entries - j - 1);
         }
     }
-    Dictionary::set_hash_mask(mask);
 }
 
 class ModelDict {
@@ -652,7 +658,6 @@ public:
 NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
 {
     ModelDict model;
-    auto mask = Dictionary::set_hash_mask(0xFFFF);
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history();
     DBRef db = DB::create(*hist, path);
@@ -701,14 +706,11 @@ NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
         tr->commit_and_continue_as_read();
         tr->verify();
     }
-    // restore
-    Dictionary::set_hash_mask(mask);
 }
 
 static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::TestContext& test_context,
-                                                   int64_t nb_entries, uint64_t mask)
+                                                   int64_t nb_entries)
 {
-    mask = Dictionary::set_hash_mask(mask);
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history();
     DBRef db = DB::create(*hist, path);
@@ -770,11 +772,10 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
             CHECK_EQUAL(bars->get_object(obj_key).get<Int>("ints"), j);
         }
     }
-    Dictionary::set_hash_mask(mask);
 }
 
 NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
 {
-    do_Dictionary_HashCollisionTransaction(test_context, 100, 0xFF);  // One node cluster
-    do_Dictionary_HashCollisionTransaction(test_context, 500, 0x3FF); // Three node cluster
+    do_Dictionary_HashCollisionTransaction(test_context, 100); // One node cluster
+    do_Dictionary_HashCollisionTransaction(test_context, 500); // Three node cluster
 }

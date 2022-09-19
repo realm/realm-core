@@ -727,6 +727,11 @@ public:
         return {};
     }
 
+    virtual ConstTableRef get_target_table() const
+    {
+        return {};
+    }
+
     virtual DataType get_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1217,14 +1222,36 @@ public:
     {
     }
 
-    std::string value_to_string(size_t ndx) const
+    std::string value_to_string(size_t ndx, util::serializer::SerialisationState& state) const
     {
         auto val = get(ndx);
         if (val.is_null())
             return "NULL";
         else {
+            static_cast<void>(state);
             if constexpr (std::is_same_v<T, TypeOfValue>) {
                 return util::serializer::print_value(val.get_type_of_value());
+            }
+            else if constexpr (std::is_same_v<T, ObjKey>) {
+                ObjKey obj_key = val.template get<ObjKey>();
+                if (state.target_table) {
+                    ObjLink link(state.target_table->get_key(), obj_key);
+                    return util::serializer::print_value(link, state.group);
+                }
+                else {
+                    return util::serializer::print_value(obj_key);
+                }
+            }
+            else if constexpr (std::is_same_v<T, ObjLink>) {
+                return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+            }
+            else if constexpr (std::is_same_v<T, Mixed>) {
+                if (val.is_type(type_TypedLink)) {
+                    return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+                }
+                else {
+                    return util::serializer::print_value(val);
+                }
             }
             else {
                 return util::serializer::print_value(val.template get<T>());
@@ -1241,13 +1268,13 @@ public:
                 if (i != 0) {
                     desc += ", ";
                 }
-                desc += value_to_string(i);
+                desc += value_to_string(i, state);
             }
             desc += "}";
             return desc;
         }
         else if (sz == 1) {
-            return value_to_string(0);
+            return value_to_string(0, state);
         }
         return "";
     }
@@ -2589,6 +2616,11 @@ public:
         return type_Link;
     }
 
+    ConstTableRef get_target_table() const override
+    {
+        return link_map().get_target_table();
+    }
+
     bool has_multiple_values() const override
     {
         return m_is_list || !m_link_map.only_unary_links();
@@ -2735,6 +2767,10 @@ public:
     ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
+    }
+    ConstTableRef get_target_table() const override
+    {
+        return m_link_map.get_target_table()->get_opposite_table(m_column_key);
     }
 
     Allocator& get_alloc() const
@@ -3014,7 +3050,6 @@ public:
     ColumnDictionaryKey(ColumnDictionaryKey const& other)
         : Columns<Dictionary>(other)
         , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
     {
         init_key(other.m_key);
     }
@@ -3023,7 +3058,6 @@ private:
     Mixed m_key;
     std::string m_buffer;
     std::vector<std::string> m_prop_list;
-    ObjKey m_objkey;
 
     void init_key(Mixed key_value);
 };
@@ -3300,7 +3334,7 @@ public:
                     const Obj obj = m_columns_collection.m_link_map.get_target_table()->get_object(links[t]);
                     auto dict = obj.get_dictionary(m_columns_collection.m_column_key);
                     if (dict.size() > 0) {
-                        destination.set(t, do_dictionary_agg(*dict.m_clusters));
+                        destination.set(t, do_dictionary_agg(dict));
                     }
                     else {
                         set_value_for_empty_dictionary(destination, t);
@@ -3308,12 +3342,10 @@ public:
                 }
             }
             else {
-                if (m_columns_collection.m_leaf_ptr->get(index)) {
+                if (auto ref = m_columns_collection.m_leaf_ptr->get(index)) {
                     Allocator& alloc = m_columns_collection.get_base_table()->get_alloc();
-                    DictionaryClusterTree dict_cluster(static_cast<Array*>(m_columns_collection.m_leaf_ptr),
-                                                       *m_dictionary_key_type, alloc, index);
-                    dict_cluster.init_from_parent();
-                    destination.set(0, do_dictionary_agg(dict_cluster));
+                    Dictionary dict(alloc, m_columns_collection.m_column_key, to_ref(ref));
+                    destination.set(0, do_dictionary_agg(dict));
                 }
                 else {
                     set_value_for_empty_dictionary(destination, 0);
@@ -3379,19 +3411,19 @@ private:
         }
     }
 
-    Mixed do_dictionary_agg(const DictionaryClusterTree& dict_cluster)
+    Mixed do_dictionary_agg(const Dictionary& dict)
     {
         if constexpr (std::is_same_v<Operation, aggregate_operations::Maximum<Mixed>>) {
-            return dict_cluster.max();
+            return *dict.do_max();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Minimum<Mixed>>) {
-            return dict_cluster.min();
+            return *dict.do_min();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Average<Mixed>>) {
-            return dict_cluster.avg(nullptr, get_type());
+            return *dict.do_avg();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
-            return dict_cluster.sum(nullptr, get_type());
+            return *dict.do_sum();
         }
         REALM_UNREACHABLE();
     }
@@ -3786,7 +3818,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state(state.class_prefix);
+        util::serializer::SerialisationState empty_state(state.class_prefix, state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4201,8 +4233,8 @@ public:
                                                  m_left->description(state));
         }
         else {
-            return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
-                                                 m_right->description(state));
+            state.target_table = m_left->get_target_table();
+            return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
         }
     }
 

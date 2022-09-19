@@ -3327,7 +3327,7 @@ TEST(Table_object_forward_iterator)
     size_t tree_size = 0;
     auto f = [&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     table.traverse_clusters(f);
     CHECK_EQUAL(tree_size, size_t(nb_rows));
@@ -5407,7 +5407,11 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
         auto ck = parent->add_column(*table, "theGreatColumn");
         Obj o = parent->create_object();
         Obj o2 = o.create_and_set_linked_object(ck);
-        o2.create_and_set_linked_object(col_recurse);
+        Obj o3 = o2.create_and_set_linked_object(col_recurse);
+        auto parent_obj = o2.get_parent_object();
+        CHECK_EQUAL(o.get_key(), parent_obj.get_key());
+        parent_obj = o3.get_parent_object();
+        CHECK_EQUAL(o2.get_key(), parent_obj.get_key());
         CHECK(table->size() == 2);
         tr->commit();
     }

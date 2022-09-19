@@ -32,7 +32,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
-#include <realm/table_cluster_tree.hpp>
+#include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
 
@@ -332,7 +332,7 @@ public:
     }
 
     void clear();
-    using Iterator = TableClusterTree::Iterator;
+    using Iterator = ClusterTree::Iterator;
     Iterator begin() const;
     Iterator end() const;
     void remove_object(const Iterator& it)
@@ -474,14 +474,14 @@ public:
     ColKey set_nullability(ColKey col_key, bool nullable, bool throw_on_null);
 
     // Iterate through (subset of) columns. The supplied function may abort iteration
-    // by returning 'true' (early out).
+    // by returning 'IteratorControl::Stop' (early out).
     template <typename Func>
     bool for_each_and_every_column(Func func) const
     {
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;
@@ -494,7 +494,7 @@ public:
                 continue;
             if (col_key.get_type() == col_type_BackLink)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;
@@ -508,7 +508,7 @@ public:
                 continue;
             if (col_key.get_type() != col_type_BackLink)
                 continue;
-            if (func(col_key))
+            if (func(col_key) == IteratorControl::Stop)
                 return true;
         }
         return false;
@@ -698,8 +698,8 @@ private:
         m_alloc.refresh_ref_translation();
     }
     Spec m_spec;                                    // 1st slot in m_top
-    TableClusterTree m_clusters;                    // 3rd slot in m_top
-    std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top
+    ClusterTree m_clusters;                         // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
     TableKey m_key;                                 // 4th slot in m_top
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
@@ -878,7 +878,6 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
-    friend class TableClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
     friend class LnkLst;

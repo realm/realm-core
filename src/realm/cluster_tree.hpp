@@ -20,6 +20,7 @@
 #define REALM_CLUSTER_TREE_HPP
 
 #include <realm/cluster.hpp>
+#include <realm/obj.hpp>
 #include <realm/util/function_ref.hpp>
 
 namespace realm {
@@ -29,11 +30,11 @@ class Cluster;
 class ClusterTree {
 public:
     class Iterator;
-    using TraverseFunction = util::FunctionRef<bool(const Cluster*)>;
+    using TraverseFunction = util::FunctionRef<IteratorControl(const Cluster*)>;
     using UpdateFunction = util::FunctionRef<void(Cluster*)>;
-    using ColIterateFunction = util::FunctionRef<bool(ColKey)>;
+    using ColIterateFunction = util::FunctionRef<IteratorControl(ColKey)>;
 
-    ClusterTree(Allocator& alloc);
+    ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree);
     virtual ~ClusterTree();
 
     ClusterTree(ClusterTree&&) = default;
@@ -128,16 +129,45 @@ public:
         m_root->remove_column(col);
     }
 
+    // Create and return object
+    Obj insert(ObjKey k, const FieldValues& values);
+
+    // Lookup and return object
+    Obj get(ObjKey k) const
+    {
+        ClusterNode::State state;
+        m_root->get(k, state);
+        return Obj(get_table_ref(), state.mem, k, state.index);
+    }
+
+    Obj try_get_obj(ObjKey k) const noexcept
+    {
+        if (auto state = ClusterTree::try_get(k)) {
+            return Obj(get_table_ref(), state.mem, k, state.index);
+        }
+        return {};
+    }
+    Obj get(size_t ndx) const
+    {
+        ObjKey k;
+        auto state = ClusterTree::get(ndx, k);
+        return Obj(get_table_ref(), state.mem, k, state.index);
+    }
+
+    void clear(CascadeState&);
+    void enumerate_string_column(ColKey col_key);
+
+    const Table* get_owning_table() const noexcept
+    {
+        return m_owner;
+    }
+
     // Insert entry for object, but do not create and return the object accessor
     void insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state);
-    // Create and return object
-    ClusterNode::State insert(ObjKey k, const FieldValues&);
     // Delete object with given key
     void erase(ObjKey k, CascadeState& state);
     // Check if an object with given key exists
     bool is_valid(ObjKey k) const noexcept;
-    // Lookup and return object
-    ClusterNode::State get(ObjKey k) const;
     // Lookup and return object
     ClusterNode::State try_get(ObjKey k) const noexcept;
     // Lookup by index
@@ -146,19 +176,15 @@ public:
     size_t get_ndx(ObjKey k) const noexcept;
     // Find the leaf containing the requested object
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
-    // Visit all leaves and call the supplied function. Stop when function returns true.
+    // Visit all leaves and call the supplied function. Stop when function returns IteratorControl::Stop.
     // Not allowed to modify the tree
     bool traverse(TraverseFunction func) const;
     // Visit all leaves and call the supplied function. The function can modify the leaf.
     void update(UpdateFunction func);
 
-    virtual void for_each_and_every_column(ColIterateFunction) const = 0;
-    virtual void update_indexes(ObjKey k, const FieldValues& init_values) = 0;
-    virtual void cleanup_key(ObjKey k) = 0;
-    virtual void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const = 0;
-    virtual bool is_string_enum_type(ColKey::Idx col_ndx) const = 0;
-    virtual const Table* get_owning_table() const noexcept = 0;
-    virtual std::unique_ptr<ClusterNode> get_root_from_parent() = 0;
+    void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const;
+
+    virtual std::unique_ptr<ClusterNode> get_root_from_parent();
 
     void dump_objects()
     {
@@ -172,19 +198,29 @@ protected:
     friend class ClusterNodeInner;
 
     Allocator& m_alloc;
+    Table* m_owner;
+    size_t m_top_position_for_cluster_tree;
 
     std::unique_ptr<ClusterNode> m_root;
     size_t m_size = 0;
 
-    void clear();
     void replace_root(std::unique_ptr<ClusterNode> leaf);
 
     std::unique_ptr<ClusterNode> create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent);
     std::unique_ptr<ClusterNode> get_node(ArrayParent* parent, size_t ndx_in_parent) const;
+    TableRef get_table_ref() const;
+    bool is_string_enum_type(ColKey::Idx col_ndx) const;
+    void remove_all_links(CascadeState&);
 };
 
 class ClusterTree::Iterator {
 public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef std::ptrdiff_t difference_type;
+    typedef Obj value_type;
+    typedef Obj* pointer;
+    typedef Obj& reference;
+
     Iterator(const ClusterTree& t, size_t ndx);
     Iterator(const Iterator& other);
 
@@ -208,6 +244,11 @@ public:
 
     Iterator& operator+=(ptrdiff_t adj);
 
+    Iterator operator+(ptrdiff_t adj)
+    {
+        return Iterator(m_tree, get_position() + adj);
+    }
+
     bool operator==(const Iterator& rhs) const
     {
         return m_key == rhs.m_key;
@@ -216,6 +257,15 @@ public:
     {
         return m_key != rhs.m_key;
     }
+
+    // If the object pointed to by the iterator is deleted, you will get an exception if
+    // you try to dereference the iterator before advancing it.
+
+    reference operator*() const
+    {
+        return *operator->();
+    }
+    pointer operator->() const;
 
 protected:
     const ClusterTree& m_tree;
@@ -227,6 +277,7 @@ protected:
     mutable bool m_leaf_invalid;
     mutable size_t m_position;
     mutable size_t m_leaf_start_pos = size_t(-1);
+    mutable Obj m_obj;
 
     ObjKey load_leaf(ObjKey key) const;
     size_t get_position();
