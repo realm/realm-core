@@ -193,7 +193,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
 #endif
     Array& top = m_group.m_top;
 
-    while (top.size() < Group::s_free_version_ndx + 1) {
+    while (top.size() < Group::s_version_ndx + 1) {
         top.add(0);
     }
 
@@ -518,7 +518,7 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
     if (m_evacuation_limit == 0) {
         size_t used_space = m_logical_size - m_free_space_size;
-        if (m_free_space_size - m_locked_space_size > 2 * used_space) {
+        if (used_space > 0x10000 && m_free_space_size - m_locked_space_size > 2 * used_space) {
             // Clean up potential
             m_evacuation_limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
             // From now on, we will only allocate below this limit
@@ -865,6 +865,7 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
                     // Chunk too small - just recycle so that we can try the next
                     m_size_map.emplace(elem.size, elem.ref);
                     m_under_evacuation.pop_back();
+                    found_or_give_up = m_under_evacuation.empty();
                 }
             }
             // Set new limit

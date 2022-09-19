@@ -1790,8 +1790,7 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
-                            m_top.size() == 11,
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() >= 10,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
         Array pos(alloc), len(alloc), ver(alloc);

@@ -986,7 +986,7 @@ void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit,
             return;
         progress.back() = s_hist_ref_ndx; // Handle history next
     }
-    if (progress[0] == s_hist_ref_ndx) {
+    if (progress[0] == s_hist_ref_ndx && m_top.get(s_hist_ref_ndx)) {
         Array hist_arr(m_top.get_alloc());
         hist_arr.set_parent(&m_top, s_hist_ref_ndx);
         hist_arr.init_from_parent();

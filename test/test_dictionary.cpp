@@ -698,8 +698,8 @@ NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
             random_op(dict2);
         }
         tr2->commit_and_continue_as_read();
-        tr2->verify();
         tr->promote_to_write();
+        tr->verify();
         {
             random_op(dict);
         }
