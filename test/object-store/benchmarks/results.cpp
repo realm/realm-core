@@ -334,3 +334,88 @@ TEST_CASE("Benchmark results notifier", "[benchmark]") {
         };
     }
 }
+
+TEST_CASE("aggregates") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"object",
+         {
+             {"value", PropertyType::Int},
+         }},
+        {"link",
+         {
+             {"list", PropertyType::Object | PropertyType::Array, "object"},
+             {"set", PropertyType::Object | PropertyType::Set, "object"},
+             {"dictionary", PropertyType::Object | PropertyType::Dictionary | PropertyType::Nullable, "object"},
+         }},
+        {"primitive",
+         {
+             {"list", PropertyType::Int | PropertyType::Array},
+             {"set", PropertyType::Int | PropertyType::Set},
+             {"dictionary", PropertyType::Int | PropertyType::Dictionary},
+         }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto link_table = realm->read_group().get_table("class_link");
+    auto prim_table = realm->read_group().get_table("class_primitive");
+
+    realm->begin_transaction();
+
+    auto link_obj = link_table->create_object();
+    auto obj_list = link_obj.get_linklist("list");
+    auto obj_set = link_obj.get_linkset(link_obj.get_table()->get_column_key("set"));
+    auto obj_dict = link_obj.get_dictionary("dictionary");
+
+    auto prim_obj = prim_table->create_object();
+    auto int_list = prim_obj.get_list<int64_t>("list");
+    auto int_set = prim_obj.get_set<int64_t>("set");
+    auto int_dict = prim_obj.get_dictionary("dictionary");
+
+    const auto value_count = GENERATE(0, 100, 1'000'000);
+    for (int i = 0; i < value_count; ++i) {
+        auto key = table->create_object().set_all(1LL).get_key();
+        obj_list.add(key);
+        obj_set.insert(key);
+        obj_dict.insert(std::to_string(i), key);
+        int_list.add(1);
+        int_set.insert(i);
+        int_dict.insert(std::to_string(i), 1);
+    }
+    realm->commit_transaction();
+
+    ColKey col = table->get_column_key("value");
+    Results table_results(realm, table);
+    Results query_results(realm, table->where());
+    Results tv_results(realm, table->where());
+    tv_results.evaluate_query_if_needed();
+
+    BENCHMARK("table") {
+        return table_results.sum(col);
+    };
+    BENCHMARK("query") {
+        return query_results.sum(col);
+    };
+    BENCHMARK("tableview") {
+        return tv_results.sum(col);
+    };
+    BENCHMARK("object list") {
+        return List(realm, obj_list).sum(col);
+    };
+    BENCHMARK("object set") {
+        return object_store::Set(realm, obj_set).sum(col);
+    };
+    BENCHMARK("object dictionary") {
+        return object_store::Dictionary(realm, obj_dict).sum(col);
+    };
+    BENCHMARK("int list") {
+        return List(realm, int_list).sum();
+    };
+    BENCHMARK("int set") {
+        return object_store::Set(realm, int_set).sum();
+    };
+    BENCHMARK("int dictionary") {
+        return object_store::Dictionary(realm, int_dict).sum();
+    };
+}

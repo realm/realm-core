@@ -222,7 +222,7 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const
     return did_accumulate;
 }
 
-int Mixed::compare(const Mixed& b) const
+int Mixed::compare(const Mixed& b) const noexcept
 {
     // Observe! Changing this function breaks the file format for Set<Mixed>
 

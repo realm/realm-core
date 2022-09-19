@@ -513,8 +513,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             return;
         }
 
-        REQUIRE(cf::get<W>(*list.max()) == TestType::max());
-        REQUIRE(cf::get<W>(*results.max()) == TestType::max());
+        REQUIRE(cf::get<W>(list.max().value()) == TestType::max());
+        REQUIRE(cf::get<W>(results.max().value()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
         REQUIRE(results.max() == util::none);

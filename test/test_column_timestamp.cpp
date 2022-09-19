@@ -325,36 +325,36 @@ TEST(TimestampColumn_AggregateBug)
     t.create_objects(4, keys);
     tv = t.where().find_all();
     CHECK_EQUAL(4, tv.size());
-    ts = tv.maximum_timestamp(col, &index);
+    CHECK(tv.max(col, &index)->is_null());
     CHECK_EQUAL(null_key, index);
-    ts = tv.minimum_timestamp(col, &index);
-    CHECK_EQUAL(null_key, index);
-
-    Query q;
-
-    ts = t.where().maximum_timestamp(col, &index);
+    CHECK(tv.min(col, &index)->is_null());
     CHECK_EQUAL(null_key, index);
 
-    ts = t.where().minimum_timestamp(col, &index);
+    Query q = t.where();
+
+    CHECK(q.max(col, &index)->is_null());
+    CHECK_EQUAL(null_key, index);
+
+    CHECK(q.min(col, &index)->is_null());
     CHECK_EQUAL(null_key, index);
 
     t.get_object(keys[2]).set(col, Timestamp(1, 0));
 
-    ts = t.where().maximum_timestamp(col, &index);
+    ts = q.max(col, &index)->get_timestamp();
     CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
-    ts = t.where().minimum_timestamp(col, &index);
+    ts = q.min(col, &index)->get_timestamp();
     CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
     t.get_object(keys[3]).set(col, Timestamp(1, 1));
 
-    ts = t.where().maximum_timestamp(col, &index);
+    ts = q.max(col, &index)->get_timestamp();
     CHECK_EQUAL(keys[3], index);
     CHECK_EQUAL(ts, Timestamp(1, 1));
 
-    ts = t.where().minimum_timestamp(col, &index);
+    ts = q.min(col, &index)->get_timestamp();
     CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 }
