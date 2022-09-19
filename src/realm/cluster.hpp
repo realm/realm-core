@@ -298,7 +298,6 @@ public:
 
 private:
     friend class ClusterTree;
-    friend class TableClusterTree;
 
     static constexpr size_t s_key_ref_or_size_index = 0;
     static constexpr size_t s_first_col_index = 1;

@@ -510,6 +510,7 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullabl
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    REALM_ASSERT(key_type != type_Mixed);
     attr.set(col_attr_Dictionary);
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
@@ -708,7 +709,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -1940,6 +1941,8 @@ void Table::migrate_sets_and_dictionaries()
                     set.migrate();
                 }
                 else if (col.is_dictionary()) {
+                    auto dict = obj.get_dictionary(col);
+                    dict.migrate();
                 }
             }
         }
@@ -2066,7 +2069,7 @@ void Table::ensure_graveyard()
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
         MemRef mem = Cluster::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
-        m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
@@ -2927,7 +2930,7 @@ void Table::refresh_accessor_tree()
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }

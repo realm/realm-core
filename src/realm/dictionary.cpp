@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/dictionary.hpp>
-#include <realm/dictionary_cluster_tree.hpp>
 #include <realm/aggregate_ops.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_ref.hpp>
@@ -41,246 +40,28 @@ void validate_key_value(const Mixed& key)
         }
     }
 }
+
+template <class T>
+class SortedKeys {
+public:
+    SortedKeys(T* keys)
+        : m_list(keys)
+    {
+    }
+    CollectionIterator<T> begin() const
+    {
+        return CollectionIterator<T>(m_list, 0);
+    }
+    CollectionIterator<T> end() const
+    {
+        return CollectionIterator<T>(m_list, m_list->size());
+    }
+
+private:
+    T* m_list;
+};
 } // namespace
 
-// Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
-static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
-
-#ifdef REALM_DEBUG
-// This will leave the upper bit 0. Reserves space for alternative keys in case of collision
-uint64_t Dictionary::s_hash_mask = 0x7FFFFFFFFFFFFFFFULL;
-#endif
-
-/************************** DictionaryClusterTree ****************************/
-
-DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_type, Allocator& alloc, size_t ndx)
-    : ClusterTree(alloc)
-    , m_owner(owner)
-    , m_ndx_in_cluster(ndx)
-    , m_keys_col(ColKey(ColKey::Idx{0}, ColumnType(key_type), ColumnAttrMask(), 0))
-{
-}
-
-DictionaryClusterTree::~DictionaryClusterTree() {}
-
-bool DictionaryClusterTree::init_from_parent()
-{
-    if (ClusterTree::init_from_parent()) {
-        m_has_collision_column = (nb_columns() == 3);
-        return true;
-    }
-    return false;
-}
-
-Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
-{
-    Mixed key;
-    switch (m_keys_col.get_type()) {
-        case col_type_String: {
-            ArrayString keys(m_alloc);
-            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(s.index));
-            break;
-        }
-        case col_type_Int: {
-            ArrayInteger keys(m_alloc);
-            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(s.index));
-            break;
-        }
-        default:
-            throw std::runtime_error("Dictionary keys can only be strings or integers");
-            break;
-    }
-    return key;
-}
-
-// Called when a given state represent an entry with no matching key
-// Check its potential siblings for a match. 'state' is only updated if match is found.
-ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const noexcept
-{
-    // Find alternatives
-    Array fallback(m_alloc);
-    Array& fields = get_fields_accessor(fallback, state.mem);
-    ArrayRef refs(m_alloc);
-    refs.set_parent(&fields, 3);
-    refs.init_from_parent();
-
-    if (auto ref = refs.get(state.index)) {
-        Array links(m_alloc);
-        links.set_parent(&refs, state.index);
-        links.init_from_ref(ref);
-
-        auto sz = links.size();
-        for (size_t i = 0; i < sz; i++) {
-            ObjKey sibling(links.get(i));
-            auto state2 = ClusterTree::try_get(sibling);
-            if (state2 && get_key(state2).compare_signed(key) == 0) {
-                state = state2;
-                return sibling;
-            }
-        }
-    }
-
-    return {};
-}
-
-ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) const noexcept
-{
-    auto state = ClusterTree::try_get(k);
-    if (state) {
-        // Some entry found - Check if key matches.
-        if (get_key(state).compare_signed(key) != 0) {
-            // Key does not match - try looking for a sibling
-            if (!(m_has_collision_column && find_sibling(state, key))) {
-                // Not found
-                state.index = realm::npos;
-            }
-        }
-    }
-
-    return state;
-}
-
-size_t DictionaryClusterTree::get_ndx_with_key(ObjKey k, Mixed key) const noexcept
-{
-    size_t pos = ClusterTree::get_ndx(k);
-    if (pos == realm::npos) {
-        return pos;
-    }
-    auto state = get(pos, k);
-    if (get_key(state).compare_signed(key) == 0) {
-        return pos;
-    }
-    if (m_has_collision_column) {
-        // Find alternatives
-        Array fallback(m_alloc);
-        Array& fields = get_fields_accessor(fallback, state.mem);
-        ArrayRef refs(m_alloc);
-        refs.set_parent(&fields, 3);
-        refs.init_from_parent();
-
-        if (auto ref = refs.get(state.index)) {
-            Array links(m_alloc);
-            links.init_from_ref(ref);
-
-            auto sz = links.size();
-            for (size_t i = 0; i < sz; i++) {
-                ObjKey sibling(links.get(i));
-                state = ClusterTree::get(sibling);
-                if (get_key(state).compare_signed(key) == 0) {
-                    return ClusterTree::get_ndx(sibling);
-                }
-            }
-        }
-    }
-    return realm::npos;
-}
-
-
-template <typename AggregateType>
-void DictionaryClusterTree::do_accumulate(size_t* return_ndx, AggregateType& agg) const
-{
-    ArrayMixed leaf(m_alloc);
-    size_t start_ndx = 0;
-    size_t ndx = realm::npos;
-
-    traverse([&](const Cluster* cluster) {
-        size_t e = cluster->node_size();
-        cluster->init_leaf(s_values_col, &leaf);
-        for (size_t i = 0; i < e; i++) {
-            auto val = leaf.get(i);
-            if (agg.accumulate(val)) {
-                ndx = i + start_ndx;
-            }
-        }
-        start_ndx += e;
-        return IteratorControl::AdvanceToNext;
-    });
-
-    if (return_ndx)
-        *return_ndx = ndx;
-}
-
-Mixed DictionaryClusterTree::min(size_t* return_ndx) const
-{
-    aggregate_operations::Minimum<Mixed> agg;
-    do_accumulate(return_ndx, agg);
-    return agg.is_null() ? Mixed{} : agg.result();
-}
-
-Mixed DictionaryClusterTree::max(size_t* return_ndx) const
-{
-    aggregate_operations::Maximum<Mixed> agg;
-    do_accumulate(return_ndx, agg);
-    return agg.is_null() ? Mixed{} : agg.result();
-}
-
-Mixed DictionaryClusterTree::sum(size_t* return_cnt, DataType type) const
-{
-    if (type == type_Int) {
-        aggregate_operations::Sum<Int> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.result();
-    }
-    else if (type == type_Double) {
-        aggregate_operations::Sum<Double> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.result();
-    }
-    else if (type == type_Float) {
-        aggregate_operations::Sum<Float> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.result();
-    }
-    else {
-        aggregate_operations::Sum<Mixed> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.result();
-    }
-}
-
-Mixed DictionaryClusterTree::avg(size_t* return_cnt, DataType type) const
-{
-    if (type == type_Int) {
-        aggregate_operations::Average<Int> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.is_null() ? Mixed{} : agg.result();
-    }
-    else if (type == type_Double) {
-        aggregate_operations::Average<Double> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.is_null() ? Mixed{} : agg.result();
-    }
-    else if (type == type_Float) {
-        aggregate_operations::Average<Float> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.is_null() ? Mixed{} : agg.result();
-    }
-    else { // Decimal128 is covered with mixed as well.
-        aggregate_operations::Average<Mixed> agg;
-        do_accumulate(nullptr, agg);
-        if (return_cnt)
-            *return_cnt = agg.items_counted();
-        return agg.is_null() ? Mixed{} : agg.result();
-    }
-}
 
 /******************************** Dictionary *********************************/
 
@@ -293,6 +74,21 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     }
 }
 
+Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)
+    : Base(Obj{}, col_key)
+    , m_key_type(type_String)
+{
+    REALM_ASSERT(ref);
+    m_dictionary_top.reset(new Array(alloc));
+    m_dictionary_top->init_from_ref(ref);
+    m_keys.reset(new BPlusTree<StringData>(alloc));
+    m_values.reset(new BPlusTree<Mixed>(alloc));
+    m_keys->set_parent(m_dictionary_top.get(), 0);
+    m_values->set_parent(m_dictionary_top.get(), 1);
+    m_keys->init_from_parent();
+    m_values->init_from_parent();
+}
+
 Dictionary::~Dictionary() = default;
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
@@ -301,7 +97,7 @@ Dictionary& Dictionary::operator=(const Dictionary& other)
 
     if (this != &other) {
         // Back to scratch
-        m_clusters.reset();
+        m_dictionary_top.reset();
         reset_content_version();
     }
 
@@ -313,7 +109,7 @@ size_t Dictionary::size() const
     if (!update())
         return 0;
 
-    return m_clusters->size();
+    return m_values->size();
 }
 
 DataType Dictionary::get_key_data_type() const
@@ -337,8 +133,7 @@ Mixed Dictionary::get_any(size_t ndx) const
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
-    ObjKey k;
-    return do_get(m_clusters->get(ndx, k));
+    return m_values->get(ndx);
 }
 
 std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
@@ -347,8 +142,7 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
-    ObjKey k;
-    return do_get_pair(m_clusters->get(ndx, k));
+    return do_get_pair(ndx);
 }
 
 Mixed Dictionary::get_key(size_t ndx) const
@@ -357,46 +151,127 @@ Mixed Dictionary::get_key(size_t ndx) const
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
-    ObjKey k;
-    return do_get_key(m_clusters->get(ndx, k));
+    return do_get_key(ndx);
 }
 
 size_t Dictionary::find_any(Mixed value) const
 {
-    size_t ret = realm::not_found;
-    if (size()) {
-        ArrayMixed leaf(m_obj.get_alloc());
-        size_t start_ndx = 0;
-
-        m_clusters->traverse([&](const Cluster* cluster) {
-            size_t e = cluster->node_size();
-            cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-            for (size_t i = 0; i < e; i++) {
-                if (leaf.get(i) == value) {
-                    ret = start_ndx + i;
-                    return IteratorControl::Stop;
-                }
-            }
-            start_ndx += e;
-            return IteratorControl::AdvanceToNext;
-        });
-    }
-
-    return ret;
+    return size() ? m_values->find_first(value) : realm::not_found;
 }
 
 size_t Dictionary::find_any_key(Mixed key) const noexcept
 {
-    if (size() == 0) {
-        return realm::not_found;
+    if (update()) {
+        return do_find_key(key);
     }
-    return m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
+
+    return realm::npos;
+}
+
+template <typename AggregateType>
+void Dictionary::do_accumulate(size_t* return_ndx, AggregateType& agg) const
+{
+    size_t ndx = realm::npos;
+
+    m_values->traverse([&](BPlusTreeNode* node, size_t offset) {
+        auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+        size_t e = leaf->size();
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf->get(i);
+            if (agg.accumulate(val)) {
+                ndx = i + offset;
+            }
+        }
+        // Continue
+        return IteratorControl::AdvanceToNext;
+    });
+
+    if (return_ndx)
+        *return_ndx = ndx;
+}
+
+util::Optional<Mixed> Dictionary::do_min(size_t* return_ndx) const
+{
+    aggregate_operations::Minimum<Mixed> agg;
+    do_accumulate(return_ndx, agg);
+    return agg.is_null() ? Mixed{} : agg.result();
+}
+
+util::Optional<Mixed> Dictionary::do_max(size_t* return_ndx) const
+{
+    aggregate_operations::Maximum<Mixed> agg;
+    do_accumulate(return_ndx, agg);
+    return agg.is_null() ? Mixed{} : agg.result();
+}
+
+util::Optional<Mixed> Dictionary::do_sum(size_t* return_cnt) const
+{
+    auto type = get_value_data_type();
+    if (type == type_Int) {
+        aggregate_operations::Sum<Int> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return Mixed{agg.result()};
+    }
+    else if (type == type_Double) {
+        aggregate_operations::Sum<Double> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return Mixed{agg.result()};
+    }
+    else if (type == type_Float) {
+        aggregate_operations::Sum<Float> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return Mixed{agg.result()};
+    }
+
+    aggregate_operations::Sum<Mixed> agg;
+    do_accumulate(nullptr, agg);
+    if (return_cnt)
+        *return_cnt = agg.items_counted();
+    return Mixed{agg.result()};
+}
+
+util::Optional<Mixed> Dictionary::do_avg(size_t* return_cnt) const
+{
+    auto type = get_value_data_type();
+    if (type == type_Int) {
+        aggregate_operations::Average<Int> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    else if (type == type_Double) {
+        aggregate_operations::Average<Double> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    else if (type == type_Float) {
+        aggregate_operations::Average<Float> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    // Decimal128 is covered with mixed as well.
+    aggregate_operations::Average<Mixed> agg;
+    do_accumulate(nullptr, agg);
+    if (return_cnt)
+        *return_cnt = agg.items_counted();
+    return agg.is_null() ? Mixed{} : agg.result();
 }
 
 util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
 {
     if (update()) {
-        return m_clusters->min(return_ndx);
+        return do_min(return_ndx);
     }
     if (return_ndx)
         *return_ndx = realm::npos;
@@ -406,7 +281,7 @@ util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
 util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
 {
     if (update()) {
-        return m_clusters->max(return_ndx);
+        return do_max(return_ndx);
     }
     if (return_ndx)
         *return_ndx = realm::npos;
@@ -416,7 +291,7 @@ util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
 util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 {
     if (update()) {
-        return m_clusters->sum(return_cnt, get_value_data_type());
+        return do_sum(return_cnt);
     }
     if (return_cnt)
         *return_cnt = 0;
@@ -426,7 +301,7 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
 {
     if (update()) {
-        return m_clusters->avg(return_cnt, get_value_data_type());
+        return do_avg(return_cnt);
     }
     if (return_cnt)
         *return_cnt = 0;
@@ -516,9 +391,11 @@ Mixed Dictionary::get(Mixed key) const
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 {
-    if (size()) {
-        if (auto state = m_clusters->try_get_with_key(get_internal_obj_key(key), key))
-            return do_get(state);
+    if (update()) {
+        auto ndx = do_find_key(key);
+        if (ndx != realm::npos) {
+            return do_get(ndx);
+        }
     }
     return {};
 }
@@ -538,7 +415,7 @@ Dictionary::Iterator Dictionary::end() const
 
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
-    if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
+    if (key.get_type() != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
     if (value.is_null()) {
@@ -576,74 +453,32 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         value = Mixed(new_link);
     }
 
-    if (!m_clusters) {
+    if (!m_dictionary_top) {
         throw LogicError(LogicError::detached_accessor);
     }
 
-    ObjKey k = get_internal_obj_key(key);
-
     bool old_entry = false;
-    ClusterNode::State state = m_clusters->try_get(k);
-    if (!state) {
+    auto [ndx, actual_key] = find_impl(key);
+    if (actual_key != key) {
         // key does not already exist
-        state = m_clusters->insert(k, key, value);
+        switch (m_key_type) {
+            case type_String:
+                static_cast<BPlusTree<StringData>*>(m_keys.get())->insert(ndx, key.get_string());
+                break;
+            case type_Int:
+                static_cast<BPlusTree<Int>*>(m_keys.get())->insert(ndx, key.get_int());
+                break;
+            default:
+                throw std::runtime_error("Not implemented");
+                break;
+        }
+        m_values->insert(ndx, value);
     }
     else {
-        // Check if key matches
-        if (do_get_key(state).compare_signed(key) == 0) {
-            old_entry = true;
-        }
-        else {
-            // We have a collision
-            if (!m_clusters->has_collisions()) {
-                m_clusters->create_collision_column();
-                // cluster tree has changed - find entry again
-                state = m_clusters->try_get(k);
-            }
-
-            if (auto sibling = m_clusters->find_sibling(state, key)) {
-                old_entry = true;
-                k = sibling;
-            }
-            else {
-                // Create a key with upper bit set and link it
-                auto hash = size_t(k.value);
-                auto start = hash;
-                ObjKey k2(-2 - hash);
-                while (m_clusters->is_valid(k2)) {
-                    hash = (hash + 1) & s_hash_mask;
-                    REALM_ASSERT(hash != start);
-                    k2 = ObjKey(-2 - hash);
-                }
-
-                Array fallback(m_obj.get_alloc());
-                Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
-                ArrayRef refs(m_obj.get_alloc());
-                refs.set_parent(&fields, 3);
-                refs.init_from_parent();
-
-                auto old_ref = refs.get(state.index);
-                if (!old_ref) {
-                    MemRef mem = Array::create_empty_array(NodeHeader::type_Normal, false, m_obj.get_alloc());
-                    refs.set(state.index, mem.get_ref());
-                }
-                Array links(m_obj.get_alloc());
-                links.set_parent(&refs, state.index);
-                links.init_from_parent();
-                links.add(k2.value);
-
-                if (fields.has_missing_parent_update()) {
-                    m_clusters->update_ref_in_parent(k, fields.get_ref());
-                }
-
-                state = m_clusters->insert(k2, key, value);
-                k = k2;
-            }
-        }
+        old_entry = true;
     }
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        auto ndx = m_clusters->get_ndx(k);
         if (old_entry) {
             repl->dictionary_set(*this, ndx, key, value);
         }
@@ -656,20 +491,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 
     ObjLink old_link;
     if (old_entry) {
-        Array fallback(m_obj.get_alloc());
-        Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
-        ArrayMixed values(m_obj.get_alloc());
-        values.set_parent(&fields, 2);
-        values.init_from_parent();
-
-        Mixed old_value = values.get(state.index);
+        Mixed old_value = m_values->get(ndx);
         if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
         }
-        values.set(state.index, value);
-        if (fields.has_missing_parent_update()) {
-            m_clusters->update_ref_in_parent(k, fields.get_ref());
-        }
+        m_values->set(ndx, value);
     }
 
     if (new_link != old_link) {
@@ -679,7 +505,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 
-    return {Iterator(this, state.index), !old_entry};
+    return {Iterator(this, ndx), !old_entry};
 }
 
 const Mixed Dictionary::operator[](Mixed key)
@@ -705,10 +531,7 @@ Obj Dictionary::get_object(StringData key)
 
 bool Dictionary::contains(Mixed key) const noexcept
 {
-    if (size() == 0) {
-        return false;
-    }
-    return m_clusters->try_get_with_key(get_internal_obj_key(key), key);
+    return find_any_key(key) != realm::npos;
 }
 
 Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
@@ -720,99 +543,16 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
     return end();
 }
 
-ObjKey Dictionary::handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state)
-{
-    Array fallback(m_obj.get_alloc());
-    Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
-    ArrayRef refs(m_obj.get_alloc());
-    refs.set_parent(&fields, 3);
-    refs.init_from_parent();
-
-    if (!refs.get(state.index)) {
-        // No collisions on this hash
-        REALM_ASSERT(do_get_key(state).compare_signed(key) == 0);
-        return k;
-    }
-
-    ObjKey k2;
-    Array links(m_obj.get_alloc());
-    links.set_parent(&refs, state.index);
-    links.init_from_parent();
-
-    auto sz = links.size();
-    REALM_ASSERT(sz > 0);
-    if (do_get_key(state).compare_signed(key) == 0) {
-        // We are erasing main entry, swap last sibling over
-        k2 = ObjKey(links.get(sz - 1));
-        if (sz == 1) {
-            refs.set(links.get_ndx_in_parent(), 0);
-            links.destroy();
-        }
-        else {
-            links.erase(sz - 1);
-        }
-        if (fields.has_missing_parent_update()) {
-            auto new_ref = fields.get_ref();
-            m_clusters->update_ref_in_parent(k, new_ref);
-        }
-
-        auto index1 = state.index;
-        state = m_clusters->get(k2);
-        Array fallback2(m_obj.get_alloc());
-        Array& fields2 = m_clusters->get_fields_accessor(fallback2, state.mem);
-
-        swap_content(fields, fields2, index1, state.index);
-
-        if (fields2.has_missing_parent_update()) {
-            auto new_ref = fields2.get_ref();
-            m_clusters->update_ref_in_parent(k2, new_ref);
-            // The content of the sibling has now been updated with the
-            // content of the master entry, so 'state' must point to this
-            // new writable cluster
-            state.mem = MemRef(new_ref, m_obj.get_alloc());
-        }
-    }
-    else {
-        // We are erasing a sibling
-        // Find the right one and erase from list in main entry
-        size_t i = 0;
-        for (;;) {
-            k2 = ObjKey(links.get(i));
-            state = m_clusters->get(k2);
-            if (do_get_key(state).compare_signed(key) == 0) {
-                // Erase this entry in the link array
-                if (links.size() == 1) {
-                    refs.set(links.get_ndx_in_parent(), 0);
-                    links.destroy();
-                }
-                else {
-                    links.erase(i);
-                }
-                break;
-            }
-            i++;
-            REALM_ASSERT_RELEASE(i < sz);
-        }
-        if (fields.has_missing_parent_update()) {
-            auto new_ref = fields.get_ref();
-            // This may COW the cluster 'state' points to, but it is still
-            // ok to use it for reading, so no need to update
-            m_clusters->update_ref_in_parent(k, new_ref);
-        }
-    }
-    return k2; // This will ensure that sibling is erased
-}
-
 UpdateStatus Dictionary::update_if_needed() const
 {
     auto status = Base::update_if_needed();
     switch (status) {
         case UpdateStatus::Detached: {
-            m_clusters.reset();
+            m_dictionary_top.reset();
             return UpdateStatus::Detached;
         }
         case UpdateStatus::NoChange: {
-            if (m_clusters && m_clusters->is_attached()) {
+            if (m_dictionary_top && m_dictionary_top->is_attached()) {
                 return UpdateStatus::NoChange;
             }
             // The tree has not been initialized yet for this accessor, so
@@ -834,7 +574,7 @@ UpdateStatus Dictionary::ensure_created()
         case UpdateStatus::Detached:
             break; // Not possible (would have thrown earlier).
         case UpdateStatus::NoChange: {
-            if (m_clusters && m_clusters->is_attached()) {
+            if (m_dictionary_top && m_dictionary_top->is_attached()) {
                 return UpdateStatus::NoChange;
             }
             // The tree has not been initialized yet for this accessor, so
@@ -854,38 +594,15 @@ UpdateStatus Dictionary::ensure_created()
 bool Dictionary::try_erase(Mixed key)
 {
     validate_key_value(key);
-    ClusterNode::State state;
-    ObjKey k = get_internal_obj_key(key);
-    if (size()) {
-        state = m_clusters->try_get(k);
-    }
-    if (!state) {
+    if (!update())
+        return false;
+
+    auto ndx = do_find_key(key);
+    if (ndx == realm::npos) {
         return false;
     }
 
-    if (m_clusters->has_collisions()) {
-        // State will be updated to refer to element that is going to be erased
-        k = handle_collision_in_erase(key, k, state);
-    }
-
-    ArrayMixed values(m_obj.get_alloc());
-    ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
-    values.init_from_ref(ref);
-    auto old_value = values.get(state.index);
-
-    CascadeState cascade_state(CascadeState::Mode::Strong);
-    bool recurse = clear_backlink(old_value, cascade_state);
-    if (recurse)
-        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
-
-    if (Replication* repl = this->m_obj.get_replication()) {
-        auto ndx = m_clusters->get_ndx(k);
-        repl->dictionary_erase(*this, ndx, key);
-    }
-
-    CascadeState dummy;
-    m_clusters->erase(k, dummy);
-    bump_content_version();
+    do_erase(ndx, key);
 
     return true;
 }
@@ -898,34 +615,30 @@ void Dictionary::erase(Mixed key)
     }
 }
 
-void Dictionary::erase(Iterator it)
+auto Dictionary::erase(Iterator it) -> Iterator
 {
-    erase((*it).first);
+    auto pos = it.m_ndx;
+    if (pos >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+
+    do_erase(pos, do_get_key(pos));
+    if (pos < size())
+        pos++;
+    return {this, pos};
 }
 
 void Dictionary::nullify(Mixed key)
 {
-    REALM_ASSERT(m_clusters);
-    ObjKey k = get_internal_obj_key(key);
-    auto state = m_clusters->try_get_with_key(k, key);
-    REALM_ASSERT(state.index != realm::npos);
+    REALM_ASSERT(m_dictionary_top);
+    auto ndx = do_find_key(key);
+    REALM_ASSERT(ndx != realm::npos);
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        auto ndx = m_clusters->get_ndx(k);
         repl->dictionary_set(*this, ndx, key, Mixed());
     }
 
-    Array fallback(m_obj.get_alloc());
-    Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
-    ArrayMixed values(m_obj.get_alloc());
-    values.set_parent(&fields, 2);
-    values.init_from_parent();
-
-    values.set(state.index, Mixed());
-
-    if (fields.has_missing_parent_update()) {
-        m_clusters->update_ref_in_parent(k, fields.get_ref());
-    }
+    m_values->set(ndx, Mixed());
 }
 
 void Dictionary::remove_backlinks(CascadeState& state) const
@@ -952,8 +665,8 @@ void Dictionary::clear()
         }
 
         // Just destroy the whole cluster
-        m_clusters->destroy();
-        m_clusters.reset();
+        m_dictionary_top->destroy_deep();
+        m_dictionary_top.reset();
 
         update_child_ref(0, 0);
 
@@ -964,36 +677,99 @@ void Dictionary::clear()
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    if (!m_clusters) {
-        m_clusters.reset(new DictionaryClusterTree(const_cast<Dictionary*>(this), m_key_type, m_obj.get_alloc(),
-                                                   m_obj.get_row_ndx()));
+    auto ref = m_obj._get<int64_t>(m_col_key.get_index());
+
+    if ((ref || allow_create) && !m_dictionary_top) {
+        m_dictionary_top.reset(new Array(m_obj.get_alloc()));
+        m_dictionary_top->set_parent(const_cast<Dictionary*>(this), m_obj.get_row_ndx());
+        switch (m_key_type) {
+            case type_String: {
+                m_keys.reset(new BPlusTree<StringData>(m_obj.get_alloc()));
+                break;
+            }
+            case type_Int: {
+                m_keys.reset(new BPlusTree<Int>(m_obj.get_alloc()));
+                break;
+            }
+            default:
+                throw std::runtime_error("Not implemented");
+                break;
+        }
+        m_keys->set_parent(m_dictionary_top.get(), 0);
+        m_values.reset(new BPlusTree<Mixed>(m_obj.get_alloc()));
+        m_values->set_parent(m_dictionary_top.get(), 1);
     }
 
-    if (m_clusters->init_from_parent()) {
-        // All is well
-        return true;
+    if (ref) {
+        m_dictionary_top->init_from_parent();
+        m_keys->init_from_parent();
+        m_values->init_from_parent();
     }
+    else {
+        // dictionary detached
+        if (!allow_create) {
+            m_dictionary_top.reset();
+            return false;
+        }
 
-
-    if (!allow_create) {
-        return false;
+        // Create dictionary
+        m_dictionary_top->create(Array::type_HasRefs, false, 2, 0);
+        m_values->create();
+        m_keys->create();
+        m_dictionary_top->update_parent();
     }
-
-    MemRef mem = Cluster::create_empty_cluster(m_obj.get_alloc());
-    const_cast<Dictionary*>(this)->update_child_ref(0, mem.get_ref());
-    bool attached = m_clusters->init_from_parent();
-    REALM_ASSERT(attached);
-    m_clusters->add_columns();
 
     return true;
 }
 
-Mixed Dictionary::do_get(const ClusterNode::State& s) const
+size_t Dictionary::do_find_key(Mixed key) const noexcept
 {
-    ArrayMixed values(m_obj.get_alloc());
-    ref_type ref = to_ref(Array::get(s.mem.get_addr(), 2));
-    values.init_from_ref(ref);
-    Mixed val = values.get(s.index);
+    auto [ndx, actual_key] = find_impl(key);
+    if (actual_key == key) {
+        return ndx;
+    }
+    return realm::npos;
+}
+
+std::pair<size_t, Mixed> Dictionary::find_impl(Mixed key) const noexcept
+{
+    auto sz = m_keys->size();
+    Mixed actual;
+    if (sz && key.is_type(m_key_type)) {
+        switch (m_key_type) {
+            case type_String: {
+                auto keys = static_cast<BPlusTree<StringData>*>(m_keys.get());
+                StringData val = key.get<StringData>();
+                SortedKeys help(keys);
+                auto it = std::lower_bound(help.begin(), help.end(), val);
+                if (it.index() < sz) {
+                    actual = *it;
+                }
+                return {it.index(), actual};
+                break;
+            }
+            case type_Int: {
+                auto keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+                Int val = key.get<Int>();
+                SortedKeys help(keys);
+                auto it = std::lower_bound(help.begin(), help.end(), val);
+                if (it.index() < sz) {
+                    actual = *it;
+                }
+                return {it.index(), actual};
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    return {sz, actual};
+}
+
+Mixed Dictionary::do_get(size_t ndx) const
+{
+    Mixed val = m_values->get(ndx);
 
     // Filter out potential unresolved links
     if (val.is_type(type_TypedLink)) {
@@ -1006,14 +782,45 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
     return val;
 }
 
-Mixed Dictionary::do_get_key(const ClusterNode::State& s) const
+void Dictionary::do_erase(size_t ndx, Mixed key)
 {
-    return m_clusters->get_key(s);
+    auto old_value = m_values->get(ndx);
+
+    CascadeState cascade_state(CascadeState::Mode::Strong);
+    bool recurse = clear_backlink(old_value, cascade_state);
+    if (recurse)
+        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_erase(*this, ndx, key);
+    }
+
+    m_keys->erase(ndx);
+    m_values->erase(ndx);
+
+    bump_content_version();
 }
 
-std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+Mixed Dictionary::do_get_key(size_t ndx) const
 {
-    return {do_get_key(s), do_get(s)};
+    switch (m_key_type) {
+        case type_String: {
+            return static_cast<BPlusTree<StringData>*>(m_keys.get())->get(ndx);
+        }
+        case type_Int: {
+            return static_cast<BPlusTree<Int>*>(m_keys.get())->get(ndx);
+        }
+        default:
+            throw std::runtime_error("Not implemented");
+            break;
+    }
+
+    return {};
+}
+
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(size_t ndx) const
+{
+    return {do_get_key(ndx), do_get(ndx)};
 }
 
 bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
@@ -1062,44 +869,75 @@ void Dictionary::swap_content(Array& fields1, Array& fields2, size_t index1, siz
     values.set(index1, val2);
 }
 
-/************************* Dictionary::Iterator *************************/
-
-Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
-    : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
-    , m_key_type(dict->get_key_data_type())
+Mixed Dictionary::find_value(Mixed value) const noexcept
 {
+    size_t ndx = update() ? m_values->find_first(value) : realm::npos;
+    return (ndx == realm::npos) ? Mixed{} : do_get_key(ndx);
 }
 
-auto Dictionary::Iterator::operator*() const -> value_type
+void Dictionary::verify() const
 {
-    update();
-    Mixed key;
-    switch (m_key_type) {
-        case type_String: {
-            ArrayString keys(m_tree.get_alloc());
-            ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+    m_keys->verify();
+    m_values->verify();
+    REALM_ASSERT(m_keys->size() == m_values->size());
+}
+
+void Dictionary::migrate()
+{
+    // Dummy implementation of legacy dictionary cluster tree
+    class DictionaryClusterTree : public ClusterTree {
+    public:
+        DictionaryClusterTree(ArrayParent* owner, Allocator& alloc, size_t ndx)
+            : ClusterTree(nullptr, alloc, ndx)
+            , m_owner(owner)
+        {
         }
-        case type_Int: {
-            ArrayInteger keys(m_tree.get_alloc());
-            ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+
+        std::unique_ptr<ClusterNode> get_root_from_parent() final
+        {
+            return create_root_from_parent(m_owner, m_top_position_for_cluster_tree);
         }
-        default:
-            throw std::runtime_error("Not implemented");
-            break;
+
+    private:
+        ArrayParent* m_owner;
+    };
+
+    if (auto dict_ref = m_obj._get<int64_t>(get_col_key().get_index())) {
+        DictionaryClusterTree cluster_tree(this, m_obj.get_alloc(), m_obj.get_row_ndx());
+        if (cluster_tree.init_from_parent()) {
+            // Create an empty dictionary in the old ones place
+            m_obj.set_int(get_col_key(), 0);
+            ensure_created();
+
+            ArrayString keys(m_obj.get_alloc()); // We only support string type keys.
+            ArrayMixed values(m_obj.get_alloc());
+            constexpr ColKey key_col(ColKey::Idx{0}, col_type_String, ColumnAttrMask(), 0);
+            constexpr ColKey value_col(ColKey::Idx{1}, col_type_Mixed, ColumnAttrMask(), 0);
+            size_t nb_elements = cluster_tree.size();
+            cluster_tree.traverse([&](const Cluster* cluster) {
+                cluster->init_leaf(key_col, &keys);
+                cluster->init_leaf(value_col, &values);
+                auto sz = cluster->node_size();
+                for (size_t i = 0; i < sz; i++) {
+                    // Just use low level functions to insert elements. All keys must be legal and
+                    // unique and all values must match expected type. Links should just be preserved
+                    // so no need to worry about backlinks.
+                    StringData key = keys.get(i);
+                    auto [ndx, actual_key] = find_impl(key);
+                    REALM_ASSERT(actual_key != key);
+                    static_cast<BPlusTree<StringData>*>(m_keys.get())->insert(ndx, key);
+                    m_values->insert(ndx, values.get(i));
+                }
+                return IteratorControl::AdvanceToNext;
+            });
+            REALM_ASSERT(size() == nb_elements);
+            Array::destroy_deep(to_ref(dict_ref), m_obj.get_alloc());
+        }
+        else {
+            REALM_UNREACHABLE();
+        }
     }
-    ArrayMixed values(m_tree.get_alloc());
-    ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
-    values.init_from_ref(ref);
-
-    return std::make_pair(key, values.get(m_state.m_current_index));
 }
-
 
 /************************* DictionaryLinkValues *************************/
 
