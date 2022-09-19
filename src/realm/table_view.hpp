@@ -152,7 +152,6 @@ public:
     /// Construct null view (no memory allocated).
     TableView() {}
 
-
     /// Construct empty view, ready for addition of row indices.
     explicit TableView(ConstTableRef parent);
     TableView(const Query& query, size_t limit);
@@ -201,20 +200,12 @@ public:
         return m_key_values.get(ndx);
     }
 
-    bool is_obj_valid(size_t ndx) const noexcept final
+    bool is_obj_valid(size_t ndx) const noexcept
     {
         return m_table->is_valid(get_key(ndx));
     }
 
-    Obj get_object(size_t ndx) const final
-    {
-        REALM_ASSERT(ndx < size());
-        ObjKey key(m_key_values.get(ndx));
-        REALM_ASSERT(key);
-        return m_table->get_object(key);
-    }
-
-    Obj try_get_object(size_t ndx) const noexcept override
+    Obj get_object(size_t ndx) const noexcept final
     {
         REALM_ASSERT(ndx < size());
         ObjKey key(m_key_values.get(ndx));
@@ -224,7 +215,7 @@ public:
     // Get the query used to create this TableView
     // The query will have a null source table if this tv was not created from
     // a query
-    const Query& get_query() const noexcept
+    const std::optional<Query>& get_query() const noexcept
     {
         return m_query;
     }
@@ -254,44 +245,33 @@ public:
         std::unique_ptr<TableView> retval(new TableView(*this, tr, mode));
         return retval;
     }
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
+    template <Action action, typename T>
+    Mixed aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
     template <typename T>
     size_t aggregate_count(ColKey column_key, T count_target) const;
 
-    int64_t sum_int(ColKey column_key) const;
-    int64_t maximum_int(ColKey column_key, ObjKey* return_key = nullptr) const;
-    int64_t minimum_int(ColKey column_key, ObjKey* return_key = nullptr) const;
-    double average_int(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_int(ColKey column_key, int64_t target) const;
-
-    double sum_float(ColKey column_key) const;
-    float maximum_float(ColKey column_key, ObjKey* return_key = nullptr) const;
-    float minimum_float(ColKey column_key, ObjKey* return_key = nullptr) const;
-    double average_float(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_float(ColKey column_key, float target) const;
-
-    double sum_double(ColKey column_key) const;
-    double maximum_double(ColKey column_key, ObjKey* return_key = nullptr) const;
-    double minimum_double(ColKey column_key, ObjKey* return_key = nullptr) const;
-    double average_double(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_double(ColKey column_key, double target) const;
-
-    Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_key = nullptr) const;
-    Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_key = nullptr) const;
     size_t count_timestamp(ColKey column_key, Timestamp target) const;
-
-    Decimal128 sum_decimal(ColKey column_key) const;
-    Decimal128 maximum_decimal(ColKey column_key, ObjKey* return_key = nullptr) const;
-    Decimal128 minimum_decimal(ColKey column_key, ObjKey* return_key = nullptr) const;
-    Decimal128 average_decimal(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_decimal(ColKey column_key, Decimal128 target) const;
-
-    Decimal128 sum_mixed(ColKey column_key) const;
-    Mixed maximum_mixed(ColKey column_key, ObjKey* return_key = nullptr) const;
-    Mixed minimum_mixed(ColKey column_key, ObjKey* return_key = nullptr) const;
-    Decimal128 average_mixed(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_mixed(ColKey column_key, Mixed target) const;
+
+    /// Get the min element, according to whatever comparison function is
+    /// meaningful for the collection, or none if min is not supported for this type.
+    util::Optional<Mixed> min(ColKey column_key, ObjKey* return_key = nullptr) const;
+
+    /// Get the max element, according to whatever comparison function is
+    /// meaningful for the collection, or none if max is not supported for this type.
+    util::Optional<Mixed> max(ColKey column_key, ObjKey* return_key = nullptr) const;
+
+    /// For collections of arithmetic types, return the sum of all elements.
+    /// For non arithmetic types, returns none.
+    util::Optional<Mixed> sum(ColKey column_key) const;
+
+    /// For collections of arithmetic types, return the average of all elements.
+    /// For non arithmetic types, returns none.
+    util::Optional<Mixed> avg(ColKey column_key, size_t* value_count = nullptr) const;
 
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
@@ -411,9 +391,7 @@ protected:
     size_t m_limit_count = 0;
 
     // A valid query holds a reference to its table which must match our m_table.
-    // hence we can use a query with a null table reference to indicate that the view
-    // was NOT generated by a query, but follows a table directly.
-    Query m_query;
+    std::optional<Query> m_query;
     // parameters for findall, needed to rerun the query
     size_t m_limit = size_t(-1);
 
@@ -440,8 +418,9 @@ protected:
 
 private:
     ObjKey find_first_integer(ColKey column_key, int64_t value) const;
-    template <class oper>
-    Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
+    template <Action action>
+    std::optional<Mixed> aggregate(ColKey column_key, size_t* count, ObjKey* return_key) const;
+
     util::RaceDetector m_race_detector;
 
     friend class Table;
@@ -471,6 +450,7 @@ inline TableView::TableView(const Query& query, size_t lim)
     , m_limit(lim)
 {
     m_key_values.create();
+    REALM_ASSERT(query.m_table);
 }
 
 inline TableView::TableView(ConstTableRef src_table, ColKey src_column_key, const Obj& obj)

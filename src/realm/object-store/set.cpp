@@ -84,55 +84,6 @@ std::pair<size_t, bool> Set::remove(const T& value)
     return as<T>().erase(value);
 }
 
-util::Optional<Mixed> Set::max(ColKey col) const
-{
-    if (get_type() == PropertyType::Object)
-        return as_results().max(col);
-    size_t out_ndx = not_found;
-    auto result = set_base().max(&out_ndx);
-    if (!result) {
-        not_supported("max");
-    }
-    return out_ndx == not_found ? none : result;
-}
-
-util::Optional<Mixed> Set::min(ColKey col) const
-{
-    if (get_type() == PropertyType::Object)
-        return as_results().min(col);
-
-    size_t out_ndx = not_found;
-    auto result = set_base().min(&out_ndx);
-    if (!result) {
-        not_supported("min");
-    }
-    return out_ndx == not_found ? none : result;
-}
-
-Mixed Set::sum(ColKey col) const
-{
-    if (get_type() == PropertyType::Object)
-        return *as_results().sum(col);
-
-    auto result = set_base().sum();
-    if (!result) {
-        not_supported("sum");
-    }
-    return *result;
-}
-
-util::Optional<Mixed> Set::average(ColKey col) const
-{
-    if (get_type() == PropertyType::Object)
-        return as_results().average(col);
-    size_t count = 0;
-    auto result = set_base().avg(&count);
-    if (!result) {
-        not_supported("average");
-    }
-    return count == 0 ? none : result;
-}
-
 bool Set::operator==(const Set& rgt) const noexcept
 {
     return set_base().get_table() == rgt.set_base().get_table() &&

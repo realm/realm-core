@@ -16,33 +16,34 @@
  *
  **************************************************************************/
 
+#include <realm/table.hpp>
+
+#include <realm/alloc_slab.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_fixed_bytes.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
+#include <realm/db.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/exceptions.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions_tpl.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/features.h>
+#include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
+
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
 #include <iostream>
 #include <iomanip>
 #endif
-
-#include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
-#include <realm/util/serializer.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/exceptions.hpp>
-#include <realm/table.hpp>
-#include <realm/alloc_slab.hpp>
-#include <realm/index_string.hpp>
-#include <realm/db.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query_engine.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_timestamp.hpp>
-#include <realm/array_decimal128.hpp>
-#include <realm/array_fixed_bytes.hpp>
-#include <realm/table_tpl.hpp>
-#include <realm/dictionary.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -2149,243 +2150,58 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     return where().equal(col_key, value).count();
 }
 
-// sum ----------------------------------------------
+template <typename T>
+void Table::aggregate(QueryStateBase& st, ColKey column_key) const
+{
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType leaf(get_alloc());
 
-
-int64_t Table::sum_int(ColKey col_key) const
-{
-    QueryStateSum<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    return st.result_sum();
-}
-double Table::sum_float(ColKey col_key) const
-{
-    QueryStateSum<float> st;
-    aggregate<float>(st, col_key);
-    return st.result_sum();
-}
-double Table::sum_double(ColKey col_key) const
-{
-    QueryStateSum<double> st;
-    aggregate<double>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_decimal(ColKey col_key) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_mixed(ColKey col_key) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    return st.result_sum();
-}
-
-// average ----------------------------------------------
-
-double Table::average_int(ColKey col_key, size_t* value_count) const
-{
-    if (is_nullable(col_key)) {
-        return average<util::Optional<int64_t>>(col_key, value_count);
-    }
-    return average<int64_t>(col_key, value_count);
-}
-double Table::average_float(ColKey col_key, size_t* value_count) const
-{
-    return average<float>(col_key, value_count);
-}
-double Table::average_double(ColKey col_key, size_t* value_count) const
-{
-    return average<double>(col_key, value_count);
-}
-Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-Decimal128 Table::average_mixed(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-// minimum ----------------------------------------------
-
-#define USE_COLUMN_AGGREGATE 1
-
-int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Mixed Table::minimum_mixed(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-
-// maximum ----------------------------------------------
-
-int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 max("-Inf");
-    ObjKey ret_key;
-    auto f = [&max, &ret_key, &leaf, col_key](const Cluster* cluster) {
+    auto f = [&leaf, column_key, &st](const Cluster* cluster) {
         // direct aggregate on the leaf
-        cluster->init_leaf(col_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto val = leaf.get(i);
-            if (!val.is_null() && val > max) {
-                max = val;
-                ret_key = cluster->get_real_key(i);
-            }
+        cluster->init_leaf(column_key, &leaf);
+        st.m_key_offset = cluster->get_offset();
+        st.m_key_values = cluster->get_key_array();
+
+        bool cont = true;
+        size_t sz = leaf.size();
+        for (size_t local_index = 0; cont && local_index < sz; local_index++) {
+            auto v = leaf.get(local_index);
+            cont = st.match(local_index, v);
         }
         return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
-    if (return_ndx) {
-        *return_ndx = ObjKey(ret_key);
-    }
-    return max;
 }
 
-Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
+// This template is also used by the query engine
+template void Table::aggregate<int64_t>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<std::optional<int64_t>>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<float>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<double>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Decimal128>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Mixed>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Timestamp>(QueryStateBase&, ColKey) const;
+
+std::optional<Mixed> Table::sum(ColKey col_key) const
 {
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::sum(*this, *this, col_key);
 }
 
-Mixed Table::maximum_mixed(ColKey col_key, ObjKey* return_ndx) const
+std::optional<Mixed> Table::avg(ColKey col_key, size_t* value_count) const
 {
-    QueryStateMax<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::avg(*this, *this, col_key, value_count);
 }
 
+std::optional<Mixed> Table::min(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::min(*this, *this, col_key, return_ndx);
+}
+
+std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
+}
 
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const

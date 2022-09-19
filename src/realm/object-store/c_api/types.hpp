@@ -53,7 +53,16 @@ public:
 };
 
 struct WrapC {
-    virtual ~WrapC() {}
+    static constexpr uint64_t s_cookie_value = 0xdeadbeefdeadbeef;
+    uint64_t cookie;
+    WrapC()
+        : cookie(s_cookie_value)
+    {
+    }
+    virtual ~WrapC()
+    {
+        cookie = 0;
+    }
 
     virtual WrapC* clone() const
     {

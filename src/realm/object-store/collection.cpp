@@ -198,6 +198,25 @@ Results Collection::snapshot() const
     return as_results().snapshot();
 }
 
+std::optional<Mixed> Collection::max(ColKey col) const
+{
+    return as_results().max(col);
+}
+
+util::Optional<Mixed> Collection::min(ColKey col) const
+{
+    return as_results().min(col);
+}
+
+Mixed Collection::sum(ColKey col) const
+{
+    return *as_results().sum(col);
+}
+
+util::Optional<Mixed> Collection::average(ColKey col) const
+{
+    return as_results().average(col);
+}
 
 NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
                                                         KeyPathArray key_path_array) &

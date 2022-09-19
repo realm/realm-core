@@ -265,6 +265,39 @@ set(REALM_INSTALL_HEADERS
     metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
 
+set(REALM_NOINST_HEADERS
+    link_translator.hpp
+    object_converter.hpp
+    query_conditions_tpl.hpp
+    util/cf_str.hpp
+    util/circular_buffer.hpp
+    util/cli_args.hpp
+    util/copy_dir_recursive.hpp
+    util/demangle.hpp
+    util/duplicating_logger.hpp
+    util/enum.hpp
+    util/ez_websocket.hpp
+    util/file_is_regular.hpp
+    util/from_chars.hpp
+    util/get_file_size.hpp
+    util/json_parser.hpp
+    util/load_file.hpp
+    util/network_ssl.hpp
+    util/parent_dir.hpp
+    util/platform_info.hpp
+    util/quote.hpp
+    util/random.hpp
+    util/resource_limits.hpp
+    util/scratch_allocator.hpp
+    util/signal_blocker.hpp
+    util/substitute.hpp
+    util/thread_exec_guard.hpp
+    util/time.hpp
+    util/timestamp_formatter.hpp
+    util/timestamp_logger.hpp
+    util/value_reset_guard.hpp
+) # REALM_NOINST_HEADERS
+
 list(APPEND REALM_SOURCES
     metrics/metrics.cpp
     metrics/metric_timer.cpp
@@ -279,6 +312,7 @@ add_library(Storage STATIC
     ${REALM_SOURCES}
     ${UTIL_SOURCES}
     ${REALM_INSTALL_HEADERS}
+    ${REALM_NOINST_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )

@@ -94,7 +94,7 @@ enum class UpdateStatus {
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
-    Obj()
+    constexpr Obj()
         : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
