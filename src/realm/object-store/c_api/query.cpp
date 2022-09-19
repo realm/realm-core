@@ -426,9 +426,6 @@ RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->min(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -453,9 +450,6 @@ RLM_API bool realm_results_max(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->max(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -480,9 +474,6 @@ RLM_API bool realm_results_sum(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (out_found) {
             *out_found = results->size() != 0;
         }
@@ -511,9 +502,6 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_property_key_
                                    bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->average(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
