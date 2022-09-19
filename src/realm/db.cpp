@@ -91,6 +91,7 @@ struct VersionList {
         uint64_t current_top;
         uint32_t count_live;
         uint32_t count_frozen;
+        uint32_t count_full;
         bool is_active()
         {
             return version != 0;
@@ -98,7 +99,7 @@ struct VersionList {
         void deactivate()
         {
             version = 0;
-            count_live = count_frozen = 0;
+            count_live = count_frozen = count_full = 0;
         }
         void activate(uint64_t v)
         {
@@ -165,6 +166,7 @@ struct VersionList {
         auto& rc = data()[i];
         REALM_ASSERT(rc.count_frozen == 0);
         REALM_ASSERT(rc.count_live == 0);
+        REALM_ASSERT(rc.count_full == 0);
         rc.current_top = top;
         rc.filesize = size;
         rc.activate(version);
@@ -203,22 +205,31 @@ struct VersionList {
     void purge_versions(uint64_t& oldest_live_v, TopRefMap& top_refs, bool& any_new_unreachables)
     {
         oldest_live_v = std::numeric_limits<uint64_t>::max();
+        auto oldest_full_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
         // correct case where an earlier crash may have left the entry at 'allocating' partially initialized:
         const auto index_of_newest = newest.load();
         if (auto a = allocating.load(); a != index_of_newest) {
             data()[a].deactivate();
+        // determine fully locked versions - after one of those all versions are considered live.
+        for (auto* rc = data(); rc < data() + entries; ++rc) {
+            if (!rc->is_active())
+                continue;
+            if (rc->count_full) {
+                if (rc->version < oldest_full_v)
+                    oldest_full_v = rc->version;
+            }
         }
         // collect reachable versions and determine oldest live reachable version
         // (oldest reachable version is the first entry in the top_refs map, so no need to find it explicitly)
         for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (!rc->is_active())
                 continue;
-            if (rc->count_frozen || rc->count_live) {
+            if (rc->count_frozen || rc->count_live || rc->version >= oldest_full_v) {
                 // entry is still reachable
                 top_refs.emplace(rc->version, VersionInfo{to_ref(rc->current_top), to_ref(rc->filesize)});
             }
-            if (rc->count_live) {
+            if (rc->count_live || rc->version >= oldest_full_v) {
                 if (rc->version < oldest_live_v)
                     oldest_live_v = rc->version;
             }
@@ -230,7 +241,7 @@ struct VersionList {
         for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (!rc->is_active())
                 continue;
-            if (rc->count_frozen == 0 && rc->count_live == 0) {
+            if (rc->count_frozen == 0 && rc->count_live == 0 && rc->version < oldest_full_v) {
                 // entry is becoming unreachable.
                 // if it is also younger than a reachable version, then set 'any_new_unreachables' to trigger
                 // backdating
@@ -536,15 +547,22 @@ public:
         REALM_ASSERT(read_lock.m_reader_idx < m_local_max_entry);
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
-        if (read_lock.m_is_frozen) {
-            --r.count_frozen;
-        }
-        else {
-            --r.count_live;
+        switch (read_lock.m_type) {
+            case ReadLockInfo::Frozen: {
+                --r.count_frozen;
+                break;
+            }
+            case ReadLockInfo::Live: {
+                --r.count_live;
+                break;
+            }
+            case ReadLockInfo::Full: {
+                break;
+            }
         }
     }
 
-    ReadLockInfo grab_read_lock(bool frozen, VersionID version_id = {})
+    ReadLockInfo grab_read_lock(ReadLockInfo::Type type, VersionID version_id = {})
     {
         ReadLockInfo read_lock;
         std::lock_guard lock(m_mutex);
@@ -558,18 +576,25 @@ public:
         if (pick_specific && version_id.version != r.version)
             throw BadVersion();
         if (!picked_newest) {
-            if (frozen && r.count_frozen == 0 && r.count_live == 0)
+            if (type == ReadLockInfo::Frozen && r.count_frozen == 0 && r.count_live == 0)
                 throw BadVersion();
-            if (!frozen && r.count_live == 0)
+            if (type != ReadLockInfo::Frozen && r.count_live == 0)
                 throw BadVersion();
         }
-        if (frozen) {
-            ++r.count_frozen;
+        switch (type) {
+            case ReadLockInfo::Frozen: {
+                ++r.count_frozen;
+                break;
+            }
+            case ReadLockInfo::Live: {
+                ++r.count_live;
+                break;
+            }
+            case ReadLockInfo::Full: {
+                break;
+            }
         }
-        else {
-            ++r.count_live;
-        }
-        read_lock.m_is_frozen = frozen;
+        read_lock.m_type = type;
         read_lock.m_version = r.version;
         read_lock.m_top_ref = static_cast<ref_type>(r.current_top);
         read_lock.m_file_size = static_cast<size_t>(r.filesize);
@@ -1909,11 +1934,11 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 }
 
 
-DB::ReadLockInfo DB::grab_read_lock(bool is_frozen, VersionID version_id)
+DB::ReadLockInfo DB::grab_read_lock(ReadLockInfo::Type type, VersionID version_id)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
     REALM_ASSERT_RELEASE(is_attached());
-    auto read_lock = m_version_manager->grab_read_lock(is_frozen, version_id);
+    auto read_lock = m_version_manager->grab_read_lock(type, version_id);
 
     m_local_locks_held.emplace_back(read_lock);
     ++m_transaction_count;
@@ -2244,7 +2269,7 @@ TransactionRef DB::start_read(VersionID version_id)
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
     }
     else {
-        ReadLockInfo read_lock = grab_read_lock(false, version_id);
+        ReadLockInfo read_lock = grab_read_lock(ReadLockInfo::Live, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
@@ -2263,7 +2288,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
     }
     else {
-        ReadLockInfo read_lock = grab_read_lock(true, version_id);
+        ReadLockInfo read_lock = grab_read_lock(ReadLockInfo::Frozen, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
@@ -2297,7 +2322,7 @@ TransactionRef DB::start_write(bool nonblocking)
     }
     TransactionRef tr;
     try {
-        ReadLockInfo read_lock = grab_read_lock(false, VersionID());
+        ReadLockInfo read_lock = grab_read_lock(ReadLockInfo::Live, VersionID());
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
