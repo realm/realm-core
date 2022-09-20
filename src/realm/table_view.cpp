@@ -166,6 +166,7 @@ Mixed TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* retu
     }
     else {
         static_cast<void>(last_accumulated_key);
+        static_cast<void>(return_key);
     }
 
     if (!agg.is_null()) {

@@ -135,7 +135,7 @@ public:
 
     // Get the first index of the given value in this results, or not_found
     // Throws DetachedAccessorException if row is not attached
-    // Throws IncorrectTableException if row belongs to a different table
+    // Throws InvalidArgument if row belongs to a different table
     template <typename T>
     size_t index_of(T const& value) REQUIRES(!m_mutex);
 

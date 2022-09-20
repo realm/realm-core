@@ -434,7 +434,18 @@ private:
 std::ostream& operator<<(std::ostream&, const Obj& obj);
 
 template <>
+int64_t Obj::get(ColKey) const;
+template <>
+bool Obj::get(ColKey) const;
+
+template <>
 int64_t Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+StringData Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+BinaryData Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+ObjKey Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...

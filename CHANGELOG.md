@@ -1,9 +1,10 @@
-# NEXT RELEASE
+r# NEXT RELEASE
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 * Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Adding support in the C API for `realm_results_find` and supporting all native types for `realm_results_get()` ([PR 5875](https://github.com/realm/realm-core/pull/5875)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
