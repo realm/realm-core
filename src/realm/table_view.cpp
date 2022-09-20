@@ -57,7 +57,8 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
     : m_source_column_key(src.m_source_column_key)
 {
     bool was_in_sync = src.is_in_sync();
-    m_query = Query(src.m_query, tr, policy_mode);
+    if (src.m_query)
+        m_query = Query(*src.m_query, tr, policy_mode);
     m_table = tr->import_copy_of(src.m_table);
 
     if (policy_mode == PayloadPolicy::Stay)
@@ -122,46 +123,35 @@ struct Aggregator<T, act_Max> {
     using AggType = typename aggregate_operations::Maximum<typename util::RemoveOptional<T>::type>;
 };
 
-template <Action action, typename T, typename R>
-R TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
+template <Action action, typename T>
+Mixed TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
-    size_t non_nulls = 0;
-
-    if (return_key)
-        *return_key = null_key;
-    if (result_count)
-        *result_count = 0;
-
-    REALM_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
+    static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
     REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_key_values.size()) == 0) {
-        return {};
-    }
-
+    size_t non_nulls = 0;
     typename Aggregator<T, action>::AggType agg;
     ObjKey last_accumulated_key = null_key;
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
-
         ObjKey key(get_key(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
             continue;
 
+        const Obj obj = m_table->try_get_object(key);
         // aggregation must be robust in the face of stale keys:
-        if (!m_table->is_valid(key))
+        if (!obj.is_valid())
             continue;
 
-        const Obj obj = m_table->get_object(key);
-        auto v = obj.get<T>(column_key);
+        if (obj.is_null(column_key))
+            continue;
 
-        if (!obj.is_null(column_key)) {
-            if (agg.accumulate(v)) {
-                ++non_nulls;
-                if constexpr (action == act_Min || action == act_Max) {
-                    last_accumulated_key = key;
-                }
+        auto v = obj.get<T>(column_key);
+        if (agg.accumulate(v)) {
+            ++non_nulls;
+            if constexpr (action == act_Min || action == act_Max) {
+                last_accumulated_key = key;
             }
         }
     }
@@ -169,7 +159,6 @@ R TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_k
     if (result_count)
         *result_count = non_nulls;
 
-    R res{};
     if constexpr (action == act_Max || action == act_Min) {
         if (return_key) {
             *return_key = last_accumulated_key;
@@ -177,13 +166,19 @@ R TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_k
     }
     else {
         static_cast<void>(last_accumulated_key);
+        static_cast<void>(return_key);
     }
 
     if (!agg.is_null()) {
-        res = agg.result();
+        return agg.result();
     }
-
-    return res;
+    if (action == act_Sum) {
+        if (std::is_same_v<T, Mixed>) {
+            return Decimal128{0};
+        }
+        return T{};
+    }
+    return Mixed();
 }
 
 template <typename T>
@@ -197,161 +192,23 @@ size_t TableView::aggregate_count(ColKey column_key, T count_target) const
 
     size_t cnt = 0;
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
-
         ObjKey key(get_key(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
             continue;
 
-        try {
-            const Obj obj = m_table->get_object(key);
-            auto v = obj.get<T>(column_key);
+        const Obj obj = m_table->try_get_object(key);
+        if (!obj.is_valid())
+            continue;
 
-            if (v == count_target) {
-                cnt++;
-            }
-        }
-        catch (const realm::KeyNotFound&) {
+        auto v = obj.get<T>(column_key);
+        if (v == count_target) {
+            cnt++;
         }
     }
 
     return cnt;
-}
-
-// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume
-// numeric types that support arithmetic (+, /, etc).
-template <class C>
-Timestamp TableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
-{
-    Timestamp best_value;
-    ObjKey best_key;
-    for_each([&best_key, &best_value, column_key](const Obj& obj) {
-        C compare;
-        auto ts = obj.get<Timestamp>(column_key);
-        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
-        // the first non-null entry
-        if ((best_key == null_key && !ts.is_null()) || compare(ts, best_value, ts.is_null(), best_value.is_null())) {
-            best_value = ts;
-            best_key = obj.get_key();
-        }
-        return IteratorControl::AdvanceToNext;
-    });
-    if (return_key)
-        *return_key = best_key;
-
-    return best_value;
-}
-
-// sum
-int64_t TableView::sum_int(ColKey column_key) const
-{
-    if (m_table->is_nullable(column_key))
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_key, 0);
-    else {
-        return aggregate<act_Sum, int64_t, int64_t>(column_key, 0);
-    }
-}
-double TableView::sum_float(ColKey column_key) const
-{
-    return aggregate<act_Sum, float, double>(column_key);
-}
-double TableView::sum_double(ColKey column_key) const
-{
-    return aggregate<act_Sum, double, double>(column_key);
-}
-
-Decimal128 TableView::sum_decimal(ColKey column_key) const
-{
-    return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
-}
-
-Decimal128 TableView::sum_mixed(ColKey column_key) const
-{
-    return aggregate<act_Sum, Mixed, Decimal128>(column_key);
-}
-
-// Maximum
-int64_t TableView::maximum_int(ColKey column_key, ObjKey* return_key) const
-{
-    if (m_table->is_nullable(column_key))
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
-    else
-        return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_key);
-}
-float TableView::maximum_float(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Max, float, float>(column_key, nullptr, return_key);
-}
-double TableView::maximum_double(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Max, double, double>(column_key, nullptr, return_key);
-}
-Timestamp TableView::maximum_timestamp(ColKey column_key, ObjKey* return_key) const
-{
-    return minmax_timestamp<realm::Greater>(column_key, return_key);
-}
-Decimal128 TableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_key);
-}
-Mixed TableView::maximum_mixed(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Max, Mixed, Mixed>(column_key, nullptr, return_key);
-}
-
-// Minimum
-int64_t TableView::minimum_int(ColKey column_key, ObjKey* return_key) const
-{
-    if (m_table->is_nullable(column_key))
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
-    else
-        return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_key);
-}
-float TableView::minimum_float(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Min, float, float>(column_key, nullptr, return_key);
-}
-double TableView::minimum_double(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Min, double, double>(column_key, nullptr, return_key);
-}
-Timestamp TableView::minimum_timestamp(ColKey column_key, ObjKey* return_key) const
-{
-    return minmax_timestamp<realm::Less>(column_key, return_key);
-}
-Decimal128 TableView::minimum_decimal(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_key);
-}
-Mixed TableView::minimum_mixed(ColKey column_key, ObjKey* return_key) const
-{
-    return aggregate<act_Min, Mixed, Mixed>(column_key, nullptr, return_key);
-}
-
-// Average. The number of values used to compute the result is written to `value_count` by callee
-double TableView::average_int(ColKey column_key, size_t* value_count) const
-{
-    if (m_table->is_nullable(column_key))
-        return aggregate<act_Average, util::Optional<int64_t>, double>(column_key, value_count);
-    else
-        return aggregate<act_Average, int64_t, double>(column_key, value_count);
-}
-double TableView::average_float(ColKey column_key, size_t* value_count) const
-{
-    return aggregate<act_Average, float, double>(column_key, value_count);
-}
-double TableView::average_double(ColKey column_key, size_t* value_count) const
-{
-    return aggregate<act_Average, double, double>(column_key, value_count);
-}
-Decimal128 TableView::average_decimal(ColKey column_key, size_t* value_count) const
-{
-    return aggregate<act_Average, Decimal128, Decimal128>(column_key, value_count);
-}
-Decimal128 TableView::average_mixed(ColKey column_key, size_t* value_count) const
-{
-    return aggregate<act_Average, Mixed, Decimal128>(column_key, value_count);
 }
 
 // Count
@@ -370,37 +227,67 @@ size_t TableView::count_double(ColKey column_key, double target) const
 {
     return aggregate_count<double>(column_key, target);
 }
-
 size_t TableView::count_timestamp(ColKey column_key, Timestamp target) const
 {
-    size_t count = 0;
-    for (size_t t = 0; t < size(); t++) {
-        try {
-            ObjKey key = get_key(t);
-            const Obj obj = m_table->get_object(key);
-            auto ts = obj.get<Timestamp>(column_key);
-            realm::Equal e;
-            if (e(ts, target, ts.is_null(), target.is_null())) {
-                count++;
-            }
-        }
-        catch (const KeyNotFound&) {
-            // Just skip objects that might have been deleted
-        }
-    }
-    return count;
+    return aggregate_count<Timestamp>(column_key, target);
 }
-
 size_t TableView::count_decimal(ColKey column_key, Decimal128 target) const
 {
     return aggregate_count<Decimal128>(column_key, target);
 }
-
 size_t TableView::count_mixed(ColKey column_key, Mixed target) const
 {
     return aggregate_count<Mixed>(column_key, target);
 }
 
+template <Action action>
+std::optional<Mixed> TableView::aggregate(ColKey column_key, size_t* count, ObjKey* return_key) const
+{
+    static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
+
+    switch (column_key.get_type()) {
+        case col_type_Int:
+            if (m_table->is_nullable(column_key))
+                return aggregate<action, util::Optional<int64_t>>(column_key, count, return_key);
+            return aggregate<action, int64_t>(column_key, count, return_key);
+        case col_type_Float:
+            return aggregate<action, float>(column_key, count, return_key);
+        case col_type_Double:
+            return aggregate<action, double>(column_key, count, return_key);
+        case col_type_Timestamp:
+            if constexpr (action == act_Min || action == act_Max) {
+                return aggregate<action, Timestamp>(column_key, count, return_key);
+            }
+            break;
+        case col_type_Decimal:
+            return aggregate<action, Decimal128>(column_key, count, return_key);
+        case col_type_Mixed:
+            return aggregate<action, Mixed>(column_key, count, return_key);
+        default:
+            break;
+    }
+    return util::none;
+}
+
+util::Optional<Mixed> TableView::min(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Min>(column_key, nullptr, return_key);
+}
+
+util::Optional<Mixed> TableView::max(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Max>(column_key, nullptr, return_key);
+}
+
+util::Optional<Mixed> TableView::sum(ColKey column_key) const
+{
+    return aggregate<act_Sum>(column_key, nullptr, nullptr);
+}
+
+util::Optional<Mixed> TableView::avg(ColKey column_key, size_t* value_count) const
+{
+    return aggregate<act_Average>(column_key, value_count, nullptr);
+}
 
 void TableView::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                         JSONOutputMode mode) const
@@ -434,8 +321,8 @@ bool TableView::depends_on_deleted_object() const
     if (m_source_column_key && !m_linked_obj.is_valid()) {
         return true;
     }
-    else if (m_query.m_source_table_view) {
-        return m_query.m_source_table_view->depends_on_deleted_object();
+    else if (m_query && m_query->m_source_table_view) {
+        return m_query->m_source_table_view->depends_on_deleted_object();
     }
     return false;
 }
@@ -448,8 +335,8 @@ void TableView::get_dependencies(TableVersions& ret) const
             ret.emplace_back(linked_table->get_key(), linked_table->get_content_version());
         }
     }
-    else if (m_query.m_table) {
-        m_query.get_outside_versions(ret);
+    else if (m_query) {
+        m_query->get_outside_versions(ret);
     }
     else {
         // This TableView was created by Table::get_distinct_view() or get_sorted_view() on collections
@@ -477,8 +364,9 @@ void TableView::sync_if_needed() const
 
 void TableView::update_query(const Query& q)
 {
-    REALM_ASSERT(m_query.m_table);
-    REALM_ASSERT(m_query.m_table == q.m_table);
+    REALM_ASSERT(m_query);
+    REALM_ASSERT(m_query->m_table);
+    REALM_ASSERT(m_query->m_table == q.m_table);
 
     m_query = q;
     do_sync();
@@ -587,7 +475,8 @@ void TableView::do_sync()
     }
     // FIXME: Unimplemented for link to a column
     else {
-        m_query.m_table.check();
+        REALM_ASSERT(m_query);
+        m_query->m_table.check();
 
         // valid query, so clear earlier results and reexecute it.
         if (m_key_values.is_attached())
@@ -595,9 +484,9 @@ void TableView::do_sync()
         else
             m_key_values.create();
 
-        if (m_query.m_view)
-            m_query.m_view->sync_if_needed();
-        m_query.do_find_all(*const_cast<TableView*>(this), m_limit);
+        if (m_query->m_view)
+            m_query->m_view->sync_if_needed();
+        m_query->do_find_all(*const_cast<TableView*>(this), m_limit);
     }
 
     do_sort(m_descriptor_ordering);
@@ -664,11 +553,11 @@ bool TableView::is_in_table_order() const
     else if (m_source_column_key) {
         return false;
     }
-    else if (!m_query.m_table) {
+    else if (!m_query) {
         return false;
     }
     else {
-        m_query.m_table.check();
-        return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
+        m_query->m_table.check();
+        return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
 }

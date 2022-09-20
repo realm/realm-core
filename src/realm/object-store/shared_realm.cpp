@@ -1085,6 +1085,13 @@ bool Realm::compact()
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
+
+#if REALM_ENABLE_SYNC
+    if (config.sync_config && config.sync_config->flx_sync_requested) {
+        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
+    }
+#endif
+
     if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();

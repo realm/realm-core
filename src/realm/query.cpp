@@ -22,15 +22,14 @@
 #include <realm/column_fwd.hpp>
 #include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/query_conditions_tpl.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
-#include <realm/table_tpl.hpp>
 #include <realm/set.hpp>
 #include <realm/array_integer_tpl.hpp>
 
 #include <algorithm>
-
 
 using namespace realm;
 using namespace realm::metrics;
@@ -949,7 +948,7 @@ bool Query::eval_object(const Obj& obj) const
 
 
 template <typename T>
-void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount, ObjKey* return_ndx) const
+void Query::aggregate(QueryStateBase& st, ColKey column_key) const
 {
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
@@ -1008,14 +1007,6 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
             });
         }
     }
-
-    if (resultcount) {
-        *resultcount = st.match_count();
-    }
-
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
 }
 
 size_t Query::find_best_node(ParentNode* pn) const
@@ -1064,259 +1055,39 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
     }
 }
 
+// Aggregates
 
-// Sum
-
-int64_t Query::sum_int(ColKey column_key) const
+std::optional<Mixed> Query::sum(ColKey col_key) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
 #endif
-
-    QueryStateSum<int64_t> st;
-    if (m_table->is_nullable(column_key)) {
-        aggregate<util::Optional<int64_t>>(st, column_key);
-    }
-    else {
-        aggregate<int64_t>(st, column_key);
-    }
-    return st.result_sum();
+    return AggregateHelper<Query>::sum(*m_table, *this, col_key);
 }
-double Query::sum_float(ColKey column_key) const
+
+std::optional<Mixed> Query::avg(ColKey col_key, size_t* value_count) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
-
-    QueryStateSum<float> st;
-    aggregate<float>(st, column_key);
-    return st.result_sum();
+    return AggregateHelper<Query>::avg(*m_table, *this, col_key, value_count);
 }
-double Query::sum_double(ColKey column_key) const
+
+std::optional<Mixed> Query::min(ColKey col_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
-    QueryStateSum<double> st;
-    aggregate<double>(st, column_key);
-    return st.result_sum();
+    return AggregateHelper<Query>::min(*m_table, *this, col_key, return_ndx);
 }
 
-Decimal128 Query::sum_decimal128(ColKey column_key) const
+std::optional<Mixed> Query::max(ColKey col_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
 #endif
-
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, column_key);
-    return st.result_sum();
+    return AggregateHelper<Query>::max(*m_table, *this, col_key, return_ndx);
 }
-
-Decimal128 Query::sum_mixed(ColKey column_key) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
-#endif
-
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, column_key);
-    return st.result_sum();
-}
-
-// Maximum
-
-int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<int64_t> st;
-    if (m_table->is_nullable(column_key)) {
-        aggregate<util::Optional<int64_t>>(st, column_key, nullptr, return_ndx);
-    }
-    else {
-        aggregate<int64_t>(st, column_key, nullptr, return_ndx);
-    }
-    return st.get_max();
-}
-
-float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<float> st;
-    aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
-}
-double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<double> st;
-    aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
-}
-
-Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<Decimal128> st;
-    aggregate<Decimal128>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
-}
-
-Mixed Query::maximum_mixed(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<Mixed> st;
-    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
-}
-
-Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
-}
-
-// Minimum
-
-int64_t Query::minimum_int(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<int64_t> st;
-    if (m_table->is_nullable(column_key)) {
-        aggregate<util::Optional<int64_t>>(st, column_key, nullptr, return_ndx);
-    }
-    else {
-        aggregate<int64_t>(st, column_key, nullptr, return_ndx);
-    }
-    return st.get_min();
-}
-float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<float> st;
-    aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.get_min();
-}
-double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<double> st;
-    aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.get_min();
-}
-
-Timestamp Query::minimum_timestamp(ColKey column_key, ObjKey* return_ndx)
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<Timestamp> st;
-    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
-    return st.get_min();
-}
-
-Decimal128 Query::minimum_decimal128(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<Decimal128> st;
-    aggregate<Decimal128>(st, column_key, nullptr, return_ndx);
-    return st.get_min();
-}
-
-Mixed Query::minimum_mixed(ColKey column_key, ObjKey* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-
-    QueryStateMin<Mixed> st;
-    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
-    return st.get_min();
-}
-
-// Average
-
-template <typename T, typename R>
-R Query::average(ColKey column_key, size_t* resultcount) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
-#endif
-    size_t resultcount2 = 0;
-    QueryStateSum<typename util::RemoveOptional<T>::type> st;
-    aggregate<T>(st, column_key, &resultcount2);
-    R sum1 = R(st.result_sum());
-    R avg1{};
-    if (resultcount2 != 0)
-        avg1 = sum1 / resultcount2;
-    if (resultcount)
-        *resultcount = resultcount2;
-    return avg1;
-}
-
-double Query::average_int(ColKey column_key, size_t* resultcount) const
-{
-    if (m_table->is_nullable(column_key)) {
-        return average<util::Optional<int64_t>>(column_key, resultcount);
-    }
-    return average<int64_t>(column_key, resultcount);
-}
-double Query::average_float(ColKey column_key, size_t* resultcount) const
-{
-    return average<float>(column_key, resultcount);
-}
-double Query::average_double(ColKey column_key, size_t* resultcount) const
-{
-    return average<double>(column_key, resultcount);
-}
-Decimal128 Query::average_decimal128(ColKey column_key, size_t* resultcount) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
-#endif
-    return average<Decimal128>(column_key, resultcount);
-}
-Decimal128 Query::average_mixed(ColKey column_key, size_t* resultcount) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
-#endif
-    return average<Mixed>(column_key, resultcount);
-}
-
 
 // Grouping
 Query& Query::group()
@@ -1418,7 +1189,7 @@ ObjKey Query::find() const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->try_get_object(i);
+            const Obj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1457,7 +1228,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && ret.size() < limit; t++) {
-            const Obj obj = m_view->try_get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
