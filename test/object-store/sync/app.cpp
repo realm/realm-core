@@ -2213,15 +2213,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
         SECTION("Test server in maintenance") {
             redir_transport->request_hook = [&](Request&) {
-                nlohmann::json maintenance_error = {
-                    {"error_code", "MaintenanceInProgress"},
-                    {"error", "This service is currently undergoing maintenance"},
-                    {"link", "https://link.to/server_logs"}};
+                nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
+                                                    {"error", "This service is currently undergoing maintenance"},
+                                                    {"link", "https://link.to/server_logs"}};
                 redir_transport->simulated_response = {
-                    500,
-                    0,
-                    {{"Content-Type", "application/json"}},
-                    maintenance_error.dump()};
+                    500, 0, {{"Content-Type", "application/json"}}, maintenance_error.dump()};
             };
 
             redir_app->log_in_with_credentials(
@@ -2232,7 +2228,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(error->is_service_error());
                     REQUIRE(error->error_code.value() == static_cast<int>(ServiceErrorCode::maintenance_in_progress));
                     REQUIRE(error->message == "This service is currently undergoing maintenance");
-                    REQUIRE(error->link_to_server_logs ==  "https://link.to/server_logs");
+                    REQUIRE(error->link_to_server_logs == "https://link.to/server_logs");
                     REQUIRE(error->http_status_code == 500);
                 });
         }
