@@ -806,7 +806,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         {"breed", "french bulldog"},
     };
 
-    auto cat_id_string = ObjectId::gen().to_string();
+    auto cat_id_string = random_string(10);
     bson::BsonDocument cat_document{
         {"_id", cat_id_string},
         {"name", "luna"},
