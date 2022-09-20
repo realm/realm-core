@@ -165,7 +165,6 @@ struct VersionList {
         auto& rc = data()[i];
         REALM_ASSERT(rc.count_frozen == 0);
         REALM_ASSERT(rc.count_live == 0);
-        // rc.count_frozen = rc.count_live = 0;
         rc.current_top = top;
         rc.filesize = size;
         rc.activate(version);
@@ -175,7 +174,7 @@ struct VersionList {
 
     uint32_t index_of(const ReadCount& rc) noexcept
     {
-        return static_cast<int>(&rc - data());
+        return &rc - data();
     }
 
     void free_entry(ReadCount* rc) noexcept
@@ -205,7 +204,11 @@ struct VersionList {
     {
         oldest_live_v = std::numeric_limits<uint64_t>::max();
         any_new_unreachables = false;
-
+        // correct case where an earlier crash may have left the entry at 'allocating' partially initialized:
+        const auto index_of_newest = newest.load();
+        if (auto a = allocating.load(); a != index_of_newest) {
+            data()[a].deactivate();
+        }
         // collect reachable versions and determine oldest live reachable version
         // (oldest reachable version is the first entry in the top_refs map, so no need to find it explicitly)
         for (auto* rc = data(); rc < data() + entries; ++rc) {
@@ -229,11 +232,12 @@ struct VersionList {
                 continue;
             if (rc->count_frozen == 0 && rc->count_live == 0) {
                 // entry is becoming unreachable.
-                // if it is also yonger than a reachable version, so set 'any_new_unreachables' to trigger backdating
+                // if it is also yonger than a reachable version, then set 'any_new_unreachables' to trigger
+                // backdating
                 if (rc->version > oldest_v) {
                     any_new_unreachables = true;
                 }
-                REALM_ASSERT(index_of(*rc) != newest);
+                REALM_ASSERT(index_of(*rc) != index_of_newest);
                 free_entry(rc);
             }
         }
