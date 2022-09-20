@@ -2211,6 +2211,31 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(error->message == "number of redirections exceeded 20");
                 });
         }
+        SECTION("Test server in maintenance") {
+            redir_transport->request_hook = [&](Request&) {
+                nlohmann::json maintenance_error = {
+                    {"error_code", "MaintenanceInProgress"},
+                    {"error", "This service is currently undergoing maintenance"},
+                    {"link", "https://link.to/server_logs"}};
+                redir_transport->simulated_response = {
+                    500,
+                    0,
+                    {{"Content-Type", "application/json"}},
+                    maintenance_error.dump()};
+            };
+
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_service_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ServiceErrorCode::maintenance_in_progress));
+                    REQUIRE(error->message == "This service is currently undergoing maintenance");
+                    REQUIRE(error->link_to_server_logs ==  "https://link.to/server_logs");
+                    REQUIRE(error->http_status_code == 500);
+                });
+        }
     }
     SECTION("Fast clock on client") {
         {

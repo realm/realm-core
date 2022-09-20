@@ -904,16 +904,16 @@ void App::handle_redirect_response(Request&& request, const Response& response,
     }
 
     // Update the metadata from the new location after trimming the url (limit to `scheme://host[:port]`)
-    auto new_url = location->second;
+    std::string_view new_url = location->second;
     // Find the end of the scheme/protocol part (e.g. 'https://', 'http://')
     auto scheme_end = new_url.find("://");
-    scheme_end = scheme_end != std::string::npos ? scheme_end + std::char_traits<char>::length("://") : 0;
+    scheme_end = scheme_end != std::string_view::npos ? scheme_end + std::char_traits<char>::length("://") : 0;
     // Trim off any trailing path/anchor/query string after the host/port
-    if (auto split = new_url.find_first_of("/#?", scheme_end); split != std::string::npos) {
-        new_url.erase(split);
+    if (auto split = new_url.find_first_of("/#?", scheme_end); split != std::string_view::npos) {
+        new_url.remove_suffix(new_url.size() - split);
     }
 
-    update_metadata_and_resend(std::move(request), std::move(completion), new_url);
+    update_metadata_and_resend(std::move(request), std::move(completion), std::string(new_url));
 }
 
 void App::do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& sync_user,
