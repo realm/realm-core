@@ -232,7 +232,7 @@ struct VersionList {
                 continue;
             if (rc->count_frozen == 0 && rc->count_live == 0) {
                 // entry is becoming unreachable.
-                // if it is also yonger than a reachable version, then set 'any_new_unreachables' to trigger
+                // if it is also younger than a reachable version, then set 'any_new_unreachables' to trigger
                 // backdating
                 if (rc->version > oldest_v) {
                     any_new_unreachables = true;
