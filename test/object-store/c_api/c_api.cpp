@@ -2276,7 +2276,7 @@ TEST_CASE("C API", "[c_api]") {
 
                     CHECK(!realm_results_get_object(r.get(), 1));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
-                    CHECK(realm_results_find_object(r.get(), obj2.get(), &index, &found));
+                    CHECK(!realm_results_find_object(r.get(), obj2.get(), &index, &found));
                     CHECK(found == false);
                     CHECK(index == realm::not_found);
                 }

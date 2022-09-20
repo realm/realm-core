@@ -429,14 +429,9 @@ RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t*
 
     return wrap_err([&]() {
         if (out_index) {
-            for (size_t i = 0; i < results->size(); ++i) {
-                auto obj1 = results->get<Obj>(i);
-                if (value->obj() == obj1) {
-                    *out_index = i;
-                    if (out_found)
-                        *out_found = true;
-                }
-            }
+            *out_index = results->index_of(value->obj());
+            if (out_found && *out_index != realm::not_found)
+                *out_found = true;
         }
         return true;
     });
