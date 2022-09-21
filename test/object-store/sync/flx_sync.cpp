@@ -1700,7 +1700,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     return;
                 }
 
-                if (query_version != 1 || batch_state != sync::DownloadBatchState::LastInBatch) {
+                if (query_version != 1 || batch_state == sync::DownloadBatchState::MoreToCome) {
                     return;
                 }
 
