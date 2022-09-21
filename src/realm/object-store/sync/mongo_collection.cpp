@@ -68,7 +68,7 @@ ResponseHandler<util::Optional<Bson>> get_update_handler(ResponseHandler<MongoCo
             auto& document = static_cast<const BsonDocument&>(*value).entries();
             return completion(MongoCollection::UpdateResult{get<int32_t>(document, "matchedCount").value_or(0),
                                                             get<int32_t>(document, "modifiedCount").value_or(0),
-                                                            get<ObjectId>(document, "upsertedId")},
+                                                            get<Bson>(document, "upsertedId")},
                               std::move(error));
         }
         catch (const std::exception& e) {
@@ -216,7 +216,7 @@ void MongoCollection::update_one(const BsonDocument& filter_bson, const BsonDocu
 void MongoCollection::update_one(const BsonDocument& filter_bson, const BsonDocument& update_bson,
                                  ResponseHandler<MongoCollection::UpdateResult>&& completion)
 {
-    update_one(filter_bson, update_bson, {}, std::move(completion));
+    update_one(filter_bson, update_bson, false, std::move(completion));
 }
 
 void MongoCollection::update_many(const BsonDocument& filter_bson, const BsonDocument& update_bson, bool upsert,
@@ -228,7 +228,7 @@ void MongoCollection::update_many(const BsonDocument& filter_bson, const BsonDoc
 void MongoCollection::update_many(const BsonDocument& filter_bson, const BsonDocument& update_bson,
                                   ResponseHandler<MongoCollection::UpdateResult>&& completion)
 {
-    update_many(filter_bson, update_bson, {}, std::move(completion));
+    update_many(filter_bson, update_bson, false, std::move(completion));
 }
 
 void MongoCollection::find_one_and_update(const BsonDocument& filter_bson, const BsonDocument& update_bson,
