@@ -169,18 +169,17 @@ public:
     /// \param changeset_applier Called to to apply each transformed changeset.
     /// Returns true if it can continue applying the changests, false otherwise.
     ///
-    /// \return Iterator to the next changeset that needs to be transformed and
-    /// applied, or `end()` if there is no changeset left.
+    /// \return The number of changesets that have been transformed and applied.
     ///
     /// \throw TransformError Thrown if operational transformation fails due to
     /// a problem with the specified changeset.
     ///
     /// FIXME: Consider using std::error_code instead of throwing
     /// TransformError.
-    virtual iterator transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
-                                                 version_type current_local_version, util::Span<Changeset> changesets,
-                                                 util::UniqueFunction<bool(const Changeset*)> changeset_applier,
-                                                 util::Logger* = nullptr) = 0;
+    virtual size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
+                                               version_type current_local_version, util::Span<Changeset> changesets,
+                                               util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                               util::Logger* = nullptr) = 0;
 
     virtual ~Transformer() noexcept {}
 };
@@ -200,12 +199,11 @@ public:
     using Instruction = sync::Instruction;
     using TransformHistory = sync::TransformHistory;
     using version_type = sync::version_type;
-    using iterator = sync::Transformer::iterator;
 
     TransformerImpl();
 
-    iterator transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
-                                         util::UniqueFunction<bool(const Changeset*)>, util::Logger*) override;
+    size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
+                                       util::UniqueFunction<bool(const Changeset*)>, util::Logger*) override;
 
     struct Side;
     struct MajorSide;

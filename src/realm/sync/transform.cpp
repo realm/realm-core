@@ -2519,10 +2519,11 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 }
 
-TransformerImpl::iterator TransformerImpl::transform_remote_changesets(
-    TransformHistory& history, file_ident_type local_file_ident, version_type current_local_version,
-    util::Span<Changeset> parsed_changesets, util::UniqueFunction<bool(const Changeset*)> changeset_applier,
-    util::Logger* logger)
+size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
+                                                    version_type current_local_version,
+                                                    util::Span<Changeset> parsed_changesets,
+                                                    util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                                    util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
@@ -2568,13 +2569,14 @@ TransformerImpl::iterator TransformerImpl::transform_remote_changesets(
                 });
             }
 
-            for (auto continue_applying = true; p != same_base_range_end && continue_applying; ++p) {
+            auto continue_applying = true;
+            for (; p != same_base_range_end && continue_applying; ++p) {
                 // It is safe to stop applying the changesets if:
                 //      1. There are no reciprocal changesets
                 //      2. No reciprocal changeset was modified
                 continue_applying = changeset_applier(p) || must_apply_all;
             }
-            if (p != same_base_range_end) {
+            if (!continue_applying) {
                 break;
             }
 
@@ -2597,7 +2599,7 @@ TransformerImpl::iterator TransformerImpl::transform_remote_changesets(
     // the current transaction.
     flush_reciprocal_transform_cache(history); // Throws
 
-    return p;
+    return p - parsed_changesets.begin();
 }
 
 
@@ -2669,6 +2671,7 @@ void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset
     parsed_changeset.last_integrated_remote_version = remote_changeset.last_integrated_local_version;
     parsed_changeset.origin_timestamp = remote_changeset.origin_timestamp;
     parsed_changeset.origin_file_ident = remote_changeset.origin_file_ident;
+    parsed_changeset.original_changeset_size = remote_changeset.original_changeset_size;
 }
 
 } // namespace sync

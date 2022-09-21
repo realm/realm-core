@@ -400,12 +400,11 @@ void ClientHistory::integrate_server_changesets(
     }
 
     VersionID new_version{0, 0};
-    constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
     auto num_changesets = incoming_changesets.size();
     util::Span<Changeset> changesets_to_integrate(changesets);
 
-    // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times, depending on how
-    // many times the sync client needs to yield the write lock to allow the user to commit their changes. In each
+    // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times, depending on the
+    // number of times the sync client yields the write lock to allow the user to commit their changes. In each
     // iteration, at least one changeset is transformed and committed.
     while (!changesets_to_integrate.empty()) {
         TransactionRef transact = m_db->start_write(); // Throws
@@ -418,65 +417,8 @@ void ClientHistory::integrate_server_changesets(
         prepare_for_write();           // Throws
 
         std::uint64_t downloaded_bytes_in_transaction = 0;
-        size_t changesets_transformed_count = 0;
-
-        try {
-            for (auto& changeset : changesets_to_integrate) {
-                REALM_ASSERT(changeset.last_integrated_remote_version <= local_version);
-                REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != sync_file_id);
-
-                // It is possible that the synchronization history has been trimmed
-                // to a point where a prefix of the merge window is no longer
-                // available, but this can only happen if that prefix consisted
-                // entirely of upload skippable entries. Since such entries (those
-                // that are empty or of remote origin) will be skipped by the
-                // transformer anyway, we can simply clamp the beginning of the
-                // merge window to the beginning of the synchronization history,
-                // when this situation occurs.
-                //
-                // See trim_sync_history() for further details.
-                if (changeset.last_integrated_remote_version < m_sync_history_base_version)
-                    changeset.last_integrated_remote_version = m_sync_history_base_version;
-            }
-
-            if (m_replication.apply_server_changes()) {
-                Transformer& transformer = get_transformer(); // Throws
-                auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
-                    InstructionApplier applier{*transact};
-                    {
-                        TempShortCircuitReplication tscr{m_replication};
-                        applier.apply(*transformed_changeset, &logger); // Throws
-                    }
-
-                    return !(m_db->other_writers_waiting_for_lock() &&
-                             transact->get_commit_size() >= commit_byte_size_limit);
-                };
-                auto it = transformer.transform_remote_changesets(*this, sync_file_id, local_version,
-                                                                  changesets_to_integrate,
-                                                                  std::move(changeset_applier), &logger); // Throws
-                changesets_transformed_count = std::distance(changesets_to_integrate.begin(), it);
-            }
-            else {
-                // Skip over all changesets if they don't need to be transformed and applied.
-                changesets_transformed_count = changesets_to_integrate.size();
-            }
-
-            // Compute downloaded bytes only after we know how many remote changesets are going to be commited in this
-            // transaction.
-            for (std::size_t i = 0; i < changesets_transformed_count; ++i) {
-                downloaded_bytes_in_transaction += incoming_changesets[i].original_changeset_size;
-            }
-        }
-        catch (const BadChangesetError& e) {
-            throw IntegrationException(ClientError::bad_changeset,
-                                       util::format("Failed to apply received changeset: %1", e.what()));
-        }
-        catch (const TransformError& e) {
-            throw IntegrationException(ClientError::bad_changeset,
-                                       util::format("Failed to transform received changeset: %1", e.what()));
-        }
-
-        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
+        auto changesets_transformed_count = transform_and_apply_server_changesets(
+            changesets_to_integrate, transact, logger, downloaded_bytes_in_transaction);
 
         // downloaded_bytes always contains the total number of downloaded bytes
         // from the Realm. downloaded_bytes must be persisted in the Realm, since
@@ -529,11 +471,78 @@ void ClientHistory::integrate_server_changesets(
         if (transact_reporter) {
             transact_reporter->report_sync_transact(old_version, new_version); // Throws
         }
+
+        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
     }
 
     REALM_ASSERT(new_version.version > 0);
     version_info.realm_version = new_version.version;
     version_info.sync_version = {new_version.version, 0};
+}
+
+
+size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset> changesets_to_integrate,
+                                                            TransactionRef transact, util::Logger& logger,
+                                                            std::uint64_t& downloaded_bytes)
+{
+    REALM_ASSERT(transact->get_transact_stage() == DB::transact_Writing);
+
+    if (!m_replication.apply_server_changes()) {
+        std::for_each(changesets_to_integrate.begin(), changesets_to_integrate.end(), [&](const Changeset c) {
+            downloaded_bytes += c.original_changeset_size;
+        });
+        // Skip over all changesets if they don't need to be transformed and applied.
+        return changesets_to_integrate.size();
+    }
+
+    version_type local_version = transact->get_version_of_current_transaction().version;
+    auto sync_file_id = transact->get_sync_file_id();
+
+    try {
+        for (auto& changeset : changesets_to_integrate) {
+            REALM_ASSERT(changeset.last_integrated_remote_version <= local_version);
+            REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != sync_file_id);
+
+            // It is possible that the synchronization history has been trimmed
+            // to a point where a prefix of the merge window is no longer
+            // available, but this can only happen if that prefix consisted
+            // entirely of upload skippable entries. Since such entries (those
+            // that are empty or of remote origin) will be skipped by the
+            // transformer anyway, we can simply clamp the beginning of the
+            // merge window to the beginning of the synchronization history,
+            // when this situation occurs.
+            //
+            // See trim_sync_history() for further details.
+            if (changeset.last_integrated_remote_version < m_sync_history_base_version)
+                changeset.last_integrated_remote_version = m_sync_history_base_version;
+        }
+
+        Transformer& transformer = get_transformer();          // Throws
+        constexpr std::size_t commit_byte_size_limit = 102400; // 100 KB
+
+        auto changeset_applier = [&](const Changeset* transformed_changeset) -> bool {
+            InstructionApplier applier{*transact};
+            {
+                TempShortCircuitReplication tscr{m_replication};
+                applier.apply(*transformed_changeset, &logger); // Throws
+            }
+            downloaded_bytes += transformed_changeset->original_changeset_size;
+
+            return !(m_db->other_writers_waiting_for_lock() && transact->get_commit_size() >= commit_byte_size_limit);
+        };
+        auto changesets_transformed_count =
+            transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets_to_integrate,
+                                                    std::move(changeset_applier), &logger); // Throws
+        return changesets_transformed_count;
+    }
+    catch (const BadChangesetError& e) {
+        throw IntegrationException(ClientError::bad_changeset,
+                                   util::format("Failed to apply received changeset: %1", e.what()));
+    }
+    catch (const TransformError& e) {
+        throw IntegrationException(ClientError::bad_changeset,
+                                   util::format("Failed to transform received changeset: %1", e.what()));
+    }
 }
 
 

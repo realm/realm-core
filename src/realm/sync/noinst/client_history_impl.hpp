@@ -416,6 +416,9 @@ private:
     std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version,
                                                   version_type end_version) const noexcept;
 
+    size_t transform_and_apply_server_changesets(util::Span<Changeset> changesets_to_integrate, TransactionRef,
+                                                 util::Logger&, std::uint64_t& downloaded_bytes);
+
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(const HistoryEntry&);
