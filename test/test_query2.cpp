@@ -5865,7 +5865,7 @@ TEST(Query_FullText)
 
     // Add before index creation
     table->create_object().set(col, "This is a test, with  spaces!");
-    Obj obj2 = table->create_object().set(col, "Ål, ø og æbler");
+    Obj obj2 = table->create_object().set(col, "Ål, ø og Æbler");
     Obj obj3 = table->create_object().set(
         col,
         "An object database (also object-oriented database management system) is a database management system in "
@@ -5887,7 +5887,7 @@ TEST(Query_FullText)
              "dag frugtavl, og der dyrkes især æbler, pærer og blommer.");
 
     // Create the fulltext index
-    table->add_search_index(col, true);
+    table->add_fulltext_index(col);
 
     table->create_object().set(col, "Alle elsker John");
     table->create_object().set(col, "Johns ven kender John godt");
@@ -5970,7 +5970,7 @@ TEST(Query_FullTextMulti)
     auto origin = g.add_table_with_primary_key("origin", type_Int, "id");
     auto col_link = origin->add_column_list(*table, "link");
     auto col = table->add_column(type_String, "text");
-    table->add_search_index(col, true);
+    table->add_fulltext_index(col);
 
     table->create_object().set(
         col,

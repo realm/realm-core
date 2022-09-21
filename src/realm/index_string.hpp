@@ -116,10 +116,10 @@ static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key, bool fulltext)
+    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
-        , m_fulltext(fulltext)
+        , m_type(type)
     {
     }
     size_t size() const
@@ -148,14 +148,14 @@ public:
     }
     bool is_fulltext() const
     {
-        return m_fulltext;
+        return m_type == IndexType::Fulltext;
     }
     Mixed get_value(ObjKey key) const;
 
 private:
     const ClusterTree* m_cluster_tree;
     ColKey m_column_key;
-    bool m_fulltext;
+    IndexType m_type;
 };
 
 class StringIndex {
@@ -278,7 +278,7 @@ private:
     };
     StringIndex(inner_node_tag, Allocator&);
 
-    static IndexArray* create_node(Allocator&, bool is_leaf);
+    static std::unique_ptr<IndexArray> create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(ObjKey key, StringData index_data, const Mixed& value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
@@ -329,8 +329,8 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
-        : m_column(cluster_tree, column_key, false)
+    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
+        : m_column(cluster_tree, column_key, type)
     {
     }
     SortedListComparator(const ClusterColumn& column)
@@ -365,7 +365,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
     : m_array(create_node(alloc, false)) // Throws
-    , m_target_column(ClusterColumn(nullptr, {}, false))
+    , m_target_column(ClusterColumn(nullptr, {}, IndexType::General))
 {
 }
 

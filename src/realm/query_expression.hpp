@@ -2080,7 +2080,7 @@ public:
     {
     }
 
-    Query fulltext(StringData sd);
+    Query fulltext(StringData sd) const;
 
     using SimpleQuerySupport::size;
 

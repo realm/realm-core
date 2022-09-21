@@ -600,7 +600,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_keys) {
             auto t = get_table(k);
             if (auto col = t->get_primary_key_column()) {
-                t->do_add_search_index(col, false);
+                t->do_add_search_index(col, IndexType::General);
             }
         }
     }

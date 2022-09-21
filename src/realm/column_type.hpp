@@ -136,6 +136,7 @@ static_assert(!col_type_OldStringEnum.is_valid());
 static_assert(!col_type_OldTable.is_valid());
 static_assert(!col_type_OldDateTime.is_valid());
 
+enum class IndexType { General, Fulltext };
 
 // Column attributes can be combined using bitwise or.
 enum ColumnAttr {
@@ -167,7 +168,6 @@ enum ColumnAttr {
 
     /// Specifies that elements in the column are full-text indexed
     col_attr_FullText_Indexed = 256,
-
 
     /// Either list, dictionary, or set
     col_attr_Collection = 128 + 64 + 32

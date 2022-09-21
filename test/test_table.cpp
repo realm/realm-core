@@ -5919,7 +5919,7 @@ TEST(Table_FullTextIndex)
 
         auto t = wt->add_table("foo");
         col = t->add_column(type_String, "str");
-        t->add_search_index(col, true);
+        t->add_fulltext_index(col);
         auto index = t->get_search_index(col);
         CHECK(index->is_fulltext_index());
 

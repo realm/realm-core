@@ -911,7 +911,7 @@ void Table::clear_indexes()
     }
 }
 
-void Table::do_add_search_index(ColKey col_key, bool fulltext)
+void Table::do_add_search_index(ColKey col_key, IndexType type)
 {
     size_t column_ndx = col_key.get_index().val;
 
@@ -932,7 +932,7 @@ void Table::do_add_search_index(ColKey col_key, bool fulltext)
 
     // Create the index
     m_index_accessors[column_ndx] =
-        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, fulltext), get_alloc()); // Throws
+        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
     StringIndex* index = m_index_accessors[column_ndx].get();
 
     // Insert ref to index
@@ -942,14 +942,14 @@ void Table::do_add_search_index(ColKey col_key, bool fulltext)
     populate_search_index(col_key);
 }
 
-void Table::add_search_index(ColKey col_key, bool fulltext)
+void Table::add_search_index(ColKey col_key, IndexType type)
 {
     check_column(col_key);
 
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
-    if (fulltext) {
+    if (type == IndexType::Fulltext) {
         // Early-out if already indexed
         if (attr.test(col_attr_FullText_Indexed)) {
             REALM_ASSERT(has_search_index(col_key));
@@ -971,10 +971,10 @@ void Table::add_search_index(ColKey col_key, bool fulltext)
         }
     }
 
-    do_add_search_index(col_key, fulltext);
+    do_add_search_index(col_key, type);
 
     // Update spec
-    attr.set(fulltext ? col_attr_FullText_Indexed : col_attr_Indexed);
+    attr.set(type == IndexType::Fulltext ? col_attr_FullText_Indexed : col_attr_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
@@ -1339,7 +1339,8 @@ void Table::migrate_indexes(ColKey pk_col_key)
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
                     // Otherwise create new index. Will be updated when objects are created
                     m_index_accessors[col_ndx] = std::make_unique<StringIndex>(
-                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx), false), get_alloc()); // Throws
+                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx), IndexType::General),
+                        get_alloc()); // Throws
                     auto index = m_index_accessors[col_ndx].get();
                     index->set_parent(&m_index_refs, col_ndx);
                     m_index_refs.set(col_ndx, index->get_ref());
@@ -2978,26 +2979,22 @@ void Table::refresh_index_accessors()
     // we can not use for_each_column() here, since the columns may have changed
     // and the index accessor vector is not updated correspondingly.
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
-        bool has_old_accessor = bool(m_index_accessors[col_ndx]);
         ref_type ref = m_index_refs.get_as_ref(col_ndx);
 
         if (ref == 0) {
-            if (has_old_accessor) { // accessor drop
-                m_index_accessors[col_ndx].reset();
-            }
+            // accessor drop
+            m_index_accessors[col_ndx].reset();
         }
         else {
             auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_ndx]);
             bool fulltext = attr.test(col_attr_FullText_Indexed);
+            auto col_key = m_leaf_ndx2colkey[col_ndx];
+            ClusterColumn virtual_col(&m_clusters, col_key, fulltext ? IndexType::Fulltext : IndexType::General);
 
-            if (has_old_accessor) { // still there, refresh:
-                auto col_key = m_leaf_ndx2colkey[col_ndx];
-                ClusterColumn virtual_col(&m_clusters, col_key, fulltext);
+            if (m_index_accessors[col_ndx]) { // still there, refresh:
                 m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
             }
             else { // new index!
-                auto col_key = m_leaf_ndx2colkey[col_ndx];
-                ClusterColumn virtual_col(&m_clusters, col_key, fulltext);
                 m_index_accessors[col_ndx] =
                     std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
             }
@@ -3735,7 +3732,7 @@ void Table::do_set_primary_key_column(ColKey col_key)
 
     if (col_key) {
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
-        do_add_search_index(col_key, false);
+        do_add_search_index(col_key, IndexType::General);
     }
     else {
         m_top.set(top_position_for_pk_col, 0);
@@ -4054,7 +4051,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
     if (si)
-        do_add_search_index(new_col, false);
+        do_add_search_index(new_col, IndexType::General);
 
     return new_col;
 }

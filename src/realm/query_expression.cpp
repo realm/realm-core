@@ -622,10 +622,10 @@ Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sens
     return string_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
 
-Query Columns<StringData>::fulltext(StringData)
+Query Columns<StringData>::fulltext(StringData text) const
 {
     const LinkMap& link_map = get_link_map();
-    return link_map.get_base_table()->where().fulltext(column_key(), "object gemstone", link_map);
+    return link_map.get_base_table()->where().fulltext(column_key(), text, link_map);
 }
 
 

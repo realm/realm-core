@@ -216,14 +216,13 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
                 result_ref.payload = key_value;
                 return first ? key_value : (get_count ? 1 : FindRes_single);
             }
-            else {
-                Mixed a = column.get_value(ObjKey(key_value));
-                if (a == value) {
-                    result_ref.payload = key_value;
-                    return first ? key_value : get_count ? 1 : FindRes_single;
-                }
-                return local_not_found;
+
+            Mixed a = column.get_value(ObjKey(key_value));
+            if (a == value) {
+                result_ref.payload = key_value;
+                return first ? key_value : get_count ? 1 : FindRes_single;
             }
+            return local_not_found;
         }
 
         const char* sub_header = m_alloc.translate(ref_type(ref));
@@ -238,9 +237,8 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
                 result_ref.end_ndx = sub.size();
                 return FindRes_column;
             }
-            else {
-                return from_list<method>(value, result_ref, sub, column);
-            }
+
+            return from_list<method>(value, result_ref, sub, column);
         }
 
         // Recurse into sub-index;
@@ -618,7 +616,7 @@ size_t IndexArray::index_string_count(Mixed value, const ClusterColumn& column) 
     return to_size_t(index_string<index_Count>(value, unused, column));
 }
 
-IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
+std::unique_ptr<IndexArray> StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     std::unique_ptr<IndexArray> top(new IndexArray(alloc)); // Throws
@@ -634,13 +632,15 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     top->add(values.get_ref());              // first entry in refs points to offsets
 
-    return top.release();
+    return top;
 }
 
+/*
 ref_type StringIndex::create_empty(Allocator& alloc)
 {
     return StringIndex(ClusterColumn(nullptr, {}, false), alloc).get_ref(); // Throws
 }
+*/
 
 void StringIndex::set_target(const ClusterColumn& target_column) noexcept
 {

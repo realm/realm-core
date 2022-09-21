@@ -1821,7 +1821,7 @@ protected:
         return BinaryData(s.data(), s.size());
     }
 
-    virtual ObjKey get_key(size_t ndx) = 0;
+    virtual ObjKey get_key(size_t ndx) const = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
 };
@@ -1886,7 +1886,7 @@ public:
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
 
-    ObjKey get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) const override
     {
         if (IntegerColumn* vec = m_index_matches.get()) {
             return ObjKey(vec->get(ndx));
@@ -1964,7 +1964,7 @@ private:
     std::string m_ucase;
     std::string m_lcase;
 
-    ObjKey get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) const override
     {
         return m_index_matches[ndx];
     }
@@ -2003,7 +2003,7 @@ private:
 
     StringNodeFulltext(const StringNodeFulltext&);
 
-    ObjKey get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) const override
     {
         return m_index_matches[ndx];
     }
