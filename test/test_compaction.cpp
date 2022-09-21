@@ -43,7 +43,7 @@ TEST(Compaction_WhileGrowing)
     for (int i = 0; i < 5000; ++i) {
         w[i] = '0' + (i % 64);
     }
-    int num = 500;
+    int num = 1490;
     tr->promote_to_write();
     for (int j = 0; j < num; ++j) {
         table1->create_object().set(col_bin1, BinaryData(w, 400));
@@ -56,82 +56,105 @@ TEST(Compaction_WhileGrowing)
     tr->commit_and_continue_as_read();
 
     tr->promote_to_write();
-    table1->clear();
+    auto objp = table1->begin();
+    for (int j = 0; j < 1460; ++j, ++objp) {
+        objp->set(col_bin1, BinaryData());
+        if (j % 10 == 0) {
+            tr->commit_and_continue_as_read();
+            tr->promote_to_write();
+        }
+    }
+
     tr->commit_and_continue_as_read();
     db->get_stats(free_space, used_space);
-    CHECK(free_space > used_space);
+    // The file is now subject to compaction
+    CHECK(free_space > 2 * used_space);
 
     // During the following, the space kept in "m_under_evacuation" will be used
     // before all elements have been moved, which will terminate that session
-    while (free_space > used_space) {
+    tr->promote_to_write();
+    table1->create_object().set(col_bin1, BinaryData(w, 4500));
+    table1->create_object().set(col_bin1, BinaryData(w, 4500));
+    tr->commit_and_continue_as_read();
+    db->get_stats(free_space, used_space);
+    std::cout << "Total: " << free_space + used_space << ", "
+              << "Free: " << free_space << ", "
+              << "Used: " << used_space << std::endl;
+
+    tr->promote_to_write();
+    table1->clear();
+    table2->clear();
+    tr->commit_and_continue_as_read();
+
+    do {
         tr->promote_to_write();
-        table1->create_object().set(col_bin1, BinaryData(w, 4000));
         tr->commit_and_continue_as_read();
         db->get_stats(free_space, used_space);
-        // std::cout << "Total: " << free_space + used_space << ", "
-        //           << "Free: " << free_space << ", "
-        //           << "Used: " << used_space << std::endl;
-    }
-    db->get_stats(free_space, used_space);
-    tr->promote_to_write();
-    table1->create_object().set(col_bin1, BinaryData(w, 4000));
-    table1->create_object().set(col_bin1, BinaryData(w, 4000));
-    table1->create_object().set(col_bin1, BinaryData(w, 4000));
-    table1->create_object().set(col_bin1, BinaryData(w, 4000));
-    tr->commit_and_continue_as_read();
+    } while (free_space < 0x1000);
 }
-
 
 TEST(Compaction_Large)
 {
-    Random random(random_int<unsigned long>());
     SHARED_GROUP_TEST_PATH(path);
     int64_t total;
     {
         DBRef db = DB::create(make_in_realm_history(), path);
-        auto tr = db->start_write();
-        auto t = tr->add_table("the_table");
-        auto c = t->add_column(type_Binary, "str", true);
-        char w[1000];
-        for (int i = 0; i < 1000; ++i) {
-            w[i] = '0' + (i % 10);
-        }
-        size_t num = 100000;
-        for (size_t j = 0; j < num; ++j) {
-            BinaryData sd(w, 500 + (j % 500));
-            t->create_object().set(c, sd);
-        }
-        tr->commit_and_continue_as_read();
-
-        tr->promote_to_write();
-        int j = 0;
-        for (auto o : *t) {
-            BinaryData sd(w, j % 500);
-            o.set(c, sd);
-            ++j;
-        }
-        tr->commit_and_continue_as_read();
-
-        tr->promote_to_write();
-        // This will likely make the table names reside in the upper end of the file
-        tr->add_table("another_table");
-        tr->commit_and_continue_as_read();
-
-        size_t free_space, used_space;
-        do {
-            tr->promote_to_write();
-            for (j = 0; j < 500; j++) {
-                int index = random.draw_int_mod(10000);
-                auto obj = t->get_object(index);
-                obj.set(c, BinaryData(w, j % 10));
+        {
+            auto tr = db->start_write();
+            auto t = tr->add_table("the_table");
+            auto c = t->add_column(type_Binary, "str", true);
+            char w[1000];
+            for (int i = 0; i < 1000; ++i) {
+                w[i] = '0' + (i % 10);
+            }
+            size_t num = 100000;
+            for (size_t j = 0; j < num; ++j) {
+                BinaryData sd(w, 500 + (j % 500));
+                t->create_object().set(c, sd);
             }
             tr->commit_and_continue_as_read();
-            db->get_stats(free_space, used_space);
-            total = free_space + used_space;
-            // std::cout << "Total: " << total << ", "
-            //           << "Free: " << free_space << ", "
-            //           << "Used: " << used_space << std::endl;
-        } while (free_space > used_space);
+
+            tr->promote_to_write();
+            int j = 0;
+            for (auto o : *t) {
+                BinaryData sd(w, j % 500);
+                o.set(c, sd);
+                ++j;
+            }
+            tr->commit_and_continue_as_read();
+
+            tr->promote_to_write();
+            // This will likely make the table names reside in the upper end of the file
+            tr->add_table("another_table");
+            tr->commit_and_continue_as_read();
+        }
+
+        auto worker = [db] {
+            Random random(random_int<unsigned long>());
+            size_t free_space, used_space;
+            auto tr = db->start_read();
+            auto t = tr->get_table("the_table");
+            auto c = t->get_column_key("str");
+            std::string data("abcdefghij");
+            do {
+                tr->promote_to_write();
+                for (int j = 0; j < 500; j++) {
+                    int index = random.draw_int_mod(10000);
+                    auto obj = t->get_object(index);
+                    obj.set(c, BinaryData(data.data(), j % 10));
+                }
+                tr->commit_and_continue_as_read();
+                db->get_stats(free_space, used_space);
+            } while (free_space > used_space);
+        };
+
+        std::thread t1(worker);
+        std::thread t2(worker);
+        t1.join();
+        t2.join();
+        size_t free_space, used_space;
+        db->get_stats(free_space, used_space);
+        total = free_space + used_space;
     }
     File f(path);
     // std::cout << "Size : " << f.get_size() << std::endl;

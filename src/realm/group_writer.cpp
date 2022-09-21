@@ -192,6 +192,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
 #endif
     Array& top = m_group.m_top;
+    m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
 
     while (top.size() < Group::s_version_ndx + 1) {
         top.add(0);
@@ -260,6 +261,11 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                 m_backoff = int(arr.get(1));
                 for (size_t i = 2; i < sz; i++)
                     m_evacuation_progress.push_back(size_t(arr.get(i)));
+            }
+            // If cleanup potential is less than 25 % - give up
+            auto cleanup_potential = m_logical_size - m_evacuation_limit;
+            if (cleanup_potential < m_logical_size / 4) {
+                m_evacuation_limit = 0;
             }
         }
     }
@@ -366,7 +372,7 @@ ref_type GroupWriter::write_group()
             arr.truncate(2);
 
             arr.set(0, int64_t(m_evacuation_limit));
-            arr.set(1, m_evacuation_progress.empty() ? 1 : 0); // Backoff
+            arr.set(1, m_evacuation_progress.empty() ? 1 : 0); // Backoff from scanning
             for (auto index : m_evacuation_progress) {
                 arr.add(int64_t(index));
             }
@@ -429,7 +435,6 @@ ref_type GroupWriter::write_group()
 
     // If current size is less than 128 MB, the database need not expand above 2 GB
     // which means that the positions and sizes can still be in 32 bit.
-    m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
     int size_per_entry = (m_logical_size < 0x8000000 ? 8 : 16) + 8;
     size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
 
@@ -452,7 +457,8 @@ ref_type GroupWriter::write_group()
         if (elem.ref + elem.size == m_logical_size) {
             // This is at the end of the file
             size_t pos = elem.ref;
-            m_logical_size = util::round_up_to_page_size(pos);
+            // Don't truncate below 64k
+            m_logical_size = (pos + 0xFFFF) & ~size_t(0xFFFF);
             elem.size = (m_logical_size - pos);
             if (elem.size == 0)
                 m_under_evacuation.clear();
@@ -518,7 +524,7 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
     if (m_evacuation_limit == 0) {
         size_t used_space = m_logical_size - m_free_space_size;
-        if (used_space > 0x10000 && m_free_space_size - m_locked_space_size > 2 * used_space) {
+        if (m_logical_size >= 0x100000 && m_free_space_size - m_locked_space_size > 2 * used_space) {
             // Clean up potential
             m_evacuation_limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
             // From now on, we will only allocate below this limit
@@ -870,7 +876,6 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
             }
             // Set new limit
             if (m_under_evacuation.empty()) {
-                found_or_give_up = true;
                 m_evacuation_limit = 0;
                 // std::cout << "Give up" << std::endl;
             }
@@ -960,7 +965,8 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     auto it = m_size_map.emplace(chunk_size, logical_file_size);
 
     // Update the logical file size
-    m_group.m_top.set(2, 1 + 2 * uint64_t(new_file_size)); // Throws
+    m_logical_size = new_file_size;
+    m_group.m_top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
 
     return it;
 }
