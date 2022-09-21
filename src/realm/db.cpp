@@ -557,6 +557,7 @@ public:
                 break;
             }
             case ReadLockInfo::Full: {
+                --r.count_full;
                 break;
             }
         }
@@ -591,6 +592,7 @@ public:
                 break;
             }
             case ReadLockInfo::Full: {
+                ++r.count_full;
                 break;
             }
         }
