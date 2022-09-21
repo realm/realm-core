@@ -11,7 +11,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-#include <future>
 
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
@@ -4438,32 +4437,33 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
         TEST_DIR(dir);
         MultiClientServerFixture fixture(2, 1, dir, test_context);
 
-        std::future<void> future;
+        std::thread th;
         version_type user_commit_version = UINT_FAST64_MAX;
 
         Session::Config config;
-        config.on_download_message_received_hook =
-            [&](const sync::SyncProgress&, int64_t, sync::DownloadBatchState batch_state, size_t num_changesets) {
-                CHECK(batch_state == sync::DownloadBatchState::SteadyState);
-                if (num_changesets == 0)
-                    return;
+        config.on_download_message_received_hook = [&](const sync::SyncProgress&, int64_t,
+                                                       sync::DownloadBatchState batch_state, size_t num_changesets) {
+            CHECK(batch_state == sync::DownloadBatchState::SteadyState);
+            if (num_changesets == 0)
+                return;
 
-                future = std::async([&] {
-                    auto write = db_1->start_write();
-                    // Keep the transaction open until the sync client is waiting to acquire the write lock.
-                    while (!db_1->other_writers_waiting_for_lock()) {
-                        millisleep(1);
-                    }
-                    write->close();
+            auto func = [&] {
+                auto write = db_1->start_write();
+                // Keep the transaction open until the sync client is waiting to acquire the write lock.
+                while (!db_1->other_writers_waiting_for_lock()) {
+                    millisleep(1);
+                }
+                write->close();
 
-                    // Sync client holds the write lock now, so commit a local change.
-                    WriteTransaction wt(db_1);
-                    TableRef table = wt.get_table("class_table name");
-                    auto obj = table->create_object();
-                    obj.set("string column", "foobar");
-                    user_commit_version = wt.commit();
-                });
+                // Sync client holds the write lock now, so commit a local change.
+                WriteTransaction wt(db_1);
+                TableRef table = wt.get_table("class_table name");
+                auto obj = table->create_object();
+                obj.set("string column", "foobar");
+                user_commit_version = wt.commit();
             };
+            th = std::thread{std::move(func)};
+        };
         Session session_1 = fixture.make_session(0, db_1, std::move(config));
         fixture.bind_session(session_1, 0, "/test");
         Session session_2 = fixture.make_session(1, db_2);
@@ -4483,20 +4483,24 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
 
-        future.wait();
+        th.join();
 
         // Check that local change was commited before all remote changes were integrated.
         ReadTransaction rt(db_1);
-        CHECK(user_commit_version < rt.get_version());
+        CHECK_LESS(user_commit_version, rt.get_version());
     }
 
     ReadTransaction read_1(db_1);
     ReadTransaction read_2(db_2);
     const Group& group_1 = read_1;
-    const Group& group_2 = read_1;
+    const Group& group_2 = read_2;
     ConstTableRef table_1 = group_1.get_table("class_table name");
     CHECK_EQUAL(table_1->size(), number_of_changesets * number_of_instructions + 1);
-    ConstTableRef table_2 = group_2.get_table("class_table name2");
+    ConstTableRef table_2 = group_1.get_table("class_table name2");
+    CHECK_EQUAL(table_2->size(), number_of_changesets * number_of_instructions);
+    table_1 = group_2.get_table("class_table name");
+    CHECK(!table_1);
+    table_2 = group_2.get_table("class_table name2");
     CHECK_EQUAL(table_2->size(), number_of_changesets * number_of_instructions);
 }
 
