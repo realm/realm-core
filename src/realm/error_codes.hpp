@@ -105,6 +105,7 @@ public:
         FileFormatUpgradeRequired = RLM_ERR_FILE_FORMAT_UPGRADE_REQUIRED,
         SchemaVersionMismatch = RLM_ERR_SCHEMA_VERSION_MISMATCH,
         NoSubscriptionForWrite = RLM_ERR_NO_SUBSCRIPTION_FOR_WRITE,
+        BadVersion = RLM_ERR_BAD_VERSION,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
@@ -129,6 +130,7 @@ public:
         InvalidSchemaVersion = RLM_ERR_INVALID_SCHEMA_VERSION,
         InvalidSchemaChange = RLM_ERR_INVALID_SCHEMA_CHANGE,
 
+        BadServerUrl = RLM_ERR_BAD_SERVER_URL,
         InvalidArgument = RLM_ERR_INVALID_ARGUMENT,
         TypeMismatch = RLM_ERR_PROPERTY_TYPE_MISMATCH,
         PropertyNotNullable = RLM_ERR_PROPERTY_NOT_NULLABLE,

@@ -34,6 +34,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 
         case AddressSpaceExhausted:
         case BadChangeset:
+        case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
         case DuplicatePrimaryKeyValue:
@@ -89,6 +90,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case WrongTransactionState:
             return ErrorCategory().set(ErrorCategory::logic_error);
 
+        case BadServerUrl:
         case IllegalCombination:
         case InvalidArgument:
         case InvalidDictionaryKey:
@@ -215,7 +217,9 @@ static const MapElem string_to_error_code[] = {
     {"BadBsonParse", ErrorCodes::BadBsonParse},
     {"BadChangeset", ErrorCodes::BadChangeset},
     {"BadRequest", ErrorCodes::BadRequest},
+    {"BadServerUrl", ErrorCodes::BadServerUrl},
     {"BadToken", ErrorCodes::BadToken},
+    {"BadVersion", ErrorCodes::BadVersion},
     {"BrokenInvariant", ErrorCodes::BrokenInvariant},
     {"BrokenPromise", ErrorCodes::BrokenPromise},
     {"CallbackFailed", ErrorCodes::CallbackFailed},

@@ -1980,13 +1980,13 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             // to it. If so we retry. If the tail ptr points somewhere else, the entry
             // has been cleaned up.
             if (&r_info->readers.get_oldest() != &r)
-                throw BadVersion();
+                throw BadVersion(version_id.version);
         }
         // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != version_id.version) {
             atomic_double_dec(r.count); // <-- release
-            throw BadVersion();
+            throw BadVersion(version_id.version);
         }
         read_lock.m_version = r.version;
         read_lock.m_top_ref = to_size_t(r.current_top);

@@ -56,7 +56,8 @@ class InvalidFreeSpace : std::exception {
 public:
     const char* what() const noexcept override
     {
-        return "Free space tracking was lost due to out-of-memory";
+        return "Free space tracking was lost due to out-of-memory. The Realm file must be closed and reopened before "
+               "further writes can be performed.";
     }
 };
 

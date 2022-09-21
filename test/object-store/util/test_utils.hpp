@@ -29,6 +29,89 @@
 namespace fs = std::filesystem;
 
 namespace realm {
+template <typename MessageMatcher>
+class ExceptionMatcher final : public Catch::Matchers::MatcherBase<Exception> {
+public:
+    ExceptionMatcher(ErrorCodes::Error code, MessageMatcher&& matcher)
+        : m_code(code)
+        , m_matcher(std::move(matcher))
+    {
+    }
+
+    bool match(Exception const& ex) const override
+    {
+        return ex.code() == m_code && m_matcher.match(ex.what());
+    }
+
+    std::string describe() const override
+    {
+        return util::format("Exception(%1, \"%2\")", ErrorCodes::error_string(m_code), m_matcher.describe());
+    }
+
+private:
+    ErrorCodes::Error m_code;
+    MessageMatcher m_matcher;
+};
+
+template <>
+class ExceptionMatcher<void> final : public Catch::Matchers::MatcherBase<Exception> {
+public:
+    ExceptionMatcher(ErrorCodes::Error code, std::string_view msg)
+        : m_code(code)
+        , m_message(msg)
+    {
+    }
+
+    bool match(Exception const& ex) const override;
+    std::string describe() const override;
+
+private:
+    ErrorCodes::Error m_code;
+    std::string m_message;
+};
+
+class OutOfBoundsMatcher final : public Catch::Matchers::MatcherBase<OutOfBounds> {
+public:
+    OutOfBoundsMatcher(size_t index, size_t size, std::string_view msg)
+        : m_index(index)
+        , m_size(size)
+        , m_message(msg)
+    {
+    }
+
+    bool match(OutOfBounds const& ex) const override;
+    std::string describe() const override;
+
+private:
+    size_t m_index, m_size;
+    std::string m_message;
+};
+
+namespace _impl {
+template <typename T>
+ExceptionMatcher<T> make_exception_matcher(ErrorCodes::Error code, T&& matcher)
+{
+    return ExceptionMatcher<T>(code, std::move(matcher));
+}
+inline ExceptionMatcher<void> make_exception_matcher(ErrorCodes::Error code, const char* msg)
+{
+    return ExceptionMatcher<void>(code, msg);
+}
+inline ExceptionMatcher<void> make_exception_matcher(ErrorCodes::Error code, std::string_view msg)
+{
+    return ExceptionMatcher<void>(code, msg);
+}
+inline ExceptionMatcher<void> make_exception_matcher(ErrorCodes::Error code, const std::string& msg)
+{
+    return ExceptionMatcher<void>(code, msg);
+}
+inline ExceptionMatcher<void> make_exception_matcher(ErrorCodes::Error code, std::string&& msg)
+{
+    return ExceptionMatcher<void>(code, msg);
+}
+} // namespace _impl
+
+std::ostream& operator<<(std::ostream&, const Exception&);
 
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path);
@@ -40,24 +123,8 @@ void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string se
 std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp = {},
                             util::Optional<int64_t> iat = {});
 
-static inline std::string random_string(std::string::size_type length)
-{
-    static auto& chrs = "abcdefghijklmnopqrstuvwxyz"
-                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    thread_local static std::mt19937 rg{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-    std::string s;
-    s.reserve(length);
-    while (length--)
-        s += chrs[pick(rg)];
-    return s;
-}
-
-static inline int64_t random_int()
-{
-    thread_local std::mt19937_64 rng(std::random_device{}());
-    return rng();
-}
+std::string random_string(std::string::size_type length);
+int64_t random_int();
 
 bool chmod_supported(const std::string& path);
 int get_permissions(const std::string& path);
@@ -101,6 +168,24 @@ std::string get_parent_directory(const std::string& path);
     } while (0)
 
 #define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::ContainsSubstring(msg))
+
+namespace {
+}
+
+#define REQUIRE_EXCEPTION(expr, c, msg)                                                                              \
+    REQUIRE_THROWS_MATCHES(expr, realm::Exception, _impl::make_exception_matcher(realm::ErrorCodes::c, msg))
+#define REQUIRE_THROWS_OUT_OF_BOUNDS(expr, index, size, msg)                                                         \
+    REQUIRE_THROWS_MATCHES(expr, OutOfBounds, OutOfBoundsMatcher(index, size, msg));
+
+#define REQUIRE_THROWS_WITH_CODE(expr, err)                                                                          \
+    do {                                                                                                             \
+        try {                                                                                                        \
+            expr;                                                                                                    \
+        }                                                                                                            \
+        catch (const Exception& e) {                                                                                 \
+            REQUIRE(e.code() == err);                                                                                \
+        }                                                                                                            \
+    } while (0)
 
 #define REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(expr, err)                                                               \
     do {                                                                                                             \

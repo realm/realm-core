@@ -115,7 +115,9 @@ TEST_CASE("thread safe reference") {
             r->begin_transaction();
             r->commit_transaction();
             REQUIRE(db->get_number_of_versions() == 2);
-            REQUIRE_THROWS(db->start_read(initial_version));
+            REQUIRE_EXCEPTION(db->start_read(initial_version), BadVersion,
+                              util::format("Unable to lock version %1 as it does not exist or has been cleaned up.",
+                                           initial_version.version));
         }
 
         SECTION("other types do not") {
@@ -132,7 +134,9 @@ TEST_CASE("thread safe reference") {
             r->begin_transaction();
             r->commit_transaction();
             REQUIRE(db->get_number_of_versions() == 2);
-            REQUIRE_THROWS(db->start_read(initial_version));
+            REQUIRE_EXCEPTION(db->start_read(initial_version), BadVersion,
+                              util::format("Unable to lock version %1 as it does not exist or has been cleaned up.",
+                                           initial_version.version));
 
             // Should still be resolvable
             auto obj_2 = obj_ref.resolve<Object>(r);

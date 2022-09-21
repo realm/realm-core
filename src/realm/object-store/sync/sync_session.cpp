@@ -752,7 +752,7 @@ void SyncSession::create_sync_session()
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
-            throw sync::BadServerUrl();
+            throw sync::BadServerUrl(sync_route);
         }
         // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
         // the session is created. How to resolve this?
