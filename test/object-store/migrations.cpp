@@ -245,7 +245,7 @@ TEST_CASE("Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
-        SECTION("delete one just element") {
+        SECTION("delete 1 element") {
             Schema delete_schema = remove_table(schema5, "Z");
             // A B C Z vs A B C ==> Z (other classes)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
