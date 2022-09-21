@@ -819,7 +819,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
     // Token refreshing requires that we have app metadata and we can't fetch
     // it normally, so just stick some fake values in
-    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](const SyncMetadataManager& manager) {
+    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](SyncMetadataManager& manager) {
         manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname");
     });
 

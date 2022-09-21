@@ -98,6 +98,9 @@ class AggregateHelper {
 public:
     static std::optional<Mixed> sum(const Table& table, const Target& target, ColKey col_key)
     {
+        table.check_column(col_key);
+        if (col_key.is_collection())
+            return std::nullopt;
         switch (table.get_column_type(col_key)) {
             case type_Int:
                 if (table.is_nullable(col_key)) {
@@ -121,6 +124,9 @@ public:
 
     static std::optional<Mixed> avg(const Table& table, const Target& target, ColKey col_key, size_t* value_count)
     {
+        table.check_column(col_key);
+        if (col_key.is_collection())
+            return std::nullopt;
         switch (table.get_column_type(col_key)) {
             case type_Int:
                 if (table.is_nullable(col_key)) {
@@ -170,6 +176,8 @@ private:
     template <typename T>
     static Mixed sum(const Target& target, ColKey col_key)
     {
+        if (col_key.is_collection())
+            return std::nullopt;
         QueryStateSum<typename util::RemoveOptional<T>::type> st;
         target.template aggregate<T>(st, col_key);
         return st.result_sum();
@@ -178,6 +186,9 @@ private:
     template <template <typename> typename QueryState>
     static std::optional<Mixed> minmax(const Table& table, const Target& target, ColKey col_key, ObjKey* return_ndx)
     {
+        table.check_column(col_key);
+        if (col_key.is_collection())
+            return std::nullopt;
         switch (table.get_column_type(col_key)) {
             case type_Int:
                 if (table.is_nullable(col_key)) {

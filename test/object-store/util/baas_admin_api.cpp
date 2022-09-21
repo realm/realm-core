@@ -274,7 +274,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
 
 } // namespace
 
-app::Response do_http_request(app::Request&& request)
+app::Response do_http_request(const app::Request& request)
 {
     CurlGlobalGuard curl_global_guard;
     auto curl = curl_easy_init();
@@ -289,7 +289,7 @@ app::Response do_http_request(app::Request&& request)
     });
 
     std::string response;
-    std::map<std::string, std::string> response_headers;
+    util::HTTPHeaders response_headers;
 
     /* First set the URL that is about to receive our POST. This URL can
      just as well be a https:// URL if that is what should receive the
@@ -771,6 +771,11 @@ AppCreateConfig default_app_config(const std::string& base_url)
                              realm::Property("breed", PropertyType::String | PropertyType::Nullable),
                              realm::Property("name", PropertyType::String),
                              realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto cat_schema =
+        ObjectSchema("Cat", {realm::Property("_id", PropertyType::String | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
     const auto person_schema =
         ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
                                 realm::Property("age", PropertyType::Int),
@@ -778,7 +783,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
                                 realm::Property("firstName", PropertyType::String),
                                 realm::Property("lastName", PropertyType::String),
                                 realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    realm::Schema default_schema({dog_schema, person_schema});
+    realm::Schema default_schema({dog_schema, cat_schema, person_schema});
 
     Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
