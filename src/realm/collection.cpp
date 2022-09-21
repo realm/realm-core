@@ -24,14 +24,14 @@ size_t virtual2real(const BPlusTree<ObjKey>* tree, size_t ndx) noexcept
             size_t sz = leaf->size();
             for (size_t i = 0; i < sz; i++) {
                 if (i + offset == ndx) {
-                    return true;
+                    return IteratorControl::Stop;
                 }
                 auto k = leaf->get(i);
                 if (k.is_unresolved()) {
                     adjust++;
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         tree->traverse(func);
@@ -63,7 +63,7 @@ void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree)
                     vec.push_back(i + offset);
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         };
 
         tree->traverse(func);

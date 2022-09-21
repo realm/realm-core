@@ -274,79 +274,6 @@ bool utf8_compare(StringData string1, StringData string2)
     return false;
 }
 
-// Here is a version for Windows that may be closer to what is ultimately needed.
-/*
-bool case_map(const char* begin, const char* end, StringBuffer& dest, bool upper)
-{
-const int wide_buffer_size = 32;
-wchar_t wide_buffer[wide_buffer_size];
-
-dest.resize(end-begin);
-size_t dest_offset = 0;
-
-for (;;) {
-int num_out;
-
-// Decode
-{
-size_t num_in = end - begin;
-if (size_t(32) <= num_in) {
-num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, 32, wide_buffer, wide_buffer_size);
-if (num_out != 0) {
-begin += 32;
-goto convert;
-}
-if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
-}
-if (num_in == 0) break;
-int n = num_in < size_t(8) ? int(num_in) : 8;
-num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, wide_buffer, wide_buffer_size);
-if (num_out != 0) {
-begin += n;
-goto convert;
-}
-return false;
-}
-
-convert:
-if (upper) {
-for (int i=0; i<num_out; ++i) {
-CharUpperW(wide_buffer + i);
-}
-}
-else {
-for (int i=0; i<num_out; ++i) {
-CharLowerW(wide_buffer + i);
-}
-}
-
-encode:
-{
-size_t free = dest.size() - dest_offset;
-if (int_less_than(std::numeric_limits<int>::max(), free)) free = std::numeric_limits<int>::max();
-int n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_buffer, num_out,
-dest.data() + dest_offset, int(free), 0, 0);
-if (i != 0) {
-dest_offset += n;
-continue;
-}
-if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
-size_t dest_size = dest.size();
-if (int_multiply_with_overflow_detect(dest_size, 2)) {
-if (dest_size == std::numeric_limits<size_t>::max()) return false;
-dest_size = std::numeric_limits<size_t>::max();
-}
-dest.resize(dest_size);
-goto encode;
-}
-}
-
-dest.resize(dest_offset);
-return true;
-}
-*/
-
-
 // Converts UTF-8 source into upper or lower case. This function
 // preserves the byte length of each UTF-8 character in following way:
 // If an output character differs in size, it is simply substituded by
@@ -358,29 +285,42 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     result.resize(source.size());
 
 #if defined(_WIN32)
+    constexpr int tmp_buffer_size = 32;
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
     while (begin != end) {
-        int n = static_cast<int>(sequence_length(*begin));
-        if (n == 0 || end - begin < n)
-            return util::none;
+        auto n = end - begin;
+        if (n > tmp_buffer_size) {
+            // Break the input string into chunks - but don't break in the middle of a multibyte character
+            const char* p = begin;
+            const char* buffer_end = begin + tmp_buffer_size;
+            while (p < buffer_end) {
+                size_t len = sequence_length(*p);
+                p += len;
+                if (p > buffer_end) {
+                    p -= len;
+                    break;
+                }
+            }
+            n = p - begin;
+        }
 
-        wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
+        wchar_t tmp[tmp_buffer_size];
 
-        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
+        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, int(n), tmp, tmp_buffer_size);
         if (n2 == 0)
             return util::none;
 
-        REALM_ASSERT(n2 == 1);
-        tmp[n2] = 0;
+        if (n2 < tmp_buffer_size)
+            tmp[n2] = 0;
 
         // Note: If tmp[0] == 0, it is because the string contains a
         // null-chacarcter, which is perfectly fine.
 
-        wchar_t mapped_tmp[2];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 1, mapped_tmp, 2,
-                      nullptr, nullptr, 0);
+        wchar_t mapped_tmp[tmp_buffer_size];
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, n2, mapped_tmp,
+                      tmp_buffer_size, nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
         // to catch invalid UTF-8. Even though the documentation says
@@ -388,7 +328,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // the flag is specified, the function fails with error
         // ERROR_INVALID_FLAGS.
         DWORD flags = 0;
-        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, 1, &*output, static_cast<int>(end - begin), 0, 0);
+        auto m = static_cast<int>(end - begin);
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, n2, &*output, m, 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
             return util::none;
 
@@ -402,32 +343,75 @@ util::Optional<std::string> case_map(StringData source, bool upper)
 
     return result;
 #else
-    // FIXME: Implement this! Note that this is trivial in C++11 due
-    // to its built-in support for UTF-8. In C++03 it is trivial when
-    // __STDC_ISO_10646__ is defined. Also consider using ICU. Maybe
-    // GNU has something to offer too.
-
-    // For now we handle just the ASCII subset
+    size_t sz = source.size();
     typedef std::char_traits<char> traits;
-    if (upper) {
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x60, c) && traits::lt(c, 0x7B))
-                c = traits::to_char_type(traits::to_int_type(c) - 0x20);
-            result[i] = c;
-        }
-    }
-    else { // lower
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x40, c) && traits::lt(c, 0x5B))
-                c = traits::to_char_type(traits::to_int_type(c) + 0x20);
-            result[i] = c;
-        }
-    }
+    for (size_t i = 0; i < sz; ++i) {
+        char c = source[i];
+        auto int_val = traits::to_int_type(c);
 
+        auto copy_bytes = [&](size_t n) {
+            if (i + n > sz) {
+                return false;
+            }
+            for (size_t j = 1; j < n; j++) {
+                result[i++] = c;
+                c = source[i];
+                if ((c & 0xC0) != 0x80) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        if (int_val < 0x80) {
+            // Handle ASCII
+            if (upper && (c >= 'a' && c <= 'z')) {
+                c -= 0x20;
+            }
+            else if (!upper && (c >= 'A' && c <= 'Z')) {
+                c += 0x20;
+            }
+        }
+        else {
+            if ((int_val & 0xE0) == 0xc0) {
+                // 2 byte utf-8
+                if (i + 2 > sz) {
+                    return {};
+                }
+                c = source[i + 1];
+                if ((c & 0xC0) != 0x80) {
+                    return {};
+                }
+                auto u = ((int_val << 6) + (traits::to_int_type(c) & 0x3F)) & 0x7FF;
+                // Handle some Latin-1 supplement characters
+                if (upper && (u >= 0xE0 && u <= 0xFE && u != 0xF7)) {
+                    u -= 0x20;
+                }
+                else if (!upper && (u >= 0xC0 && u <= 0xDE && u != 0xD7)) {
+                    u += 0x20;
+                }
+
+                result[i++] = static_cast<char>((u >> 6) | 0xC0);
+                c = static_cast<char>((u & 0x3f) | 0x80);
+            }
+            else if ((int_val & 0xF0) == 0xE0) {
+                // 3 byte utf-8
+                if (!copy_bytes(3)) {
+                    return {};
+                }
+            }
+            else if ((int_val & 0xF8) == 0xF0) {
+                // 4 byte utf-8
+                if (!copy_bytes(4)) {
+                    return {};
+                }
+            }
+            else {
+                return {};
+            }
+        }
+        result[i] = c;
+    }
     return result;
 #endif
 }

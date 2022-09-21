@@ -1407,15 +1407,15 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
-                completion_block(response);
-            });
+            SynchronousTestTransport::send_request_to_server(
+                std::move(request), [&](const Request& request, const Response& response) {
+                    completion_block(std::move(request), std::move(response));
+                });
         }
         util::UniqueFunction<void(Request&)> request_hook;
     };
@@ -1949,6 +1949,21 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
         });
+    }
+
+    SECTION("asymmetric table not allowed in PBS") {
+        Schema schema{
+            {"Asymmetric2",
+             ObjectSchema::ObjectType::TopLevelAsymmetric,
+             {
+                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"location", PropertyType::Int},
+                 {"reading", PropertyType::Int},
+             }},
+        };
+
+        SyncTestFile config(harness->app(), bson::Bson{}, schema);
+        REQUIRE_THROWS(Realm::get_shared_realm(config));
     }
 
     // Add any new test sections above this point

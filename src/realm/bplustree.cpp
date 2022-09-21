@@ -218,7 +218,7 @@ size_t BPlusTreeLeaf::bptree_erase(size_t ndx, EraseFunc func)
 
 bool BPlusTreeLeaf::bptree_traverse(TraverseFunc func)
 {
-    return func(this, 0);
+    return func(this, 0) == IteratorControl::Stop;
 }
 
 /****************************** BPlusTreeInner *******************************/
@@ -465,7 +465,7 @@ bool BPlusTreeInner::bptree_traverse(TraverseFunc func)
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             auto leaf = cache_leaf(mem, i, child_offset + m_my_offset);
-            done = func(leaf, child_offset + m_my_offset);
+            done = (func(leaf, child_offset + m_my_offset) == IteratorControl::Stop);
         }
         else {
             BPlusTreeInner node(m_tree);

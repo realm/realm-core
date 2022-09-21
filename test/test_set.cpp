@@ -268,8 +268,9 @@ TEST(Set_Links)
     CHECK_EQUAL(set_mixeds.find(bar3.get_link()), realm::npos);
 
     bar1.remove();
+    set_links.insert(bar4.get_key());
 
-    CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(set_links.size(), 3);
     CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
@@ -281,14 +282,16 @@ TEST(Set_Links)
     auto bar2_link = bar2.get_link();
     bar2.invalidate();
 
-    CHECK_EQUAL(set_links.size(), 2);
-    CHECK_EQUAL(lnkset_links->size(), 1); // Unresolved link was hidden from LnkSet
+    CHECK_EQUAL(set_links.size(), 3);
+    CHECK_EQUAL(lnkset_links->size(), 2); // Unresolved link was hidden from LnkSet
     CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
     CHECK_EQUAL(set_links.find(bar2_key), realm::npos);               // The original bar2 key is no longer in the set
     CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);     // The unresolved bar2 key is in the set
     CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by LnkSet
+    CHECK_EQUAL(lnkset_links->find_any(bar3.get_key()), 0);
+    CHECK_EQUAL(lnkset_links->find_any(bar4.get_key()), 1);
     CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 

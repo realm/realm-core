@@ -112,8 +112,7 @@ public:
                 for (size_t i = 0; i < e; i++) {
                     f(leaf.get(i));
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
             m_clusters->traverse(trv_func);
         }
@@ -132,8 +131,7 @@ public:
                 for (size_t i = 0; i < e; i++) {
                     f(leaf.get(i));
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             };
             m_clusters->traverse(trv_func);
         }
@@ -241,7 +239,6 @@ public:
 
     // Overrides of ObjList:
     ObjKey get_key(size_t ndx) const final;
-    bool is_obj_valid(size_t ndx) const noexcept final;
     Obj get_object(size_t row_ndx) const final;
 
     // Overrides of CollectionBase, these simply forward to the underlying dictionary.

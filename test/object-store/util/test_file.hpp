@@ -249,21 +249,31 @@ public:
 
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
-    realm::util::UniqueFunction<void(const realm::app::Response&)> network_callback;
+    struct TransportCallback {
+        realm::app::Request request;
+        realm::app::HttpCompletion completion_block;
+
+        void operator()(realm::app::Response&& response)
+        {
+            REQUIRE(completion_block);
+            completion_block(request, std::move(response));
+        }
+    };
+
+    TransportCallback network_callback;
     struct Transport : realm::app::GenericNetworkTransport {
-        Transport(realm::util::UniqueFunction<void(const realm::app::Response&)>* network_callback)
+        Transport(TransportCallback* network_callback)
             : network_callback(network_callback)
         {
         }
 
-        void send_request_to_server(
-            realm::app::Request&&,
-            realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion_block) override
+        void send_request_to_server(realm::app::Request&& request,
+                                    realm::app::HttpCompletion&& completion_block) override
         {
-            *network_callback = std::move(completion_block);
+            *network_callback = TransportCallback{std::move(request), std::move(completion_block)};
         }
 
-        realm::util::UniqueFunction<void(const realm::app::Response&)>* network_callback;
+        TransportCallback* network_callback;
     };
     std::shared_ptr<realm::app::GenericNetworkTransport> transport = std::make_shared<Transport>(&network_callback);
 
