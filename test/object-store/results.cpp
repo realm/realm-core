@@ -450,116 +450,91 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("handling of results not ready") {
         make_remote_change();
+        auto initial_version = r->read_transaction_version().version;
 
-        SECTION("notify() does nothing") {
+        SECTION("notify() does nothing if no notifiers are ready") {
             r->notify();
             REQUIRE(notification_calls == 1);
+            REQUIRE(r->read_transaction_version().version == initial_version);
+
             coordinator->on_change();
             r->notify();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
         }
 
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the "
-                "newest at the time it is called") {
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                make_remote_change();
-                coordinator->on_change();
-                make_remote_change();
-            });
-            // advances to the version after the one it was waiting for, but still
-            // not the latest
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-
-            thread.join();
-            REQUIRE(notification_calls == 2);
-
-            // now advances to the latest
+        SECTION("notify() advances to a stale ready version") {
             coordinator->on_change();
-            r->refresh();
+            make_remote_change();
+
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+
+            coordinator->on_change();
+            r->notify();
             REQUIRE(notification_calls == 3);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
         }
 
-        SECTION("begin_transaction() blocks") {
+        SECTION("refresh() runs the stale notifiers") {
             REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
+            // note: no on_change()
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+        }
+
+        SECTION("refresh() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+        }
+
+        SECTION("begin_transaction() runs the stale notifiers") {
+            REQUIRE(notification_calls == 1);
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
             r->cancel_transaction();
         }
 
-        SECTION("refresh() does not block for results without callbacks") {
+        SECTION(
+            "begin_transaction() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+            r->cancel_transaction();
+        }
+
+        SECTION("refresh() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->refresh();
         }
 
-        SECTION("begin_transaction() does not block for results without callbacks") {
+        SECTION("begin_transaction() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->begin_transaction();
             r->cancel_transaction();
         }
 
-        SECTION("begin_transaction() does not block for Results for different Realms") {
+        SECTION("begin_transaction() does not run stale notifiers if they are for a different Realm") {
             // this would deadlock if beginning the write on the secondary Realm
             // waited for the primary Realm to be ready
+            auto lock = coordinator->block_notifier_execution();
             make_remote_change();
 
             // sanity check that the notifications never did run
             r->notify();
             REQUIRE(notification_calls == 1);
-        }
-    }
-
-    SECTION("handling of stale results") {
-        make_remote_change();
-        coordinator->on_change();
-        make_remote_change();
-
-        SECTION("notify() uses the older version") {
-            r->notify();
-            REQUIRE(notification_calls == 2);
-            coordinator->on_change();
-            r->notify();
-            REQUIRE(notification_calls == 3);
-            r->notify();
-            REQUIRE(notification_calls == 3);
-        }
-
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("begin_transaction() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->begin_transaction();
-            REQUIRE(notification_calls == 2);
-            r->cancel_transaction();
         }
     }
 
@@ -4264,6 +4239,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"float", PropertyType::Float | PropertyType::Nullable},
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
+             {"int list", PropertyType::Int | PropertyType::Array},
          }},
         {"linking_object",
          {
@@ -4277,6 +4253,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
+    ColKey col_int_list = table->get_column_key("int list");
+    ColKey col_invalid(ColKey::Idx{10}, col_type_Int, {}, 0);
 
     SECTION("one row with null values") {
         r->begin_transaction();
@@ -4296,6 +4274,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_float)->get_float() == 2.f);
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
+            REQUIRE_THROWS_AS(results.max(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.max(col_invalid), LogicError);
         }
 
         SECTION("min") {
@@ -4303,6 +4283,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_float)->get_float() == 0.f);
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
+            REQUIRE_THROWS_AS(results.min(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.min(col_invalid), LogicError);
         }
 
         SECTION("average") {
@@ -4310,6 +4292,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
             REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_invalid), LogicError);
         }
 
         SECTION("sum") {
@@ -4317,6 +4301,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
             REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_invalid), LogicError);
         }
     }
 
@@ -4403,17 +4389,22 @@ TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalid
     TestContext ctx(realm);
 
     ColKey invalid_col;
+    ColKey well_formed_key(ColKey::Idx{0}, col_type_Int, {}, 0);
     SECTION("max") {
         REQUIRE(!results.max(invalid_col));
+        REQUIRE(!results.max(well_formed_key));
     }
     SECTION("min") {
         REQUIRE(!results.min(invalid_col));
+        REQUIRE(!results.min(well_formed_key));
     }
     SECTION("average") {
         REQUIRE(!results.average(invalid_col));
+        REQUIRE(!results.average(well_formed_key));
     }
     SECTION("sum") {
         REQUIRE(!results.sum(invalid_col));
+        REQUIRE(!results.sum(well_formed_key));
     }
     SECTION("first") {
         REQUIRE(!results.first());

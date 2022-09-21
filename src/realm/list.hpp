@@ -414,11 +414,6 @@ public:
     void swap(size_t ndx1, size_t ndx2) final;
 
     // Overriding members of ObjList:
-    bool is_obj_valid(size_t) const noexcept final
-    {
-        // A link list cannot contain null values
-        return true;
-    }
     Obj get_object(size_t ndx) const final
     {
         ObjKey key = this->get(ndx);
@@ -1046,6 +1041,12 @@ inline size_t LnkLst::find_any(Mixed value) const
     }
     else if (value.get_type() == type_Link) {
         return find_first(value.get<ObjKey>());
+    }
+    else if (value.get_type() == type_TypedLink) {
+        auto link = value.get_link();
+        if (link.get_table_key() == get_target_table()->get_key()) {
+            return find_first(link.get_obj_key());
+        }
     }
     return realm::not_found;
 }

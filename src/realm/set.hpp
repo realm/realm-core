@@ -347,7 +347,6 @@ public:
     std::pair<size_t, bool> erase_any(Mixed value) final;
 
     // Overriding members of ObjList:
-    bool is_obj_valid(size_t) const noexcept final;
     Obj get_object(size_t ndx) const final;
     ObjKey get_key(size_t ndx) const final;
 
@@ -1240,19 +1239,18 @@ inline size_t LnkSet::find_any(Mixed value) const
 {
     if (value.is_null())
         return not_found;
-    if (value.get_type() != type_Link)
-        return not_found;
-    size_t found = find(value.get<ObjKey>());
-    if (found != not_found) {
-        found = real2virtual(found);
-    }
-    return found;
-}
 
-inline bool LnkSet::is_obj_valid(size_t) const noexcept
-{
-    // LnkSet cannot contain NULL links.
-    return true;
+    const auto type = value.get_type();
+    if (type == type_Link) {
+        return find(value.get<ObjKey>());
+    }
+    if (type == type_TypedLink) {
+        auto link = value.get_link();
+        if (link.get_table_key() == get_target_table()->get_key()) {
+            return find(link.get_obj_key());
+        }
+    }
+    return not_found;
 }
 
 inline Obj LnkSet::get_object(size_t ndx) const

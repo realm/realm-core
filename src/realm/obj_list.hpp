@@ -34,7 +34,6 @@ public:
     virtual size_t size() const = 0;
     virtual TableRef get_target_table() const = 0;
     virtual ObjKey get_key(size_t ndx) const = 0;
-    virtual bool is_obj_valid(size_t ndx) const noexcept = 0;
     virtual Obj get_object(size_t row_ndx) const = 0;
     virtual void sync_if_needed() const = 0;
     virtual void get_dependencies(TableVersions&) const = 0;
@@ -64,19 +63,14 @@ public:
     {
         return get_object(ndx);
     }
-    virtual Obj try_get_object(size_t row_ndx) const noexcept
-    {
-        REALM_ASSERT(row_ndx < size());
-        return is_obj_valid(row_ndx) ? get_object(row_ndx) : Obj();
-    }
 
     template <class F>
     void for_each(F func) const
     {
         auto sz = size();
         for (size_t i = 0; i < sz; i++) {
-            auto o = try_get_object(i);
-            if (o && func(o))
+            auto o = get_object(i);
+            if (o && func(o) == IteratorControl::Stop)
                 return;
         }
     }
@@ -86,7 +80,7 @@ public:
     {
         auto sz = size();
         for (size_t i = 0; i < sz; i++) {
-            auto o = try_get_object(i);
+            auto o = get_object(i);
             if (o) {
                 T v = o.get<T>(column_key);
                 if (v == value)

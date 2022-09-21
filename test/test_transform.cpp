@@ -596,7 +596,6 @@ TEST(Transform_MergeInsertSetAndErase)
     });
 
     client_2->transaction([](Peer& client_2) {
-        TableRef t;
         client_2.table("class_t")->remove_object(client_2.table("class_t")->begin());
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});

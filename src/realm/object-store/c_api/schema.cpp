@@ -58,7 +58,7 @@ RLM_API uint64_t realm_get_schema_version(const realm_t* realm)
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {
-        schema->ptr->validate(validation_mode);
+        schema->ptr->validate(static_cast<SchemaValidationMode>(validation_mode));
         return true;
     });
 }
@@ -182,8 +182,6 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(class_key));
         auto col_key = ColKey(key);
-
-        // FIXME: We can do better than linear search.
 
         for (auto& prop : os.persisted_properties) {
             if (prop.column_key == col_key) {

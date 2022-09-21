@@ -230,8 +230,8 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
     return wrap_err([&]() {
         auto realm = existing_query->weak_realm.lock();
         auto table = existing_query->query.get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        Query combined = Query(existing_query->query).and_query(query);
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = existing_query->get_ordering();
         if (auto ordering = query.get_ordering())
@@ -244,11 +244,15 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
                                                   const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
+        auto existing_query = list->get_query();
         auto realm = list->get_realm();
         auto table = list->get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        auto ordering = query.get_ordering();
-        return new realm_query_t{std::move(query), std::move(ordering), realm};
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = existing_query.and_query(query);
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
+        if (auto ordering = query.get_ordering())
+            ordering_copy->append(*ordering);
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
     });
 }
 
@@ -256,11 +260,15 @@ RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* resu
                                                      size_t num_args, const realm_query_arg_t* args)
 {
     return wrap_err([&]() {
+        auto existing_query = results->get_query();
         auto realm = results->get_realm();
         auto table = results->get_table();
-        Query query = parse_and_apply_query(realm, table, query_string, num_args, args);
-        auto ordering = query.get_ordering();
-        return new realm_query_t{std::move(query), std::move(ordering), realm};
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = existing_query.and_query(query);
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
+        if (auto ordering = query.get_ordering())
+            ordering_copy->append(*ordering);
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
     });
 }
 
@@ -299,6 +307,27 @@ RLM_API realm_results_t* realm_query_find_all(realm_query_t* query)
         auto shared_realm = query->weak_realm.lock();
         REALM_ASSERT_RELEASE(shared_realm);
         return new realm_results{Results{shared_realm, query->query, query->get_ordering()}};
+    });
+}
+
+RLM_API realm_results_t* realm_list_to_results(realm_list_t* list)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{list->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_set_to_results(realm_set_t* set)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{set->as_results()};
+    });
+}
+
+RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t* dictionary)
+{
+    return wrap_err([&]() {
+        return new realm_results_t{dictionary->as_results()};
     });
 }
 
@@ -354,14 +383,28 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
 RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
-        // FIXME: Support non-object results.
-        auto obj = results->get<Obj>(index);
-        auto table_key = obj.get_table()->get_key();
-        auto obj_key = obj.get_key();
+        auto mixed = results->get_any(index);
         if (out_value) {
-            out_value->type = RLM_TYPE_LINK;
-            out_value->link.target_table = table_key.value;
-            out_value->link.target = obj_key.value;
+            *out_value = to_capi(mixed);
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_results_find(realm_results_t* results, realm_value_t* value, size_t* out_index, bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&]() {
+        auto val = from_capi(*value);
+        if (out_index) {
+            *out_index = results->index_of(val);
+            if (out_found && *out_index != realm::not_found) {
+                *out_found = true;
+            }
         }
         return true;
     });
@@ -373,6 +416,24 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
         auto shared_realm = results->get_realm();
         auto obj = results->get<Obj>(index);
         return new realm_object_t{Object{shared_realm, std::move(obj)}};
+    });
+}
+
+RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
+                                       bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&]() {
+        if (out_index) {
+            *out_index = results->index_of(value->obj());
+            if (out_found && *out_index != realm::not_found)
+                *out_found = true;
+        }
+        return true;
     });
 }
 
@@ -397,9 +458,6 @@ RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->min(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -424,9 +482,6 @@ RLM_API bool realm_results_max(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->max(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -451,9 +506,6 @@ RLM_API bool realm_results_sum(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (out_found) {
             *out_found = results->size() != 0;
         }
@@ -482,9 +534,6 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_property_key_
                                    bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->average(ColKey(col))) {
             if (out_found) {
                 *out_found = true;

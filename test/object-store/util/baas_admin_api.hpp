@@ -31,7 +31,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 namespace realm {
-app::Response do_http_request(app::Request&& request);
+app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
 public:
@@ -101,6 +101,7 @@ public:
         }
     };
     std::vector<Service> get_services(const std::string& app_id) const;
+    std::vector<std::string> get_errors(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;
     ServiceConfig get_config(const std::string& app_id, const Service& service) const;
     ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id,
@@ -200,13 +201,12 @@ AppSession create_app(const AppCreateConfig& config);
 
 class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
-    void send_request_to_server(app::Request&& request,
-                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    void send_request_to_server(app::Request&& request, realm::app::HttpCompletion&& completion) override
     {
         {
             std::lock_guard barrier(m_mutex);
         }
-        completion(do_http_request(std::move(request)));
+        completion(request, do_http_request(request));
     }
 
     void block()

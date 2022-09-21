@@ -51,6 +51,27 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
     });
 }
 
+RLM_API bool realm_list_find(const realm_list_t* list, const realm_value_t* value, size_t* out_index, bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&] {
+        list->verify_attached();
+        auto val = from_capi(*value);
+        check_value_assignable(*list, val);
+        auto index = list->find_any(val);
+        if (out_index)
+            *out_index = index;
+        if (out_found)
+            *out_found = index < list->size();
+        return true;
+    });
+}
+
+
 RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t value)
 {
     return wrap_err([&]() {

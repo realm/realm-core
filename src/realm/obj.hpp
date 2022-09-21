@@ -94,7 +94,7 @@ enum class UpdateStatus {
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
-    Obj()
+    constexpr Obj()
         : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
@@ -427,6 +427,8 @@ private:
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
+    template <class ValueType>
+    inline void nullify_single_link(ColKey col, ValueType target);
 
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
 };
@@ -434,7 +436,18 @@ private:
 std::ostream& operator<<(std::ostream&, const Obj& obj);
 
 template <>
+int64_t Obj::get(ColKey) const;
+template <>
+bool Obj::get(ColKey) const;
+
+template <>
 int64_t Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+StringData Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+BinaryData Obj::_get(ColKey::Idx col_ndx) const;
+template <>
+ObjKey Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
