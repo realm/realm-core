@@ -174,7 +174,7 @@ struct VersionList {
 
     uint32_t index_of(const ReadCount& rc) noexcept
     {
-        return &rc - data();
+        return (uint32_t)(&rc - data());
     }
 
     void free_entry(ReadCount* rc) noexcept
