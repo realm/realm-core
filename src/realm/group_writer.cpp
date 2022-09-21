@@ -300,7 +300,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 #define REALM_ALLOC_DEBUG 0
 #define ALLOC_DBG_COUT                                                                                               \
-    if constexpr (!(REALM_ALLOC_DEBUG)) {                                                                            \
+    if ((!(REALM_ALLOC_DEBUG))) {                                                                                    \
     }                                                                                                                \
     else                                                                                                             \
         std::cout
