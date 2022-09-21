@@ -556,7 +556,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
 {
     size_t first_page_ndx = ref_start >> m_page_shift;
-    size_t last_page_ndx = (ref_end - 1) >> m_page_shift;
+    size_t last_page_ndx = (ref_end - 1) >> m_page_shift; // FIXME: why - 1 ?
     for (size_t page_ndx = first_page_ndx; page_ndx <= last_page_ndx; ++page_ndx) {
         for (size_t i = 0; i < m_file.mappings.size(); ++i) {
             EncryptedFileMapping* m = m_file.mappings[i];

@@ -112,11 +112,10 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
 
-    // FIXME: is there a better way?
-    //    VersionID::version_type last_up_to_date_version = _db->get_locked_version_previous_to(rli.m_version);
-    //    _db->refresh_encrypted_mappings(last_up_to_date_version, rli.m_version, m_alloc);
-    m_alloc.refresh_all_encrypted_pages();
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version,
+                  [_db, rli, alloc]() {
+                      _db->refresh_encrypted_mappings(VersionID{rli.m_version, rli.m_reader_idx}, *alloc);
+                  });
 }
 
 Transaction::~Transaction()

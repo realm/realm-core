@@ -1114,11 +1114,14 @@ inline bool randomly_false_in_debug(bool x)
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
  */
-void SlabAlloc::update_reader_view(size_t file_size)
+void SlabAlloc::update_reader_view(size_t file_size, util::UniqueFunction<void()> refresh_mappings)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     if (file_size <= old_baseline) {
+        if (refresh_mappings) {
+            refresh_mappings();
+        }
         return;
     }
     REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
@@ -1209,6 +1212,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
         }
     }
 
+    if (refresh_mappings) {
+        refresh_mappings();
+    }
     rebuild_freelists_from_slab();
 
     // Build the fast path mapping
@@ -1231,7 +1237,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
 
 void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
 {
-    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
             for (auto& r : ranges) {
@@ -1244,7 +1250,7 @@ void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
 
 void SlabAlloc::refresh_all_encrypted_pages()
 {
-    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
             encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());

@@ -450,6 +450,7 @@ private:
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
+    std::optional<ReadLockInfo> m_last_encryption_page_reader;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
@@ -547,7 +548,7 @@ private:
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept;
 
-    void refresh_encrypted_mappings(version_type from, version_type to, SlabAlloc& alloc) noexcept;
+    void refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept;
 
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();

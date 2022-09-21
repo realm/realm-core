@@ -28,6 +28,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -293,7 +294,7 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    void update_reader_view(size_t file_size);
+    void update_reader_view(size_t file_size, util::UniqueFunction<void()> refresh_mappings = nullptr);
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
     void init_mapping_management(uint64_t currently_live_version);
 

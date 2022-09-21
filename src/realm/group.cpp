@@ -595,14 +595,14 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
+                          util::UniqueFunction<void()> refresh_encrypted_pages)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
     // update readers view of memory
-    // FIXME: refresh encrypted mappings?
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, std::move(refresh_encrypted_pages)); // Throws
     update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
