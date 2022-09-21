@@ -23,7 +23,8 @@ r# NEXT RELEASE
 -----------
 
 ### Internals
-* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862))
+* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862)).
+* Updated Windows distros on Evergreen CI to use vsCurrent.
 
 ----------------------------------------------
 
