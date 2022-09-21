@@ -138,18 +138,6 @@ public:
     void wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
         REQUIRES(!m_state_mutex);
 
-    // Block until upload completion occurs. Prefer the async version of this
-    // which takes a callback outside of test code.
-    // Returns true if upload completion actually occurred, and false if the
-    // session does not exist or the client was stopped.
-    bool wait_for_upload_completion() REQUIRES(!m_state_mutex);
-
-    // Block until download completion occurs. Prefer the async version of this
-    // which takes a callback outside of test code.
-    // Returns true if download completion actually occurred, and false if the
-    // session does not exist or the client was stopped.
-    bool wait_for_download_completion() REQUIRES(!m_state_mutex);
-
     // Register a notifier that updates the app regarding progress.
     //
     // If `m_current_progress` is populated when this method is called, the notifier

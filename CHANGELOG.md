@@ -5,14 +5,18 @@
 * Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 * Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 * Adding support in the C API for `realm_results_find` and supporting all native types for `realm_results_get()` ([PR 5875](https://github.com/realm/realm-core/pull/5875)).
+* Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
 * Prioritize integration of local changes over remote changes - shorten the time users may have to wait when committing local changes. Stop storing downloaded changesets in history. ([PR #5844](https://github.com/realm/realm-core/pull/5844)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Results permitted some nonsensical aggregate operations on column types which do not make sense to aggregate, giving garbage results rather than reporting an error ([#5876](https://github.com/realm/realm-core/pull/5876)).
+* Removed blocking wait for upload/download completion due to possibility of deadlock ([#5829](https://github.com/realm/realm-core/issues/5829)).
 
 ### Breaking changes
 * The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
+* Callback for `GenericNetworkTransport::send_request_to_server()` now receives both the original Request and Response objects (does not affect the C-API).
+* Removed blocking `SyncSession::wait_for_upload_completion` and `SyncSession::wait_for_download_completion`.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -32,7 +36,6 @@
 * Expose `realm_object_get_parent` in the C API (PR [#5851](https://github.com/realm/realm-core/pull/5851))
 * Expose `realm_list_find` in the C API (PR [#5848](https://github.com/realm/realm-core/pull/5848))
 * Expose `Group::remove_table` in the C API (PR [#5860](https://github.com/realm/realm-core/pull/5860))
-* Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
 
 ### Fixed
 * Prevent migrations to an embedded object type when there are incoming links from Mixed/TypedLink properties until we can support them. ([#5796](https://github.com/realm/realm-core/pull/5796), since 6.1.0)
@@ -51,7 +54,7 @@
 * Fix crash when upserting a document with the primary key not an ObjectId into a mongo collection. ([#5345](https://github.com/realm/realm-core/issues/5345), since v10.0.0).
 
 ### Breaking changes
-* Callback for `GenericNetworkTransport::send_request_to_server()` now receives both the original Request and Response objects (does not affect the C-API).
+None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

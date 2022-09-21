@@ -1053,24 +1053,6 @@ void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::er
     add_completion_callback(std::move(callback), ProgressDirection::download);
 }
 
-bool SyncSession::wait_for_upload_completion()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_upload_complete_or_client_stopped();
-    }
-    return false;
-}
-
-bool SyncSession::wait_for_download_completion()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_download_complete_or_client_stopped();
-    }
-    return false;
-}
-
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
                                                  ProgressDirection direction, bool is_streaming)
 {
