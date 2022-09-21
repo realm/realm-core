@@ -864,54 +864,6 @@ TEST(Query_FindAllContainsUnicode)
     CHECK_EQUAL(3, tv2[3].get<Int>(col_id));
 }
 
-TEST(Query_SyntaxCheck)
-{
-    Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    table.add_column(type_String, "2");
-
-    std::string s;
-
-    table.create_object().set_all(1, "a");
-    table.create_object().set_all(2, "a");
-    table.create_object().set_all(3, "X");
-
-    Query q1 = table.where().equal(col_int, 2).end_group();
-    s = q1.validate();
-    CHECK(s != "");
-
-    Query q2 = table.where().group().group().equal(col_int, 2).end_group();
-    s = q2.validate();
-    CHECK(s != "");
-
-    Query q3 = table.where().equal(col_int, 2).Or();
-    s = q3.validate();
-    CHECK(s != "");
-
-    Query q4 = table.where().Or().equal(col_int, 2);
-    s = q4.validate();
-    CHECK(s != "");
-
-    Query q5 = table.where().equal(col_int, 2);
-    s = q5.validate();
-    CHECK(s == "");
-
-    Query q6 = table.where().group().equal(col_int, 2);
-    s = q6.validate();
-    CHECK(s != "");
-
-    // FIXME: Work is currently underway to fully support locale
-    // independent case folding as defined by Unicode. Reenable this test
-    // when is becomes available.
-    /*
-    Query q7 = ttt.where().equal(1, "\xa0", false);
-#ifdef REALM_DEBUG
-    s = q7.verify();
-    CHECK(s != "");
-#endif
-    */
-}
-
 TEST(Query_TestTV_where)
 {
     // When using .where(&tv), tv can have any order, and the resulting view will retain its order
@@ -959,67 +911,67 @@ TEST(Query_SumMinMaxAvg)
     t.get_object(keys[7]).set_all(0, Timestamp{3000, 0}, 30.0f, 30.0, Decimal128{8.8}, Mixed{42});
     t.get_object(keys[8]).set_all(0, Timestamp{5, 0}, 0.5f, 0.5, Decimal128{9.9}, Mixed{0.1});
 
-    CHECK_EQUAL(9, t.where().sum_int(int_col));
+    CHECK_EQUAL(9, *t.where().sum(int_col));
 
-    CHECK_EQUAL(0, t.where().minimum_int(int_col));
-    CHECK_EQUAL(3, t.where().maximum_int(int_col));
-    CHECK_EQUAL(Decimal128{9.9}, t.where().maximum_decimal128(decimal_col));
-    CHECK_EQUAL(Mixed{"foo"}, t.where().maximum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{1.1}, t.where().minimum_decimal128(decimal_col));
-    CHECK_EQUAL(Mixed{0.1}, t.where().minimum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{49.5}, t.where().sum_decimal128(decimal_col));
-    CHECK_EQUAL(Mixed{48.5}, t.where().sum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{49.5 / 9}, t.where().average_decimal128(decimal_col));
-    Decimal128 avg_mixed = t.where().average_mixed(mixed_col);
+    CHECK_EQUAL(0, *t.where().min(int_col));
+    CHECK_EQUAL(3, *t.where().max(int_col));
+    CHECK_EQUAL(Decimal128{9.9}, t.where().max(decimal_col));
+    CHECK_EQUAL(Mixed{"foo"}, t.where().max(mixed_col));
+    CHECK_EQUAL(Decimal128{1.1}, t.where().min(decimal_col));
+    CHECK_EQUAL(Mixed{0.1}, t.where().min(mixed_col));
+    CHECK_EQUAL(Decimal128{49.5}, t.where().sum(decimal_col));
+    CHECK_EQUAL(Mixed{48.5}, t.where().sum(mixed_col));
+    CHECK_EQUAL(Decimal128{49.5 / 9}, t.where().avg(decimal_col));
+    Decimal128 avg_mixed = t.where().avg(mixed_col)->get_decimal();
     Decimal128 expected_avg_mixed = Decimal128{48.5 / 6};
     Decimal128 allowed_epsilon{0.001};
     CHECK(avg_mixed <= (expected_avg_mixed + allowed_epsilon) && avg_mixed >= (expected_avg_mixed - allowed_epsilon));
     t.get_object(keys[6]).set<Mixed>(mixed_col, Mixed{false});
-    CHECK_EQUAL(Mixed{false}, t.where().minimum_mixed(mixed_col));
+    CHECK_EQUAL(Mixed{false}, t.where().min(mixed_col));
 
     ObjKey resindex;
 
-    t.where().maximum_int(int_col, &resindex);
+    t.where().max(int_col, &resindex);
     CHECK_EQUAL(keys[5], resindex);
 
-    t.where().minimum_int(int_col, &resindex);
+    t.where().min(int_col, &resindex);
     CHECK_EQUAL(keys[6], resindex);
 
-    t.where().maximum_float(float_col, &resindex);
+    t.where().max(float_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_float(float_col, &resindex);
+    t.where().min(float_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_double(double_col, &resindex);
+    t.where().max(double_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_double(double_col, &resindex);
+    t.where().min(double_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_timestamp(date_col, &resindex);
+    t.where().max(date_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_timestamp(date_col, &resindex);
+    t.where().min(date_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
     // Now with condition (tests another code path in Array::minmax())
-    t.where().not_equal(int_col, 0).minimum_double(double_col, &resindex);
+    t.where().not_equal(int_col, 0).min(double_col, &resindex);
     CHECK_EQUAL(keys[1], resindex);
 
-    t.where().not_equal(int_col, 0).minimum_float(float_col, &resindex);
+    t.where().not_equal(int_col, 0).min(float_col, &resindex);
     CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(int_col, 0).minimum_timestamp(date_col, &resindex);
+    t.where().not_equal(int_col, 0).min(date_col, &resindex);
     CHECK_EQUAL(keys[5], resindex);
 
-    t.where().not_equal(int_col, 0).maximum_timestamp(date_col, &resindex);
+    t.where().not_equal(int_col, 0).max(date_col, &resindex);
     CHECK_EQUAL(keys[4], resindex);
 
-    CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(int_col), 0.001);
+    CHECK_APPROXIMATELY_EQUAL(1, t.where().avg(int_col)->get_double(), 0.001);
 
-    CHECK_EQUAL(t.where().maximum_timestamp(date_col), Timestamp(3000, 0));
-    CHECK_EQUAL(t.where().minimum_timestamp(date_col), Timestamp(5, 0));
+    CHECK_EQUAL(t.where().max(date_col), Timestamp(3000, 0));
+    CHECK_EQUAL(t.where().min(date_col), Timestamp(5, 0));
 }
 
 
@@ -1029,9 +981,9 @@ TEST(Query_Avg)
     auto col = t.add_column(type_Int, "1");
 
     t.create_object().set(col, 10);
-    CHECK_EQUAL(10, t.where().average_int(col));
+    CHECK_EQUAL(10, t.where().avg(col));
     t.create_object().set(col, 30);
-    CHECK_EQUAL(20, t.where().average_int(col));
+    CHECK_EQUAL(20, t.where().avg(col));
 }
 
 TEST(Query_Avg2)
@@ -1049,11 +1001,11 @@ TEST(Query_Avg2)
     t.create_object().set_all(100, "b");
     t.create_object().set_all(30, "a");
 
-    CHECK_EQUAL(60, t.where().equal(col_str, "a").sum_int(col_int));
+    CHECK_EQUAL(60, t.where().equal(col_str, "a").sum(col_int));
 
-    CHECK_EQUAL(20, t.where().equal(col_str, "a").average_int(col_int, &cnt));
+    CHECK_EQUAL(20, t.where().equal(col_str, "a").avg(col_int, &cnt));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(100, t.where().equal(col_str, "b").average_int(col_int, &cnt));
+    CHECK_EQUAL(100, t.where().equal(col_str, "b").avg(col_int, &cnt));
     CHECK_EQUAL(3, cnt);
 }
 
@@ -1136,38 +1088,38 @@ TEST(Query_AllTypesDynamicallyTyped)
 
         ObjKey ndx;
 
-        CHECK_EQUAL(54, query.minimum_int(col_int));
-        query.minimum_int(col_int, &ndx);
+        CHECK_EQUAL(54, query.min(col_int));
+        query.min(col_int, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(54, query.maximum_int(col_int));
-        query.maximum_int(col_int, &ndx);
+        CHECK_EQUAL(54, query.max(col_int));
+        query.max(col_int, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(54, query.sum_int(col_int));
-        CHECK_EQUAL(54, query.average_int(col_int));
+        CHECK_EQUAL(54, query.sum(col_int));
+        CHECK_EQUAL(54, query.avg(col_int));
 
-        CHECK_EQUAL(0.7f, query.minimum_float(col_flt));
-        query.minimum_float(col_flt, &ndx);
+        CHECK_EQUAL(0.7f, query.min(col_flt));
+        query.min(col_flt, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.7f, query.maximum_float(col_flt));
-        query.maximum_float(col_flt, &ndx);
+        CHECK_EQUAL(0.7f, query.max(col_flt));
+        query.max(col_flt, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.7f, query.sum_float(col_flt));
-        CHECK_EQUAL(0.7f, query.average_float(col_flt));
+        CHECK_EQUAL(0.7f, query.sum(col_flt));
+        CHECK_EQUAL(0.7f, query.avg(col_flt));
 
-        CHECK_EQUAL(0.8, query.minimum_double(col_dbl));
-        query.minimum_double(col_dbl, &ndx);
+        CHECK_EQUAL(0.8, query.min(col_dbl));
+        query.min(col_dbl, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.8, query.maximum_double(col_dbl));
-        query.maximum_double(col_dbl, &ndx);
+        CHECK_EQUAL(0.8, query.max(col_dbl));
+        query.max(col_dbl, &ndx);
         CHECK_EQUAL(obj0.get_key(), ndx);
 
-        CHECK_EQUAL(0.8, query.sum_double(col_dbl));
-        CHECK_EQUAL(0.8, query.average_double(col_dbl));
+        CHECK_EQUAL(0.8, query.sum(col_dbl));
+        CHECK_EQUAL(0.8, query.avg(col_dbl));
     }
 }
 
@@ -1184,9 +1136,9 @@ TEST(Query_AggregateSortedView)
     TableView tv = table.where().greater(col, 1.0).find_all();
     tv.sort(col, false);
 
-    CHECK_EQUAL(2.0, tv.minimum_double(col));
-    CHECK_EQUAL(count, tv.maximum_double(col));
-    CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(col), .1);
+    CHECK_EQUAL(2.0, tv.min(col));
+    CHECK_EQUAL(count, tv.max(col));
+    CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum(col)->get_double(), .1);
 }
 
 
@@ -2023,57 +1975,55 @@ TEST(Query_NullShowcase)
 
     // TableView
     size_t count;
-    int64_t i;
-    double d;
-    Timestamp dt;
+    std::optional<Mixed> m;
     tv = table->where().find_all();
 
     // Integer column
-    i = tv.maximum_int(col_price);
-    CHECK_EQUAL(i, 20);
+    m = tv.max(col_price);
+    CHECK_EQUAL(m, 20);
 
-    i = tv.minimum_int(col_price);
-    CHECK_EQUAL(i, 10);
+    m = tv.min(col_price);
+    CHECK_EQUAL(m, 10);
 
     count = 123;
-    d = tv.average_int(col_price, &count);
-    CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    m = tv.avg(col_price, &count);
+    CHECK_APPROXIMATELY_EQUAL(m->get_double(), 15., 0.001);
     CHECK_EQUAL(count, 2);
 
-    i = tv.sum_int(col_price);
-    CHECK_EQUAL(i, 30);
+    m = tv.sum(col_price);
+    CHECK_EQUAL(m, 30);
 
 
     // Float column
-    d = tv.maximum_float(col_shipping);
-    CHECK_EQUAL(d, 30.);
+    m = tv.max(col_shipping);
+    CHECK_EQUAL(m, 30.);
 
-    d = tv.minimum_float(col_shipping);
-    CHECK_EQUAL(d, 30.);
+    m = tv.min(col_shipping);
+    CHECK_EQUAL(m, 30.);
 
     count = 123;
-    d = tv.average_float(col_shipping, &count);
-    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    m = tv.avg(col_shipping, &count);
+    CHECK_APPROXIMATELY_EQUAL(m->get_double(), 30., 0.001);
     CHECK_EQUAL(count, 1);
 
-    d = tv.sum_float(col_shipping);
-    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    m = tv.sum(col_shipping);
+    CHECK_APPROXIMATELY_EQUAL(m->get_double(), 30., 0.001);
 
-    // Double column
-    d = tv.maximum_double(col_rating);
-    CHECK_EQUAL(d, 3.3);
-    d = tv.minimum_double(col_rating);
-    CHECK_EQUAL(d, 1.1);
-    d = tv.average_double(col_rating);
-    CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
-    d = tv.sum_double(col_rating);
-    CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
+    // double column
+    m = tv.max(col_rating);
+    CHECK_EQUAL(m, 3.3);
+    m = tv.min(col_rating);
+    CHECK_EQUAL(m, 1.1);
+    m = tv.avg(col_rating);
+    CHECK_APPROXIMATELY_EQUAL(m->get_double(), (1.1 + 2.2 + 3.3) / 3, 0.001);
+    m = tv.sum(col_rating);
+    CHECK_APPROXIMATELY_EQUAL(m->get_double(), 1.1 + 2.2 + 3.3, 0.001);
 
     // OldDateTime column
-    dt = tv.maximum_timestamp(col_date);
-    CHECK_EQUAL(dt, Timestamp(12345, 67));
-    dt = tv.minimum_timestamp(col_date);
-    CHECK_EQUAL(dt, Timestamp(12345, 0));
+    m = tv.max(col_date);
+    CHECK_EQUAL(m, Timestamp(12345, 67));
+    m = tv.min(col_date);
+    CHECK_EQUAL(m, Timestamp(12345, 0));
 
 #if 0 // FIXME?
     // NaN
@@ -2406,53 +2356,53 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     auto test_tv = [&]() {
         // int
         match = ObjKey(123);
-        tv.maximum_int(col_price, &match);
+        tv.max(col_price, &match);
         CHECK_EQUAL(match, realm::null_key);
 
         match = ObjKey(123);
-        tv.minimum_int(col_price, &match);
+        tv.min(col_price, &match);
         CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_int(col_price), 0);
+        CHECK_EQUAL(tv.sum(col_price), 0);
         count = 123;
-        CHECK_EQUAL(tv.average_int(col_price, &count), 0.);
+        CHECK(tv.avg(col_price, &count)->is_null());
         CHECK_EQUAL(count, 0);
 
         // float
         match = ObjKey(123);
-        tv.maximum_float(col_shipping, &match);
+        CHECK(tv.max(col_shipping, &match)->is_null());
         CHECK_EQUAL(match, realm::null_key);
 
         match = ObjKey(123);
-        tv.minimum_float(col_shipping, &match);
+        CHECK(tv.min(col_shipping, &match)->is_null());
         CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_float(col_shipping), 0.);
+        CHECK_EQUAL(tv.sum(col_shipping), 0.);
         count = 123;
-        CHECK_EQUAL(tv.average_float(col_shipping, &count), 0.);
+        CHECK(tv.avg(col_shipping, &count)->is_null());
         CHECK_EQUAL(count, 0);
 
         // double
         match = ObjKey(123);
-        tv.maximum_double(col_rating, &match);
+        CHECK(tv.max(col_rating, &match)->is_null());
         CHECK_EQUAL(match, realm::null_key);
 
         match = ObjKey(123);
-        tv.minimum_double(col_rating, &match);
+        CHECK(tv.min(col_rating, &match)->is_null());
         CHECK_EQUAL(match, realm::null_key);
 
-        CHECK_EQUAL(tv.sum_double(col_rating), 0.);
+        CHECK_EQUAL(tv.sum(col_rating), 0.);
         count = 123;
-        CHECK_EQUAL(tv.average_double(col_rating, &count), 0.);
+        CHECK(tv.avg(col_rating, &count)->is_null());
         CHECK_EQUAL(count, 0);
 
         // date
         match = ObjKey(123);
-        tv.maximum_timestamp(col_date, &match);
+        tv.max(col_date, &match);
         CHECK_EQUAL(match, realm::null_key);
 
         match = ObjKey(123);
-        tv.minimum_timestamp(col_date, &match);
+        tv.min(col_date, &match);
         CHECK_EQUAL(match, realm::null_key);
     };
 
@@ -2476,13 +2426,13 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
     tv = table->where().find_all();
     count = 123;
-    CHECK_EQUAL(tv.average_int(col_price, &count), 10);
+    CHECK_EQUAL(tv.avg(col_price, &count), 10);
     CHECK_EQUAL(count, 1);
     count = 123;
-    CHECK_EQUAL(tv.average_float(col_shipping, &count), 10.);
+    CHECK_EQUAL(tv.avg(col_shipping, &count), 10.);
     CHECK_EQUAL(count, 1);
     count = 123;
-    CHECK_EQUAL(tv.average_double(col_rating, &count), 10.);
+    CHECK_EQUAL(tv.avg(col_rating, &count), 10.);
     CHECK_EQUAL(count, 1);
 }
 
@@ -3367,9 +3317,9 @@ TEST(Query_AverageNullableColumns)
     auto col_float = table.add_column(type_Float, "float", true);
     auto col_double = table.add_column(type_Double, "double", true);
 
-    CHECK_EQUAL(0, table.where().average_int(col_int));
-    CHECK_EQUAL(0, table.where().average_float(col_float));
-    CHECK_EQUAL(0, table.where().average_double(col_double));
+    CHECK(table.where().avg(col_int)->is_null());
+    CHECK(table.where().avg(col_float)->is_null());
+    CHECK(table.where().avg(col_double)->is_null());
 
     //
     // +-----+-------+--------+
@@ -3382,17 +3332,17 @@ TEST(Query_AverageNullableColumns)
     table.create_object().set_all(2, 2.0f, 2.0);
     table.create_object().set_all(4, 4.0f, 4.0);
 
-    CHECK_EQUAL(3, table.where().average_int(col_int));
-    CHECK_EQUAL(3, table.where().average_float(col_float));
-    CHECK_EQUAL(3, table.where().average_double(col_double));
+    CHECK_EQUAL(3, table.where().avg(col_int));
+    CHECK_EQUAL(3, table.where().avg(col_float));
+    CHECK_EQUAL(3, table.where().avg(col_double));
 
     // Add a row with nulls in each column. These nulls must be treated as not existing, that is,
     // it must be such that the average of 2 + 2 + null == 2.
     table.create_object();
 
-    CHECK_EQUAL(3, table.where().average_int(col_int));
-    CHECK_EQUAL(3, table.where().average_float(col_float));
-    CHECK_EQUAL(3, table.where().average_double(col_double));
+    CHECK_EQUAL(3, table.where().avg(col_int));
+    CHECK_EQUAL(3, table.where().avg(col_float));
+    CHECK_EQUAL(3, table.where().avg(col_double));
 }
 
 TEST(Query_NegativeNumbers)
@@ -3467,14 +3417,14 @@ TEST_TYPES(Query_EqualityInts, int64_t, util::Optional<int64_t>)
         Query q_eq = table->where().equal(col_ndx, target);
         CHECK_EQUAL(q_eq.find(), obj.get_key());
         CHECK_EQUAL(q_eq.count(), 1);
-        CHECK_EQUAL(q_eq.sum_int(col_ndx), target);
-        CHECK_EQUAL(q_eq.average_int(col_ndx), target);
+        CHECK_EQUAL(q_eq.sum(col_ndx), target);
+        CHECK_EQUAL(q_eq.avg(col_ndx), target);
 
         Query q_neq = table->where().not_equal(col_ndx, target);
         CHECK_EQUAL(q_neq.find(), first ? ObjKey(1) : ObjKey(0));
         CHECK_EQUAL(q_neq.count(), num_rows - 1);
-        CHECK_EQUAL(q_neq.sum_int(col_ndx), sum - target);
-        CHECK_EQUAL(q_neq.average_int(col_ndx), (sum - target) / double(num_rows - 1));
+        CHECK_EQUAL(q_neq.sum(col_ndx), sum - target);
+        CHECK_EQUAL(q_neq.avg(col_ndx), (sum - target) / double(num_rows - 1));
         first = false;
     }
 }
@@ -3506,260 +3456,256 @@ TEST(Query_MaximumSumAverage)
             double d;
 
             // Those that have criterias include all rows, also those with null
-            d = table1->where().average_int(c0);
+            d = table1->where().avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = table1->where().average_int(c1);
+            d = table1->where().avg(c1)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Criteria on same column as average
-            d = table1->where().not_equal(c0, 1234).average_int(c0);
+            d = table1->where().not_equal(c0, 1234).avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Criteria on other column than average (triggers different code paths)
-            d = table1->where().not_equal(c0, 1234).average_int(c1);
+            d = table1->where().not_equal(c0, 1234).avg(c1)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Average of double, criteria on integer
-            d = table1->where().not_equal(c0, 1234).average_double(c2);
+            d = table1->where().not_equal(c0, 1234).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = table1->where().not_equal(c2, 1234.).average_double(c2);
+            d = table1->where().not_equal(c2, 1234.).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = (table1->column<Int>(c0) == null()).average_int(c0);
-            CHECK_EQUAL(d, 0);
+            CHECK((table1->column<Int>(c0) == null()).avg(c0)->is_null());
 
-            d = (table1->column<Int>(c0) != null()).average_int(c0);
+            d = (table1->column<Int>(c0) != null()).avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Those with criteria now only include some rows, whereof none are null
-            d = table1->where().average_int(c0);
+            d = table1->where().avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = table1->where().average_int(c1);
+            d = table1->where().avg(c1)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
             // Criteria on same column as average
-            d = table1->where().equal(c0, 3).average_int(c0);
+            d = table1->where().equal(c0, 3).avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
 
             // Criteria on other column than average (triggers different code paths)
-            d = table1->where().equal(c0, 3).average_int(c1);
+            d = table1->where().equal(c0, 3).avg(c1)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
 
             // Average of double, criteria on integer
-            d = table1->where().not_equal(c0, 3).average_double(c2);
+            d = table1->where().not_equal(c0, 3).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 4., 0.001);
 
-            d = table1->where().equal(c2, 3.).average_double(c2);
+            d = table1->where().equal(c2, 3.).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
 
             // Now using null as criteria
-            d = (table1->column<Int>(c0) != null()).average_double(c2);
+            d = (table1->column<Int>(c0) != null()).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = (table1->column<Double>(c2) != null()).average_double(c2);
+            d = (table1->column<Double>(c2) != null()).avg(c2)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = (table1->column<Int>(c0) != null()).average_int(c0);
+            d = (table1->column<Int>(c0) != null()).avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
 
-            d = (table1->column<Int>(c1) != null()).average_int(c0);
+            d = (table1->column<Int>(c1) != null()).avg(c0)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
         }
 
 
         // Maximum
         {
-            int64_t d;
-            double dbl;
+            std::optional<Mixed> m;
             // Those that have criterias include all rows, also those with null
-            d = table1->where().maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().max(c0);
+            CHECK_EQUAL(m, 4);
 
-            d = table1->where().maximum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().max(c1);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on same column as maximum
-            d = table1->where().not_equal(c0, 1234).maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().not_equal(c0, 1234).max(c0);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on other column than maximum (triggers different code paths)
-            d = table1->where().not_equal(c0, 1234).maximum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().not_equal(c0, 1234).max(c1);
+            CHECK_EQUAL(m, 4);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 1234).maximum_double(c2);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().not_equal(c0, 1234).max(c2);
+            CHECK_EQUAL(m, 4);
 
-            dbl = table1->where().not_equal(c2, 1234.).maximum_double(c2);
-            CHECK_EQUAL(d, 4.);
+            m = table1->where().not_equal(c2, 1234.).max(c2);
+            CHECK_EQUAL(m, 4.);
 
             // Those with criteria now only include some rows, whereof none are null
-            d = table1->where().maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().max(c0);
+            CHECK_EQUAL(m, 4);
 
-            d = table1->where().maximum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().max(c1);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on same column as maximum
-            d = table1->where().equal(c0, 4).maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).max(c0);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on other column than maximum (triggers different code paths)
-            d = table1->where().equal(c0, 4).maximum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).max(c1);
+            CHECK_EQUAL(m, 4);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 3).maximum_double(c2);
-            CHECK_EQUAL(dbl, 4.);
+            m = table1->where().not_equal(c0, 3).max(c2);
+            CHECK_EQUAL(m, 4.);
 
-            dbl = table1->where().equal(c2, 3.).maximum_double(c2);
-            CHECK_EQUAL(dbl, 3.);
+            m = table1->where().equal(c2, 3.).max(c2);
+            CHECK_EQUAL(m, 3.);
 
             // Now using null as criteria
-            dbl = (table1->column<Int>(c0) != null()).maximum_double(c2);
-            CHECK_EQUAL(dbl, 4.);
+            m = (table1->column<Int>(c0) != null()).max(c2);
+            CHECK_EQUAL(m, 4.);
 
-            dbl = (table1->column<Double>(c2) != null()).maximum_double(c2);
-            CHECK_EQUAL(dbl, 4.);
+            m = (table1->column<Double>(c2) != null()).max(c2);
+            CHECK_EQUAL(m, 4.);
 
-            d = (table1->column<Int>(c0) != null()).maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = (table1->column<Int>(c0) != null()).max(c0);
+            CHECK_EQUAL(m, 4);
 
-            d = (table1->column<Int>(c1) != null()).maximum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = (table1->column<Int>(c1) != null()).max(c0);
+            CHECK_EQUAL(m, 4);
         }
 
 
         // Minimum
         {
-            int64_t d;
-            double dbl;
+            std::optional<Mixed> m;
             // Those that have criterias include all rows, also those with null
-            d = table1->where().minimum_int(c0);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().min(c0);
+            CHECK_EQUAL(m, 3);
 
-            d = table1->where().minimum_int(c1);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().min(c1);
+            CHECK_EQUAL(m, 3);
 
             // Criteria on same column as minimum
-            d = table1->where().not_equal(c0, 1234).minimum_int(c0);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().not_equal(c0, 1234).min(c0);
+            CHECK_EQUAL(m, 3);
 
             // Criteria on other column than minimum (triggers different code paths)
-            d = table1->where().not_equal(c0, 1234).minimum_int(c1);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().not_equal(c0, 1234).min(c1);
+            CHECK_EQUAL(m, 3);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 1234).minimum_double(c2);
-            CHECK_EQUAL(dbl, 3);
+            m = table1->where().not_equal(c0, 1234).min(c2);
+            CHECK_EQUAL(m, 3);
 
-            dbl = table1->where().not_equal(c2, 1234.).minimum_double(c2);
-            CHECK_EQUAL(dbl, 3.);
+            m = table1->where().not_equal(c2, 1234.).min(c2);
+            CHECK_EQUAL(m, 3.);
 
 
             // Those with criteria now only include some rows, whereof none are null
-            d = table1->where().minimum_int(c0);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().min(c0);
+            CHECK_EQUAL(m, 3);
 
-            d = table1->where().minimum_int(c1);
-            CHECK_EQUAL(d, 3);
+            m = table1->where().min(c1);
+            CHECK_EQUAL(m, 3);
 
             // Criteria on same column as minimum
-            d = table1->where().equal(c0, 4).minimum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).min(c0);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on other column than minimum (triggers different code paths)
-            d = table1->where().equal(c0, 4).minimum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).min(c1);
+            CHECK_EQUAL(m, 4);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 3).minimum_double(c2);
-            CHECK_EQUAL(dbl, 4.);
+            m = table1->where().not_equal(c0, 3).min(c2);
+            CHECK_EQUAL(m, 4.);
 
-            dbl = table1->where().equal(c2, 3.).minimum_double(c2);
-            CHECK_EQUAL(dbl, 3.);
+            m = table1->where().equal(c2, 3.).min(c2);
+            CHECK_EQUAL(m, 3.);
 
             // Now using null as criteria
-            dbl = (table1->column<Int>(c0) != null()).minimum_double(c2);
-            CHECK_EQUAL(dbl, 3.);
+            m = (table1->column<Int>(c0) != null()).min(c2);
+            CHECK_EQUAL(m, 3.);
 
-            dbl = (table1->column<Double>(c2) != null()).minimum_double(c2);
-            CHECK_EQUAL(dbl, 3.);
+            m = (table1->column<Double>(c2) != null()).min(c2);
+            CHECK_EQUAL(m, 3.);
 
-            d = (table1->column<Int>(c0) != null()).minimum_int(c0);
-            CHECK_EQUAL(d, 3);
+            m = (table1->column<Int>(c0) != null()).min(c0);
+            CHECK_EQUAL(m, 3);
 
-            d = (table1->column<Int>(c1) != null()).minimum_int(c0);
-            CHECK_EQUAL(d, 3);
+            m = (table1->column<Int>(c1) != null()).min(c0);
+            CHECK_EQUAL(m, 3);
         }
 
         // Sum
         {
-            int64_t d;
-            double dbl;
+            std::optional<Mixed> m;
             // Those that have criterias include all rows, also those with null
-            d = table1->where().sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = table1->where().sum(c0);
+            CHECK_EQUAL(m, 7);
 
             // Criteria on same column as maximum
-            d = table1->where().not_equal(c0, 1234).sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = table1->where().not_equal(c0, 1234).sum(c0);
+            CHECK_EQUAL(m, 7);
 
             // Criteria on other column than maximum (triggers different code paths)
-            d = table1->where().not_equal(c0, 1234).sum_int(c1);
-            CHECK_EQUAL(d, 7);
+            m = table1->where().not_equal(c0, 1234).sum(c1);
+            CHECK_EQUAL(m, 7);
 
-            d = (table1->column<Int>(c0) == null()).sum_int(c0);
-            CHECK_EQUAL(d, 0);
+            m = (table1->column<Int>(c0) == null()).sum(c0);
+            CHECK_EQUAL(m, 0);
 
-            d = (table1->column<Int>(c0) != null()).sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = (table1->column<Int>(c0) != null()).sum(c0);
+            CHECK_EQUAL(m, 7);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 1234).sum_double(c2);
-            CHECK_EQUAL(dbl, 7.);
+            m = table1->where().not_equal(c0, 1234).sum(c2);
+            CHECK_EQUAL(m, 7.);
 
-            dbl = table1->where().not_equal(c2, 1234.).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            m = table1->where().not_equal(c2, 1234.).sum(c2);
+            CHECK_APPROXIMATELY_EQUAL(m->get_double(), 7., 0.001);
 
 
             // Those with criteria now only include some rows, whereof none are null
-            d = table1->where().sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = table1->where().sum(c0);
+            CHECK_EQUAL(m, 7);
 
-            d = table1->where().sum_int(c1);
-            CHECK_EQUAL(d, 7);
+            m = table1->where().sum(c1);
+            CHECK_EQUAL(m, 7);
 
             // Criteria on same column as maximum
-            d = table1->where().equal(c0, 4).sum_int(c0);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).sum(c0);
+            CHECK_EQUAL(m, 4);
 
             // Criteria on other column than maximum (triggers different code paths)
-            d = table1->where().equal(c0, 4).sum_int(c1);
-            CHECK_EQUAL(d, 4);
+            m = table1->where().equal(c0, 4).sum(c1);
+            CHECK_EQUAL(m, 4);
 
             // Average of double, criteria on integer
-            dbl = table1->where().not_equal(c0, 3).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 4., 0.001);
+            m = table1->where().not_equal(c0, 3).sum(c2);
+            CHECK_APPROXIMATELY_EQUAL(m->get_double(), 4., 0.001);
 
-            dbl = table1->where().equal(c2, 3.).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 3., 0.001);
+            m = table1->where().equal(c2, 3.).sum(c2);
+            CHECK_APPROXIMATELY_EQUAL(m->get_double(), 3., 0.001);
 
             // Now using null as criteria
-            dbl = (table1->column<Int>(c0) != null()).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            m = (table1->column<Int>(c0) != null()).sum(c2);
+            CHECK_APPROXIMATELY_EQUAL(m->get_double(), 7., 0.001);
 
-            dbl = (table1->column<Double>(c2) != null()).sum_double(c2);
-            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+            m = (table1->column<Double>(c2) != null()).sum(c2);
+            CHECK_APPROXIMATELY_EQUAL(m->get_double(), 7., 0.001);
 
-            d = (table1->column<Int>(c0) != null()).sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = (table1->column<Int>(c0) != null()).sum(c0);
+            CHECK_EQUAL(m, 7);
 
-            d = (table1->column<Int>(c1) != null()).sum_int(c0);
-            CHECK_EQUAL(d, 7);
+            m = (table1->column<Int>(c1) != null()).sum(c0);
+            CHECK_EQUAL(m, 7);
         }
 
 
@@ -3829,15 +3775,15 @@ TEST(Query_ReferDeletedLinkView)
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);
     CHECK_EQUAL(q.find(), null_key);
-    CHECK_EQUAL(q.sum_int(col_int), 0);
+    CHECK_EQUAL(q.sum(col_int), 0);
     CHECK_EQUAL(q.count(), 0);
     size_t rows;
-    q.average_int(col_int, &rows);
+    q.avg(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     tv_sorted.sync_if_needed();
     // See if "TableView that depends on LinkView" returns sane "empty"-like values
-    tv_sorted.average_int(col_int, &rows);
+    tv_sorted.avg(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     // Now check a "Query that depends on (TableView that depends on LinkView)"

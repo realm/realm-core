@@ -40,6 +40,7 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include "sync/flx_sync_harness.hpp"
 #endif
 
 #include <realm/db.hpp>
@@ -281,6 +282,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
             migration_called = true;
+            REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
             REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
         };
@@ -297,6 +299,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         };
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
+            REQUIRE_FALSE(old_realm->auto_refresh());
             REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
             REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
             if (!migration_called) {
@@ -816,7 +819,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
     // Token refreshing requires that we have app metadata and we can't fetch
     // it normally, so just stick some fake values in
-    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](const SyncMetadataManager& manager) {
+    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](SyncMetadataManager& manager) {
         manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname");
     });
 
@@ -1077,6 +1080,12 @@ TEST_CASE("SharedRealm: convert") {
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("cannot convert from local realm to flx sync") {
+        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
+        auto local_realm = Realm::get_shared_realm(local_config1);
+        REQUIRE_THROWS(local_realm->convert(sync_config));
     }
 
     SECTION("can copy a local realm to a local realm") {

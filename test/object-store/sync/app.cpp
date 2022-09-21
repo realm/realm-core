@@ -41,6 +41,7 @@
 #include <external/mpark/variant.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
@@ -1948,7 +1949,27 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
+static void set_app_config_defaults(app::App::Config& app_config,
+                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
+{
+    if (!app_config.transport)
+        app_config.transport = transport;
+    if (app_config.platform.empty())
+        app_config.platform = "Object Store Test Platform";
+    if (app_config.platform_version.empty())
+        app_config.platform_version = "Object Store Test Platform Version";
+    if (app_config.sdk_version.empty())
+        app_config.sdk_version = "SDK Version";
+    if (app_config.app_id.empty())
+        app_config.app_id = "app_id";
+    if (!app_config.local_app_version)
+        app_config.local_app_version.emplace("A Local App Version");
+}
+
 TEST_CASE("app: sync integration", "[sync][app]") {
+    auto logger = std::make_unique<util::StderrLogger>();
+    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+
     const auto schema = default_app_config("").schema;
 
     auto get_dogs = [](SharedRealm r) -> Results {
@@ -2021,23 +2042,197 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
-                if (response_hook) {
-                    response_hook(request, const_cast<Response&>(response));
-                }
-                completion_block(response);
-            });
+            if (simulated_response) {
+                return completion_block(std::move(request), *simulated_response);
+            }
+            SynchronousTestTransport::send_request_to_server(
+                std::move(request), [&](const Request& request, const Response& response) {
+                    if (response_hook) {
+                        response_hook(const_cast<Request&>(request), const_cast<Response&>(response));
+                    }
+                    completion_block(std::move(request), std::move(response));
+                });
         }
+        // Optional handler for the request and response before it is returned to completion
         util::UniqueFunction<void(Request&, Response&)> response_hook;
+        // Optional handler for the request before it is sent to the server
         util::UniqueFunction<void(Request&)> request_hook;
+        // Optional Response object to return immediately instead of communicating with the server
+        util::Optional<Response> simulated_response;
     };
 
+    {
+        std::unique_ptr<realm::AppSession> app_session;
+        std::string base_file_path = util::make_temp_dir() + random_string(10);
+        auto redir_transport = std::make_shared<HookedTransport>();
+        AutoVerifiedEmailCredentials creds;
+
+        auto app_config = get_config(redir_transport, session.app_session());
+        set_app_config_defaults(app_config, redir_transport);
+
+        util::try_make_dir(base_file_path);
+        SyncClientConfig sc_config;
+        sc_config.base_file_path = base_file_path;
+        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+
+        // initialize app and sync client
+        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+
+        SECTION("Test invalid redirect response") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](Request& request) {
+                if (request_count == 0) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+            };
+
+            // This will fail due to no Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+
+            // This will fail due to empty Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+        }
+
+        SECTION("Test redirect response") {
+            int request_count = 0;
+            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string redirect_scheme = "http://";
+            std::string redirect_host = "localhost:9090";
+            std::string redirect_url = "http://localhost:9090";
+            redir_transport->request_hook = [&](Request& request) {
+                if (request_count == 0) {
+                    if (request.url.find("https://") != std::string::npos) {
+                        redirect_scheme = "https://";
+                    }
+                    if (request.url.find("localhost:9090") != std::string::npos) {
+                        redirect_host = "127.0.0.1:9090";
+                    }
+                    redirect_url = redirect_scheme + redirect_host;
+                    logger->trace("redirect_url (%1): %2", request_count, redirect_url);
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.redirect_count);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 2) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find("somehost:9090") != std::string::npos);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 3) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    // Let the init_app_metadata request go through
+                    redir_transport->simulated_response = util::none;
+                    request_count++;
+                }
+                else if (request_count == 4) {
+                    // This is the original request after the init app metadata
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    auto sync_manager = redir_app->sync_manager();
+                    REQUIRE(sync_manager);
+                    auto app_metadata = sync_manager->app_metadata();
+                    REQUIRE(app_metadata);
+                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
+                    logger->trace("Location: %1", app_metadata->location);
+                    logger->trace("Hostname: %1", app_metadata->hostname);
+                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
+                    REQUIRE(app_metadata->hostname.find(redirect_url) != std::string::npos);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    redir_transport->simulated_response = util::none;
+                    // Validate the retry count tracked in the original message
+                    REQUIRE(request.redirect_count == 2);
+                    request_count++;
+                }
+            };
+
+            // This will be successful after a couple of retries due to the redirect response
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                });
+        }
+        SECTION("Test too many redirects") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request_count <= 21);
+                redir_transport->simulated_response = {
+                    301,
+                    0,
+                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                    "Some body data"};
+                request_count++;
+            };
+
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
+                    REQUIRE(error->message == "number of redirections exceeded 20");
+                });
+        }
+        SECTION("Test server in maintenance") {
+            redir_transport->request_hook = [&](Request&) {
+                nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
+                                                    {"error", "This service is currently undergoing maintenance"},
+                                                    {"link", "https://link.to/server_logs"}};
+                redir_transport->simulated_response = {
+                    500, 0, {{"Content-Type", "application/json"}}, maintenance_error.dump()};
+            };
+
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_service_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ServiceErrorCode::maintenance_in_progress));
+                    REQUIRE(error->message == "This service is currently undergoing maintenance");
+                    REQUIRE(error->link_to_server_logs == "https://link.to/server_logs");
+                    REQUIRE(error->http_status_code == 500);
+                });
+        }
+    }
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
@@ -2073,6 +2268,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     seen_waiting_for_access_token = true;
                 }
             }
+            return true;
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
@@ -2836,10 +3032,9 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         {
         }
 
-        void send_request_to_server(Request&&,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
-            completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
+            completion_block(std::move(request), Response{0, m_code, util::HTTPHeaders(), m_message});
         }
 
     private:
@@ -2921,7 +3116,7 @@ public:
     }
 
 private:
-    void handle_profile(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_profile(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2937,10 +3132,10 @@ private:
                             {"data", profile_0}})
                 .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion_block(std::move(request), Response{200, 0, {}, response});
     }
 
-    void handle_login(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_login(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2960,10 +3155,10 @@ private:
                                                {"device_id", "Panda Bear"}})
                                    .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_location(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_location(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -2974,10 +3169,10 @@ private:
                                                {"location", "matter"}})
                                    .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_create_api_key(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2988,10 +3183,10 @@ private:
             nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
                 .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_fetch_api_key(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3002,10 +3197,10 @@ private:
         std::string response =
             nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion_block(request, Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_fetch_api_keys(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3018,10 +3213,10 @@ private:
             elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
         }
 
-        completion_block(Response{200, 0, {}, nlohmann::json(elements).dump()});
+        completion_block(request, Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_token_refresh(Request& request, HttpCompletion& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -3032,12 +3227,11 @@ private:
         auto elements = std::vector<nlohmann::json>();
         nlohmann::json json{{"access_token", access_token}};
 
-        completion_block(Response{200, 0, {}, json.dump()});
+        completion_block(request, Response{200, 0, {}, json.dump()});
     }
 
 public:
-    void send_request_to_server(Request&& request,
-                                util::UniqueFunction<void(const Response&)>&& completion_block) override
+    void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
     {
         if (request.url.find("/login") != std::string::npos) {
             handle_login(request, completion_block);
@@ -3046,7 +3240,7 @@ public:
             handle_profile(request, completion_block);
         }
         else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            completion_block(Response{200, 0, {}, ""});
+            completion_block(std::move(request), Response{200, 0, {}, ""});
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
@@ -3065,7 +3259,7 @@ public:
             handle_location(request, completion_block);
         }
         else {
-            completion_block(Response{200, 0, {}, "something arbitrary"});
+            completion_block(std::move(request), Response{200, 0, {}, "something arbitrary"});
         }
     }
 };
@@ -3223,11 +3417,10 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
     SECTION("login_anonymous bad") {
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/login") != std::string::npos) {
-                    completion_block({200, 0, {}, user_json(bad_access_token).dump()});
+                    completion_block(std::move(request), {200, 0, {}, user_json(bad_access_token).dump()});
                 }
                 else {
                     UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
@@ -3441,9 +3634,9 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(Request&&, util::UniqueFunction<void(const Response&)>&& completion_block) override
+    void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
     {
-        completion_block(Response(*m_response));
+        completion_block(std::move(request), Response(*m_response));
     }
 
 private:
@@ -3457,7 +3650,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                                 {"device_id", "Panda Bear"}})
                                     .dump();
 
-    Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
+    Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
 
     TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
     auto app = tsm.app();
@@ -3501,6 +3694,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("session error code") {
+        response.headers = util::HTTPHeaders{{"Content-Type", "application/json"}};
         response.http_status_code = 400;
         response.body = nlohmann::json({{"error_code", "MongoDBError"},
                                         {"error", "a fake MongoDB error message!"},
@@ -3805,13 +3999,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
                     nlohmann::json json{{"access_token", good_access_token}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion_block(std::move(request), {200, 0, {}, json.dump()});
                 }
                 else {
                     UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
@@ -3836,13 +4029,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
                     nlohmann::json json{{"access_token", bad_access_token}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion_block(std::move(request), {200, 0, {}, json.dump()});
                 }
                 else {
                     UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
@@ -3879,12 +4071,11 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             bool get_profile_2_hit = false;
             bool refresh_hit = false;
 
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     login_hit = true;
-                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
+                    completion_block(std::move(request), {200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/profile") != std::string::npos) {
                     CHECK(login_hit);
@@ -3898,13 +4089,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
                         get_profile_2_hit = true;
 
-                        completion_block({200, 0, {}, user_profile_json().dump()});
+                        completion_block(std::move(request), {200, 0, {}, user_profile_json().dump()});
                     }
                     else if (access_token.find(good_access_token) != std::string::npos) {
                         CHECK(!get_profile_2_hit);
                         get_profile_1_hit = true;
 
-                        completion_block({401, 0, {}});
+                        completion_block(std::move(request), {401, 0, {}});
                     }
                 }
                 else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
@@ -3914,11 +4105,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     refresh_hit = true;
 
                     nlohmann::json json{{"access_token", good_access_token2}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion_block(std::move(request), {200, 0, {}, json.dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
                     CHECK(request.method == HttpMethod::get);
-                    completion_block({200,
+                    completion_block(std::move(request),
+                                     {200,
                                       0,
                                       {},
                                       "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
@@ -3942,10 +4134,11 @@ public:
     {
     }
 
-    void add_work_item(Response response, util::UniqueFunction<void(const Response&)> completion_block)
+    void add_work_item(Request request, Response response, HttpCompletion completion_block)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion_block)});
+        transport_work.push_front(
+            ResponseWorkItem{std::move(request), std::move(response), std::move(completion_block)});
         transport_work_cond.notify_one();
     }
 
@@ -3967,8 +4160,9 @@ public:
 
 private:
     struct ResponseWorkItem {
+        Request request;
         Response response;
-        util::UniqueFunction<void(const Response&)> completion_block;
+        HttpCompletion completion_block;
     };
 
     void worker_routine()
@@ -3985,7 +4179,8 @@ private:
                 lk.unlock();
 
                 mpark::visit(util::overload{[](ResponseWorkItem& work_item) {
-                                                work_item.completion_block(std::move(work_item.response));
+                                                work_item.completion_block(std::move(work_item.request),
+                                                                           std::move(work_item.response));
                                             },
                                             [](util::UniqueFunction<void()>& cb) {
                                                 cb();
@@ -4051,15 +4246,13 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
-
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
                 mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
+                    std::move(request), Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
                     std::move(completion_block));
             }
             else if (request.url.find("/profile") != std::string::npos) {
@@ -4068,31 +4261,34 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
                 if (cur_state == TestState::refresh_1) {
                     state.advance_to(TestState::profile_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                    mock_transport_worker.add_work_item(std::move(request),
+                                                        Response{200, 0, {}, user_profile_json().dump()},
                                                         std::move(completion_block));
                 }
                 else if (cur_state == TestState::login) {
                     state.advance_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
+                    mock_transport_worker.add_work_item(std::move(request), Response{401, 0, {}},
+                                                        std::move(completion_block));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
                     state.advance_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                    mock_transport_worker.add_work_item(std::move(request), Response{200, 0, {}, json.dump()},
                                                         std::move(completion_block));
                 }
                 else if (state.get() == TestState::profile_2) {
                     state.advance_to(TestState::refresh_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
+                    mock_transport_worker.add_work_item(std::move(request),
+                                                        Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
                                                         std::move(completion_block));
                 }
                 else {
                     CHECK(state.get() == TestState::refresh_2);
                     state.advance_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                    mock_transport_worker.add_work_item(std::move(request), Response{200, 0, {}, json.dump()},
                                                         std::move(completion_block));
                 }
             }
@@ -4101,6 +4297,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 CHECK(state.get() == TestState::unknown);
                 state.advance_to(TestState::location);
                 mock_transport_worker.add_work_item(
+                    std::move(request),
                     Response{200,
                              0,
                              {},
@@ -4151,19 +4348,18 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_ws_hostname = "wsproto://host:1234";
 
     struct transport : UnitTestTransport {
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                completion_block({200,
-                                  0,
-                                  {},
-                                  nlohmann::json({{"deployment_model", "LOCAL"},
-                                                  {"location", "IE"},
-                                                  {"hostname", test_hostname},
-                                                  {"ws_hostname", test_ws_hostname}})
-                                      .dump()});
+                completion_block(std::move(request), {200,
+                                                      0,
+                                                      {},
+                                                      nlohmann::json({{"deployment_model", "LOCAL"},
+                                                                      {"location", "IE"},
+                                                                      {"hostname", test_hostname},
+                                                                      {"ws_hostname", test_ws_hostname}})
+                                                          .dump()});
             }
             else if (request.url.find("functions/call") != std::string::npos) {
                 REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
@@ -4349,26 +4545,26 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
-
+        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 state.advance_to(TestState::login);
                 state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
+                    std::move(request), Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion_block));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 state.advance_to(TestState::profile);
-                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                mock_transport_worker.add_work_item(std::move(request),
+                                                    Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion_block));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
                 state.advance_to(TestState::location);
                 mock_transport_worker.add_work_item(
+                    std::move(request),
                     Response{200,
                              0,
                              {},

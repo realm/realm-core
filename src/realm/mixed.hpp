@@ -209,32 +209,32 @@ public:
     bool is_unresolved_link() const;
     bool is_same_type(const Mixed& b) const;
     // Will use utf8_compare for strings
-    int compare(const Mixed& b) const;
+    int compare(const Mixed& b) const noexcept;
     // Will compare strings as arrays of signed chars
     int compare_signed(const Mixed& b) const;
-    bool operator==(const Mixed& other) const
+    friend bool operator==(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) == 0;
+        return a.compare(b) == 0;
     }
-    bool operator!=(const Mixed& other) const
+    friend bool operator!=(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) != 0;
+        return a.compare(b) != 0;
     }
-    bool operator<(const Mixed& other) const
+    friend bool operator<(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) < 0;
+        return a.compare(b) < 0;
     }
-    bool operator>(const Mixed& other) const
+    friend bool operator>(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) > 0;
+        return a.compare(b) > 0;
     }
-    bool operator<=(const Mixed& other) const
+    friend bool operator<=(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) <= 0;
+        return a.compare(b) <= 0;
     }
-    bool operator>=(const Mixed& other) const
+    friend bool operator>=(const Mixed& a, const Mixed& b) noexcept
     {
-        return compare(other) >= 0;
+        return a.compare(b) >= 0;
     }
 
     Mixed operator+(const Mixed&) const;

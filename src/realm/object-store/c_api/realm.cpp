@@ -263,8 +263,30 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {
         auto& p = **realm;
-        *did_compact = p.compact();
+        if (did_compact)
+            *did_compact = p.compact();
         return true;
+    });
+}
+
+RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* table_deleted)
+{
+    if (table_deleted)
+        *table_deleted = false;
+
+    return wrap_err([&] {
+        auto table = ObjectStore::table_for_object_type((*realm)->read_group(), table_name);
+        if (table) {
+            const auto& schema = (*realm)->schema();
+            const auto& object_schema = schema.find(table_name);
+            if (object_schema != schema.end()) {
+                throw std::logic_error("Attempt to remove a table that is currently part of the schema");
+            }
+            (*realm)->read_group().remove_table(table->get_key());
+            *table_deleted = true;
+        }
+        return true;
+        ;
     });
 }
 

@@ -86,16 +86,6 @@ public:
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
     List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
 
-    // Get the min/max/average/sum of the given column
-    // All but sum() returns none when there are zero matching rows
-    // sum() returns 0,
-    // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
-    // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(ColKey column = {}) const;
-    util::Optional<Mixed> min(ColKey column = {}) const;
-    util::Optional<Mixed> average(ColKey column = {}) const;
-    Mixed sum(ColKey column = {}) const;
-
     bool operator==(List const& rgt) const noexcept;
 
     template <typename Context>
