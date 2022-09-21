@@ -127,9 +127,7 @@ public:
         SchemaValidationFailed = RLM_ERR_SCHEMA_VALIDATION_FAILED,
         SchemaMismatch = RLM_ERR_SCHEMA_MISMATCH,
         InvalidSchemaVersion = RLM_ERR_INVALID_SCHEMA_VERSION,
-        InvalidAdditiveSchemaChange = RLM_ERR_INVALID_ADDITIVE_SCHEMA_CHANGE,
-        InvalidReadOnlySchemaChange = RLM_ERR_INVALID_READ_ONLY_SCHEMA_CHANGE,
-        InvalidExternalSchemaChange = RLM_ERR_INVALID_EXTERNAL_SCHEMA_CHANGE,
+        InvalidSchemaChange = RLM_ERR_INVALID_SCHEMA_CHANGE,
 
         InvalidArgument = RLM_ERR_INVALID_ARGUMENT,
         TypeMismatch = RLM_ERR_PROPERTY_TYPE_MISMATCH,

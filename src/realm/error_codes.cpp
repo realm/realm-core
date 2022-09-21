@@ -72,9 +72,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case CrossTableLinkTarget:
         case DeleteOnOpenRealm:
         case IllegalOperation:
-        case InvalidAdditiveSchemaChange:
-        case InvalidExternalSchemaChange:
-        case InvalidReadOnlySchemaChange:
+        case InvalidSchemaChange:
         case InvalidSchemaVersion:
         case InvalidTableRef:
         case InvalidatedObject:
@@ -255,21 +253,19 @@ static const MapElem string_to_error_code[] = {
     {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
     {"IncompatibleSession", ErrorCodes::IncompatibleSession},
     {"InternalServerError", ErrorCodes::InternalServerError},
-    {"InvalidAdditiveSchemaChange", ErrorCodes::InvalidAdditiveSchemaChange},
     {"InvalidArgument", ErrorCodes::InvalidArgument},
     {"InvalidCombination", ErrorCodes::IllegalCombination},
     {"InvalidDatabase", ErrorCodes::InvalidDatabase},
     {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
     {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
     {"InvalidEncryptionKey", ErrorCodes::InvalidEncryptionKey},
-    {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
     {"InvalidName", ErrorCodes::InvalidName},
     {"InvalidParameter", ErrorCodes::InvalidParameter},
     {"InvalidPassword", ErrorCodes::InvalidPassword},
     {"InvalidProperty", ErrorCodes::InvalidProperty},
     {"InvalidQuery", ErrorCodes::InvalidQuery},
     {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
-    {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
+    {"InvalidSchemaChange", ErrorCodes::InvalidSchemaChange},
     {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
     {"InvalidSession", ErrorCodes::InvalidSession},
     {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
