@@ -2999,7 +2999,6 @@ TEST_CASE("migration: ReadOnly") {
     }
 
     SECTION("disallowed mismatches") {
-
         SECTION("missing columns in table") {
             auto realm = realm_with_schema({
                 {"object",
