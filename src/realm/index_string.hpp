@@ -177,8 +177,6 @@ public:
                 type == type_ObjectId || type == type_Mixed || type == type_UUID);
     }
 
-    static ref_type create_empty(Allocator& alloc);
-
     void set_target(const ClusterColumn& target_column) noexcept;
 
     // Accessor concept:

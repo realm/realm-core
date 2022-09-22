@@ -919,7 +919,8 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+        (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);

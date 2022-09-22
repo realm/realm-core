@@ -1527,7 +1527,7 @@ The reason we use this map pattern is that we can exit the link-tree-traversal a
 found the first link that points to key '5'. Other solutions could be a std::vector<ColKey> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
-class LinkMap {
+class LinkMap final {
 public:
     LinkMap() = default;
     LinkMap(ConstTableRef table, std::vector<ColKey> columns)
@@ -1591,7 +1591,7 @@ public:
 
     void collect_dependencies(std::vector<TableKey>& tables) const;
 
-    virtual std::string description(util::serializer::SerialisationState& state) const;
+    std::string description(util::serializer::SerialisationState& state) const;
 
     ObjKey get_unary_link_or_not_found(size_t index) const
     {

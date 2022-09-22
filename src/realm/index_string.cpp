@@ -635,13 +635,6 @@ std::unique_ptr<IndexArray> StringIndex::create_node(Allocator& alloc, bool is_l
     return top;
 }
 
-/*
-ref_type StringIndex::create_empty(Allocator& alloc)
-{
-    return StringIndex(ClusterColumn(nullptr, {}, false), alloc).get_ref(); // Throws
-}
-*/
-
 void StringIndex::set_target(const ClusterColumn& target_column) noexcept
 {
     m_target_column = target_column;
@@ -962,7 +955,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
 
 // This method reconstructs the string inserted in the search index based on a string
 // that matches so far and the last key (only works if complete strings are stored in the index)
-StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
 {
     if (key == 0)
         return StringData();
