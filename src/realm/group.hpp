@@ -539,7 +539,7 @@ protected:
     static constexpr size_t s_sync_file_id_ndx = 10;
     static constexpr size_t s_evacuation_point_ndx = 11;
 
-    static constexpr size_t s_group_max_size = 11;
+    static constexpr size_t s_group_max_size = 12;
 
     virtual Replication* const* get_repl() const
     {

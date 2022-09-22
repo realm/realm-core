@@ -76,10 +76,11 @@ TEST(Compaction_WhileGrowing)
     table1->create_object().set(col_bin1, BinaryData(w, 4500));
     table1->create_object().set(col_bin1, BinaryData(w, 4500));
     tr->commit_and_continue_as_read();
-    db->get_stats(free_space, used_space);
-    std::cout << "Total: " << free_space + used_space << ", "
-              << "Free: " << free_space << ", "
-              << "Used: " << used_space << std::endl;
+
+    // db->get_stats(free_space, used_space);
+    // std::cout << "Total: " << free_space + used_space << ", "
+    //           << "Free: " << free_space << ", "
+    //           << "Used: " << used_space << std::endl;
 
     tr->promote_to_write();
     table1->clear();

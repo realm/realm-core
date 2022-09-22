@@ -1588,18 +1588,11 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
 void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
 {
     REALM_ASSERT(m_file_format_version >= 7);
-    if (m_top.size() < s_group_max_size) {
-        REALM_ASSERT(m_top.size() <= s_hist_type_ndx);
-        while (m_top.size() < s_hist_type_ndx) {
-            m_top.add(0); // Throws
-        }
-        ref_type history_ref = 0;                                    // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
-        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
-        m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
+    while (m_top.size() < s_hist_type_ndx) {
+        m_top.add(0); // Throws
     }
-    else {
+
+    if (m_top.size() > s_hist_version_ndx) {
         int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
         int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         if (stored_history_type != Replication::hist_None) {
@@ -1608,6 +1601,21 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         }
         m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
         m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    else {
+        // No history yet
+        REALM_ASSERT(m_top.size() == s_hist_type_ndx);
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
+        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+
+    if (m_top.size() > s_sync_file_id_ndx) {
+        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(file_ident));
+    }
+    else {
+        m_top.add(RefOrTagged::make_tagged(file_ident)); // Throws
     }
 }
 

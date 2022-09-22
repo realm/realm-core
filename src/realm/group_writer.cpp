@@ -194,8 +194,9 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     Array& top = m_group.m_top;
     m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
 
-    while (top.size() < Group::s_version_ndx + 1) {
-        top.add(0);
+    // When we make a commit, we will at least need room for the version
+    while (top.size() < Group::s_version_ndx) {
+        top.add(0); // Throws
     }
 
     m_free_positions.set_parent(&top, Group::s_free_pos_ndx);
@@ -353,14 +354,11 @@ ref_type GroupWriter::write_group()
     // If file has a history and is opened in shared mode, write the new history
     // to the file. If the file has a history, but si not opened in shared mode,
     // discard the history, as it could otherwise be left in an inconsistent state.
-    if (top.size() >= 8) {
-        REALM_ASSERT(top.size() >= 10);
-        // In nonshared mode, history must already have been discarded by GroupWriter constructor.
-        if (ref_type history_ref = top.get_as_ref(8)) {
+    if (top.size() > Group::s_hist_ref_ndx) {
+        if (ref_type history_ref = top.get_as_ref(Group::s_hist_ref_ndx)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
-            int_fast64_t value_3 = from_ref(new_history_ref);
-            top.set(8, value_3); // Throws
+            top.set(Group::s_hist_ref_ndx, from_ref(new_history_ref));                            // Throws
         }
     }
     if (top.size() > Group::s_evacuation_point_ndx) {
@@ -457,8 +455,7 @@ ref_type GroupWriter::write_group()
         if (elem.ref + elem.size == m_logical_size) {
             // This is at the end of the file
             size_t pos = elem.ref;
-            // Don't truncate below 64k
-            m_logical_size = (pos + 0xFFFF) & ~size_t(0xFFFF);
+            m_logical_size = util::round_up_to_page_size(pos);
             elem.size = (m_logical_size - pos);
             if (elem.size == 0)
                 m_under_evacuation.clear();
@@ -524,9 +521,14 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
     if (m_evacuation_limit == 0) {
         size_t used_space = m_logical_size - m_free_space_size;
-        if (m_logical_size >= 0x100000 && m_free_space_size - m_locked_space_size > 2 * used_space) {
+        // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
+        static constexpr size_t one_mb = 0x100000;
+        // If we make the file too small, there is a big chance it will grow immediately afterwards
+        static constexpr size_t sixty_four_kb = 0x10000;
+        if (m_logical_size >= one_mb && m_free_space_size - m_locked_space_size > 2 * used_space) {
             // Clean up potential
-            m_evacuation_limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
+            auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
+            m_evacuation_limit = std::max(sixty_four_kb, limit);
             // From now on, we will only allocate below this limit
             // Save the limit in the file
             while (top.size() <= Group::s_evacuation_point_ndx) {
