@@ -21,6 +21,8 @@ xcrun simctl launch --console-pty "$id" "$bundleId"
 # with F_FULLFSYNC, and any unflushed writes are lost entirely if the simulator
 # is shut down. As a result, we need to wait for the test results file to
 # actually appear on disk before continuing.
+# Wait 5 seconds before checking the first time
+sleep 5
 while [ ! -s "$outputFile" ] && [ $((retries++)) -lt 100 ]; do
     sleep 5
 done
