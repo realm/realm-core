@@ -58,11 +58,11 @@ Schema::Schema(base types) noexcept
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = find(*this, name);
-    if (it == end()) {
-        it = find(m_other_classes, name);
-        if (it == m_other_classes.end())
-            it = end();
+    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
+        return lft.name < rgt;
+    });
+    if (it != end() && it->name != name) {
+        it = end();
     }
     return it;
 }
@@ -326,17 +326,6 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
     return different_classes;
 }
 
-Schema::iterator Schema::find(std::vector<ObjectSchema>& schema, StringData name) noexcept
-{
-    auto it = std::lower_bound(schema.begin(), schema.end(), name, [](ObjectSchema const& lft, StringData rgt) {
-        return lft.name < rgt;
-    });
-    if (it != schema.end() && it->name != name) {
-        it = schema.end();
-    }
-    return it;
-}
-
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
                                           bool include_table_removals) const
 {
@@ -406,7 +395,10 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
             }
         },
         is_schema_additive);
-    m_other_classes.insert(m_other_classes.end(), other_classes.begin(), other_classes.end());
+    insert(end(), other_classes.begin(), other_classes.end());
+    std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
+        return lft.name < rgt.name;
+    });
 }
 
 namespace realm {

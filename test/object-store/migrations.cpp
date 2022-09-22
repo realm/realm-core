@@ -50,8 +50,8 @@ using util::any_cast;
     do {                                                                                                             \
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
-        REQUIRE((r).schema() == s);                                                                                  \
     } while (0)
+// REQUIRE((r).schema() == s);
 
 #define REQUIRE_NO_MIGRATION_NEEDED(r, schema1, schema2)                                                             \
     do {                                                                                                             \
@@ -191,7 +191,8 @@ auto create_objects(Table& table, size_t count)
 }
 } // anonymous namespace
 
-TEST_CASE("Additive mode returns OS schema - Automatic migration") {
+TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
+
     SECTION("Check OS schema returned in additive mode") {
         InMemoryTestFile config;
         config.automatic_change_notifications = false;
@@ -218,54 +219,56 @@ TEST_CASE("Additive mode returns OS schema - Automatic migration") {
         // after deletion the schema size is decremented but the just deleted object can still be found.
         // the object that was just deleted is still there, thus find should return a valid iterator
         SECTION("delete in reverse order") {
-            Schema delete_schema = remove_table(schema5, "Z");
+            auto new_schema = schema5;
+            Schema delete_schema = remove_table(new_schema, "Z");
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 3);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("Z") != schema.end());
             delete_schema = remove_table(schema4, "C");
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
-            REQUIRE(schema.size() == 2);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             delete_schema = remove_table(schema3, "B");
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
-            REQUIRE(schema.size() == 1);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
             delete_schema = remove_table(schema2, "A");
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
-            REQUIRE(schema.size() == 0);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
         SECTION("delete 1 element") {
-            Schema delete_schema = remove_table(schema5, "Z");
+            auto new_schema = schema5;
+            Schema delete_schema = remove_table(new_schema, "Z");
             // A B C Z vs A B C ==> Z (other classes)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 3);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(schema5, "C");
+            delete_schema = remove_table(new_schema, "C");
             schema = realm->schema();
             // A B C vs A B Z => Z
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
-            REQUIRE(schema.size() == 3);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(schema5, "B");
+            delete_schema = remove_table(new_schema, "B");
             // A B Z vs A C Z => B
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
@@ -273,53 +276,56 @@ TEST_CASE("Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
-            delete_schema = remove_table(schema5, "A");
+            delete_schema = remove_table(new_schema, "A");
             // A B Z vs B C Z => A
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             schema = realm->schema();
-            REQUIRE(schema.size() == 3);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
         SECTION("delete 2 elements") {
+            auto new_schema = schema5;
             Schema delete_schema;
-            delete_schema = remove_table(schema5, "Z");
+            delete_schema = remove_table(new_schema, "Z");
             delete_schema = remove_table(delete_schema, "A");
             // A B C Z vs B C ==> A,Z (other classes)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 2);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
         SECTION("delete 3 elements") {
+            auto new_schema = schema5;
             Schema delete_schema;
-            delete_schema = remove_table(schema5, "Z");
+            delete_schema = remove_table(new_schema, "Z");
             delete_schema = remove_table(delete_schema, "A");
             delete_schema = remove_table(delete_schema, "C");
             // A B C Z vs B  ==> A,C,Z (other classes)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 1);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
         SECTION("delete all elements") {
+            auto new_schema = schema5;
             Schema delete_schema;
-            delete_schema = remove_table(schema5, "Z");
+            delete_schema = remove_table(new_schema, "Z");
             delete_schema = remove_table(delete_schema, "A");
             delete_schema = remove_table(delete_schema, "C");
             delete_schema = remove_table(delete_schema, "B");
             // A B C Z vs None  ==> A,C,Z,B (other classes)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 0);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
@@ -344,7 +350,7 @@ TEST_CASE("Additive mode returns OS schema - Automatic migration") {
             // Z B A C vs Z A => B C (others)
             REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
             auto schema = realm->schema();
-            REQUIRE(schema.size() == 2);
+            REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
