@@ -459,8 +459,8 @@ void GroupWriter::backdate()
 
     // check if a given entry overlaps a reachable block. Only used in debug mode.
     auto is_referenced = [&](FreeSpaceEntry& entry) -> bool {
-        bool referenced = false;
 #ifdef REALM_DEBUG
+        bool referenced = false;
         ALLOC_DBG_COUT(std::endl
                        << "    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
                        << " {");
@@ -486,8 +486,11 @@ void GroupWriter::backdate()
             ALLOC_DBG_COUT("none");
         }
         ALLOC_DBG_COUT("} ");
-#endif
         return referenced;
+#else
+        static_cast<void>(entry);
+        return false;
+#endif
     };
 
     auto backdate_single_entry = [&](FreeSpaceEntry& entry) -> void {
