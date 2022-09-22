@@ -233,8 +233,6 @@ public:
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
 
-    static std::set<std::string> tokenize(const StringData text);
-
     typedef int32_t key_type;
 
     // s_max_offset specifies the number of levels of recursive string indexes

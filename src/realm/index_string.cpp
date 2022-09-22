@@ -29,6 +29,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/unicode.hpp>
+#include <realm/tokenizer.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -1164,52 +1165,12 @@ Mixed StringIndex::get(ObjKey key) const
     return m_target_column.get_value(key);
 }
 
-std::set<std::string> StringIndex::tokenize(const StringData text)
-{
-    std::set<std::string> words;
-
-    const char* str = text.data();
-    const size_t len = text.size();
-    size_t start = 0;
-
-    for (size_t i = 0; i < len; ++i) {
-        signed char c = static_cast<signed char>(str[i]); // char may not be signed by default
-
-        // Words are alnum + unicode chars above 128 (special unicode whitespace
-        // chars are not used as word separators)
-        bool is_alnum = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                        c < 0; // sign bit is set = unicode above 128
-
-        if (is_alnum)
-            continue;
-
-        if (i > start) {
-            StringData w(str + start, i - start);
-
-            // All words are converted to lowercase (not very unicode aware)
-            // This is also where we could do stemming.
-            if (auto opt = case_map(w, false)) {
-                words.emplace(*opt);
-            }
-        }
-        start = i + 1;
-    }
-    if (start < len) {
-        StringData w(str + start, len - start);
-        if (auto opt = case_map(w, false)) {
-            words.emplace(*opt);
-        }
-    }
-
-    return words;
-}
-
 void StringIndex::erase(ObjKey key)
 {
     StringConversionBuffer buffer;
-    StringData value = get(key).get_index_data(buffer);
+    auto value = std::string_view(get(key).get_index_data(buffer));
     if (m_target_column.is_fulltext()) {
-        std::set<std::string> words = tokenize(value);
+        auto words = Tokenizer::get_instance()->reset(value).get_all_tokens();
         for (auto& w : words) {
             erase_string(key, w);
         }
@@ -1224,11 +1185,11 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
     InternalFindResult res;
     REALM_ASSERT(result.empty());
 
-    // Convert search string to lowercase
-    std::set<std::string> words = tokenize(value);
-
-    for (const std::string& w : words) {
-        FindRes res1 = find_all_no_copy(StringData(w), res);
+    auto tokenizer = Tokenizer::get_instance();
+    tokenizer->reset({value.data(), value.size()});
+    while (tokenizer->next()) {
+        auto token = tokenizer->get_token();
+        FindRes res1 = find_all_no_copy(StringData{token.data(), token.size()}, res);
         if (res1 == FindRes_not_found) {
             result.clear();
             return;
@@ -1481,7 +1442,7 @@ void StringIndex::insert<StringData>(ObjKey key, StringData value)
     StringConversionBuffer buffer;
 
     if (this->m_target_column.is_fulltext()) {
-        std::set<std::string> words = tokenize(value);
+        auto words = Tokenizer::get_instance()->reset(std::string_view(value)).get_all_tokens();
 
         for (auto& word : words) {
             Mixed m(word);
@@ -1502,8 +1463,17 @@ void StringIndex::set<StringData>(ObjKey key, StringData new_value)
     Mixed new_value2 = Mixed(new_value);
 
     if (this->m_target_column.is_fulltext()) {
-        std::set<std::string> old_words = tokenize(old_value.get_string());
-        std::set<std::string> new_words = tokenize(new_value);
+        auto tokenizer = Tokenizer::get_instance();
+        StringData old_string = old_value.get_index_data(buffer);
+        std::set<std::string> old_words;
+
+        if (old_string.size() > 0) {
+            tokenizer->reset({old_string.data(), old_string.size()});
+            old_words = tokenizer->get_all_tokens();
+        }
+
+        tokenizer->reset({new_value.data(), new_value.size()});
+        auto new_words = tokenizer->get_all_tokens();
 
         auto w1 = old_words.begin();
         auto w2 = new_words.begin();
