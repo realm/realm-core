@@ -514,12 +514,7 @@ void Realm::add_schema_change_handler()
     m_transaction->set_schema_change_notification_handler([&] {
         m_new_schema = ObjectStore::schema_from_group(read_group());
         m_schema_version = ObjectStore::get_schema_version(read_group());
-        if (m_dynamic_schema) {
-            m_schema = *m_new_schema;
-        }
-        else
-            m_schema.copy_keys_from(*m_new_schema);
-
+        m_schema.copy_keys_from(*m_new_schema);
         notify_schema_changed();
     });
 }
