@@ -1,16 +1,14 @@
-r# NEXT RELEASE
+# 12.8.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 * Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
 * Adding support in the C API for `realm_results_find` and supporting all native types for `realm_results_get()` ([PR 5875](https://github.com/realm/realm-core/pull/5875)).
 * Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Results permitted some nonsensical aggregate operations on column types which do not make sense to aggregate, giving garbage results rather than reporting an error ([#5876](https://github.com/realm/realm-core/pull/5876)).
-* Removed blocking wait for upload/download completion due to possibility of deadlock ([#5829](https://github.com/realm/realm-core/issues/5829)).
+* Results permitted some nonsensical aggregate operations on column types which do not make sense to aggregate, giving garbage results rather than reporting an error ([#5876](https://github.com/realm/realm-core/pull/5876), since v6.0.0).
+* Removed blocking wait for upload/download completion due to possibility of deadlock ([#5829](https://github.com/realm/realm-core/issues/5829), since v11.17.0).
 
 ### Breaking changes
 * The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
