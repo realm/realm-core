@@ -251,8 +251,8 @@ public:
 
 struct ObjLink {
 public:
-    ObjLink() {}
-    ObjLink(TableKey table_key, ObjKey obj_key)
+    constexpr ObjLink() = default;
+    constexpr ObjLink(TableKey table_key, ObjKey obj_key)
         : m_obj_key(obj_key)
         , m_table_key(table_key)
     {

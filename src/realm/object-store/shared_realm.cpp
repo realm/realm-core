@@ -285,12 +285,12 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
             if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, false);
             return true;
 
         case SchemaMode::Immutable:
             if (version != m_schema_version)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, true);
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
@@ -316,7 +316,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 
         case SchemaMode::Manual:
             if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, false);
             if (version == m_schema_version) {
                 ObjectStore::verify_no_changes_required(changes);
                 REALM_UNREACHABLE(); // changes is non-empty so above line always throws

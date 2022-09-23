@@ -1028,9 +1028,11 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 }
 
-InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
-    : logic_error(
-          util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
+InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version,
+                                                             bool must_exactly_equal)
+    : logic_error(util::format(must_exactly_equal ? "Provided schema version %1 does not equal last set version %2."
+                                                  : "Provided schema version %1 is less than last set version %2.",
+                               new_version, old_version))
     , m_old_version(old_version)
     , m_new_version(new_version)
 {

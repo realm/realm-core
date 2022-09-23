@@ -110,6 +110,9 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    // Get table name with class prefix removed
+    StringData get_class_name() const noexcept;
+
     const char* get_state() const noexcept;
 
     /// If this table is a group-level table, the parent group is returned,
@@ -868,18 +871,7 @@ private:
     friend class AggregateHelper;
 };
 
-inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
-{
-    switch (table_type) {
-        case Table::Type::TopLevel:
-            return o << "TopLevel";
-        case Table::Type::Embedded:
-            return o << "Embedded";
-        case Table::Type::TopLevelAsymmetric:
-            return o << "TopLevelAsymmetric";
-    }
-    return o << "Invalid table type: " << uint8_t(table_type);
-}
+std::ostream& operator<<(std::ostream& o, Table::Type table_type);
 
 class ColKeyIterator {
 public:

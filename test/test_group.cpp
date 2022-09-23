@@ -1698,35 +1698,38 @@ TEST(Group_MakeEmbedded_DeepCopy)
     // Single/List/Set/Dictionary of a link to a top-level object
     TableRef target = g.add_table("target");
     target->add_column(type_Int, "value");
-    auto target_obj1 = target->create_object().set_all(123).get_key();
-    auto target_obj2 = target->create_object().set_all(456).get_key();
-    auto target_obj3 = target->create_object().set_all(789).get_key();
+    auto target_obj1 = target->create_object().set_all(123);
+    auto target_obj2 = target->create_object().set_all(456);
+    auto target_obj3 = target->create_object().set_all(789);
+    auto target_objkey1 = target_obj1.get_key();
+    auto target_objkey2 = target_obj2.get_key();
+    auto target_objkey3 = target_obj3.get_key();
 
-    obj.set(t->add_column(*target, "link"), target_obj1);
+    obj.set(t->add_column(*target, "link"), target_objkey1);
     auto obj_list = obj.get_linklist(t->add_column_list(*target, "obj list"));
-    obj_list.add(target_obj1);
-    obj_list.add(target_obj2);
-    obj_list.add(target_obj3);
-    obj_list.add(target_obj1);
-    obj_list.add(target_obj2);
-    obj_list.add(target_obj3);
+    obj_list.add(target_objkey1);
+    obj_list.add(target_objkey2);
+    obj_list.add(target_objkey3);
+    obj_list.add(target_objkey1);
+    obj_list.add(target_objkey2);
+    obj_list.add(target_objkey3);
     auto obj_set = obj.get_linkset(t->add_column_set(*target, "obj set"));
-    obj_set.insert(target_obj1);
-    obj_set.insert(target_obj2);
-    obj_set.insert(target_obj3);
+    obj_set.insert(target_objkey1);
+    obj_set.insert(target_objkey2);
+    obj_set.insert(target_objkey3);
     auto obj_dict = obj.get_dictionary(t->add_column_dictionary(*target, "obj dict"));
-    obj_dict.insert("a", target_obj1);
-    obj_dict.insert("b", target_obj2);
-    obj_dict.insert("c", target_obj3);
-    obj_dict.insert("d", target_obj1);
-    obj_dict.insert("e", target_obj2);
-    obj_dict.insert("f", target_obj3);
+    obj_dict.insert("a", target_objkey1);
+    obj_dict.insert("b", target_objkey2);
+    obj_dict.insert("c", target_objkey3);
+    obj_dict.insert("d", target_objkey1);
+    obj_dict.insert("e", target_objkey2);
+    obj_dict.insert("f", target_objkey3);
 
     // Single/List/Dictionary of a link to an embedded object
     TableRef embedded = g.add_table("embedded", Table::Type::Embedded);
     embedded->add_column(type_Int, "value");
 
-    obj.create_and_set_linked_object(t->add_column(*target, "embedded link")).set_all(1);
+    obj.create_and_set_linked_object(t->add_column(*embedded, "embedded link")).set_all(1);
     auto embedded_list = obj.get_linklist(t->add_column_list(*embedded, "embedded list"));
     embedded_list.create_and_insert_linked_object(0).set_all(2);
     embedded_list.create_and_insert_linked_object(1).set_all(3);
@@ -1742,7 +1745,93 @@ TEST(Group_MakeEmbedded_DeepCopy)
     parent->create_object().set_all(obj.get_key());
     parent->create_object().set_all(obj.get_key());
 
+    // Pre-conversion sanity check
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(target->size(), 3);
+    CHECK_EQUAL(embedded->size(), 7);
+    CHECK_EQUAL(parent->get_object(0).get<ObjKey>("link"), parent->get_object(1).get<ObjKey>("link"));
+
     CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+
+    CHECK_EQUAL(t->size(), 2);
+    CHECK_EQUAL(target->size(), 3);
+    CHECK_EQUAL(embedded->size(), 14);
+    CHECK_NOT_EQUAL(parent->get_object(0).get<ObjKey>("link"), parent->get_object(1).get<ObjKey>("link"));
+
+    // The original objects should be deleted, except for target since that's still top-level
+    CHECK_NOT(obj.is_valid());
+    CHECK(target_obj1.is_valid());
+    CHECK(target_obj2.is_valid());
+    CHECK(target_obj3.is_valid());
+    CHECK_NOT(int_list.is_attached());
+    CHECK_NOT(int_set.is_attached());
+    CHECK_NOT(int_dict.is_attached());
+    CHECK_NOT(obj_list.is_attached());
+    CHECK_NOT(obj_set.is_attached());
+    CHECK_NOT(obj_dict.is_attached());
+    CHECK_NOT(embedded_list.is_attached());
+    CHECK_NOT(embedded_dict.is_attached());
+
+    for (auto parent_obj : *parent) {
+        auto obj = parent_obj.get_linked_object("link");
+        CHECK_EQUAL(obj.get<int64_t>("int"), 1);
+
+        auto int_list = obj.get_list<int64_t>("int list");
+        CHECK_EQUAL(int_list.size(), 3);
+        CHECK_EQUAL(int_list.get(0), 1);
+        CHECK_EQUAL(int_list.get(1), 2);
+        CHECK_EQUAL(int_list.get(2), 3);
+
+        auto int_set = obj.get_set<int64_t>("int set");
+        CHECK_EQUAL(int_set.size(), 3);
+        CHECK_NOT_EQUAL(int_set.find(4), -1);
+        CHECK_NOT_EQUAL(int_set.find(5), -1);
+        CHECK_NOT_EQUAL(int_set.find(6), -1);
+
+        auto int_dict = obj.get_dictionary("int dict");
+        CHECK_EQUAL(int_dict.size(), 3);
+        CHECK_EQUAL(int_dict.get("a"), 7);
+        CHECK_EQUAL(int_dict.get("b"), 8);
+        CHECK_EQUAL(int_dict.get("c"), 9);
+
+        CHECK_EQUAL(obj.get<ObjKey>("link"), target_objkey1);
+
+        auto obj_list = obj.get_linklist("obj list");
+        CHECK_EQUAL(obj_list.size(), 6);
+        CHECK_EQUAL(obj_list.get(0), target_objkey1);
+        CHECK_EQUAL(obj_list.get(1), target_objkey2);
+        CHECK_EQUAL(obj_list.get(2), target_objkey3);
+        CHECK_EQUAL(obj_list.get(3), target_objkey1);
+        CHECK_EQUAL(obj_list.get(4), target_objkey2);
+        CHECK_EQUAL(obj_list.get(5), target_objkey3);
+
+        auto obj_set = obj.get_linkset("obj set");
+        CHECK_EQUAL(obj_set.size(), 3);
+        CHECK_NOT_EQUAL(obj_set.find(target_objkey1), -1);
+        CHECK_NOT_EQUAL(obj_set.find(target_objkey2), -1);
+        CHECK_NOT_EQUAL(obj_set.find(target_objkey3), -1);
+
+        auto obj_dict = obj.get_dictionary("obj dict");
+        CHECK_EQUAL(obj_dict.size(), 6);
+        CHECK_EQUAL(obj_dict.get("a"), target_obj1.get_link());
+        CHECK_EQUAL(obj_dict.get("b"), target_obj2.get_link());
+        CHECK_EQUAL(obj_dict.get("c"), target_obj3.get_link());
+        CHECK_EQUAL(obj_dict.get("d"), target_obj1.get_link());
+        CHECK_EQUAL(obj_dict.get("e"), target_obj2.get_link());
+        CHECK_EQUAL(obj_dict.get("f"), target_obj3.get_link());
+
+        CHECK_EQUAL(obj.get_linked_object("embedded link").get<int64_t>("value"), 1);
+
+        auto embedded_list = obj.get_linklist("embedded list");
+        CHECK_EQUAL(embedded_list[0].get<int64_t>("value"), 2);
+        CHECK_EQUAL(embedded_list[1].get<int64_t>("value"), 3);
+        CHECK_EQUAL(embedded_list[2].get<int64_t>("value"), 4);
+
+        auto embedded_dict = obj.get_dictionary("embedded dict");
+        CHECK_EQUAL(embedded_dict.get_object("a").get<int64_t>("value"), 5);
+        CHECK_EQUAL(embedded_dict.get_object("b").get<int64_t>("value"), 6);
+        CHECK_EQUAL(embedded_dict.get_object("c").get<int64_t>("value"), 7);
+    }
 }
 
 TEST(Group_WriteEmpty)

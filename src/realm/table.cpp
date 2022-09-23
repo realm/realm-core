@@ -316,6 +316,19 @@ const char* get_data_type_name(DataType type) noexcept
     }
     return "unknown";
 }
+
+std::ostream& operator<<(std::ostream& o, Table::Type table_type)
+{
+    switch (table_type) {
+        case Table::Type::TopLevel:
+            return o << "TopLevel";
+        case Table::Type::Embedded:
+            return o << "Embedded";
+        case Table::Type::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
 } // namespace realm
 
 void LinkChain::add(ColKey ck)
@@ -1942,6 +1955,11 @@ StringData Table::get_name() const noexcept
     return static_cast<Group*>(parent)->get_table_name(get_key());
 }
 
+StringData Table::get_class_name() const noexcept
+{
+    return Group::table_name_to_class_name(get_name());
+}
+
 const char* Table::get_state() const noexcept
 {
     switch (m_cookie) {
@@ -3529,7 +3547,7 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        throw DuplicatePrimaryKeyValueException(get_class_name(), get_column_name(col));
     }
 }
 
