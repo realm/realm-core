@@ -295,6 +295,10 @@ std::shared_ptr<SyncManager> SyncSession::sync_manager() const
 
 void SyncSession::detach_from_sync_manager()
 {
+    {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        m_detaching_from_sync_manager = true;
+    }
     shutdown_and_wait();
     util::CheckedLockGuard lk(m_state_mutex);
     m_sync_manager = nullptr;
@@ -955,8 +959,17 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             break;
         case State::Inactive: {
             auto& sync_manager = *m_sync_manager;
+            auto needs_to_unregister = !m_detaching_from_sync_manager;
             m_state_mutex.unlock(lock);
-            sync_manager.unregister_session(m_db->get_path());
+            // There is a race if `detach_from_sync_manager()` and `close()` are called at the same time (the
+            // SyncManager may get deallocated just before unregistering the session). So if at this point
+            // `detach_from_sync_manager()` was called, we skip unregistration.
+            // Note: The session will not be unregistered if `detach_from_sync_manager()` is called while the session
+            // is in its initial state (i.e, `State::Inactive`), but that's not a problem since the SyncManager is
+            // being destroyed anyway.
+            if (needs_to_unregister) {
+                sync_manager.unregister_session(m_db->get_path());
+            }
             break;
         }
         case State::WaitingForAccessToken:

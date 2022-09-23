@@ -387,6 +387,7 @@ private:
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;
+    bool m_detaching_from_sync_manager GUARDED_BY(m_state_mutex) = false;
 
     int64_t m_completion_request_counter GUARDED_BY(m_state_mutex) = 0;
     CompletionCallbacks m_completion_callbacks GUARDED_BY(m_state_mutex);
