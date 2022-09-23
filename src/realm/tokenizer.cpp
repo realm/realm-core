@@ -47,48 +47,6 @@ public:
     bool next() override;
 };
 
-/*
-std::set<std::string> tokenize(const StringData text)
-{
-    std::set<std::string> words;
-
-    const char* str = text.data();
-    const size_t len = text.size();
-    size_t start = 0;
-
-    for (size_t i = 0; i < len; ++i) {
-        signed char c = static_cast<signed char>(str[i]); // char may not be signed by default
-
-        // Words are alnum + unicode chars above 128 (special unicode whitespace
-        // chars are not used as word separators)
-        bool is_alnum = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                        c < 0; // sign bit is set = unicode above 128
-
-        if (is_alnum)
-            continue;
-
-        if (i > start) {
-            StringData w(str + start, i - start);
-
-            // All words are converted to lowercase (not very unicode aware)
-            // This is also where we could do stemming.
-            if (auto opt = case_map(w, false)) {
-                words.emplace(*opt);
-            }
-        }
-        start = i + 1;
-    }
-    if (start < len) {
-        StringData w(str + start, len - start);
-        if (auto opt = case_map(w, false)) {
-            words.emplace(*opt);
-        }
-    }
-
-    return words;
-}
-*/
-
 bool DefaultTokenizer::next()
 {
     const char* str = nullptr;

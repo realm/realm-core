@@ -1168,7 +1168,7 @@ Mixed StringIndex::get(ObjKey key) const
 void StringIndex::erase(ObjKey key)
 {
     StringConversionBuffer buffer;
-    auto value = std::string_view(get(key).get_index_data(buffer));
+    std::string_view value{(get(key).get_index_data(buffer))};
     if (m_target_column.is_fulltext()) {
         auto words = Tokenizer::get_instance()->reset(value).get_all_tokens();
         for (auto& w : words) {
