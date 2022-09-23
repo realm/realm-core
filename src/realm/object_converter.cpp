@@ -369,17 +369,17 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
         }
         else {
             Obj dst_link;
-            if (m_opposite_of_src->get_primary_key_column()) {
-                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+            if (m_opposite_of_dst == m_opposite_of_src) {
+                // if this is the same Realm, we can use the ObjKey
+                dst_link = m_opposite_of_dst->get_object(src_link_key);
             }
             else {
-                if (m_opposite_of_dst == m_opposite_of_src) {
-                    // if this is the same Realm, we can use the ObjKey
-                    dst_link = m_opposite_of_dst->get_object(src_link_key);
+                // in different Realms we create a new object
+                if (m_opposite_of_src->get_primary_key_column()) {
+                    Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+                    dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
                 }
                 else {
-                    // in different Realms we create a new object
                     dst_link = m_opposite_of_dst->create_object();
                 }
             }
@@ -437,19 +437,6 @@ InterRealmObjectConverter::InterRealmObjectConverter(ConstTableRef table_src, Ta
                                                      EmbeddedObjectConverter* embedded_tracker)
     : m_embedded_tracker(embedded_tracker)
 {
-    populate_columns_from_table(table_src, table_dst);
-}
-
-void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
-{
-    for (auto& column : m_columns_cache) {
-        column.copy_value(src, dst, update_out);
-    }
-}
-
-void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_src, ConstTableRef table_dst)
-{
-    m_columns_cache.clear();
     m_columns_cache.reserve(table_src->get_column_count());
     ColKey pk_col = table_src->get_primary_key_column();
     for (ColKey col_key_src : table_src->get_column_keys()) {
@@ -459,6 +446,13 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
         ColKey col_key_dst = table_dst->get_column_key(col_name);
         REALM_ASSERT(col_key_dst);
         m_columns_cache.emplace_back(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker);
+    }
+}
+
+void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
+{
+    for (auto& column : m_columns_cache) {
+        column.copy_value(src, dst, update_out);
     }
 }
 

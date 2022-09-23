@@ -95,10 +95,7 @@ struct ColKey {
         unsigned val;
     };
 
-    constexpr ColKey() noexcept
-        : value(null_value)
-    {
-    }
+    constexpr ColKey() noexcept = default;
     constexpr explicit ColKey(int64_t val) noexcept
         : value(val)
     {
@@ -164,7 +161,7 @@ struct ColKey {
     {
         return (value >> 30) & 0xFFFFFFFFUL;
     }
-    int64_t value;
+    int64_t value = null_value;
 };
 
 static_assert(ColKey::null_value == 0x7fffffffffffffff, "Fix this");

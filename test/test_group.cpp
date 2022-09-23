@@ -1342,9 +1342,9 @@ TEST(Group_ChangeEmbeddedness)
     p2.set(col, obj2.get_key());
 
     // obj3 has no owner, so we can't make the table embedded
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
-    CHECK_EQUAL(message, "At least one object in 'table' does not have a backlink (data would get lost).");
+    CHECK_THROW_CONTAINING_MESSAGE(
+        t->set_table_type(Table::Type::Embedded),
+        "Cannot convert 'table' to embedded: at least one object has no incoming links and would be deleted.");
     CHECK_NOT(t->is_embedded());
 
     // Now it has owner
@@ -1358,11 +1358,392 @@ TEST(Group_ChangeEmbeddedness)
 
     // Now obj2 has 2 parents
     CHECK_EQUAL(obj2.get_backlink_count(), 2);
-    CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
-    CHECK_EQUAL(message, "At least one object in 'table' does have multiple backlinks.");
+    CHECK_THROW_CONTAINING_MESSAGE(
+        t->set_table_type(Table::Type::Embedded),
+        "Cannot convert 'table' to embedded: at least one object has more than one incoming link.");
     CHECK_NOT(t->is_embedded());
 }
 
+TEST(Group_MakeEmbedded_PrimaryKey)
+{
+    Group g;
+    TableRef t = g.add_table_with_primary_key("child", type_Int, "_id");
+    CHECK_THROW_CONTAINING_MESSAGE(t->set_table_type(Table::Type::Embedded),
+                                   "Cannot change 'child' to embedded when using a primary key.");
+    CHECK_NOT(t->is_embedded());
+}
+
+TEST(Group_MakeEmbedded_NoIncomingLinks_Empty)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 0);
+}
+
+TEST(Group_MakeEmbedded_NoIncomingLinks_Nonempty)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto child_obj = t->create_object();
+    CHECK_THROW_CONTAINING_MESSAGE(
+        t->set_table_type(Table::Type::Embedded),
+        "Cannot convert 'child' to embedded: at least one object has no incoming links and would be deleted.");
+    CHECK_NOT(t->is_embedded());
+
+    // Add an incoming link and it should now work
+    TableRef parent = g.add_table("parent");
+    parent->add_column(*t, "child");
+    parent->create_object().set_all(child_obj.get_key());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_MultipleIncomingLinks_OneProperty)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    TableRef parent = g.add_table("parent");
+
+    auto child_obj = t->create_object();
+
+    parent->add_column(*t, "child");
+    parent->create_object().set_all(child_obj.get_key());
+    parent->create_object().set_all(child_obj.get_key());
+
+    CHECK_THROW_CONTAINING_MESSAGE(
+        t->set_table_type(Table::Type::Embedded),
+        "Cannot convert 'child' to embedded: at least one object has more than one incoming link.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after deleting one of the incoming links
+    parent->begin()->remove();
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_MultipleIncomingLinks_MultipleProperties)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    TableRef parent = g.add_table("parent");
+
+    auto child_obj = t->create_object();
+
+    parent->add_column(*t, "link 1");
+    parent->add_column(*t, "link 2");
+    parent->create_object().set_all(child_obj.get_key(), child_obj.get_key());
+
+    CHECK_THROW_CONTAINING_MESSAGE(
+        t->set_table_type(Table::Type::Embedded),
+        "Cannot convert 'child' to embedded: at least one object has more than one incoming link.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after deleting one of the incoming links
+    parent->begin()->set_all(ObjKey());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_IncomingMixed_Single)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto child_obj = t->create_object();
+
+    TableRef parent = g.add_table("parent");
+    parent->add_column(type_Mixed, "mixed");
+    parent->add_column(*t, "link");
+    parent->create_object().set_all(Mixed(child_obj.get_link()), child_obj.get_key());
+
+    CHECK_THROW_CONTAINING_MESSAGE(t->set_table_type(Table::Type::Embedded),
+                                   "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
+                                   "property 'parent.mixed', which does not support linking to embedded objects.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after removing the Mixed link
+    parent->begin()->set_all(Mixed());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_IncomingMixed_List)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto child_obj = t->create_object();
+
+    TableRef parent = g.add_table("parent");
+    parent->add_column(*t, "link");
+    auto col = parent->add_column_list(type_Mixed, "mixed");
+    auto obj = parent->create_object().set_all(child_obj.get_key());
+    obj.get_list<Mixed>(col).add(child_obj.get_link());
+
+    CHECK_THROW_CONTAINING_MESSAGE(t->set_table_type(Table::Type::Embedded),
+                                   "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
+                                   "property 'parent.mixed', which does not support linking to embedded objects.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after removing the Mixed link
+    obj.get_list<Mixed>(col).clear();
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_IncomingMixed_Set)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto child_obj = t->create_object();
+
+    TableRef parent = g.add_table("parent");
+    parent->add_column(*t, "link");
+    auto col = parent->add_column_set(type_Mixed, "mixed");
+    auto obj = parent->create_object().set_all(child_obj.get_key());
+    obj.get_set<Mixed>(col).insert(child_obj.get_link());
+
+    CHECK_THROW_CONTAINING_MESSAGE(t->set_table_type(Table::Type::Embedded),
+                                   "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
+                                   "property 'parent.mixed', which does not support linking to embedded objects.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after removing the Mixed link
+    obj.get_set<Mixed>(col).clear();
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_IncomingMixed_Dictionary)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto child_obj = t->create_object();
+
+    TableRef parent = g.add_table("parent");
+    parent->add_column(*t, "link");
+    auto col = parent->add_column_dictionary(type_Mixed, "mixed");
+    auto obj = parent->create_object().set_all(child_obj.get_key());
+    obj.get_dictionary(col).insert("foo", child_obj.get_link());
+
+    CHECK_THROW_CONTAINING_MESSAGE(t->set_table_type(Table::Type::Embedded),
+                                   "Cannot convert 'child' to embedded: there is an incoming link from the Mixed "
+                                   "property 'parent.mixed', which does not support linking to embedded objects.");
+    CHECK_NOT(t->is_embedded());
+
+    // Should work after removing the Mixed link
+    obj.get_dictionary(col).clear();
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 1);
+}
+
+TEST(Group_MakeEmbedded_DeleteOrphans)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto col = t->add_column(type_Int, "value");
+    std::vector<ObjKey> children;
+    t->create_objects(10000, children);
+
+    TableRef parent = g.add_table("parent");
+    parent->add_column(*t, "link");
+    for (int i = 0; i < 100; ++i) {
+        t->get_object(children[i * 100]).set_all(i + 1);
+        parent->create_object().set_all(children[i * 100]);
+    }
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 100);
+    for (int i = 0; i < 100; ++i) {
+        Obj obj;
+        if (CHECK_NOTHROW(obj = t->get_object(children[i * 100]))) {
+            CHECK_EQUAL(obj.get<int64_t>(col), i + 1);
+        }
+    }
+}
+
+TEST(Group_MakeEmbedded_DuplicateObjectsForMultipleParentObjects)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto col = t->add_column(type_Int, "value");
+    auto child = t->create_object().set_all(10);
+
+    TableRef parent = g.add_table("parent");
+    auto link_col = parent->add_column(*t, "link");
+    for (int i = 0; i < 10000; ++i) {
+        parent->create_object().set_all(child.get_key());
+    }
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 10000);
+    CHECK(parent->size() == 10000);
+    CHECK_NOT(child.is_valid()); // original object should have been deleted
+
+    for (auto parent_obj : *parent) {
+        CHECK_EQUAL(t->get_object(parent_obj.get<ObjKey>(link_col)).get<int64_t>(col), 10);
+    }
+}
+
+TEST(Group_MakeEmbedded_DuplicateObjectsForMultipleColumns)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto col = t->add_column(type_Int, "value");
+    auto child = t->create_object().set_all(10);
+
+    TableRef parent = g.add_table("parent");
+    auto parent_obj = parent->create_object();
+    for (int i = 0; i < 10; ++i) {
+        auto col = parent->add_column(*t, util::format("link %1", i));
+        parent_obj.set(col, child.get_key());
+    }
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 10);
+    CHECK(parent->size() == 1);
+    CHECK_NOT(child.is_valid()); // original object should have been deleted
+
+    for (auto link_col : parent->get_column_keys()) {
+        CHECK_EQUAL(t->get_object(parent_obj.get<ObjKey>(link_col)).get<int64_t>(col), 10);
+    }
+}
+
+TEST(Group_MakeEmbedded_DuplicateObjectsForList)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto col = t->add_column(type_Int, "value");
+    auto child = t->create_object().set_all(10);
+
+    TableRef parent = g.add_table("parent");
+    auto parent_obj = parent->create_object();
+    auto list = parent_obj.get_linklist(parent->add_column_list(*t, "link"));
+    for (int i = 0; i < 10; ++i)
+        list.add(child.get_key());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 10);
+    CHECK(parent->size() == 1);
+    CHECK_NOT(child.is_valid()); // original object should have been deleted
+
+    CHECK_EQUAL(list.size(), 10);
+    for (int i = 0; i < 10; ++i)
+        CHECK_EQUAL(t->get_object(list.get(i)).get<int64_t>(col), 10);
+}
+
+TEST(Group_MakeEmbedded_DuplicateObjectsForDictionary)
+{
+    Group g;
+    TableRef t = g.add_table("child");
+    auto col = t->add_column(type_Int, "value");
+    auto child = t->create_object().set_all(10);
+
+    TableRef parent = g.add_table("parent");
+    auto parent_obj = parent->create_object();
+    auto dict = parent_obj.get_dictionary(parent->add_column_dictionary(*t, "link"));
+    for (int i = 0; i < 10; ++i)
+        dict.insert(util::to_string(i), child.get_link());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+    CHECK(t->is_embedded());
+    CHECK(t->size() == 10);
+    CHECK(parent->size() == 1);
+    CHECK_NOT(child.is_valid()); // original object should have been deleted
+
+    CHECK_EQUAL(dict.size(), 10);
+    for (auto [key, value] : dict)
+        CHECK_EQUAL(g.get_object(value.get_link()).get<int64_t>(col), 10);
+}
+
+TEST(Group_MakeEmbedded_DeepCopy)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    auto obj = t->create_object();
+
+    // Single/List/Set/Dictionary of a primitive value
+    obj.set(t->add_column(type_Int, "int"), 1);
+    auto int_list = obj.get_list<int64_t>(t->add_column_list(type_Int, "int list"));
+    int_list.add(1);
+    int_list.add(2);
+    int_list.add(3);
+    auto int_set = obj.get_set<int64_t>(t->add_column_set(type_Int, "int set"));
+    int_set.insert(4);
+    int_set.insert(5);
+    int_set.insert(6);
+    auto int_dict = obj.get_dictionary(t->add_column_dictionary(type_Int, "int dict"));
+    int_dict.insert("a", 7);
+    int_dict.insert("b", 8);
+    int_dict.insert("c", 9);
+
+    // Single/List/Set/Dictionary of a link to a top-level object
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "value");
+    auto target_obj1 = target->create_object().set_all(123).get_key();
+    auto target_obj2 = target->create_object().set_all(456).get_key();
+    auto target_obj3 = target->create_object().set_all(789).get_key();
+
+    obj.set(t->add_column(*target, "link"), target_obj1);
+    auto obj_list = obj.get_linklist(t->add_column_list(*target, "obj list"));
+    obj_list.add(target_obj1);
+    obj_list.add(target_obj2);
+    obj_list.add(target_obj3);
+    obj_list.add(target_obj1);
+    obj_list.add(target_obj2);
+    obj_list.add(target_obj3);
+    auto obj_set = obj.get_linkset(t->add_column_set(*target, "obj set"));
+    obj_set.insert(target_obj1);
+    obj_set.insert(target_obj2);
+    obj_set.insert(target_obj3);
+    auto obj_dict = obj.get_dictionary(t->add_column_dictionary(*target, "obj dict"));
+    obj_dict.insert("a", target_obj1);
+    obj_dict.insert("b", target_obj2);
+    obj_dict.insert("c", target_obj3);
+    obj_dict.insert("d", target_obj1);
+    obj_dict.insert("e", target_obj2);
+    obj_dict.insert("f", target_obj3);
+
+    // Single/List/Dictionary of a link to an embedded object
+    TableRef embedded = g.add_table("embedded", Table::Type::Embedded);
+    embedded->add_column(type_Int, "value");
+
+    obj.create_and_set_linked_object(t->add_column(*target, "embedded link")).set_all(1);
+    auto embedded_list = obj.get_linklist(t->add_column_list(*embedded, "embedded list"));
+    embedded_list.create_and_insert_linked_object(0).set_all(2);
+    embedded_list.create_and_insert_linked_object(1).set_all(3);
+    embedded_list.create_and_insert_linked_object(2).set_all(4);
+    auto embedded_dict = obj.get_dictionary(t->add_column_dictionary(*embedded, "embedded dict"));
+    embedded_dict.create_and_insert_linked_object("a").set_all(5);
+    embedded_dict.create_and_insert_linked_object("b").set_all(6);
+    embedded_dict.create_and_insert_linked_object("c").set_all(7);
+
+    // Parent object type for the table which'll be made embedded
+    auto parent = g.add_table("parent");
+    parent->add_column(*t, "link");
+    parent->create_object().set_all(obj.get_key());
+    parent->create_object().set_all(obj.get_key());
+
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded, true));
+}
 
 TEST(Group_WriteEmpty)
 {

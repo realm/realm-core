@@ -2070,8 +2070,8 @@ private:
 void Obj::handle_multiple_backlinks_during_schema_migration()
 {
     REALM_ASSERT(!m_table->get_primary_key_column());
-    auto copy_links = [this](ColKey col) {
-        converters::EmbeddedObjectConverter embedded_obj_tracker;
+    converters::EmbeddedObjectConverter embedded_obj_tracker;
+    auto copy_links = [&](ColKey col) {
         auto opposite_table = m_table->get_opposite_table(col);
         auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);

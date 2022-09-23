@@ -174,8 +174,7 @@ public:
             throw LogicError(LogicError::column_does_not_exist);
     }
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
-    // Called only when updating the schema.
-    void set_table_type(Type table_tpe);
+    void set_table_type(Type new_type, bool handle_backlinks = false);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -512,7 +511,7 @@ private:
     Obj create_linked_object(GlobalKey = {});
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
-    void set_embedded(bool embedded);
+    void set_embedded(bool embedded, bool handle_backlinks);
     /// Changes type unconditionally. Called only from Group::do_get_or_add_table()
     void do_set_table_type(Type table_type);
 

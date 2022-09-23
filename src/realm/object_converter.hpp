@@ -74,7 +74,6 @@ struct InterRealmObjectConverter {
     void copy(const Obj& src, Obj& dst, bool* update_out);
 
 private:
-    void populate_columns_from_table(ConstTableRef table_src, ConstTableRef table_dst);
     EmbeddedObjectConverter* m_embedded_tracker;
     std::vector<InterRealmValueConverter> m_columns_cache;
 };
