@@ -488,7 +488,7 @@ void GroupWriter::backdate()
         ALLOC_DBG_COUT("} ");
         return referenced;
 #else
-        static_cast<void>(entry);
+        static_cast<void>(entry); // silence a warning
         return false;
 #endif
     };

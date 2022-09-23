@@ -579,6 +579,7 @@ public:
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
         std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
         if (m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version)) {
             return;
         }
@@ -591,7 +592,8 @@ public:
         m_info = m_reader_map.get_addr();
         m_local_max_entry = new_entries;
         m_info->readers.reserve(new_entries);
-        m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
+        auto success = m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
+        REALM_ASSERT_EX(success, new_info_size, new_version);
     }
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
