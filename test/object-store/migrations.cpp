@@ -50,8 +50,13 @@ using util::any_cast;
     do {                                                                                                             \
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
+        auto schema = (r).schema();                                                                                  \
+                                                                                                                     \
+        for (const auto& object_schema : s)                                                                          \
+                                                                                                                     \
+            REQUIRE(schema.find(object_schema.name) != schema.end());                                                \
+                                                                                                                     \
     } while (0)
-// REQUIRE((r).schema() == s);
 
 #define REQUIRE_NO_MIGRATION_NEEDED(r, schema1, schema2)                                                             \
     do {                                                                                                             \
@@ -466,7 +471,8 @@ TEST_CASE("migration: Automatic") {
                      {"col2", PropertyType::Int},
                  }},
             };
-            REQUIRE_MIGRATION_NEEDED(*realm, schema, remove_property(schema, "object", "col2"));
+            auto new_schema = remove_property(schema, "object", "col2");
+            REQUIRE_MIGRATION_NEEDED(*realm, schema, new_schema);
         }
 
         SECTION("migratation which replaces a persisted property with a computed one") {
