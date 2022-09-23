@@ -649,6 +649,8 @@ Query StringOpsNode::visit(ParserDriver* drv)
                     return drv->m_base_table->where().contains(col_key, val, case_sensitive);
                 case CompareNode::LIKE:
                     return drv->m_base_table->where().like(col_key, val, case_sensitive);
+                case CompareNode::TEXT:
+                    return drv->m_base_table->where().fulltext(col_key, val);
             }
         }
         else if (right_type == type_Binary) {
@@ -677,6 +679,11 @@ Query StringOpsNode::visit(ParserDriver* drv)
                 return Query(std::unique_ptr<Expression>(new Compare<Contains>(std::move(right), std::move(left))));
             case CompareNode::LIKE:
                 return Query(std::unique_ptr<Expression>(new Compare<Like>(std::move(right), std::move(left))));
+            case CompareNode::TEXT: {
+                StringData val = right->get_mixed().get_string();
+                auto string_prop = dynamic_cast<Columns<StringData>*>(left.get());
+                return string_prop->fulltext(val);
+            }
         }
     }
     else {
