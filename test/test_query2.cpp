@@ -5864,7 +5864,7 @@ TEST(Query_FullText)
     auto col = table->add_column(type_String, "text");
 
     // Add before index creation
-    table->create_object().set(col, "This is a test, with  spaces!");
+    table->create_object().set(col, " This is a test, with  spaces!");
     Obj obj2 = table->create_object().set(col, "Ål, ø og Æbler");
     Obj obj3 = table->create_object().set(
         col,

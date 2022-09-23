@@ -119,6 +119,7 @@ let notSyncServerSources: [String] = [
     "realm/table.cpp",
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
+    "realm/tokenizer.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
