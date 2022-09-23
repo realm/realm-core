@@ -149,7 +149,7 @@ public:
 
     // Get the changes which must be applied to this schema to produce the passed-in schema
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,
-                                      bool include_removals = false) const;
+                                      bool include_removals = false);
 
     void copy_keys_from(Schema const&, bool is_schema_additive = false) noexcept;
 

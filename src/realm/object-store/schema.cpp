@@ -326,8 +326,7 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
     return different_classes;
 }
 
-std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
-                                          bool include_table_removals) const
+std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode, bool include_table_removals)
 {
     std::unordered_set<std::string> orphans;
     if (mode == SchemaMode::AdditiveDiscovered) {
@@ -336,15 +335,16 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     std::vector<SchemaChange> changes;
 
     // Add missing tables
-    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (target && !existing && !orphans.count(target->name)) {
-            changes.emplace_back(schema_change::AddTable{target});
-        }
-        else if (existing && !target) {
-            if (include_table_removals)
-                changes.emplace_back(schema_change::RemoveTable{existing});
-        }
-    });
+    auto other_tables =
+        zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+            if (target && !existing && !orphans.count(target->name)) {
+                changes.emplace_back(schema_change::AddTable{target});
+            }
+            else if (existing && !target) {
+                if (include_table_removals)
+                    changes.emplace_back(schema_change::RemoveTable{existing});
+            }
+        });
 
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
@@ -395,10 +395,13 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
             }
         },
         is_schema_additive);
-    insert(end(), other_classes.begin(), other_classes.end());
-    std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
-        return lft.name < rgt.name;
-    });
+    // append mismatching classes and sort them if needed
+    if (!other_classes.empty()) {
+        insert(end(), other_classes.begin(), other_classes.end());
+        std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
+            return lft.name < rgt.name;
+        });
+    }
 }
 
 namespace realm {
