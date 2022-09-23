@@ -169,7 +169,7 @@ struct RealmConfig {
     bool backup_at_file_format_change = true;
 
     // delete embedded orphan objects
-    bool automatic_handle_backlicks_in_migrations = false;
+    bool automatically_handle_backlinks_in_migrations = false;
 
     // Only for internal testing. Not to be used by SDKs.
     //

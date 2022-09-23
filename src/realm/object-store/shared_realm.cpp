@@ -464,12 +464,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
-                                          required_changes, m_config.automatic_handle_backlicks_in_migrations,
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations,
                                           wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes, m_config.automatic_handle_backlicks_in_migrations);
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations);
         REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }

@@ -701,7 +701,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("Migrations to embedded object with untyped Mixed links") {
             auto setup_mixed_link = [&](PropertyType type) -> SharedRealm {
                 InMemoryTestFile config;
-                config.automatic_handle_backlicks_in_migrations = true;
+                config.automatically_handle_backlinks_in_migrations = true;
                 Schema schema = {
                     {
                         "child_table",
@@ -1153,7 +1153,7 @@ TEST_CASE("migration: Automatic") {
         SECTION(
             "change table from top-level to embedded, delete objects with 0 incoming links, resolved automatically") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {"child_table",
                  {
@@ -1188,7 +1188,7 @@ TEST_CASE("migration: Automatic") {
                 "Resolve automatic "
                 "should not be triggered") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {"child_table",
                  {
@@ -1224,7 +1224,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("change table to embedded - multiple incoming links - resolved automatically + copy array of mixed "
                 "verification") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {
                     "child_table",
@@ -1300,7 +1300,7 @@ TEST_CASE("migration: Automatic") {
                 "any array "
                 "verification") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {
                     "child_table",
@@ -1425,7 +1425,7 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("change table to embedded - multiple links stored in a dictionary") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {
                     "child_table",
@@ -1481,7 +1481,7 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("change table to embedded - incoming links stored in a set") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {
                     "child_table",
@@ -1519,7 +1519,7 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("change table to embedded - multiple links stored in linked list") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {
                     "child_table",
@@ -1564,7 +1564,7 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("change table to embedded - convert the whole list of linking embedded objects") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
             Schema schema = {
                 {"child_table",
                  {
@@ -1654,7 +1654,7 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("change table to embedded - violate embedded object constraints") {
             InMemoryTestFile config;
-            config.automatic_handle_backlicks_in_migrations = true;
+            config.automatically_handle_backlinks_in_migrations = true;
 
             Schema schema = {
                 {"child_embedded_table",
