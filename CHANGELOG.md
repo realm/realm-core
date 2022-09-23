@@ -2,8 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
-* Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -11,8 +10,7 @@
 * Calling Results::sum/min/max on a collection field throws an exception rather than aggregating on the underlying memory addresses. ([#5137](https://github.com/realm/realm-core/issues/5137))
  
 ### Breaking changes
-* The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
-* * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
+* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -20,7 +18,35 @@
 -----------
 
 ### Internals
-* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862))
+* None.
+
+----------------------------------------------
+
+# 12.8.0 Release notes
+
+### Enhancements
+* Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Adding support in the C API for `realm_results_find` and supporting all native types for `realm_results_get()` ([PR 5875](https://github.com/realm/realm-core/pull/5875)).
+* Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
+
+### Fixed
+* Results permitted some nonsensical aggregate operations on column types which do not make sense to aggregate, giving garbage results rather than reporting an error ([#5876](https://github.com/realm/realm-core/pull/5876), since v6.0.0).
+* Removed blocking wait for upload/download completion due to possibility of deadlock ([#5829](https://github.com/realm/realm-core/issues/5829), since v11.17.0).
+
+### Breaking changes
+* The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
+* Callback for `GenericNetworkTransport::send_request_to_server()` now receives both the original Request and Response objects (does not affect the C-API).
+* Removed blocking `SyncSession::wait_for_upload_completion` and `SyncSession::wait_for_download_completion`.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862)).
+* Updated Windows distros on Evergreen CI to use vsCurrent.
 
 ----------------------------------------------
 
@@ -46,6 +72,7 @@
 * Disable auto refresh for old realm instance passed to migration callbacks. ([#5856](https://github.com/realm/realm-core/pull/5856), since 10.0.0).
 * If a case insensitive query searched for a string including an 4-byte UTF8 character, the program would crash ([#5825](https://github.com/realm/realm-core/issues/5825), since v2.3.0)
 * Throw exception if `Realm::Convert` tries to convert to flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798), since v11.16.0).
+* Fix crash when upserting a document with the primary key not an ObjectId into a mongo collection. ([#5345](https://github.com/realm/realm-core/issues/5345), since v10.0.0).
 
 ### Breaking changes
 * None

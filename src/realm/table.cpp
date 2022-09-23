@@ -1113,7 +1113,7 @@ void Table::set_embedded(bool embedded)
                     TableRef source_table = get_opposite_table(backlink_col_key);
                     ColKey forward_col_mapped = source_table->get_opposite_column(source_col);
                     if (!forward_col_mapped) {
-                        throw std::logic_error(util::format("There is a dynamic/untyped link from a Mixed property "
+                        throw IllegalOperation(util::format("There is a dynamic/untyped link from a Mixed property "
                                                             "'%1.%2' which prevents migrating class '%3' to embedded",
                                                             source_table->get_name(),
                                                             source_table->get_column_name(source_col), get_name()));

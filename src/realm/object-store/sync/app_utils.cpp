@@ -27,22 +27,12 @@ namespace app {
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
+    std::string error_msg;
     bool http_status_code_is_fatal =
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
-    auto find_case_insensitive_header = [&response](const std::string& needle) {
-        for (auto it = response.headers.begin(); it != response.headers.end(); ++it) {
-            if (std::equal(it->first.begin(), it->first.end(), needle.begin(), needle.end(), [](char a, char b) {
-                    return tolower(a) == tolower(b);
-                })) {
-                return it;
-            }
-        }
-        return response.headers.end();
-    };
-
     try {
-        auto ct = find_case_insensitive_header("content-type");
+        auto ct = response.headers.find("content-type");
         if (ct != response.headers.end() && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
@@ -65,9 +55,13 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         // ignore parse errors from our attempt to read the error from json
     }
 
+    if (response.client_error_code) {
+        error_msg = response.body.empty() ? "client error code value considered fatal" : response.body;
+        return AppError(*(response.client_error_code), error_msg, "", response.http_status_code);
+    }
+
     if (response.custom_status_code != 0) {
-        std::string error_msg =
-            (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        error_msg = response.body.empty() ? "non-zero custom status code considered fatal" : response.body;
         return AppError(ErrorCodes::CustomError, error_msg, "", response.custom_status_code);
     }
 

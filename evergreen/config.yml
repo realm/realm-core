@@ -318,10 +318,12 @@ timeout:
 tasks:
 - name: compile
   tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
 
 - name: package
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - command: shell.exec
@@ -353,6 +355,7 @@ tasks:
       content_type: '${content_type|application/x-gzip}'
 
 - name: swift-build-and-test
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -374,6 +377,7 @@ tasks:
         xcrun swift run ObjectStoreTests
 
 - name: test-on-exfat
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -385,6 +389,7 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: bloaty
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -562,7 +567,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b master 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -596,6 +601,7 @@ tasks:
 
 - name: lint
   tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -959,7 +965,7 @@ buildvariants:
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
-  run_on: windows-64-vs2019-test
+  run_on: windows-vsCurrent-small
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
     cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
@@ -972,12 +978,12 @@ buildvariants:
   tasks:
   - name: compile_test_and_package
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: long-running-tests
 
 - name: windows-64-vs2019-release
   display_name: "Windows x86_64 (VS 2019 Release build)"
-  run_on: windows-64-vs2019-test
+  run_on: windows-vsCurrent-small
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
     cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
@@ -991,4 +997,4 @@ buildvariants:
   tasks:
   - name: compile_test
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large

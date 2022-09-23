@@ -4240,7 +4240,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"float", PropertyType::Float | PropertyType::Nullable},
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
-             {"int_list", PropertyType::Int | PropertyType::Array},
+             {"int list", PropertyType::Int | PropertyType::Array},
          }},
         {"linking_object",
          {
@@ -4251,10 +4251,11 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
 
     auto table = r->read_group().get_table("class_object");
     ColKey col_int = table->get_column_key("int");
-    ColKey col_int_list = table->get_column_key("int_list");
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
+    ColKey col_int_list = table->get_column_key("int list");
+    ColKey col_invalid(ColKey::Idx{10}, col_type_Int, {}, 0);
 
     SECTION("one row with null values") {
         r->begin_transaction();
@@ -4275,6 +4276,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(col_int_list), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(col_invalid), ErrorCodes::InvalidProperty);
         }
 
         SECTION("min") {
@@ -4283,6 +4285,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(col_int_list), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(col_invalid), ErrorCodes::InvalidProperty);
         }
 
         SECTION("average") {
@@ -4291,6 +4294,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.average(col_double) == 1.0);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_int_list), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_invalid), ErrorCodes::InvalidProperty);
         }
 
         SECTION("sum") {
@@ -4299,6 +4303,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_int_list), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_invalid), ErrorCodes::InvalidProperty);
         }
     }
 
@@ -4385,17 +4390,22 @@ TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalid
     TestContext ctx(realm);
 
     ColKey invalid_col;
+    ColKey well_formed_key(ColKey::Idx{0}, col_type_Int, {}, 0);
     SECTION("max") {
         REQUIRE(!results.max(invalid_col));
+        REQUIRE(!results.max(well_formed_key));
     }
     SECTION("min") {
         REQUIRE(!results.min(invalid_col));
+        REQUIRE(!results.min(well_formed_key));
     }
     SECTION("average") {
         REQUIRE(!results.average(invalid_col));
+        REQUIRE(!results.average(well_formed_key));
     }
     SECTION("sum") {
         REQUIRE(!results.sum(invalid_col));
+        REQUIRE(!results.sum(well_formed_key));
     }
     SECTION("first") {
         REQUIRE(!results.first());

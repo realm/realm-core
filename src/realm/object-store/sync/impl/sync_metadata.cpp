@@ -424,15 +424,20 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
 /// Magic key to fetch app metadata, which there should always only be one of.
 static const auto app_metadata_pk = 1;
 
-void SyncMetadataManager::set_app_metadata(const std::string& deployment_model, const std::string& location,
-                                           const std::string& hostname, const std::string& ws_hostname) const
+bool SyncMetadataManager::set_app_metadata(const std::string& deployment_model, const std::string& location,
+                                           const std::string& hostname, const std::string& ws_hostname)
 {
-    if (m_app_metadata) {
-        return;
+    if (m_app_metadata && m_app_metadata->hostname == hostname && m_app_metadata->ws_hostname == ws_hostname &&
+        m_app_metadata->deployment_model == deployment_model && m_app_metadata->location == location) {
+        // App metadata not updated
+        return false;
     }
 
     auto realm = get_realm();
     auto& schema = m_app_metadata_schema;
+
+    // let go of stale cached copy of metadata - it will be refreshed on the next call to get_app_metadata()
+    m_app_metadata = util::none;
 
     realm->begin_transaction();
 
@@ -444,6 +449,8 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model, 
     obj.set(schema.ws_hostname_col, ws_hostname);
 
     realm->commit_transaction();
+    // App metadata was updated
+    return true;
 }
 
 util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()

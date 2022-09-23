@@ -114,6 +114,8 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ClientUserNotFound:
         case ClientUserNotLoggedIn:
         case ClientAppDeallocated:
+        case ClientRedirectError:
+        case ClientTooManyRedirects:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::client_error);
         case BadToken:
         case MalformedJson:
@@ -171,6 +173,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidPassword:
         case SchemaValidationFailedWrite:
         case AppUnknownError:
+        case MaintenanceInProgress:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::service_error);
         case UnknownError:
             break;
@@ -254,8 +257,10 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"NotSupported", ErrorCodes::NotSupported},
     {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
-    {"ClientUserNotLogged_in", ErrorCodes::ClientUserNotLoggedIn},
+    {"ClientUserNotLoggedIn", ErrorCodes::ClientUserNotLoggedIn},
     {"ClientAppDeallocated", ErrorCodes::ClientAppDeallocated},
+    {"ClientRedirectError", ErrorCodes::ClientRedirectError},
+    {"ClientTooManyRedirects", ErrorCodes::ClientTooManyRedirects},
     {"BadToken", ErrorCodes::BadToken},
     {"MalformedJson", ErrorCodes::MalformedJson},
     {"MissingJsonKey", ErrorCodes::MissingJsonKey},
@@ -313,6 +318,7 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"BadRequest", ErrorCodes::BadRequest},
     {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"InvalidPassword", ErrorCodes::InvalidPassword},
+    {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
     {"SchemaValidationFailedWrite", ErrorCodes::SchemaValidationFailedWrite},
     {"SchemaVersionMismatch", ErrorCodes::SchemaVersionMismatch},
 };

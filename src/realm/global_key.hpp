@@ -36,7 +36,7 @@ class Mixed;
 /// We define a way to map from 128-bit on-write GlobalKeys to local 64-bit ObjKeys.
 ///
 /// The three object ID types are:
-/// a. Global Keyss for objects in tables without primary keys.
+/// a. Global Keys for objects in tables without primary keys.
 /// b. Global Keys for objects in tables with integer primary keys.
 /// c. Global Keys for objects in tables with other primary key types.
 ///

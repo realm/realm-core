@@ -166,6 +166,7 @@ Mixed TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* retu
     }
     else {
         static_cast<void>(last_accumulated_key);
+        static_cast<void>(return_key);
     }
 
     if (!agg.is_null()) {
@@ -243,6 +244,10 @@ template <Action action>
 std::optional<Mixed> TableView::aggregate(ColKey column_key, size_t* count, ObjKey* return_key) const
 {
     static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
+    m_table->check_column(column_key);
+    if (column_key.is_collection()) {
+        return std::nullopt;
+    }
 
     switch (column_key.get_type()) {
         case col_type_Int:

@@ -22,6 +22,7 @@
 #include <realm/exceptions.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/http.hpp>
 
 #include <iosfwd>
 #include <map>
@@ -93,9 +94,9 @@ struct Request {
     uint64_t timeout_ms = 0;
 
     /**
-     * The HTTP headers of this request.
+     * The HTTP headers of this request - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    util::HTTPHeaders headers;
 
     /**
      * The body of the request.
@@ -104,6 +105,11 @@ struct Request {
 
     /// Indicates if the request uses the refresh token or the access token
     bool uses_refresh_token = false;
+
+    /**
+     * A recursion counter to prevent too many redirects
+     */
+    int redirect_count = 0;
 };
 
 /**
@@ -116,25 +122,32 @@ struct Response {
     int http_status_code;
 
     /**
-     * A custom status code provided by the language binding.
+     * A custom status code provided by the language binding (SDK).
      */
     int custom_status_code;
 
     /**
-     * The headers of the HTTP response.
+     * The headers of the HTTP response - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    util::HTTPHeaders headers;
 
     /**
      * The body of the HTTP response.
      */
     std::string body;
+
+    /**
+     * An error code used by the client to report http processing errors.
+     */
+    util::Optional<ErrorCodes::Error> client_error_code;
 };
+
+
+using HttpCompletion = util::UniqueFunction<void(const Request&, const Response&)>;
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completionBlock) = 0;
+    virtual void send_request_to_server(Request&& request, HttpCompletion&& completion_block) = 0;
     virtual ~GenericNetworkTransport() = default;
 };
 

@@ -169,6 +169,8 @@ public:
         ClientUserNotFound = RLM_ERR_CLIENT_USER_NOT_FOUND,
         ClientUserNotLoggedIn = RLM_ERR_CLIENT_USER_NOT_LOGGED_IN,
         ClientAppDeallocated = RLM_ERR_CLIENT_APP_DEALLOCATED,
+        ClientRedirectError = RLM_ERR_CLIENT_REDIRECT_ERROR,
+        ClientTooManyRedirects = RLM_ERR_CLIENT_TOO_MANY_REDIRECTS,
 
         BadToken = RLM_ERR_BAD_TOKEN,
         MalformedJson = RLM_ERR_MALFORMED_JSON,
@@ -227,6 +229,7 @@ public:
         InvalidPassword = RLM_ERR_INVALID_PASSWORD,
         SchemaValidationFailedWrite = RLM_ERR_SCHEMA_VALIDATION_FAILED_WRITE,
         AppUnknownError = RLM_ERR_APP_UNKNOWN,
+        MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,

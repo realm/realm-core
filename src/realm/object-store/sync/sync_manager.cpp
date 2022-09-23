@@ -311,7 +311,7 @@ util::Logger::Level SyncManager::log_level() const noexcept
     return m_config.log_level;
 }
 
-bool SyncManager::perform_metadata_update(util::FunctionRef<void(const SyncMetadataManager&)> update_function) const
+bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const
 {
     util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
