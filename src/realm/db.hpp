@@ -413,6 +413,7 @@ protected:
 
 private:
     class AsyncCommitHelper;
+    class VersionManager;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -420,7 +421,7 @@ private:
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
-
+        bool m_is_frozen = false;
         // a little helper
         static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
         {
@@ -442,16 +443,15 @@ private:
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
+    std::unique_ptr<VersionManager> m_version_manager;
     Replication* m_replication = nullptr;
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0;          // highest version observed by this DB
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map;   // Never remapped, provides access to everything but the ringbuffer
-    util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    bool m_wait_for_change_enabled = true;    // Initially wait_for_change is enabled
+    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
     bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
@@ -462,6 +462,7 @@ private:
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
     util::InterprocessMutex m_controlmutex;
+    util::InterprocessMutex m_versionlist_mutex;
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
@@ -532,7 +533,7 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    void grab_read_lock(ReadLockInfo&, VersionID);
+    ReadLockInfo grab_read_lock(bool is_frozen, VersionID);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
@@ -552,11 +553,6 @@ private:
     version_type do_commit(Transaction&, bool commit_to_disk = true);
     void do_end_write() noexcept;
     void end_write_on_correct_thread() noexcept;
-
-    // make sure the given index is within the currently mapped area.
-    // if not, expand the mapped area. Returns true if the area is expanded.
-    bool grow_reader_mapping(uint_fast32_t index);
-
     // Must be called only by someone that has a lock on the write mutex.
     void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk = true);
 
@@ -593,7 +589,6 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked
         *locked_space = m_locked_space;
     }
 }
-
 
 
 class DisableReplication {
@@ -639,7 +634,6 @@ private:
     DB& m_db;
     ReadLockInfo* m_read_lock;
 };
-
 
 inline int DB::get_file_format_version() const noexcept
 {

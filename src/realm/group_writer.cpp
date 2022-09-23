@@ -17,10 +17,9 @@
  **************************************************************************/
 
 #include <algorithm>
+#include <set>
 
-#ifdef REALM_DEBUG
 #include <iostream>
-#endif
 
 #include <realm/group_writer.hpp>
 
@@ -300,6 +299,238 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 }
 
 #define REALM_ALLOC_DEBUG 0
+#if REALM_ALLOC_DEBUG
+#define ALLOC_DBG_COUT(args)                                                                                         \
+    {                                                                                                                \
+        std::cout << args;                                                                                           \
+    }
+#else
+#define ALLOC_DBG_COUT(args)
+#endif
+
+#ifdef REALM_DEBUG
+void GroupWriter::map_reachable()
+{
+    class Collector : public Array::MemUsageHandler {
+    public:
+        Collector(std::vector<Reachable>& reachable)
+            : m_reachable(reachable)
+        {
+        }
+        void handle(ref_type ref, size_t, size_t used) override
+        {
+            m_reachable.emplace_back(Reachable{ref, used});
+        }
+        std::vector<Reachable>& m_reachable;
+    };
+    // collect reachable blocks in all reachable versions
+    for (auto& [version, info] : m_top_ref_map) {
+        Collector collector(info.reachable_blocks);
+        // skip any empty entries
+        if (info.top_ref == 0)
+            continue;
+        Array array(m_alloc);
+        array.init_from_ref(info.top_ref);
+        array.report_memory_usage(collector);
+        std::sort(info.reachable_blocks.begin(), info.reachable_blocks.end(),
+                  [](const Reachable& a, const Reachable& b) {
+                      return a.pos < b.pos;
+                  });
+    }
+
+#if REALM_ALLOC_DEBUG
+    std::cout << "  Reachable: ";
+    // this really should be inverted, showing all versions pr entry instead of all entries pr version
+    for (auto& [version, info] : m_top_ref_map) {
+        std::cout << std::endl << "    Version: " << version;
+        for (auto& i : info.reachable_blocks) {
+            std::cout << std::endl << "      " << i.pos << " - " << i.pos + i.size;
+        }
+    }
+    std::cout << std::endl << "  Backdating:";
+#endif
+}
+#endif
+
+void GroupWriter::backdate()
+{
+    struct FreeList {
+        Array positions;
+        Array lengths;
+        Array versions;
+        ref_type top_ref;
+        ref_type logical_file_size;
+        uint64_t version;
+        bool initialized = false;
+        FreeList(Allocator& alloc, ref_type top, ref_type logical_file_size, uint64_t version)
+            : positions(alloc)
+            , lengths(alloc)
+            , versions(alloc)
+            , top_ref(top)
+            , logical_file_size(logical_file_size)
+            , version(version)
+        {
+        }
+    };
+
+
+    using FreeListMap = std::vector<std::unique_ptr<FreeList>>;
+    FreeListMap old_freelists;
+    old_freelists.reserve(m_top_ref_map.size());
+    for (auto& [version, info] : m_top_ref_map) {
+        if (version < m_oldest_reachable_version)
+            continue;
+        auto e = std::make_unique<FreeList>(m_alloc, info.top_ref, info.logical_file_size, version);
+        old_freelists.push_back(std::move(e));
+    }
+
+
+    // little helper: get the youngest version older than given
+    auto get_earlier = [&](uint64_t version) -> FreeList* {
+        auto it = std::lower_bound(old_freelists.begin(), old_freelists.end(), version,
+                                   [](const std::unique_ptr<FreeList>& e, uint64_t v) {
+                                       return e->version < v;
+                                   });
+        // There will always be at least one freelist:
+        REALM_ASSERT(it != old_freelists.end());
+        REALM_ASSERT(it != old_freelists.begin());
+        --it;
+        REALM_ASSERT((*it)->version < version);
+        return it->get();
+    };
+
+
+    // find (if possible) youngest time stamp in any block in a sequence that fully covers a given one.
+    auto find_cover_for = [&](const FreeSpaceEntry& entry, FreeList& free_list) -> std::optional<uint64_t> {
+        auto entry_end = std::min(entry.ref + entry.size, free_list.logical_file_size);
+        if (entry.ref >= entry_end) {
+            return 0; // block completely beyond end of file
+        }
+
+        if (!free_list.initialized) {
+            // setup arrays
+            free_list.initialized = true;
+            if (free_list.top_ref) {
+                Array top_array(m_alloc);
+                top_array.init_from_ref(free_list.top_ref);
+                if (top_array.size() > Group::s_free_version_ndx) {
+                    // we have a freelist with versioning info
+                    free_list.positions.init_from_ref(top_array.get_as_ref(Group::s_free_pos_ndx));
+                    free_list.lengths.init_from_ref(top_array.get_as_ref(Group::s_free_size_ndx));
+                    free_list.versions.init_from_ref(top_array.get_as_ref(Group::s_free_version_ndx));
+                }
+            }
+        }
+
+        if (!free_list.positions.is_attached()) {
+            return {}; // no free list associated with that version
+        }
+        const size_t limit = free_list.positions.size();
+        if (limit == 0) {
+            return {}; // empty freelist
+        }
+        const size_t index = free_list.positions.upper_bound_int(entry.ref) - 1;
+        if (index == size_t(-1)) {
+            return {}; // no free blocks before the 'ref' we are looking for
+        }
+        REALM_ASSERT(index < limit); // follows from above
+        const auto start_pos = static_cast<ref_type>(free_list.positions.get(index));
+        REALM_ASSERT(start_pos <= entry.ref);
+        auto end_pos = start_pos + static_cast<ref_type>(free_list.lengths.get(index));
+        if (end_pos <= entry.ref) {
+            return {}; // free block ends before the 'ref' we are looking for
+        }
+        uint64_t found_version = free_list.versions.get(index);
+
+        // coalesce any subsequent contiguous entries
+        for (auto next = index + 1;
+             next < limit && free_list.positions.get(next) == (int64_t)end_pos && end_pos < entry_end; ++next) {
+            end_pos += static_cast<ref_type>(free_list.lengths.get(next));
+            // pick youngest (highest) version of blocks
+            found_version = std::max<uint64_t>(found_version, free_list.versions.get(next));
+        }
+        // is the block fully covered by range established above?
+        if (end_pos < entry_end) {
+            return {}; // no, it isn't
+        }
+        REALM_ASSERT(found_version <= entry.released_at_version);
+        return found_version;
+    };
+
+    // check if a given entry overlaps a reachable block. Only used in debug mode.
+    auto is_referenced = [&](FreeSpaceEntry& entry) -> bool {
+#ifdef REALM_DEBUG
+        bool referenced = false;
+        ALLOC_DBG_COUT(std::endl
+                       << "    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
+                       << " {");
+        for (auto& [version, info] : m_top_ref_map) {
+            auto pred = [](const Reachable& a, const size_t& val) {
+                return val > a.pos;
+            };
+            auto it = std::lower_bound(info.reachable_blocks.begin(), info.reachable_blocks.end(), entry.ref, pred);
+            if (it != info.reachable_blocks.end()) {
+                if (it != info.reachable_blocks.begin())
+                    --it;
+                while (it != info.reachable_blocks.end() && it->pos < entry.ref + entry.size) {
+                    if (it->pos + it->size > entry.ref) {
+                        ALLOC_DBG_COUT(version << " ");
+                        referenced = true;
+                        break;
+                    }
+                    ++it;
+                }
+            }
+        }
+        if (!referenced) {
+            ALLOC_DBG_COUT("none");
+        }
+        ALLOC_DBG_COUT("} ");
+        return referenced;
+#else
+        static_cast<void>(entry); // silence a warning
+        return false;
+#endif
+    };
+
+    auto backdate_single_entry = [&](FreeSpaceEntry& entry) -> void {
+        const auto referenced = is_referenced(entry);
+        // early out if the reference is to the most recent version
+        if (entry.released_at_version == m_current_version) {
+            REALM_ASSERT_DEBUG(!referenced);
+            return;
+        }
+        while (entry.released_at_version) {
+            // early out for references before oldest freelist:
+            if (entry.released_at_version <= this->m_oldest_reachable_version) {
+                REALM_ASSERT_DEBUG(!referenced);
+                break;
+            }
+            auto earlier_it = get_earlier(entry.released_at_version);
+            ALLOC_DBG_COUT(" - earlier freelist: " << earlier_it->version);
+            if (auto covering_version = find_cover_for(entry, *earlier_it)) {
+                ALLOC_DBG_COUT("  backdating [" << entry.ref << ", " << entry.size << "]  version: "
+                                                << entry.released_at_version << " -> " << *covering_version);
+                REALM_ASSERT_DEBUG(!referenced);
+                entry.released_at_version = *covering_version;
+            }
+            else {
+                ALLOC_DBG_COUT("  not free at that point");
+                REALM_ASSERT_DEBUG(referenced);
+                break;
+            }
+        }
+        ALLOC_DBG_COUT(std::endl);
+    };
+
+
+#ifdef REALM_DEBUG
+    map_reachable();
+#endif
+    for (auto&& entry : m_not_free_in_file) {
+        backdate_single_entry(entry);
+    }
+}
 
 ref_type GroupWriter::write_group()
 {
@@ -307,20 +538,14 @@ ref_type GroupWriter::write_group()
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
 #endif // REALM_METRICS
 
-#if REALM_ALLOC_DEBUG
-    std::cout << "Commit nr " << m_current_version << "   ( from " << (is_shared ? m_readlock_version : 0) << " )"
-              << std::endl;
-    std::cout << "    In-file freelist before merge: " << m_free_positions.size();
-#endif
+    ALLOC_DBG_COUT("Commit nr " << m_current_version << "   ( from " << m_oldest_reachable_version << " )"
+                                << std::endl);
 
     read_in_freelist();
     // Now, 'm_size_map' holds all free elements candidate for recycling
 
     Array& top = m_group.m_top;
-#if REALM_ALLOC_DEBUG
-    std::cout << "    In-file freelist after merge:  " << m_size_map.size() << std::endl;
-    std::cout << "    Allocating file space for data:" << std::endl;
-#endif
+    ALLOC_DBG_COUT("  Allocating file space for data:" << std::endl);
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
     // as they are going to change along the way.) If free space is available in
@@ -351,9 +576,11 @@ ref_type GroupWriter::write_group()
         }
     }
 
-#if REALM_ALLOC_DEBUG
-    std::cout << "    Freelist size after allocations: " << m_size_map.size() << std::endl;
-#endif
+    ALLOC_DBG_COUT("  Freelist size after allocations: " << m_size_map.size() << std::endl);
+    // We now back-date (if possible) any blocks freed in versions which
+    // are becoming unreachable.
+    if (m_any_new_unreachables)
+        backdate();
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
@@ -371,13 +598,9 @@ ref_type GroupWriter::write_group()
     // the space that was freed during the current transaction. Note that a
     // copy-on-write on m_free_positions, for example, also implies a
     // copy-on-write on Group::m_top.
-#if REALM_ALLOC_DEBUG
-    std::cout << "        In-mem freelist before/after consolidation: " << m_group.m_alloc.m_free_read_only.size();
-#endif
+    ALLOC_DBG_COUT("  In-mem freelist before/after consolidation: " << m_group.m_alloc.m_free_read_only.size());
     size_t free_read_only_size = m_group.m_alloc.consolidate_free_read_only(); // Throws
-#if REALM_ALLOC_DEBUG
-    std::cout << "/" << free_read_only_size << std::endl;
-#endif
+    ALLOC_DBG_COUT("/" << free_read_only_size << std::endl);
     max_free_list_size += free_read_only_size;
     max_free_list_size += m_not_free_in_file.size();
     // The final allocation of free space (i.e., the call to
@@ -403,9 +626,7 @@ ref_type GroupWriter::write_group()
     int size_per_entry = ((top.get(2) >> 1) < 0x8000000 ? 8 : 16) + 8;
     size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
 
-#if REALM_ALLOC_DEBUG
-    std::cout << "    Allocating file space for freelists:" << std::endl;
-#endif
+    ALLOC_DBG_COUT("  Allocating file space for freelists:" << std::endl);
     // Reserve space for remaining arrays. We ask for some extra bytes beyond the
     // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
@@ -426,11 +647,8 @@ ref_type GroupWriter::write_group()
     // lists in the file.
     size_t reserve_ndx = recreate_freelist(reserve_pos);
 
-#if REALM_ALLOC_DEBUG
-    std::cout << "    Freelist size after merge: " << m_free_positions.size()
-              << "   freelist space required: " << max_free_space_needed << std::endl
-              << std::endl;
-#endif
+    ALLOC_DBG_COUT("  Freelist size after merge: " << m_free_positions.size() << "   freelist space required: "
+                                                   << max_free_space_needed << std::endl);
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the
     // deduction of the actually used space from the reserved chunk,) will not
@@ -483,13 +701,25 @@ ref_type GroupWriter::write_group()
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
 
-    // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
+    // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit
+    // expansion
     REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
     REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
 
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
     m_free_space_size += rest;
+
+#if REALM_ALLOC_DEBUG
+    std::cout << "  Final Freelist:" << std::endl;
+    for (size_t j = 0; j < m_free_positions.size(); ++j) {
+        std::cout << "    [" << m_free_positions.get(j) << ".." << m_free_lengths.get(j);
+        if (m_free_versions.size()) {
+            std::cout << "]: " << m_free_versions.get(j);
+        }
+    }
+    std::cout << std::endl << std::endl;
+#endif
 
     // The free-list now have their final form, so we can write them to the file
     // char* start_addr = m_file_map.get_addr() + reserve_ref;
@@ -511,20 +741,20 @@ ref_type GroupWriter::write_group()
 void GroupWriter::read_in_freelist()
 {
     FreeList free_in_file;
-
+    REALM_ASSERT(m_free_lengths.is_attached());
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
     REALM_ASSERT_RELEASE_EX(m_free_versions.size() == limit, limit, m_free_versions.size());
 
     if (limit) {
-        auto limit_version = m_readlock_version;
+        auto limit_version = m_oldest_reachable_version;
         for (size_t idx = 0; idx < limit; ++idx) {
             size_t ref = size_t(m_free_positions.get(idx));
             size_t size = size_t(m_free_lengths.get(idx));
 
             uint64_t version = m_free_versions.get(idx);
-            // Entries that are freed in still alive versions are not candidates for merge or allocation
-            if (version >= limit_version) {
+            // Entries that are freed in later still alive versions are not candidates for merge or allocation
+            if (version > limit_version) {
                 m_not_free_in_file.emplace_back(ref, size, version);
                 continue;
             }
@@ -545,7 +775,13 @@ void GroupWriter::read_in_freelist()
         m_free_lengths.copy_on_write();
         m_free_versions.copy_on_write();
     }
-
+#if REALM_ALLOC_DEBUG
+    std::cout << "  Freelist (pinned): ";
+    for (auto e : m_not_free_in_file) {
+        std::cout << "[" << e.ref << ", " << e.size << "] <" << e.released_at_version << ">  ";
+    }
+    std::cout << std::endl;
+#endif
     free_in_file.merge_adjacent_entries_in_freelist();
     // Previous step produces - potentially - some entries with size of zero. These
     // entries will be skipped in the next step.
@@ -653,14 +889,17 @@ void GroupWriter::FreeList::merge_adjacent_entries_in_freelist()
 
 void GroupWriter::FreeList::move_free_in_file_to_size_map(std::multimap<size_t, size_t>& size_map)
 {
+    ALLOC_DBG_COUT("  Freelist (true free): ");
     for (auto& elem : *this) {
         // Skip elements merged in 'merge_adjacent_entries_in_freelist'
         if (elem.size) {
             REALM_ASSERT_RELEASE_EX(!(elem.size & 7), elem.size);
             REALM_ASSERT_RELEASE_EX(!(elem.ref & 7), elem.ref);
             size_map.emplace(elem.size, elem.ref);
+            ALLOC_DBG_COUT("[" << elem.ref << ", " << elem.size << "] ");
         }
     }
+    ALLOC_DBG_COUT(std::endl);
 }
 
 size_t GroupWriter::get_free_space(size_t size)
@@ -722,6 +961,7 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
         it = split_freelist_chunk(it, alloc_pos);
     }
     // Match found!
+    ALLOC_DBG_COUT("    alloc [" << alloc_pos << ", " << size << "]" << std::endl);
     return it;
 }
 
@@ -817,10 +1057,8 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
     REALM_ASSERT(new_file_size <= get_file_size());
-#if REALM_ALLOC_DEBUG
-    std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
-              << std::endl;
-#endif
+    ALLOC_DBG_COUT("        ** File extension to " << new_file_size << "     after request for " << requested_size
+                                                   << std::endl);
 
     // as new_file_size is larger than logical_file_size, but known to
     // be representable in a size_t, so is the result:
@@ -935,7 +1173,7 @@ void GroupWriter::dump()
 {
     size_t count = m_free_lengths.size();
     std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
-              << "version >= " << m_readlock_version << "\n";
+              << "version >= " << m_oldest_reachable_version << "\n";
     for (size_t i = 0; i < count; ++i) {
         std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << " - "
                   << m_free_versions.get(i) << "\n";

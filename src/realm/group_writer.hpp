@@ -36,6 +36,26 @@ namespace realm {
 class Group;
 class SlabAlloc;
 
+class Reachable {
+public:
+    ref_type pos;
+    size_t size;
+};
+class VersionInfo {
+public:
+    VersionInfo(ref_type t, ref_type l)
+        : top_ref(t)
+        , logical_file_size(l)
+    {
+    }
+    ref_type top_ref;
+    ref_type logical_file_size;
+    // used in debug mode to validate backdating algo:
+    std::vector<Reachable> reachable_blocks;
+};
+
+using TopRefMap = std::map<uint64_t, VersionInfo>;
+using VersionVector = std::vector<uint64_t>;
 
 /// This class is not supposed to be reused for multiple write sessions. In
 /// particular, do not reuse it in case any of the functions throw.
@@ -54,7 +74,7 @@ public:
     GroupWriter(Group&, Durability dura = Durability::Full);
     ~GroupWriter();
 
-    void set_versions(uint64_t current, uint64_t read_lock) noexcept;
+    void set_versions(uint64_t current, TopRefMap& top_refs, bool any_num_unreachables) noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -96,7 +116,9 @@ private:
     Array m_free_lengths;   // 5th slot in Group::m_top
     Array m_free_versions;  // 6th slot in Group::m_top
     uint64_t m_current_version = 0;
-    uint64_t m_readlock_version;
+    uint64_t m_oldest_reachable_version;
+    TopRefMap m_top_ref_map;
+    bool m_any_new_unreachables;
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
@@ -182,16 +204,26 @@ private:
 
     void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
     FreeListElement split_freelist_chunk(FreeListElement, size_t alloc_pos);
+
+    /// Backdate (if possible) any blocks in the freelist belonging to
+    /// a version currently becomming unreachable. The effect of backdating
+    /// is that many blocks can be freed earlier.
+    void backdate();
+
+    /// Debug helper - extends the TopRefMap with list of reachable blocks
+    void map_reachable();
 };
 
 
 // Implementation:
 
-inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
+inline void GroupWriter::set_versions(uint64_t current, TopRefMap& top_refs, bool any_new_unreachables) noexcept
 {
-    REALM_ASSERT(read_lock <= current);
+    m_oldest_reachable_version = top_refs.begin()->first;
+    REALM_ASSERT(m_oldest_reachable_version <= current);
     m_current_version = current;
-    m_readlock_version = read_lock;
+    m_any_new_unreachables = any_new_unreachables;
+    m_top_ref_map = std::move(top_refs);
 }
 
 } // namespace realm
