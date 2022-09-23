@@ -1001,8 +1001,8 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
     switch (batch_state) {
         case DownloadBatchState::SteadyState:
-            // Cannot be called with this value. This is to make compiler happy.
-            return;
+            // Cannot be called with this value.
+            REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
             if (m_flx_active_version == new_version) {
                 return;
