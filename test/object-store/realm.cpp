@@ -2890,19 +2890,19 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("update_schema() to version already on disk updates cache") {
-        //        r->read_group();
-        //        external_write(config, [](auto& wt) {
-        //            auto table = wt.add_table("class_object 2");
-        //            table->add_column(type_Int, "value");
-        //        });
-        //
-        //        auto tv = cache_tv;
-        //        r->update_schema(schema2);
-        //
-        //        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
-        //        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
-        //        REQUIRE(cache_schema.size() == 2);
-        //        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+        r->read_group();
+        external_write(config, [](auto& wt) {
+            auto table = wt.add_table("class_object 2");
+            table->add_column(type_Int, "value");
+        });
+
+        auto tv = cache_tv;
+        r->update_schema(schema2);
+
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
 
     SECTION("update_schema() to version already on disk updates cache") {
@@ -2912,13 +2912,13 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
             table->add_column(type_Int, "value");
         });
 
-        // auto tv = cache_tv;
-        // r->update_schema(schema2);
+        auto tv = cache_tv;
+        r->update_schema(schema2);
 
-        //        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
-        //        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
-        //        REQUIRE(cache_schema.size() == 2);
-        //        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
 
     SECTION("update_schema() to version populated on disk while waiting for the write lock updates cache") {

@@ -217,7 +217,8 @@ void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
     const bool additive_mode = m_config.schema_mode == SchemaMode::AdditiveExplicit ||
-                               m_config.schema_mode == SchemaMode::AdditiveDiscovered;
+                               m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                               m_config.schema_mode == SchemaMode::ReadOnly;
     schema.copy_keys_from(reference, additive_mode);
     m_schema = std::move(schema);
     notify_schema_changed();
@@ -514,7 +515,17 @@ void Realm::add_schema_change_handler()
     m_transaction->set_schema_change_notification_handler([&] {
         m_new_schema = ObjectStore::schema_from_group(read_group());
         m_schema_version = ObjectStore::get_schema_version(read_group());
-        m_schema.copy_keys_from(*m_new_schema);
+        if (m_dynamic_schema) {
+            m_schema = *m_new_schema;
+        }
+        else {
+            const bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                                  m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                                  m_config.schema_mode == SchemaMode::ReadOnly;
+            m_schema.copy_keys_from(*m_new_schema, additive);
+        }
+
+
         notify_schema_changed();
     });
 }
