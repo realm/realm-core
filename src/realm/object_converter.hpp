@@ -25,7 +25,7 @@
 namespace realm::converters {
 
 struct EmbeddedObjectConverter {
-    void track(Obj e_src, Obj e_dst);
+    void track(const Obj& e_src, const Obj& e_dst);
     void process_pending();
 
 private:
@@ -39,7 +39,7 @@ private:
 struct InterRealmValueConverter {
     InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col,
                              EmbeddedObjectConverter* ec);
-    void track_new_embedded(Obj src, Obj dst);
+    void track_new_embedded(const Obj& src, const Obj& dst);
     struct ConversionResult {
         Mixed converted_value;
         bool requires_new_embedded_object = false;

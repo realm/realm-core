@@ -284,29 +284,27 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
 // If an embedded object is encountered, add it to a list of embedded objects to process.
 // This relies on the property that embedded objects only have one incoming link
 // otherwise there could be an infinite loop while discovering embedded objects.
-void EmbeddedObjectConverter::track(Obj e_src, Obj e_dst)
+void EmbeddedObjectConverter::track(const Obj& e_src, const Obj& e_dst)
 {
     embedded_pending.push_back({e_src, e_dst});
 }
 
 void EmbeddedObjectConverter::process_pending()
 {
-    // Conceptually this is a map, but doing a linear search through a vector is known
-    // to be faster for small number of elements. Since the number of tables expected
-    // to be processed here is assumed to be small < 20, use linear search instead of
-    // hashing. N is the depth to which embedded objects are connected and the upper
-    // bound is the total number of tables which is finite, and is usually small.
     util::FlatMap<TableKey, InterRealmObjectConverter> converters;
 
     while (!embedded_pending.empty()) {
         EmbeddedToCheck pending = embedded_pending.back();
         embedded_pending.pop_back();
-        TableRef src_table = pending.embedded_in_src.get_table();
+
         TableRef dst_table = pending.embedded_in_dst.get_table();
         TableKey dst_table_key = dst_table->get_key();
-        auto it_with_did_insert =
-            converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, this}});
-        InterRealmObjectConverter& converter = it_with_did_insert.first->second;
+        auto it = converters.find(dst_table_key);
+        if (it == converters.end()) {
+            TableRef src_table = pending.embedded_in_src.get_table();
+            it = converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, this}}).first;
+        }
+        InterRealmObjectConverter& converter = it->second;
         converter.copy(pending.embedded_in_src, pending.embedded_in_dst, nullptr);
     }
 }
@@ -333,7 +331,7 @@ InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColK
     }
 }
 
-void InterRealmValueConverter::track_new_embedded(Obj src, Obj dst)
+void InterRealmValueConverter::track_new_embedded(const Obj& src, const Obj& dst)
 {
     m_embedded_converter->track(src, dst);
 }
