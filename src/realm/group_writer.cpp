@@ -522,13 +522,13 @@ ref_type GroupWriter::write_group()
     if (m_evacuation_limit == 0) {
         size_t used_space = m_logical_size - m_free_space_size;
         // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
-        static constexpr size_t one_mb = 0x100000;
+        static constexpr size_t minimal_compaction_size = 0x100000;
         // If we make the file too small, there is a big chance it will grow immediately afterwards
-        static constexpr size_t sixty_four_kb = 0x10000;
-        if (m_logical_size >= one_mb && m_free_space_size - m_locked_space_size > 2 * used_space) {
+        static constexpr size_t minimal_evac_limit = 0x10000;
+        if (m_logical_size >= minimal_compaction_size && m_free_space_size - m_locked_space_size > 2 * used_space) {
             // Clean up potential
             auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
-            m_evacuation_limit = std::max(sixty_four_kb, limit);
+            m_evacuation_limit = std::max(minimal_evac_limit, limit);
             // From now on, we will only allocate below this limit
             // Save the limit in the file
             while (top.size() <= Group::s_evacuation_point_ndx) {
