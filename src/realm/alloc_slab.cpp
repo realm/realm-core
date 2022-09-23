@@ -1235,6 +1235,131 @@ void SlabAlloc::update_reader_view(size_t file_size, util::UniqueFunction<void()
     rebuild_translations(replace_last_mapping, old_num_mappings);
 }
 
+void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks, size_t top_array_max_size,
+                                           size_t top_array_free_pos_ndx, size_t top_array_free_sizes_ndx)
+{
+    // FIXME: don't refresh the same page more than once!
+    REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
+    RefRanges ranges;
+    for (auto version : read_locks) {
+        ranges.push_back(RefRange{version.top_ref, version.top_ref + top_array_max_size});
+    }
+    this->refresh_encrypted_pages(ranges);
+
+    Array prev_freelist_positions(*this);
+    Array prev_freelist_lengths(*this);
+    bool processed_first_version = false;
+    for (auto& read_lock : read_locks) {
+        Array top_array(*this), free_positions(*this), free_lengths(*this);
+        top_array.init_from_ref(read_lock.top_ref);
+        REALM_ASSERT_EX(top_array.size() > top_array_free_pos_ndx, top_array.size(), top_array_free_pos_ndx,
+                        read_lock.top_ref, read_lock.version);
+        REALM_ASSERT_EX(top_array.size() > top_array_free_sizes_ndx, top_array.size(), top_array_free_sizes_ndx,
+                        read_lock.top_ref, read_lock.version);
+
+        ref_type free_positions_ref = top_array.get_as_ref(top_array_free_pos_ndx);
+        ref_type free_sizes_ref = top_array.get_as_ref(top_array_free_sizes_ndx);
+        this->refresh_encrypted_pages({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
+                                       {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
+
+        free_positions.init_from_ref(free_positions_ref);
+        free_lengths.init_from_ref(free_sizes_ref);
+        size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
+        size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
+
+        this->refresh_encrypted_pages({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
+                                       {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
+
+        // we can now access this freelist version's pos and lengths
+        Array cur_freelist_posistions(*this), cur_freelist_lengths(*this);
+        cur_freelist_posistions.init_from_ref(free_positions_ref);
+        cur_freelist_lengths.init_from_ref(free_sizes_ref);
+        // auto print_freelist = [&]() {
+        //     std::cout << util::format("freelist for version: %1 has %2 entries.\n", version,
+        //                               cur_freelist_posistions.size());
+        //     for (size_t i = 0; i < cur_freelist_posistions.size(); ++i) {
+        //         std::cout << util::format("{%1, %2}, ", cur_freelist_posistions.get(i),
+        //                                   cur_freelist_lengths.get(i));
+        //     }
+        //     std::cout << std::endl;
+        // };
+        if (!processed_first_version) {
+            processed_first_version = true;
+            prev_freelist_positions.init_from_ref(free_positions_ref);
+            prev_freelist_lengths.init_from_ref(free_sizes_ref);
+            // print_freelist();
+            continue;
+        }
+
+        // print_freelist();
+        RefRanges allocations;
+
+        // Assumes freelists are in sorted order and are minimal contiguous ranges.
+        // find allocations by walking through differences
+        size_t previous_ndx = 0;
+        size_t current_ndx = 0;
+        const size_t prev_freelist_size = prev_freelist_positions.size();
+        const size_t cur_freelist_size = cur_freelist_posistions.size();
+        while (previous_ndx < prev_freelist_size && current_ndx < cur_freelist_size) {
+            REALM_ASSERT_EX(previous_ndx < prev_freelist_positions.size(), previous_ndx,
+                            prev_freelist_positions.size());
+            REALM_ASSERT_EX(previous_ndx < prev_freelist_lengths.size(), previous_ndx, prev_freelist_lengths.size());
+            REALM_ASSERT_EX(current_ndx < cur_freelist_posistions.size(), current_ndx,
+                            cur_freelist_posistions.size());
+            REALM_ASSERT_EX(current_ndx < cur_freelist_lengths.size(), current_ndx, cur_freelist_lengths.size());
+
+            ref_type prev_start = prev_freelist_positions.get(previous_ndx);
+            ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
+            ref_type cur_start = cur_freelist_posistions.get(current_ndx);
+            ref_type cur_end = cur_start + cur_freelist_lengths.get(current_ndx);
+            if (cur_start > prev_end) {
+                allocations.push_back(RefRange{prev_start, prev_end});
+                ++previous_ndx;
+            }
+            else if (cur_start > prev_start) {
+                allocations.push_back(RefRange{prev_start, cur_start});
+                ++previous_ndx;
+                if (cur_end < prev_end) {
+                    allocations.push_back(RefRange{cur_end, prev_end});
+                    ++current_ndx;
+                }
+            }
+            else if (cur_end < prev_end) {
+                ++current_ndx;
+            }
+            else if (cur_end < prev_end) {
+                allocations.push_back(RefRange{cur_end, prev_end});
+                ++previous_ndx;
+                ++current_ndx;
+            }
+            else {
+                // current block is equal to or contains the previous block
+                REALM_ASSERT_EX(cur_start <= prev_start && cur_end >= prev_end, cur_start, cur_end, prev_start,
+                                prev_end);
+                ++previous_ndx;
+                ++current_ndx;
+            }
+        }
+        // if we exhausted the current freelist but not the previous one, then
+        // all remaining blocks in the previous list have been allocated
+        while (previous_ndx < prev_freelist_size) {
+            REALM_ASSERT_EX(previous_ndx < prev_freelist_positions.size(), previous_ndx,
+                            prev_freelist_positions.size());
+            REALM_ASSERT_EX(previous_ndx < prev_freelist_lengths.size(), previous_ndx, prev_freelist_lengths.size());
+
+            ref_type prev_start = prev_freelist_positions.get(previous_ndx);
+            ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
+            allocations.push_back(RefRange{prev_start, prev_end});
+            ++previous_ndx;
+        }
+
+        this->refresh_encrypted_pages(allocations);
+
+        prev_freelist_positions.init_from_ref(free_positions_ref);
+        prev_freelist_lengths.init_from_ref(free_sizes_ref);
+    }
+}
+
 void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
 {
     // callers must already hold m_mapping_mutex

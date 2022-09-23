@@ -79,6 +79,11 @@ struct RefRange {
 };
 using RefRanges = std::vector<RefRange>;
 
+struct VersionedTopRef {
+    ref_type top_ref;
+    uint_fast64_t version;
+};
+
 /// The common interface for Realm allocators.
 ///
 /// A Realm allocator must associate a 'ref' to each allocated
