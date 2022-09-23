@@ -305,14 +305,14 @@ void EmbeddedObjectConverter::process_pending()
         TableRef dst_table = pending.embedded_in_dst.get_table();
         TableKey dst_table_key = dst_table->get_key();
         auto it_with_did_insert =
-            converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, shared_from_this()}});
+            converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, this}});
         InterRealmObjectConverter& converter = it_with_did_insert.first->second;
         converter.copy(pending.embedded_in_src, pending.embedded_in_dst, nullptr);
     }
 }
 
 InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table,
-                                                   ColKey dst_col, std::shared_ptr<EmbeddedObjectConverter> ec)
+                                                   ColKey dst_col, EmbeddedObjectConverter* ec)
     : m_src_table(src_table)
     , m_dst_table(dst_table)
     , m_src_col(src_col)
@@ -436,7 +436,7 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
 }
 
 InterRealmObjectConverter::InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst,
-                                                     std::shared_ptr<EmbeddedObjectConverter> embedded_tracker)
+                                                     EmbeddedObjectConverter* embedded_tracker)
     : m_embedded_tracker(embedded_tracker)
 {
     populate_columns_from_table(table_src, table_dst);
@@ -460,8 +460,7 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
         StringData col_name = table_src->get_column_name(col_key_src);
         ColKey col_key_dst = table_dst->get_column_key(col_name);
         REALM_ASSERT(col_key_dst);
-        m_columns_cache.emplace_back(
-            InterRealmValueConverter(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker));
+        m_columns_cache.emplace_back(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker);
     }
 }
 

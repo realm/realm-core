@@ -22,11 +22,9 @@
 #include <realm/mixed.hpp>
 #include <realm/obj.hpp>
 
-#include <memory>
-
 namespace realm::converters {
 
-struct EmbeddedObjectConverter : std::enable_shared_from_this<EmbeddedObjectConverter> {
+struct EmbeddedObjectConverter {
     void track(Obj e_src, Obj e_dst);
     void process_pending();
 
@@ -40,7 +38,7 @@ private:
 
 struct InterRealmValueConverter {
     InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col,
-                             std::shared_ptr<EmbeddedObjectConverter> ec);
+                             EmbeddedObjectConverter* ec);
     void track_new_embedded(Obj src, Obj dst);
     struct ConversionResult {
         Mixed converted_value;
@@ -66,19 +64,18 @@ private:
     ColKey m_dst_col;
     TableRef m_opposite_of_src;
     TableRef m_opposite_of_dst;
-    std::shared_ptr<EmbeddedObjectConverter> m_embedded_converter;
+    EmbeddedObjectConverter* m_embedded_converter;
     bool m_is_embedded_link;
     const bool m_primitive_types_only;
 };
 
 struct InterRealmObjectConverter {
-    InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst,
-                              std::shared_ptr<EmbeddedObjectConverter> embedded_tracker);
+    InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst, EmbeddedObjectConverter* embedded_tracker);
     void copy(const Obj& src, Obj& dst, bool* update_out);
 
 private:
     void populate_columns_from_table(ConstTableRef table_src, ConstTableRef table_dst);
-    std::shared_ptr<EmbeddedObjectConverter> m_embedded_tracker;
+    EmbeddedObjectConverter* m_embedded_tracker;
     std::vector<InterRealmValueConverter> m_columns_cache;
 };
 
