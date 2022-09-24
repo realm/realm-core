@@ -1520,8 +1520,7 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 
         std::vector<VersionedTopRef> read_locks = m_version_manager->get_versions_from(from, to.version);
 
-        alloc.refresh_pages_for_versions(read_locks, Group::s_group_max_size, Group::s_free_pos_ndx,
-                                         Group::s_free_size_ndx);
+        alloc.refresh_pages_for_versions(read_locks);
 
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_last_encryption_page_reader
         auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full);

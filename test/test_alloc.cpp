@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
 
@@ -440,32 +441,6 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
     }
 }
 
-namespace {
-
-class TestSlabAlloc : public SlabAlloc {
-
-public:
-    size_t test_get_upper_section_boundary(size_t start_pos)
-    {
-        return get_upper_section_boundary(start_pos);
-    }
-    size_t test_get_lower_section_boundary(size_t start_pos)
-    {
-        return get_lower_section_boundary(start_pos);
-    }
-    size_t test_get_section_base(size_t index)
-    {
-        return get_section_base(index);
-    }
-    size_t test_get_section_index(size_t ref)
-    {
-        return get_section_index(ref);
-    }
-};
-
-} // end anonymous namespace
-
-
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.
 TEST(Alloc_ToAndFromRef)
@@ -484,6 +459,113 @@ TEST(Alloc_ToAndFromRef)
         ref_type back_to_ref = to_ref(ref_as_int);
         CHECK_EQUAL(ref, back_to_ref);
     }
+}
+
+TEST(Alloc_EncryptionPageRefresher)
+{
+    constexpr size_t top_array_size = 11;         // s_group_max_size
+    constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
+    constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
+    constexpr size_t total_size = 50;
+
+    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges allocations, size_t total_size, Array& top) {
+        RefRanges free_space;
+        size_t last_alloc = 0;
+        for (auto& allocation : allocations) {
+            free_space.push_back({last_alloc, allocation.begin});
+            last_alloc = allocation.end;
+        }
+        if (last_alloc < total_size) {
+            free_space.push_back({last_alloc, total_size});
+        }
+        constexpr bool context_flag = false;
+        top.create(Node::Type::type_HasRefs, context_flag, top_array_size, 0);
+        Array free_positions(alloc);
+        free_positions.create(Node::Type::type_Normal, context_flag, free_space.size(), 0);
+        Array free_sizes(alloc);
+        free_sizes.create(Node::Type::type_Normal, context_flag, free_space.size(), 0);
+        for (size_t i = 0; i < free_space.size(); ++i) {
+            free_positions.set(i, free_space[i].begin);
+            free_sizes.set(i, free_space[i].end - free_space[i].begin);
+        }
+        top.set_as_ref(top_array_free_pos_ndx, free_positions.get_ref());
+        top.set_as_ref(top_array_free_size_ndx, free_sizes.get_ref());
+    };
+    auto add_expected_refreshes_for_arrays = [](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
+                                                RefRanges& to_refresh) {
+        for (auto& v : top_refs) {
+            // all top refs up to the max top ref size
+            to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size + top_array_size});
+            // the ref + header size of free_pos and free_size
+            Array top(alloc), pos(alloc), sizes(alloc);
+            top.init_from_ref(v.top_ref);
+            pos.init_from_ref(top.get_as_ref(top_array_free_pos_ndx));
+            sizes.init_from_ref(top.get_as_ref(top_array_free_size_ndx));
+            to_refresh.push_back({pos.get_ref(), pos.get_ref() + Array::header_size});
+            to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + Array::header_size});
+            // now the full size of pos and size
+            to_refresh.push_back({pos.get_ref(), pos.get_ref() + pos.get_byte_size()});
+            to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + sizes.get_byte_size()});
+        }
+    };
+
+    auto check_range_refreshes = [&](std::vector<RefRanges> versions, RefRanges expected_diffs) {
+        SlabAlloc alloc;
+        alloc.attach_empty();
+        CHECK(alloc.is_attached());
+        std::vector<VersionedTopRef> top_refs;
+        size_t version_dummy = 0;
+        for (auto& v : versions) {
+            Array top(alloc);
+            make_top_ref_with_allocations(alloc, v, total_size, top);
+            top_refs.push_back({top.get_ref(), ++version_dummy});
+        }
+        add_expected_refreshes_for_arrays(alloc, top_refs, expected_diffs);
+        RefRanges actual_allocations;
+        alloc.refresh_pages_for_versions(top_refs, [&](RefRanges allocs) {
+            actual_allocations.insert(actual_allocations.end(), allocs.begin(), allocs.end());
+        });
+        std::sort(actual_allocations.begin(), actual_allocations.end(), [](const RefRange& a, const RefRange& b) {
+            return a.begin < b.begin;
+        });
+        std::sort(expected_diffs.begin(), expected_diffs.end(), [](const RefRange& a, const RefRange& b) {
+            return a.begin < b.begin;
+        });
+        CHECK_EQUAL(actual_allocations.size(), expected_diffs.size());
+        for (size_t i = 0; i < actual_allocations.size(); ++i) {
+            CHECK_EQUAL(actual_allocations[i].begin, expected_diffs[i].begin);
+            CHECK_EQUAL(actual_allocations[i].end, expected_diffs[i].end);
+        }
+        alloc.detach();
+    };
+
+    std::vector<RefRanges> allocated_blocks = {{{5, 10}, {20, 30}}, {{5, 10}, {20, 40}}};
+    RefRanges expected_diff = {{30, 40}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {{0, 10}, {20, 50}}};
+    expected_diff = {{0, 5}, {30, 50}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {{0, 50}}};
+    expected_diff = {{0, 5}, {10, 20}, {30, 50}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {}};
+    expected_diff = {};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {{5, 30}}};
+    expected_diff = {{10, 20}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {{9, 29}}};
+    expected_diff = {{10, 20}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {20, 30}}, {{10, 20}}};
+    expected_diff = {{10, 20}};
+    check_range_refreshes(allocated_blocks, expected_diff);
 }
 
 #endif // TEST_ALLOC

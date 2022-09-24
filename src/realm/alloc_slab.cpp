@@ -41,6 +41,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/group.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -1235,16 +1236,24 @@ void SlabAlloc::update_reader_view(size_t file_size, util::UniqueFunction<void()
     rebuild_translations(replace_last_mapping, old_num_mappings);
 }
 
-void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks, size_t top_array_max_size,
-                                           size_t top_array_free_pos_ndx, size_t top_array_free_sizes_ndx)
+void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
+                                           util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
     // FIXME: don't refresh the same page more than once!
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
+    auto do_refresh = [&](const RefRanges& ranges) {
+        if (REALM_UNLIKELY(refresh_hook)) {
+            refresh_hook(ranges);
+        }
+        else {
+            this->refresh_encrypted_pages(ranges);
+        }
+    };
     RefRanges ranges;
     for (auto version : read_locks) {
-        ranges.push_back(RefRange{version.top_ref, version.top_ref + top_array_max_size});
+        ranges.push_back(RefRange{version.top_ref, version.top_ref + Group::s_group_max_size + Array::header_size});
     }
-    this->refresh_encrypted_pages(ranges);
+    do_refresh(ranges);
 
     Array prev_freelist_positions(*this);
     Array prev_freelist_lengths(*this);
@@ -1252,23 +1261,23 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     for (auto& read_lock : read_locks) {
         Array top_array(*this), free_positions(*this), free_lengths(*this);
         top_array.init_from_ref(read_lock.top_ref);
-        REALM_ASSERT_EX(top_array.size() > top_array_free_pos_ndx, top_array.size(), top_array_free_pos_ndx,
+        REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
                         read_lock.top_ref, read_lock.version);
-        REALM_ASSERT_EX(top_array.size() > top_array_free_sizes_ndx, top_array.size(), top_array_free_sizes_ndx,
+        REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,
                         read_lock.top_ref, read_lock.version);
 
-        ref_type free_positions_ref = top_array.get_as_ref(top_array_free_pos_ndx);
-        ref_type free_sizes_ref = top_array.get_as_ref(top_array_free_sizes_ndx);
-        this->refresh_encrypted_pages({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
-                                       {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
+        ref_type free_positions_ref = top_array.get_as_ref(Group::s_free_pos_ndx);
+        ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
+        do_refresh({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
+                    {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
 
         free_positions.init_from_ref(free_positions_ref);
         free_lengths.init_from_ref(free_sizes_ref);
         size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
         size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
 
-        this->refresh_encrypted_pages({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
-                                       {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
+        do_refresh({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
+                    {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
 
         // we can now access this freelist version's pos and lengths
         Array cur_freelist_posistions(*this), cur_freelist_lengths(*this);
@@ -1300,6 +1309,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         size_t current_ndx = 0;
         const size_t prev_freelist_size = prev_freelist_positions.size();
         const size_t cur_freelist_size = cur_freelist_posistions.size();
+        REALM_ASSERT_3(prev_freelist_positions.size(), ==, prev_freelist_lengths.size());
+        REALM_ASSERT_3(cur_freelist_posistions.size(), ==, cur_freelist_lengths.size());
         while (previous_ndx < prev_freelist_size && current_ndx < cur_freelist_size) {
             REALM_ASSERT_EX(previous_ndx < prev_freelist_positions.size(), previous_ndx,
                             prev_freelist_positions.size());
@@ -1337,7 +1348,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                 REALM_ASSERT_EX(cur_start <= prev_start && cur_end >= prev_end, cur_start, cur_end, prev_start,
                                 prev_end);
                 ++previous_ndx;
-                ++current_ndx;
             }
         }
         // if we exhausted the current freelist but not the previous one, then
@@ -1353,7 +1363,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             ++previous_ndx;
         }
 
-        this->refresh_encrypted_pages(allocations);
+        do_refresh(allocations);
 
         prev_freelist_positions.init_from_ref(free_positions_ref);
         prev_freelist_lengths.init_from_ref(free_sizes_ref);

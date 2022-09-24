@@ -339,6 +339,9 @@ public:
     void print() const;
 #endif
 
+    void refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
+                                    util::UniqueFunction<void(const RefRanges&)> = nullptr);
+
 protected:
     MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, char*, size_t old_size, size_t new_size) override;
@@ -366,8 +369,6 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks, size_t top_array_max_size,
-                                    size_t top_array_free_pos_ndx, size_t top_array_free_sizes_ndx);
     void refresh_encrypted_pages(const RefRanges& ranges);
     void refresh_all_encrypted_pages();
 
