@@ -39,5 +39,5 @@ scp $ssh_options evergreen/setup_baas_host.sh $ssh_user:/home/ubuntu || exit 1
 scp $ssh_options evergreen/install_baas.sh $ssh_user:/home/ubuntu || exit 1
 
 echo "Running setup script"
-ssh $ssh_options  -L 9090:127.0.0.1:9090 $ssh_user "/home/ubuntu/setup_baas_host.sh -a /home/ubuntu/baas_host_vars.sh -x"
+ssh $ssh_options  -L 9090:127.0.0.1:9090 $ssh_user "/home/ubuntu/setup_baas_host.sh -a /home/ubuntu/baas_host_vars.sh -x -b master"
 
