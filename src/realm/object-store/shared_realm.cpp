@@ -255,7 +255,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
-        m_schema.copy_keys_from(schema);
+        m_schema.copy_keys_from(schema, m_config.is_schema_additive());
     }
     notify_schema_changed();
 }

@@ -335,16 +335,15 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     std::vector<SchemaChange> changes;
 
     // Add missing tables
-    auto other_tables =
-        zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-            if (target && !existing && !orphans.count(target->name)) {
-                changes.emplace_back(schema_change::AddTable{target});
-            }
-            else if (existing && !target) {
-                if (include_table_removals)
-                    changes.emplace_back(schema_change::RemoveTable{existing});
-            }
-        });
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+        if (target && !existing && !orphans.count(target->name)) {
+            changes.emplace_back(schema_change::AddTable{target});
+        }
+        else if (existing && !target) {
+            if (include_table_removals)
+                changes.emplace_back(schema_change::RemoveTable{existing});
+        }
+    });
 
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
@@ -396,7 +395,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
         },
         is_schema_additive);
     // append mismatching classes and sort them if needed
-    if (!other_classes.empty()) {
+    if (is_schema_additive && !other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
         std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
             return lft.name < rgt.name;
