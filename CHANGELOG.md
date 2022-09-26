@@ -7,6 +7,7 @@
 
 ### Breaking changes
 * File format version bumped. File will be upgraded if it contains any Set<Mixed> or any Dictionary.
+* The layout of the lock-file has changed, the lock file format version is bumped and all participants in a multiprocess scenario needs to be up to date so they expect the same format. This requires an update of Studio. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -40,7 +41,7 @@
 * Throw exception if `Realm::Convert` tries to convert to flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798), since v11.16.0).
 
 ### Breaking changes
-* The layout of the lock-file has changed, the lock file format version is bumped and all participants in a multiprocess scenario needs to be up to date so they expect the same format. This requires an update of Studio. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
