@@ -51,13 +51,7 @@ using util::any_cast;
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
         auto schema = (r).schema();                                                                                  \
-        if (!(r).config().is_schema_additive()) {                                                                    \
-            REQUIRE(schema == s);                                                                                    \
-        }                                                                                                            \
-        else {                                                                                                       \
-            for (const auto& object_schema : s)                                                                      \
-                REQUIRE(schema.find(object_schema.name) != schema.end());                                            \
-        }                                                                                                            \
+        REQUIRE(schema == s);                                                                                        \
     } while (0)
 
 #define REQUIRE_NO_MIGRATION_NEEDED(r, schema1, schema2)                                                             \
@@ -206,20 +200,30 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
         config.schema_mode = SchemaMode::AdditiveExplicit;
         auto realm = Realm::get_shared_realm(config);
 
+        auto update_schema = [](Realm& r, Schema& s, uint64_t version) {
+            REQUIRE_NOTHROW((r).update_schema(s, version));
+            VERIFY_SCHEMA(r, false);
+            auto schema = (r).schema();
+            for (const auto& other : s) {
+                REQUIRE(schema.find(other.name) != schema.end());
+            }
+        };
+
+
         Schema schema1 = {};
         Schema schema2 = add_table(schema1, {"A", {{"value", PropertyType::Int}}});
         Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
         Schema schema4 = add_table(schema3, {"C", {{"value", PropertyType::Int}}});
         Schema schema5 = add_table(schema4, {"Z", {{"value", PropertyType::Int}}});
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+        update_schema(*realm, schema1, 0);
         REQUIRE(realm->schema().size() == 0);
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 0);
+        update_schema(*realm, schema2, 0);
         REQUIRE(realm->schema().size() == 1);
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 0);
+        update_schema(*realm, schema3, 0);
         REQUIRE(realm->schema().size() == 2);
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema4, 0);
+        update_schema(*realm, schema4, 0);
         REQUIRE(realm->schema().size() == 3);
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema5, 0);
+        update_schema(*realm, schema5, 0);
         REQUIRE(realm->schema().size() == 4);
 
         // schema size is decremented.
@@ -228,25 +232,25 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
         SECTION("delete in reverse order") {
             auto new_schema = schema5;
             Schema delete_schema = remove_table(new_schema, "Z");
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("Z") != schema.end());
             delete_schema = remove_table(schema4, "C");
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             delete_schema = remove_table(schema3, "B");
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
             delete_schema = remove_table(schema2, "A");
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -258,7 +262,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             auto new_schema = schema5;
             Schema delete_schema = remove_table(new_schema, "Z");
             // A B C Z vs A B C ==> Z (other classes)
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -268,7 +272,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             delete_schema = remove_table(new_schema, "C");
             schema = realm->schema();
             // A B C vs A B Z => Z
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -277,7 +281,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("B") != schema.end());
             delete_schema = remove_table(new_schema, "B");
             // A B Z vs A C Z => B
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.find("C") != schema.end());
             REQUIRE(schema.find("Z") != schema.end());
@@ -285,7 +289,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("B") != schema.end());
             delete_schema = remove_table(new_schema, "A");
             // A B Z vs B C Z => A
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -299,7 +303,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             delete_schema = remove_table(new_schema, "Z");
             delete_schema = remove_table(delete_schema, "A");
             // A B C Z vs B C ==> A,Z (other classes)
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -314,7 +318,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             delete_schema = remove_table(delete_schema, "A");
             delete_schema = remove_table(delete_schema, "C");
             // A B C Z vs B  ==> A,C,Z (other classes)
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -330,7 +334,7 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             delete_schema = remove_table(delete_schema, "C");
             delete_schema = remove_table(delete_schema, "B");
             // A B C Z vs None  ==> A,C,Z,B (other classes)
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
@@ -349,13 +353,13 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
             Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
             Schema schema5 = add_table(schema4, {"C", {{"value", PropertyType::Int}}});
-            REQUIRE_UPDATE_SUCCEEDS(*realm, schema5, 0);
+            update_schema(*realm, schema5, 0);
 
             Schema delete_schema;
             delete_schema = remove_table(schema5, "Z");
             delete_schema = remove_table(delete_schema, "A");
             // Z B A C vs Z A => B C (others)
-            REQUIRE_UPDATE_SUCCEEDS(*realm, delete_schema, 0);
+            update_schema(*realm, delete_schema, 0);
             auto schema = realm->schema();
             REQUIRE(schema.size() == 4);
             REQUIRE(schema.find("C") != schema.end());
