@@ -69,18 +69,6 @@ using util::Optional;
 
 using namespace std::string_view_literals;
 
-namespace realm {
-
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-
-} // namespace realm
-
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
 {
@@ -2840,7 +2828,6 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
         CHECK(metadata["name"] == "Foo Bar");
     }
 }
-
 
 namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collections]", cf::ListOfObjects,
