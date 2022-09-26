@@ -280,10 +280,15 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
 }
 
 template <typename T, typename U, typename Func>
-std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool is_additive) noexcept
+std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool is_schema_additive) noexcept
 {
     std::vector<ObjectSchema> different_classes;
     size_t i = 0, j = 0;
+    auto add_missing_classes = [&different_classes, &is_schema_additive](const ObjectSchema& o) {
+        if (is_schema_additive)
+            different_classes.push_back(o);
+    };
+
     while (i < a.size() && j < b.size()) {
         auto& object_schema = a[i];
         auto& matching_schema = b[j];
@@ -293,35 +298,24 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
             ++i;
             ++j;
         }
+        else if (cmp < 0) {
+            add_missing_classes(object_schema);
+            func(&object_schema, nullptr);
+            ++i;
+        }
         else {
-            if (cmp < 0) {
-                func(&object_schema, nullptr);
-                ++i;
-                if (is_additive) {
-                    different_classes.push_back(object_schema);
-                }
-            }
-            else {
-                func(nullptr, &matching_schema);
-                ++j;
-                if (is_additive) {
-                    different_classes.push_back(matching_schema);
-                }
-            }
+            add_missing_classes(matching_schema);
+            func(nullptr, &matching_schema);
+            ++j;
         }
     }
-
     for (; i < a.size(); ++i) {
+        add_missing_classes(a[i]);
         func(&a[i], nullptr);
-
-        if (is_additive)
-            different_classes.push_back(a[i]);
     }
     for (; j < b.size(); ++j) {
+        add_missing_classes(b[j]);
         func(nullptr, &b[j]);
-
-        if (is_additive)
-            different_classes.push_back(b[j]);
     }
     return different_classes;
 }
@@ -395,7 +389,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
         },
         is_schema_additive);
     // append mismatching classes and sort them if needed
-    if (is_schema_additive && !other_classes.empty()) {
+    if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
         std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
             return lft.name < rgt.name;
