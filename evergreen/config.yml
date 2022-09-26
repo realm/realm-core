@@ -454,7 +454,6 @@ tasks:
 - name: compile
   exec_timeout_secs: 1800
   tags: [ "for_pull_requests" ]
-  exec_timeout_secs: 1800
   commands:
   - func: "compile"
 
