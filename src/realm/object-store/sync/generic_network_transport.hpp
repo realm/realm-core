@@ -234,13 +234,69 @@ struct Response {
     util::Optional<ClientErrorCode> client_error_code;
 };
 
+struct HttpCompletionImpl;
 
-using HttpCompletion = util::UniqueFunction<void(const Request&, const Response&)>;
+struct HttpCompletion
+{
+    HttpCompletion(HttpCompletion&& copy) : impl(std::move(copy.impl)) {}
+    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) : impl(std::move(impl)) {}
+
+    operator bool() const noexcept { return impl != nullptr; }
+    void operator()(const Response & response);
+
+    const Request& request() const;
+
+    // Helper functions for the c_api interface
+    inline void* release()
+    {
+        REALM_ASSERT(impl != nullptr);
+        return impl.release();
+    }
+    HttpCompletion(void* context) : impl(static_cast<HttpCompletionImpl*>(context)) {}
+
+    // Needed for testing purposes
+    void operator()(Request&& request, const Response & response);
+
+protected:
+    std::unique_ptr<HttpCompletionImpl> impl;
+};
+
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request, HttpCompletion&& completion_block) = 0;
+    virtual void send_request_to_server(const Request& request, HttpCompletion&& completion) = 0;
     virtual ~GenericNetworkTransport() = default;
+};
+
+
+struct HttpCompletionImpl
+{
+    using CompletionFunction = util::UniqueFunction<void(Request&&, const Response&)>;
+
+    static HttpCompletion make_completion(Request&& request, CompletionFunction&& completion);
+
+    HttpCompletionImpl(Request&& request, CompletionFunction&& completion)
+        : m_request(std::move(request)), m_completion(std::move(completion)) {}
+
+    inline void call(const Response& response)
+    {
+        REALM_ASSERT(m_completion);
+        m_completion(std::move(m_request), response);
+    }
+
+    // Needed for testing purposes
+    inline void call(Request&& request, const Response & response)
+    {
+        REALM_ASSERT(m_completion);
+        m_completion(std::move(request), response);
+    }
+
+    inline const Request& request() const { return m_request; }
+    inline const CompletionFunction& completion() const { return m_completion; }
+
+protected:
+    Request m_request;
+    CompletionFunction m_completion;
 };
 
 } // namespace realm::app

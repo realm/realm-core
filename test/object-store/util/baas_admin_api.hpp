@@ -201,12 +201,12 @@ AppSession create_app(const AppCreateConfig& config);
 
 class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
-    void send_request_to_server(app::Request&& request, realm::app::HttpCompletion&& completion) override
+    void send_request_to_server(const app::Request& request, app::HttpCompletion&& completion) override
     {
         {
             std::lock_guard barrier(m_mutex);
         }
-        completion(request, do_http_request(request));
+        completion(do_http_request(request));
     }
 
     void block()

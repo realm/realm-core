@@ -1406,15 +1406,12 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
+        void send_request_to_server(const Request&, HttpCompletion&& completion) override
         {
             if (request_hook) {
-                request_hook(request);
+                request_hook(const_cast<Request&>(completion.request()));
             }
-            SynchronousTestTransport::send_request_to_server(
-                std::move(request), [&](const Request& request, const Response& response) {
-                    completion_block(std::move(request), std::move(response));
-                });
+            SynchronousTestTransport::send_request_to_server(completion.request(), std::move(completion));
         }
         util::UniqueFunction<void(Request&)> request_hook;
     };
