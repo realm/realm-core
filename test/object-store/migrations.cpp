@@ -51,11 +51,13 @@ using util::any_cast;
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
         auto schema = (r).schema();                                                                                  \
-                                                                                                                     \
-        for (const auto& object_schema : s)                                                                          \
-                                                                                                                     \
-            REQUIRE(schema.find(object_schema.name) != schema.end());                                                \
-                                                                                                                     \
+        if (!(r).config().is_schema_additive()) {                                                                    \
+            REQUIRE(schema == s);                                                                                    \
+        }                                                                                                            \
+        else {                                                                                                       \
+            for (const auto& object_schema : s)                                                                      \
+                REQUIRE(schema.find(object_schema.name) != schema.end());                                            \
+        }                                                                                                            \
     } while (0)
 
 #define REQUIRE_NO_MIGRATION_NEEDED(r, schema1, schema2)                                                             \

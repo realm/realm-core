@@ -237,8 +237,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         ++after_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
-        REQUIRE(before->read_group().get_table("class_object"));
-        REQUIRE(before->config().path == local_config.path);
+        if (!before->config().is_schema_additive()) {
+            REQUIRE(before->read_group().get_table("class_object"));
+            REQUIRE(before->config().path == local_config.path);
+        }
         REQUIRE(after);
         REQUIRE(!after->is_frozen());
         REQUIRE(after->read_group().get_table("class_object"));
