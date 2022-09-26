@@ -183,8 +183,6 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
         auto& os = schema_for_table(*realm, TableKey(class_key));
         auto col_key = ColKey(key);
 
-        // FIXME: We can do better than linear search.
-
         for (auto& prop : os.persisted_properties) {
             if (prop.column_key == col_key) {
                 *out_property_info = to_capi(prop);

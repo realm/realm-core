@@ -106,7 +106,16 @@ struct PropertyTypeMismatch : std::logic_error {
 //// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrapC {
-    virtual ~WrapC() {}
+    static constexpr uint64_t s_cookie_value = 0xdeadbeefdeadbeef;
+    uint64_t cookie;
+    WrapC()
+        : cookie(s_cookie_value)
+    {
+    }
+    virtual ~WrapC()
+    {
+        cookie = 0;
+    }
 
     virtual WrapC* clone() const
     {

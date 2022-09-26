@@ -268,28 +268,67 @@ util::Optional<Mixed> Dictionary::do_avg(size_t* return_cnt) const
     return agg.is_null() ? Mixed{} : agg.result();
 }
 
+namespace {
+bool can_minmax(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+        case type_Timestamp:
+            return true;
+        default:
+            return false;
+    }
+}
+bool can_sum(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+            return true;
+        default:
+            return false;
+    }
+}
+} // anonymous namespace
+
 util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return do_min(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return do_max(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return do_sum(return_cnt);
     }
@@ -300,6 +339,9 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 
 util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return do_avg(return_cnt);
     }
@@ -960,14 +1002,6 @@ ObjKey DictionaryLinkValues::get_key(size_t ndx) const
         return val.get<ObjKey>();
     }
     return {};
-}
-
-// In contrast to a link list and a link set, a dictionary can contain null links.
-// This is because the corresponding key may contain useful information by itself.
-bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
-{
-    Mixed val = m_source.get_any(ndx);
-    return val.is_type(type_TypedLink);
 }
 
 Obj DictionaryLinkValues::get_object(size_t row_ndx) const

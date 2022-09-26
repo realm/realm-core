@@ -145,24 +145,24 @@ TEST(Metrics_QueryTypes)
     query.find();
     query.find_all();
     query.count();
-    query.sum_int(int_col);
-    query.average_int(int_col);
-    query.maximum_int(int_col);
-    query.minimum_int(int_col);
+    query.sum(int_col);
+    query.avg(int_col);
+    query.max(int_col);
+    query.min(int_col);
 
-    query.sum_double(double_col);
-    query.average_double(double_col);
-    query.maximum_double(double_col);
-    query.minimum_double(double_col);
+    query.sum(double_col);
+    query.avg(double_col);
+    query.max(double_col);
+    query.min(double_col);
 
-    query.sum_float(float_col);
-    query.average_float(float_col);
-    query.maximum_float(float_col);
-    query.minimum_float(float_col);
+    query.sum(float_col);
+    query.avg(float_col);
+    query.max(float_col);
+    query.min(float_col);
 
     ObjKey return_dummy;
-    query.maximum_timestamp(timestamp_col, &return_dummy);
-    query.minimum_timestamp(timestamp_col, &return_dummy);
+    query.max(timestamp_col, &return_dummy);
+    query.min(timestamp_col, &return_dummy);
 
     rt->end_read();
     std::shared_ptr<Metrics> metrics = sg->get_metrics();

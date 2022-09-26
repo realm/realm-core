@@ -41,7 +41,7 @@ public:
         /// The number of documents modified.
         int32_t modified_count;
         /// The identifier of the inserted document if an upsert took place.
-        util::Optional<ObjectId> upserted_id;
+        util::Optional<bson::Bson> upserted_id;
     };
 
     /// Options to use when executing a `find` command on a `MongoCollection`.

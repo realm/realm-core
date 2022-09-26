@@ -94,17 +94,17 @@ TEST(TableView_TimestampMaxMinCount)
     t.create_object();
 
     TableView tv = t.where().find_all();
-    Timestamp ts;
+    std::optional<Mixed> ts;
 
-    ts = tv.maximum_timestamp(col, nullptr);
+    ts = tv.max(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(300, 300));
-    ts = tv.minimum_timestamp(col, nullptr);
+    ts = tv.min(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(100, 100));
 
     ObjKey key;
-    ts = tv.maximum_timestamp(col, &key);
+    ts = tv.max(col, &key);
     CHECK_EQUAL(key, max_key);
-    ts = tv.minimum_timestamp(col, &key);
+    ts = tv.min(col, &key);
     CHECK_EQUAL(key, min_key);
 
     size_t cnt;
@@ -159,55 +159,55 @@ TEST(TableView_FloatsFindAndAggregations)
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum(col_double)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum(col_float)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum(col_double)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum(col_float)->get_double(), 10 * epsilon);
 
     ObjKey key;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.maximum_double(col_double, &key));
+    CHECK_EQUAL(3.2, v_all.max(col_double, &key)->get_double());
     CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double, &key));
+    CHECK_EQUAL(-1.2, v_some.max(col_double, &key)->get_double());
     CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float, &key));
+    CHECK_EQUAL(3.1f, v_all.max(col_float, &key)->get_float());
     CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
+    CHECK_EQUAL(1.2f, v_some.max(col_float, &key)->get_float());
     CHECK_EQUAL(ObjKey(0), key);
 
     // Max without ret_index
-    CHECK_EQUAL(3.2, v_all.maximum_double(col_double));
-    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double));
-    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float));
-    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float));
+    CHECK_EQUAL(3.2, v_all.max(col_double)->get_double());
+    CHECK_EQUAL(-1.2, v_some.max(col_double)->get_double());
+    CHECK_EQUAL(3.1f, v_all.max(col_float)->get_float());
+    CHECK_EQUAL(1.2f, v_some.max(col_float)->get_float());
 
     // Test min
-    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double));
-    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double));
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float));
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float));
+    CHECK_EQUAL(-1.2, v_all.min(col_double)->get_double());
+    CHECK_EQUAL(-1.2, v_some.min(col_double)->get_double());
+    CHECK_EQUAL(-1.1f, v_all.min(col_float)->get_float());
+    CHECK_EQUAL(-1.1f, v_some.min(col_float)->get_float());
     // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
+    CHECK_EQUAL(-1.2, v_all.min(col_double, &key)->get_double());
     CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double, &key));
+    CHECK_EQUAL(-1.2, v_some.min(col_double, &key)->get_double());
     CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float, &key));
+    CHECK_EQUAL(-1.1f, v_all.min(col_float, &key)->get_float());
     CHECK_EQUAL(ObjKey(3), key);
 
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float, &key));
+    CHECK_EQUAL(-1.1f, v_some.min(col_float, &key)->get_float());
     CHECK_EQUAL(ObjKey(3), key);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(col_float), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.avg(col_double)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.avg(col_double)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.avg(col_float)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.avg(col_float)->get_double(), 10 * epsilon);
 
     CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
     CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
@@ -232,7 +232,7 @@ TEST(TableView_Sum)
     TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.sum_int(c0);
+    int64_t sum = v.sum(c0)->get_int();
     CHECK_EQUAL(10, sum);
 }
 
@@ -250,7 +250,7 @@ TEST(TableView_Average)
     TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
 
-    double sum = v.average_int(c0);
+    double sum = v.avg(c0)->get_double();
     CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
 }
 
@@ -267,7 +267,7 @@ TEST(TableView_SumNegative)
     v[0].set<Int>(c0, 11);
     v[2].set<Int>(c0, -20);
 
-    int64_t sum = v.sum_int(c0);
+    int64_t sum = v.sum(c0)->get_int();
     CHECK_EQUAL(-9, sum);
 }
 
@@ -304,7 +304,7 @@ TEST(TableView_Max)
     v[1].set<Int>(c0, 2);
     v[2].set<Int>(c0, 1);
 
-    int64_t max = v.maximum_int(c0);
+    int64_t max = v.max(c0)->get_int();
     CHECK_EQUAL(2, max);
 }
 
@@ -322,7 +322,7 @@ TEST(TableView_Max2)
     v[1].set<Int>(c0, -2);
     v[2].set<Int>(c0, -3);
 
-    int64_t max = v.maximum_int(c0, 0);
+    int64_t max = v.max(c0, 0)->get_int();
     CHECK_EQUAL(-1, max);
 }
 
@@ -341,11 +341,11 @@ TEST(TableView_Min)
     v[1].set<Int>(c0, 2);
     v[2].set<Int>(c0, 1);
 
-    int64_t min = v.minimum_int(c0);
+    int64_t min = v.min(c0)->get_int();
     CHECK_EQUAL(-1, min);
 
     ObjKey key;
-    min = v.minimum_int(c0, &key);
+    min = v.min(c0, &key)->get_int();
     CHECK_EQUAL(-1, min);
     CHECK_EQUAL(v[0].get_key(), key);
 }
@@ -364,11 +364,11 @@ TEST(TableView_Min2)
     v[1].set<Int>(c0, -2);
     v[2].set<Int>(c0, -3);
 
-    int64_t min = v.minimum_int(c0);
+    int64_t min = v.min(c0)->get_int();
     CHECK_EQUAL(-3, min);
 
     ObjKey key;
-    min = v.minimum_int(c0 ,&key);
+    min = v.min(c0, &key)->get_int();
     CHECK_EQUAL(-3, min);
     CHECK_EQUAL(v[2].get_key(), key);
 }
@@ -2763,15 +2763,15 @@ TEST(TableView_TimestampMaxRemoveRow)
 
     TableView tv = table.where().find_all();
     CHECK_EQUAL(tv.size(), 10);
-    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(9, 0));
+    CHECK_EQUAL(tv.max(col_date)->get_timestamp(), Timestamp(9, 0));
 
     table.remove_object(ObjKey(9));
     CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
-    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0)); // but aggregate functions skip removed rows
+    CHECK_EQUAL(tv.max(col_date)->get_timestamp(), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
-    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
+    CHECK_EQUAL(tv.max(col_date)->get_timestamp(), Timestamp(8, 0));
 }
 
 TEST(TableView_UpdateQuery)
