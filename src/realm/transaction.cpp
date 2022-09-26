@@ -922,12 +922,22 @@ public:
     {
         // std::cout << "Moved: " << m_moved << std::endl;
     }
-    bool trv(Array& parent, unsigned level, std::vector<size_t>& progress)
+
+    /// Function used to traverse the node tree and "copy on write" nodes
+    /// that are found above the evac_limit. The function will return
+    /// when either the whole tree has been travesed or when the work_limit
+    /// has been reached.
+    /// \param current_node - node to process.
+    /// \param level - the level at which current_node is placed in the tree
+    /// \param progress - When the traversal is initiated, this vector identifies at which
+    ///                   node the process should be resumed. It is subesequently updated
+    ///                   to point to the node we have just processed
+    bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
     {
-        if (parent.is_read_only()) {
-            auto byte_size = parent.get_byte_size();
-            if ((parent.get_ref() + byte_size) > m_evac_limit) {
-                parent.copy_on_write();
+        if (current_node.is_read_only()) {
+            auto byte_size = current_node.get_byte_size();
+            if ((current_node.get_ref() + byte_size) > m_evac_limit) {
+                current_node.copy_on_write();
                 m_moved++;
                 if (m_work_limit > byte_size) {
                     m_work_limit -= byte_size;
@@ -939,17 +949,17 @@ public:
             }
         }
 
-        if (parent.has_refs()) {
-            auto sz = parent.size();
+        if (current_node.has_refs()) {
+            auto sz = current_node.size();
             if (progress.size() == level) {
                 progress.push_back(0);
             }
             size_t ndx = progress[level];
             while (ndx < sz) {
-                auto val = parent.get(ndx);
+                auto val = current_node.get(ndx);
                 if (val && !(val & 1)) {
-                    Array arr(parent.get_alloc());
-                    arr.set_parent(&parent, ndx);
+                    Array arr(current_node.get_alloc());
+                    arr.set_parent(&current_node, ndx);
                     arr.init_from_parent();
                     if (!trv(arr, level + 1, progress)) {
                         return false;

@@ -651,6 +651,12 @@ std::vector<Entry> Group::get_allocated_nodes() const
         consolidate_lists(all_nodes, history);
     }
 
+    if (size() > 11) {
+        std::vector<Entry> evac_info;
+        evac_info = get_nodes(m_alloc, get_ref(11));
+        consolidate_lists(all_nodes, evac_info);
+    }
+
     return all_nodes;
 }
 
