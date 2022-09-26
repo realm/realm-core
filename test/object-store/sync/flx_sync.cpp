@@ -860,7 +860,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
-                util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
             wait_for_advance(*realm);
 
@@ -904,7 +904,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             wait_for_download(*realm);
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
-                util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
             wait_for_advance(*realm);
 
