@@ -491,27 +491,49 @@ void Dictionary::align_indices(std::vector<size_t>& indices) const
     }
 }
 
+namespace {
+std::vector<Mixed> get_keys(const Dictionary& dict)
+{
+    std::vector<Mixed> values;
+    values.reserve(dict.size());
+    for (auto it = dict.begin(), end = dict.end(); it != end; ++it)
+        values.push_back(it.key());
+    return values;
+}
+
+std::vector<Mixed> get_values(const Dictionary& dict)
+{
+    std::vector<Mixed> values;
+    values.reserve(dict.size());
+    for (auto it = dict.begin(), end = dict.end(); it != end; ++it)
+        values.push_back(it.value());
+    return values;
+}
+
+void do_sort(std::vector<size_t>& indices, bool ascending, const std::vector<Mixed>& values)
+{
+    auto b = indices.begin();
+    auto e = indices.end();
+    std::sort(b, e, [ascending, &values](size_t i1, size_t i2) {
+        return ascending ? values[i1] < values[i2] : values[i2] < values[i1];
+    });
+}
+} // anonymous namespace
+
 void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 {
     align_indices(indices);
-    auto b = indices.begin();
-    auto e = indices.end();
-    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
-        auto v1 = get_any(i1);
-        auto v2 = get_any(i2);
-        return ascending ? v1 < v2 : v2 < v1;
-    });
+    do_sort(indices, ascending, get_values(*this));
 }
 
 void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
 {
     align_indices(indices);
-
-    bool sort_ascending = ascending ? *ascending : true;
-    sort(indices, sort_ascending);
+    auto values = get_values(*this);
+    do_sort(indices, ascending.value_or(true), values);
     indices.erase(std::unique(indices.begin(), indices.end(),
-                              [this](size_t i1, size_t i2) {
-                                  return get_any(i1) == get_any(i2);
+                              [&values](size_t i1, size_t i2) {
+                                  return values[i1] == values[i2];
                               }),
                   indices.end());
 
@@ -524,13 +546,7 @@ void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> asc
 void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
 {
     align_indices(indices);
-    auto b = indices.begin();
-    auto e = indices.end();
-    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
-        auto k1 = get_key(i1);
-        auto k2 = get_key(i2);
-        return ascending ? k1 < k2 : k2 < k1;
-    });
+    do_sort(indices, ascending, get_keys(*this));
 }
 
 void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
@@ -1112,34 +1128,38 @@ Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
 {
 }
 
-auto Dictionary::Iterator::operator*() const -> value_type
+Mixed Dictionary::Iterator::key() const
 {
-    update();
-    Mixed key;
     switch (m_key_type) {
         case type_String: {
             ArrayString keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+            return Mixed(keys.get(m_state.m_current_index));
         }
         case type_Int: {
             ArrayInteger keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+            return Mixed(keys.get(m_state.m_current_index));
         }
         default:
             throw std::runtime_error("Not implemented");
-            break;
     }
+}
+
+Mixed Dictionary::Iterator::value() const
+{
     ArrayMixed values(m_tree.get_alloc());
     ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
     values.init_from_ref(ref);
+    return values.get(m_state.m_current_index);
+}
 
-    return std::make_pair(key, values.get(m_state.m_current_index));
+auto Dictionary::Iterator::operator*() const -> value_type
+{
+    update();
+    return std::make_pair(key(), value());
 }
 
 
