@@ -234,7 +234,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
         client.register_email(email_to_reject, password, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->reason() == util::format("failed to confirm user %1", email_to_reject));
+            CHECK(error->reason() == util::format("failed to confirm user \"%1\"", email_to_reject));
             CHECK(error->code() == ErrorCodes::BadRequest);
             processed = true;
         });
@@ -301,7 +301,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string rejected_password = util::format("%1", random_string(10));
         client.call_reset_password_function(email, rejected_password, {"foo", "bar"}, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->reason() == util::format("failed to reset password for user %1", email));
+            CHECK(error->reason() == util::format("failed to reset password for user \"%1\"", email));
             CHECK(error->is_service_error());
             processed = true;
         });

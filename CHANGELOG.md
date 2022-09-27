@@ -2,13 +2,13 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Prioritize integration of local changes over remote changes - shorten the time users may have to wait when committing local changes. Stop storing downloaded changesets in history. ([PR #5844](https://github.com/realm/realm-core/pull/5844)).
+* Greatly improve the performance of sorting or distincting a Dictionary's keys or values. The most expensive operation is now performed O(log N) rather than O(N log N) times, and large Dictionaries can see upwards of 99% reduction in time to sort. ([PR #5166](https://github.com/realm/realm-core/pulls/5166))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
-* Calling Results::sum/min/max on a collection field throws an exception rather than aggregating on the underlying memory addresses. ([#5137](https://github.com/realm/realm-core/issues/5137))
- 
+* Fix a data race reported by thread sanitizer when preparing to deliver change notifications. This probably did not cause observable problems in practice ([PR #5892](https://github.com/realm/realm-core/pull/5892) since 12.7.0).
+
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 
@@ -18,7 +18,8 @@
 -----------
 
 ### Internals
-* None.
+* Reenable sync benchmark.
+* Add util/http.hpp to the release package.
 
 ----------------------------------------------
 

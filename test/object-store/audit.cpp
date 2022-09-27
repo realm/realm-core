@@ -82,7 +82,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
         // If the session is still active (in this case the audit session) wait for audit to complete
         if (session->state() == SyncSession::State::Active) {
             auto [promise, future] = util::make_promise_future<void>();
-            session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
+            session->wait_for_upload_completion([promise = std::move(promise)](Status) mutable {
                 // Don't care if error occurred, just finish operation
                 promise.emplace_value();
             });

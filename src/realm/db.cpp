@@ -1519,6 +1519,17 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
 }
 
+bool DB::other_writers_waiting_for_lock() const
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
+    uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
+    // When holding the write lock, next_ticket = next_served + 1, hence, if the diference between 'next_ticket' and
+    // 'next_served' is greater than 1, there is at least one thread waiting to acquire the write lock.
+    return next_ticket > next_served + 1;
+}
+
 class DB::AsyncCommitHelper {
 public:
     AsyncCommitHelper(DB* db)

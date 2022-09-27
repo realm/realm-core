@@ -864,7 +864,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
-                util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
             wait_for_advance(*realm);
 
@@ -908,7 +908,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             wait_for_download(*realm);
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
-                util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
             wait_for_advance(*realm);
 
@@ -1041,7 +1041,8 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         config.sync_config->on_download_message_received_hook = [promise = std::move(shared_promise)](
                                                                     std::weak_ptr<SyncSession> weak_session,
                                                                     const sync::SyncProgress&, int64_t query_version,
-                                                                    sync::DownloadBatchState batch_state) mutable {
+                                                                    sync::DownloadBatchState batch_state,
+                                                                    size_t) mutable {
             auto session = weak_session.lock();
             if (!session) {
                 return;
@@ -1697,13 +1698,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         interrupted_realm_config.sync_config->on_download_message_received_hook =
             [&, promise = std::move(shared_saw_valid_state_promise)](std::weak_ptr<SyncSession> weak_session,
                                                                      const sync::SyncProgress&, int64_t query_version,
-                                                                     sync::DownloadBatchState batch_state) {
+                                                                     sync::DownloadBatchState batch_state, size_t) {
                 auto session = weak_session.lock();
                 if (!session) {
                     return;
                 }
 
-                if (query_version != 1 || batch_state != sync::DownloadBatchState::LastInBatch) {
+                if (query_version != 1 || batch_state == sync::DownloadBatchState::MoreToCome) {
                     return;
                 }
 
