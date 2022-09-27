@@ -50,7 +50,7 @@ using util::any_cast;
     do {                                                                                                             \
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
-        REQUIRE(schema == s);                                                                                        \
+        REQUIRE((r).schema() == s);                                                                                  \
     } while (0)
 
 #define REQUIRE_NO_MIGRATION_NEEDED(r, schema1, schema2)                                                             \
