@@ -839,7 +839,7 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
             }
 
             auto http_completion = HttpCompletionImpl::make_completion(
-                std::move(request), [completion = std::move(completion), anchor = std::move(anchor)](
+                std::move(request), [completion = std::move(completion), anchor = anchor](
                     Request&& request, const Response& response) mutable {
                 if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
                     anchor->handle_redirect_response(std::move(request), response, std::move(completion));

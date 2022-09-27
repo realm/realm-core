@@ -238,8 +238,14 @@ struct HttpCompletionImpl;
 
 struct HttpCompletion
 {
-    HttpCompletion(HttpCompletion&& copy) : impl(std::move(copy.impl)) {}
-    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) : impl(std::move(impl)) {}
+    HttpCompletion() noexcept = default;
+    HttpCompletion(HttpCompletion&& copy) noexcept : impl(std::move(copy.impl)) {}
+    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) noexcept : impl(std::move(impl)) {}
+    HttpCompletion& operator=(HttpCompletion&& copy) noexcept
+    {
+        impl = std::move(copy.impl);
+        return *this;
+    }
 
     operator bool() const noexcept { return impl != nullptr; }
     void operator()(const Response & response);

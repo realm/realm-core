@@ -250,23 +250,10 @@ public:
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
     struct TransportCallback {
-        TransportCallback() = default;
-        TransportCallback(realm::app::HttpCompletion&& completion) : context(completion.release()) {}
-        void* context;
+        realm::app::HttpCompletion completion;
 
-        void set_context(void* new_context)
-        {
-            if (context) {
-                // Make sure the old context is properly destroyed
-                auto completion = realm::app::HttpCompletion(context);
-            }
-            context = new_context;
-        }
         void operator()(const realm::app::Response& response)
         {
-            REQUIRE(context);
-            auto completion = realm::app::HttpCompletion(context);
-            context = nullptr;
             completion(response);
         }
     };
@@ -281,7 +268,7 @@ public:
         void send_request_to_server(const realm::app::Request&,
                                     realm::app::HttpCompletion&& completion) override
         {
-            network_callback->set_context(completion.release());
+            *network_callback = TransportCallback{std::move(completion)};
         }
 
         TransportCallback* network_callback;
