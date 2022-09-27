@@ -194,7 +194,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
 
     // When we make a commit, we will at least need room for the version
-    while (top.size() < Group::s_version_ndx) {
+    while (top.size() <= Group::s_version_ndx) {
         top.add(0); // Throws
     }
 
@@ -251,7 +251,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                 arr.create(Node::type_Normal);
                 arr.add(uint64_t(m_evacuation_limit));
                 arr.add(0); // Backoff = false
-                top.set(Group::s_evacuation_point_ndx, int64_t(arr.get_ref()));
+                top.set_as_ref(Group::s_evacuation_point_ndx, arr.get_ref());
             }
             else {
                 arr.init_from_ref(to_ref(val));
@@ -475,20 +475,21 @@ void GroupWriter::backdate()
     auto is_referenced = [&](FreeSpaceEntry& entry) -> bool {
 #ifdef REALM_DEBUG
         bool referenced = false;
-        ALLOC_DBG_COUT(std::endl
-                       << "    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
-                       << " {");
-        for (auto& [version, info] : m_top_ref_map) {
-            auto pred = [](const Reachable& a, const size_t& val) {
+        ALLOC_DBG_COUT("    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
+                                           << " {");
+        auto end = m_top_ref_map.end();
+        for (auto top_ref_map = m_top_ref_map.begin(); top_ref_map != end && !referenced; ++top_ref_map) {
+            auto info_begin = top_ref_map->second.reachable_blocks.begin();
+            auto info_end = top_ref_map->second.reachable_blocks.end();
+            auto it = std::lower_bound(info_begin, info_end, entry.ref, [](const Reachable& a, size_t val) {
                 return val > a.pos;
-            };
-            auto it = std::lower_bound(info.reachable_blocks.begin(), info.reachable_blocks.end(), entry.ref, pred);
-            if (it != info.reachable_blocks.end()) {
-                if (it != info.reachable_blocks.begin())
+            });
+            if (it != info_end) {
+                if (it != info_begin)
                     --it;
-                while (it != info.reachable_blocks.end() && it->pos < entry.ref + entry.size) {
+                while (it != info_end && it->pos < entry.ref + entry.size) {
                     if (it->pos + it->size > entry.ref) {
-                        ALLOC_DBG_COUT(version << " ");
+                        ALLOC_DBG_COUT(top_ref_map->first << " ");
                         referenced = true;
                         break;
                     }
@@ -600,7 +601,7 @@ ref_type GroupWriter::write_group()
                 arr.add(int64_t(index));
             }
             ref = arr.write(*this, false, only_if_modified);
-            top.set(Group::s_evacuation_point_ndx, from_ref(ref));
+            top.set_as_ref(Group::s_evacuation_point_ndx, ref);
         }
         else if (ref) {
             Array::destroy(ref, m_alloc);
@@ -681,7 +682,7 @@ ref_type GroupWriter::write_group()
             if (elem.size == 0)
                 m_under_evacuation.clear();
             top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
-            auto ref = top.get(Group::s_evacuation_point_ndx);
+            auto ref = top.get_as_ref(Group::s_evacuation_point_ndx);
             REALM_ASSERT(ref);
             Array::destroy(ref, m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
