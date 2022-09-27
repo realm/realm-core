@@ -1172,7 +1172,8 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
     }
 
     // We have notifiers for a newer version, so advance to that
-    transaction::advance(tr, realm.m_binding_context.get(), std::move(notifiers));
+    transaction::advance(tr, realm.m_binding_context.get(),
+                         _impl::NotifierPackage(std::move(notifiers), notifier_version));
 }
 
 std::vector<std::shared_ptr<_impl::CollectionNotifier>> RealmCoordinator::notifiers_for_realm(Realm& realm)
@@ -1198,11 +1199,11 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
         util::CheckedUniqueLock lock(m_notifier_mutex);
         notifiers = notifiers_for_realm(realm);
     }
-    package_notifiers(notifiers, m_db->get_version_of_latest_snapshot());
+    auto version = package_notifiers(notifiers, m_db->get_version_of_latest_snapshot());
 
-    auto version = tr->get_version_of_current_transaction();
-    transaction::advance(tr, realm.m_binding_context.get(), _impl::NotifierPackage(std::move(notifiers)));
-    return !realm.is_closed() && version != tr->get_version_of_current_transaction();
+    auto prev_version = tr->get_version_of_current_transaction();
+    transaction::advance(tr, realm.m_binding_context.get(), _impl::NotifierPackage(std::move(notifiers), version));
+    return !realm.is_closed() && prev_version != tr->get_version_of_current_transaction();
 }
 
 void RealmCoordinator::promote_to_write(Realm& realm)
@@ -1257,7 +1258,8 @@ void RealmCoordinator::process_available_async(Realm& realm)
         realm.m_binding_context->did_send_notifications();
 }
 
-void RealmCoordinator::package_notifiers(NotifierVector& notifiers, VersionID::version_type target_version)
+std::optional<VersionID> RealmCoordinator::package_notifiers(NotifierVector& notifiers,
+                                                             VersionID::version_type target_version)
 {
     auto ready = [&] {
         util::CheckedUniqueLock notifier_lock(m_notifier_mutex);
@@ -1280,6 +1282,7 @@ void RealmCoordinator::package_notifiers(NotifierVector& notifiers, VersionID::v
                notifier->version().version < target_version;
     };
     notifiers.erase(std::remove_if(begin(notifiers), end(notifiers), package), end(notifiers));
+    return notifiers.empty() ? std::optional<VersionID>{} : notifiers.front()->version();
 }
 
 bool RealmCoordinator::compact()
