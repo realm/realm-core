@@ -126,8 +126,10 @@ TEST_CASE("notifications: async delivery") {
     Results results(r, table->where().greater(col, 0).less(col, 10));
 
     int notification_calls = 0;
-    auto token = results.add_notification_callback([&](CollectionChangeSet) {
+    CollectionChangeSet saved_changes;
+    auto token = results.add_notification_callback([&](CollectionChangeSet changes) {
         ++notification_calls;
+        saved_changes = changes;
     });
 
     auto make_local_change = [&] {
@@ -140,6 +142,13 @@ TEST_CASE("notifications: async delivery") {
         auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
+        r2->commit_transaction();
+    };
+
+    auto make_remote_object_addition = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->create_object().set_all(7);
         r2->commit_transaction();
     };
 
@@ -299,6 +308,19 @@ TEST_CASE("notifications: async delivery") {
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
+        }
+
+        SECTION("Notify of object additions done in long reclaimed versions") {
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(saved_changes.insertions.count() == 1);
+            for (int j = 0; j < 100; ++j) {
+                make_remote_object_addition();
+            }
+            coordinator->on_change();
+            r->notify();
+            REQUIRE(notification_calls == 3);
+            REQUIRE(saved_changes.insertions.count() == 100);
         }
     }
 
@@ -4239,6 +4261,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"float", PropertyType::Float | PropertyType::Nullable},
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
+             {"int list", PropertyType::Int | PropertyType::Array},
          }},
         {"linking_object",
          {
@@ -4252,6 +4275,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
+    ColKey col_int_list = table->get_column_key("int list");
+    ColKey col_invalid(ColKey::Idx{10}, col_type_Int, {}, 0);
 
     SECTION("one row with null values") {
         r->begin_transaction();
@@ -4271,6 +4296,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_float)->get_float() == 2.f);
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
+            REQUIRE_THROWS_AS(results.max(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.max(col_invalid), LogicError);
         }
 
         SECTION("min") {
@@ -4278,6 +4305,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_float)->get_float() == 0.f);
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
+            REQUIRE_THROWS_AS(results.min(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.min(col_invalid), LogicError);
         }
 
         SECTION("average") {
@@ -4285,6 +4314,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
             REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_invalid), LogicError);
         }
 
         SECTION("sum") {
@@ -4292,6 +4323,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
             REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_invalid), LogicError);
         }
     }
 
@@ -4378,17 +4411,22 @@ TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalid
     TestContext ctx(realm);
 
     ColKey invalid_col;
+    ColKey well_formed_key(ColKey::Idx{0}, col_type_Int, {}, 0);
     SECTION("max") {
         REQUIRE(!results.max(invalid_col));
+        REQUIRE(!results.max(well_formed_key));
     }
     SECTION("min") {
         REQUIRE(!results.min(invalid_col));
+        REQUIRE(!results.min(well_formed_key));
     }
     SECTION("average") {
         REQUIRE(!results.average(invalid_col));
+        REQUIRE(!results.average(well_formed_key));
     }
     SECTION("sum") {
         REQUIRE(!results.sum(invalid_col));
+        REQUIRE(!results.sum(well_formed_key));
     }
     SECTION("first") {
         REQUIRE(!results.first());

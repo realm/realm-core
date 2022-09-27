@@ -241,7 +241,7 @@ private:
     util::CheckedMutex m_notifier_mutex;
     NotifierVector m_new_notifiers GUARDED_BY(m_notifier_mutex);
     NotifierVector m_notifiers GUARDED_BY(m_notifier_mutex);
-    VersionID m_notifier_skip_version GUARDED_BY(m_notifier_mutex) = {0, 0};
+    TransactionRef m_notifier_skip_version GUARDED_BY(m_notifier_mutex);
 
     util::CheckedMutex m_running_notifiers_mutex;
     // Transaction used for actually running async notifiers

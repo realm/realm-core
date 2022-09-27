@@ -414,11 +414,6 @@ public:
     void swap(size_t ndx1, size_t ndx2) final;
 
     // Overriding members of ObjList:
-    bool is_obj_valid(size_t) const noexcept final
-    {
-        // A link list cannot contain null values
-        return true;
-    }
     Obj get_object(size_t ndx) const final
     {
         ObjKey key = this->get(ndx);

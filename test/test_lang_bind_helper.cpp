@@ -166,6 +166,60 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         threads[j].join();
 }
 
+TEST(Transactions_ReclaimFrozen)
+{
+    struct Entry {
+        TransactionRef frozen;
+        Obj o;
+        int64_t value;
+    };
+    int num_pending_transactions = 100;
+    int num_transactions_created = 1000;
+    int num_objects = 200;
+    int num_checks_pr_trans = 10;
+
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
+    std::vector<Entry> refs;
+    refs.resize(num_pending_transactions);
+    Random random(random_int<unsigned long>());
+
+    auto wt = db->start_write();
+    auto tbl = wt->add_table("TestTable");
+    auto col = tbl->add_column(type_Int, "IntCol");
+    Obj o;
+    for (int j = 0; j < num_objects; ++j) {
+        o = tbl->create_object(ObjKey(j));
+        o.set<Int>(col, 10000000000 + j);
+    }
+    wt->commit_and_continue_as_read();
+    for (int j = 0; j < num_transactions_created; ++j) {
+        int trans_number = random.draw_int_mod(num_pending_transactions);
+        auto frozen = wt->freeze();
+        // auto frozen = wt->duplicate();
+        refs[trans_number].frozen = frozen;
+        refs[trans_number].o = frozen->import_copy_of(o);
+        refs[trans_number].value = o.get<Int>(col);
+        wt->promote_to_write();
+        int key = random.draw_int_mod(num_objects);
+        o = tbl->get_object(ObjKey(key));
+        o.set<Int>(col, o.get<Int>(col) + 42);
+        wt->commit_and_continue_as_read();
+        for (int k = 0; k < num_checks_pr_trans; ++k) {
+            int selected_trans = random.draw_int_mod(num_pending_transactions);
+            if (refs[selected_trans].frozen) {
+                CHECK(refs[selected_trans].value == refs[selected_trans].o.get<Int>(col));
+            }
+        }
+    }
+    for (auto& e : refs) {
+        e.frozen.reset();
+    }
+    wt->promote_to_write();
+    wt->commit();
+    // frozen = wt->freeze();
+}
 
 TEST(Transactions_ConcurrentFrozenTableGetByKey)
 {
@@ -1699,7 +1753,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get_object(0), realm::KeyNotFound);
+    CHECK_NOT(tv.get_object(0).is_valid());
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -4782,6 +4836,7 @@ TEST(LangBindHelper_VersionControl)
     const int num_versions = 10;
     const int num_random_tests = 100;
     DB::VersionID versions[num_versions];
+    std::vector<TransactionRef> trs;
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
@@ -4804,6 +4859,7 @@ TEST(LangBindHelper_VersionControl)
             }
             {
                 auto rt = sg->start_read();
+                trs.push_back(rt->duplicate());
                 versions[i] = rt->get_version_of_current_transaction();
             }
         }
@@ -4877,6 +4933,7 @@ TEST(LangBindHelper_VersionControl)
             }
             old_version = new_version;
         }
+        trs.clear();
         g->end_read();
         // release the first readlock and commit something to force a cleanup
         // we need to commit twice, because cleanup is done before the actual
@@ -5039,8 +5096,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     // Verify that an aggregate on the view with detached refs gives the expected result.
     CHECK_EQUAL(false, view.is_in_sync());
     ObjKey res;
-    double min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 
     // Sync the view to discard the detached refs.
@@ -5048,8 +5104,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
     // Verify that an aggregate on the view still gives the expected result.
     res = ObjKey();
-    min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 }
 

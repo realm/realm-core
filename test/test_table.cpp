@@ -440,8 +440,8 @@ TEST(Table_DateTimeMinMax)
     objs[1].set(col, Timestamp{0, 0});
     objs[2].set(col, Timestamp{2, 2});
 
-    CHECK_EQUAL(table->maximum_timestamp(col), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(col), Timestamp(0, 0));
+    CHECK_EQUAL(table->max(col)->get_timestamp(), Timestamp(2, 2));
+    CHECK_EQUAL(table->min(col)->get_timestamp(), Timestamp(0, 0));
 
     objs[0].set(col, Timestamp{0, 0});
     objs[1].set_null(col);
@@ -449,25 +449,25 @@ TEST(Table_DateTimeMinMax)
 
     ObjKey idx; // tableview entry that points at the max/min value
 
-    CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(table->max(col, &idx)->get_timestamp(), Timestamp(2, 2));
     CHECK_EQUAL(idx, objs[2].get_key());
-    CHECK_EQUAL(table->minimum_timestamp(col, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(table->min(col, &idx)->get_timestamp(), Timestamp(0, 0));
     CHECK_EQUAL(idx, objs[0].get_key());
 
     objs[0].set_null(col);
     objs[1].set(col, Timestamp{2, 2});
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(col), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(col), Timestamp(0, 0));
+    CHECK_EQUAL(table->max(col)->get_timestamp(), Timestamp(2, 2));
+    CHECK_EQUAL(table->min(col)->get_timestamp(), Timestamp(0, 0));
 
     objs[0].set(col, Timestamp{2, 2});
     objs[1].set_null(col);
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(table->max(col, &idx)->get_timestamp(), Timestamp(2, 2));
     CHECK_EQUAL(idx, objs[0].get_key());
-    CHECK_EQUAL(table->minimum_timestamp(col, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(table->min(col, &idx)->get_timestamp(), Timestamp(0, 0));
     CHECK_EQUAL(idx, objs[2].get_key());
 }
 
@@ -485,70 +485,67 @@ TEST(Table_MinMaxSingleNullRow)
 
     ObjKey key;
 
-    // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
-    // The return-value is not necessarily a null-object. Always test the return_ndx argument!
-
     // Maximum
     {
-        table->maximum_timestamp(date_col, &key); // max on table
+        table->max(date_col, &key); // max on table
         CHECK(key == null_key);
-        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().max(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().maximum_timestamp(date_col, &key); // max on query
-        CHECK(key == null_key);
-
-        table->maximum_int(int_col, &key); // max on table
-        CHECK(key == null_key);
-        table->where().find_all().maximum_int(int_col, &key); // max on tableview
-        CHECK(key == null_key);
-        table->where().maximum_int(int_col, &key); // max on query
+        table->where().max(date_col, &key); // max on query
         CHECK(key == null_key);
 
-        table->maximum_float(float_col, &key); // max on table
+        table->max(int_col, &key); // max on table
         CHECK(key == null_key);
-        table->where().find_all().maximum_float(float_col, &key); // max on tableview
+        table->where().find_all().max(int_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().maximum_float(float_col, &key); // max on query
+        table->where().max(int_col, &key); // max on query
+        CHECK(key == null_key);
+
+        table->max(float_col, &key); // max on table
+        CHECK(key == null_key);
+        table->where().find_all().max(float_col, &key); // max on tableview
+        CHECK(key == null_key);
+        table->where().max(float_col, &key); // max on query
         CHECK(key == null_key);
 
         table->create_object();
 
-        CHECK(table->maximum_timestamp(date_col).is_null());         // max on table
-        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
+        CHECK(table->max(date_col)->is_null());        // max on table
+        table->where().find_all().max(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().maximum_timestamp(date_col, &key); // max on query
+        table->where().max(date_col, &key); // max on query
         CHECK(key == null_key);
     }
 
     // Minimum
     {
-        table->minimum_timestamp(date_col, &key); // max on table
+        table->min(date_col, &key); // max on table
         CHECK(key == null_key);
-        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().min(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().minimum_timestamp(date_col, &key); // max on query
-        CHECK(key == null_key);
-
-        table->minimum_int(int_col, &key); // max on table
-        CHECK(key == null_key);
-        table->where().find_all().minimum_int(int_col, &key); // max on tableview
-        CHECK(key == null_key);
-        table->where().minimum_int(int_col, &key); // max on query
+        table->where().min(date_col, &key); // max on query
         CHECK(key == null_key);
 
-        table->minimum_float(float_col, &key); // max on table
+        table->min(int_col, &key); // max on table
         CHECK(key == null_key);
-        table->where().find_all().minimum_float(float_col, &key); // max on tableview
+        table->where().find_all().min(int_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().minimum_float(float_col, &key); // max on query
+        table->where().min(int_col, &key); // max on query
+        CHECK(key == null_key);
+
+        table->min(float_col, &key); // max on table
+        CHECK(key == null_key);
+        table->where().find_all().min(float_col, &key); // max on tableview
+        CHECK(key == null_key);
+        table->where().min(float_col, &key); // max on query
         CHECK(key == null_key);
 
         table->create_object();
 
-        CHECK(table->minimum_timestamp(date_col).is_null());         // max on table
-        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
+        CHECK(table->min(date_col)->is_null());        // max on table
+        table->where().find_all().min(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table->where().minimum_timestamp(date_col, &key); // max on query
+        table->where().min(date_col, &key); // max on query
         CHECK(key == null_key);
     }
 }
@@ -569,47 +566,48 @@ TEST(TableView_AggregateBugs)
 
         auto tv = table.where().not_equal(int_col, 42).find_all();
         CHECK_EQUAL(tv.size(), 3);
-        CHECK_EQUAL(tv.maximum_int(int_col), 2);
+        CHECK_EQUAL(tv.max(int_col), 2);
 
         // average == sum / rows, where rows does *not* include values with null.
         size_t vc; // number of non-null values that the average was computed from
-        CHECK_APPROXIMATELY_EQUAL(table.average_int(int_col, &vc), double(1 + 2 + 42) / 3, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.avg(int_col, &vc)->get_double(), double(1 + 2 + 42) / 3, 0.001);
         CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_EQUAL(table.average_int(int_col), table.where().average_int(int_col, &vc));
+        CHECK_EQUAL(table.avg(int_col)->get_double(), table.where().avg(int_col, &vc)->get_double());
         CHECK_EQUAL(vc, 3);
-        CHECK_EQUAL(table.average_int(int_col), table.where().find_all().average_int(int_col, &vc));
+        CHECK_EQUAL(table.avg(int_col)->get_double(), table.where().find_all().avg(int_col, &vc)->get_double());
         CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(int_col, 1).find_all().average_int(int_col, &vc),
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(int_col, 1).find_all().avg(int_col, &vc)->get_double(),
                                   double(2 + 42) / 2, 0.001);
         CHECK_EQUAL(vc, 2);
 
         // Now doubles
         tv = table.where().not_equal(double_col, 42.).find_all();
         CHECK_EQUAL(tv.size(), 3);
-        CHECK_EQUAL(tv.maximum_double(double_col), 2.);
+        CHECK_EQUAL(tv.max(double_col), 2.);
 
         // average == sum / rows, where rows does *not* include values with null.
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col, &vc), double(1. + 2. + 42.) / 3, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.avg(double_col, &vc)->get_double(), double(1. + 2. + 42.) / 3, 0.001);
         CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().average_double(double_col, &vc),
-                                  0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.avg(double_col)->get_double(),
+                                  table.where().avg(double_col, &vc)->get_double(), 0.001);
         CHECK_EQUAL(vc, 3);
 
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col),
-                                  table.where().find_all().average_double(double_col, &vc), 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.avg(double_col)->get_double(),
+                                  table.where().find_all().avg(double_col, &vc)->get_double(), 0.001);
         CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(double_col, 1.).find_all().average_double(double_col, &vc),
-                                  (2. + 42.) / 2, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(
+            table.where().not_equal(double_col, 1.).find_all().avg(double_col, &vc)->get_double(), (2. + 42.) / 2,
+            0.001);
         CHECK_EQUAL(vc, 2);
     }
 
@@ -625,18 +623,18 @@ TEST(TableView_AggregateBugs)
 
         auto tv = table.where().not_equal(int_col, 42).find_all();
         CHECK_EQUAL(tv.size(), 3);
-        CHECK_EQUAL(tv.maximum_int(int_col), 2);
+        CHECK_EQUAL(tv.max(int_col), 2);
 
         // average == sum / rows, where rows does *not* include values with null.
-        CHECK_APPROXIMATELY_EQUAL(table.average_int(int_col), double(1 + 2 + 42) / 3, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.avg(int_col)->get_double(), double(1 + 2 + 42) / 3, 0.001);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_EQUAL(table.average_int(int_col), table.where().average_int(int_col));
-        CHECK_EQUAL(table.average_int(int_col), table.where().find_all().average_int(int_col));
+        CHECK_EQUAL(table.avg(int_col)->get_double(), table.where().avg(int_col)->get_double());
+        CHECK_EQUAL(table.avg(int_col)->get_double(), table.where().find_all().avg(int_col)->get_double());
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(int_col, 1).find_all().average_int(int_col),
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(int_col, 1).find_all().avg(int_col)->get_double(),
                                   double(2 + 42) / 2, 0.001);
     }
 }
@@ -690,49 +688,49 @@ TEST(Table_AggregateFuzz)
 
         ObjKey key;
         size_t cnt;
-        float f;
         int64_t i;
         Timestamp ts;
+        Mixed m;
 
         // Test methods on Table
         {
             // Table::max
             key = ObjKey(123);
-            f = table->maximum_float(float_col, &key);
+            m = *table->max(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
+                CHECK_EQUAL(m.get_float(), table->get_object(largest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->maximum_int(int_col, &key);
+            m = *table->max(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m.get_int(), table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            ts = table->maximum_timestamp(date_col, &key);
+            m = *table->max(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m.get_timestamp(), table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // Table::min
             key = ObjKey(123);
-            f = table->minimum_float(float_col, &key);
+            m = *table->min(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
+                CHECK_EQUAL(m.get_float(), table->get_object(smallest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->minimum_int(int_col, &key);
+            m = *table->min(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m.get_int(), table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            ts = table->minimum_timestamp(date_col, &key);
+            m = *table->min(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m.get_timestamp(), table->get_object(smallest_pos).get<Timestamp>(date_col));
 
             // Table::avg
             double d;
@@ -741,22 +739,22 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // Table::avg
-            d = table->average_float(float_col, &cnt);
+            m = *table->avg(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             cnt = 123;
-            d = table->average_int(int_col, &cnt);
+            m = *table->avg(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             // Table::sum
-            d = table->sum_float(float_col);
+            d = table->sum(float_col)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->sum_int(int_col);
+            i = table->sum(int_col)->get_int();
             CHECK_EQUAL(i, sum);
         }
 
@@ -764,41 +762,41 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = ObjKey(123);
-            f = table->where().find_all().maximum_float(float_col, &key);
+            m = *table->where().find_all().max(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->where().find_all().maximum_int(int_col, &key);
+            m = *table->where().find_all().max(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            ts = table->where().find_all().maximum_timestamp(date_col, &key);
+            m = *table->where().find_all().max(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = ObjKey(123);
-            f = table->where().find_all().minimum_float(float_col, &key);
+            m = *table->where().find_all().min(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->where().find_all().minimum_int(int_col, &key);
+            m = *table->where().find_all().min(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            ts = table->where().find_all().minimum_timestamp(date_col, &key);
+            m = *table->where().find_all().min(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<Timestamp>(date_col));
 
             // TableView::avg
             double d;
@@ -807,22 +805,22 @@ TEST(Table_AggregateFuzz)
             key = ObjKey(123);
 
             // TableView::avg
-            d = table->where().find_all().average_float(float_col, &cnt);
+            m = *table->where().find_all().avg(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             cnt = 123;
-            d = table->where().find_all().average_int(int_col, &cnt);
+            m = *table->where().find_all().avg(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             // TableView::sum
-            d = table->where().find_all().sum_float(float_col);
+            d = table->where().find_all().sum(float_col)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->where().find_all().sum_int(int_col);
+            i = table->where().find_all().sum(int_col)->get_int();
             CHECK_EQUAL(i, sum);
         }
 
@@ -830,43 +828,41 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = ObjKey(123);
-            f = table->where().maximum_float(float_col, &key);
+            m = *table->where().max(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->where().maximum_int(int_col, &key);
+            m = *table->where().max(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            // Note: Method arguments different from metholds on other column types
-            ts = table->where().maximum_timestamp(date_col, &key);
+            m = *table->where().max(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = ObjKey(123);
-            f = table->where().minimum_float(float_col, &key);
+            m = *table->where().min(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<float>(float_col));
 
             key = ObjKey(123);
-            i = table->where().minimum_int(int_col, &key);
+            m = *table->where().min(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = ObjKey(123);
-            // Note: Method arguments different from metholds on other column types
-            ts = table->where().minimum_timestamp(date_col, &key);
+            m = *table->where().min(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
+                CHECK_EQUAL(m, table->get_object(smallest_pos).get<Timestamp>(date_col));
 
             // TableView::avg
             double d;
@@ -875,23 +871,23 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // TableView::avg
-            d = table->where().average_float(float_col, &cnt);
+            m = *table->where().avg(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             cnt = 123;
-            d = table->where().average_int(int_col, &cnt);
+            m = *table->where().avg(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
-                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+                CHECK_APPROXIMATELY_EQUAL(m.get_double(), avg, 0.001);
 
             // TableView::sum
-            d = table->where().sum_float(float_col);
+            d = table->where().sum(float_col)->get_double();
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->where().sum_int(int_col);
-            CHECK_EQUAL(i, sum);
+            m = *table->where().sum(int_col);
+            CHECK_EQUAL(m, sum);
         }
     }
 }
@@ -1921,55 +1917,55 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(1, table.count_decimal(decimal_col, Decimal128("1.12e23")));
     ObjKey ret;
     // minimum
-    CHECK_EQUAL(1, table.minimum_int(int_col, &ret));
+    CHECK_EQUAL(1, table.min(int_col, &ret)->get_int());
     CHECK(ret && table.get_object(ret).get<Int>(int_col) == 1);
     ret = ObjKey();
-    CHECK_EQUAL(1.1f, table.minimum_float(float_col, &ret));
+    CHECK_EQUAL(1.1f, table.min(float_col, &ret)->get_float());
     CHECK(ret);
     CHECK_EQUAL(table.get_object(ret).get<Float>(float_col), 1.1f);
     ret = ObjKey();
-    CHECK_EQUAL(1.2, table.minimum_double(double_col, &ret));
+    CHECK_EQUAL(1.2, table.min(double_col, &ret)->get_double());
     CHECK(ret);
     CHECK_EQUAL(table.get_object(ret).get<Double>(double_col), 1.2);
     ret = ObjKey();
-    CHECK_EQUAL(Decimal128(7.7), table.minimum_decimal(decimal_col, &ret));
+    CHECK_EQUAL(Decimal128(7.7), table.min(decimal_col, &ret)->get_decimal());
     CHECK(ret);
     CHECK_EQUAL(table.get_object(ret).get<Decimal128>(decimal_col), Decimal128(7.7));
 
     // maximum
     ret = ObjKey();
-    CHECK_EQUAL(987654321, table.maximum_int(int_col, &ret));
+    CHECK_EQUAL(987654321, table.max(int_col, &ret)->get_int());
     CHECK(ret);
     CHECK_EQUAL(table.get_object(ret).get<Int>(int_col), 987654321);
     ret = ObjKey();
-    CHECK_EQUAL(11.0f, table.maximum_float(float_col, &ret));
+    CHECK_EQUAL(11.0f, table.max(float_col, &ret)->get_float());
     CHECK(ret);
     CHECK_EQUAL(11.0f, table.get_object(ret).get<Float>(float_col));
     ret = ObjKey();
-    CHECK_EQUAL(12.0, table.maximum_double(double_col, &ret));
+    CHECK_EQUAL(12.0, table.max(double_col, &ret)->get_double());
     CHECK(ret);
     CHECK_EQUAL(12.0, table.get_object(ret).get<Double>(double_col));
     ret = ObjKey();
-    CHECK_EQUAL(Decimal128("1.12e23"), table.maximum_decimal(decimal_col, &ret));
+    CHECK_EQUAL(Decimal128("1.12e23"), table.max(decimal_col, &ret)->get_decimal());
     CHECK(ret);
     CHECK_EQUAL(Decimal128("1.12e23"), table.get_object(ret).get<Decimal128>(decimal_col));
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(int_col)), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(float_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(double_col), 10 * epsilon);
-    CHECK_EQUAL(decimal_sum, table.sum_decimal(decimal_col));
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum(int_col)->get_int()), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum(float_col)->get_double(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum(double_col)->get_double(), 10 * epsilon);
+    CHECK_EQUAL(decimal_sum, table.sum(decimal_col)->get_decimal());
     // average
     size_t count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col, &count), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.avg(int_col, &count)->get_double(), 10 * epsilon);
     CHECK_EQUAL(count, size);
     count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col, &count), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.avg(float_col, &count)->get_double(), 10 * epsilon);
     CHECK_EQUAL(count, size);
     count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col, &count), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.avg(double_col, &count)->get_double(), 10 * epsilon);
     CHECK_EQUAL(count, size);
     count = realm::npos;
-    CHECK_EQUAL(decimal_sum / Decimal128(size), table.average_decimal(decimal_col, &count));
+    CHECK_EQUAL(decimal_sum / Decimal128(size), table.avg(decimal_col, &count)->get_decimal());
     CHECK_EQUAL(count, size);
 }
 
@@ -1985,9 +1981,9 @@ TEST(Table_Aggregates2)
         c++;
     }
 
-    CHECK_EQUAL(-420, table.minimum_int(int_col));
-    CHECK_EQUAL(-21, table.maximum_int(int_col));
-    CHECK_EQUAL(s, table.sum_int(int_col));
+    CHECK_EQUAL(-420, table.min(int_col)->get_int());
+    CHECK_EQUAL(-21, table.max(int_col)->get_int());
+    CHECK_EQUAL(s, table.sum(int_col)->get_int());
 }
 
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
@@ -2034,120 +2030,120 @@ TEST(Table_Aggregates3)
         if (nullable) {
             // max
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_int(col_price), 3);
-            CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
+            CHECK_EQUAL(table->max(col_price)->get_int(), 3);
+            CHECK_EQUAL(table->max(col_price, &pos)->get_int(), 3);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_float(col_shipping), 30.f);
-            CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(table->max(col_shipping)->get_float(), 30.f);
+            CHECK_EQUAL(table->max(col_shipping, &pos)->get_float(), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_double(col_rating), 2.2);
-            CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
+            CHECK_EQUAL(table->max(col_rating)->get_double(), 2.2);
+            CHECK_EQUAL(table->max(col_rating, &pos)->get_double(), 2.2);
             CHECK_EQUAL(pos, ObjKey(1));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_timestamp(col_date), Timestamp(6, 6));
-            CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(table->max(col_date)->get_timestamp(), Timestamp(6, 6));
+            CHECK_EQUAL(table->max(col_date, &pos)->get_timestamp(), Timestamp(6, 6));
             CHECK_EQUAL(pos, ObjKey(2));
 
             // min
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_int(col_price), 1);
-            CHECK_EQUAL(table->minimum_int(col_price, &pos), 1);
+            CHECK_EQUAL(table->min(col_price)->get_int(), 1);
+            CHECK_EQUAL(table->min(col_price, &pos)->get_int(), 1);
             CHECK_EQUAL(pos, ObjKey(0));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_float(col_shipping), 30.f);
-            CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(table->min(col_shipping)->get_float(), 30.f);
+            CHECK_EQUAL(table->min(col_shipping, &pos)->get_float(), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_double(col_rating), 1.1);
-            CHECK_EQUAL(table->minimum_double(col_rating, &pos), 1.1);
+            CHECK_EQUAL(table->min(col_rating)->get_double(), 1.1);
+            CHECK_EQUAL(table->min(col_rating, &pos)->get_double(), 1.1);
             CHECK_EQUAL(pos, ObjKey(0));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_timestamp(col_date), Timestamp(2, 2));
-            CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(2, 2));
+            CHECK_EQUAL(table->min(col_date)->get_timestamp(), Timestamp(2, 2));
+            CHECK_EQUAL(table->min(col_date, &pos)->get_timestamp(), Timestamp(2, 2));
             CHECK_EQUAL(pos, ObjKey(0));
 
             // average
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price), (1 + 3) / 2., 0.01);
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price, &count), (1 + 3) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_price)->get_double(), (1 + 3) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_price, &count)->get_double(), (1 + 3) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             count = 123;
-            CHECK_EQUAL(table->average_float(col_shipping), 30.f);
-            CHECK_EQUAL(table->average_float(col_shipping, &count), 30.f);
+            CHECK_EQUAL(table->avg(col_shipping)->get_double(), 30.f);
+            CHECK_EQUAL(table->avg(col_shipping, &count)->get_double(), 30.f);
             CHECK_EQUAL(count, 1);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating), (1.1 + 2.2) / 2., 0.01);
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating, &count), (1.1 + 2.2) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_rating)->get_double(), (1.1 + 2.2) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_rating, &count)->get_double(), (1.1 + 2.2) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             // sum
-            CHECK_EQUAL(table->sum_int(col_price), 4);
-            CHECK_EQUAL(table->sum_float(col_shipping), 30.f);
-            CHECK_APPROXIMATELY_EQUAL(table->sum_double(col_rating), 1.1 + 2.2, 0.01);
+            CHECK_EQUAL(table->sum(col_price)->get_int(), 4);
+            CHECK_EQUAL(table->sum(col_shipping)->get_double(), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum(col_rating)->get_double(), 1.1 + 2.2, 0.01);
         }
         else { // not nullable
             // max
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
+            CHECK_EQUAL(table->max(col_price, &pos)->get_int(), 3);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(table->max(col_shipping, &pos)->get_float(), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
+            CHECK_EQUAL(table->max(col_rating, &pos)->get_double(), 2.2);
             CHECK_EQUAL(pos, ObjKey(1));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(table->max(col_date, &pos)->get_timestamp(), Timestamp(6, 6));
             CHECK_EQUAL(pos, ObjKey(2));
 
             // min
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_int(col_price, &pos), 0);
+            CHECK_EQUAL(table->min(col_price, &pos)->get_int(), 0);
             CHECK_EQUAL(pos, ObjKey(1));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 0.f);
+            CHECK_EQUAL(table->min(col_shipping, &pos)->get_float(), 0.f);
             CHECK_EQUAL(pos, ObjKey(0));
 
             pos = ObjKey(123);
-            CHECK_EQUAL(table->minimum_double(col_rating, &pos), 0.);
+            CHECK_EQUAL(table->min(col_rating, &pos)->get_double(), 0.);
             CHECK_EQUAL(pos, ObjKey(2));
 
             pos = ObjKey(123);
             // Timestamp(0, 0) is default value for non-nullable column
-            CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(0, 0));
+            CHECK_EQUAL(table->min(col_date, &pos)->get_timestamp(), Timestamp(0, 0));
             CHECK_EQUAL(pos, ObjKey(1));
 
             // average
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price, &count), (1 + 3 + 0) / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_price, &count)->get_double(), (1 + 3 + 0) / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_float(col_shipping, &count), 30.f / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_shipping, &count)->get_double(), 30.f / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating, &count), (1.1 + 2.2 + 0.) / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->avg(col_rating, &count)->get_double(), (1.1 + 2.2 + 0.) / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             // sum
-            CHECK_EQUAL(table->sum_int(col_price), 4);
-            CHECK_EQUAL(table->sum_float(col_shipping), 30.f);
-            CHECK_APPROXIMATELY_EQUAL(table->sum_double(col_rating), 1.1 + 2.2, 0.01);
+            CHECK_EQUAL(table->sum(col_price)->get_int(), 4);
+            CHECK_EQUAL(table->sum(col_shipping)->get_double(), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum(col_rating)->get_double(), 1.1 + 2.2, 0.01);
         }
     }
 }
@@ -2159,14 +2155,14 @@ TEST(Table_EmptyMinmax)
     auto col = table->add_column(type_Timestamp, "date");
 
     ObjKey min_key;
-    Timestamp min_ts = table->minimum_timestamp(col, &min_key);
+    bool is_null = table->min(col, &min_key)->is_null();
     CHECK_EQUAL(min_key, null_key);
-    CHECK(min_ts.is_null());
+    CHECK(is_null);
 
     ObjKey max_key;
-    Timestamp max_ts = table->maximum_timestamp(col, &max_key);
+    is_null = table->max(col, &max_key)->is_null();
     CHECK_EQUAL(max_key, null_key);
-    CHECK(max_ts.is_null());
+    CHECK(is_null);
 }
 
 TEST(Table_EnumStringInsertEmptyRow)
@@ -2410,10 +2406,10 @@ TEST(Table_Nulls)
         CHECK_EQUAL(false, obj0.get<Bool>(col_bool));
         CHECK_EQUAL(Timestamp(3, 0), obj0.get<Timestamp>(col_date));
 
-        CHECK_EQUAL(65, t.maximum_int(col_int));
-        CHECK_EQUAL(65, t.minimum_int(col_int));
-        CHECK_EQUAL(Timestamp(3, 0), t.maximum_timestamp(col_date));
-        CHECK_EQUAL(Timestamp(3, 0), t.minimum_timestamp(col_date));
+        CHECK_EQUAL(65, t.max(col_int)->get_int());
+        CHECK_EQUAL(65, t.min(col_int)->get_int());
+        CHECK_EQUAL(Timestamp(3, 0), t.max(col_date)->get_timestamp());
+        CHECK_EQUAL(Timestamp(3, 0), t.min(col_date)->get_timestamp());
 
         CHECK_NOT(obj0.is_null(col_int));
         CHECK_NOT(obj0.is_null(col_bool));
@@ -2459,10 +2455,10 @@ TEST(Table_Nulls)
         CHECK_EQUAL(1.23f, obj0.get<float>(col_float));
         CHECK_EQUAL(12.3, obj0.get<double>(col_double));
 
-        CHECK_EQUAL(1.23f, t.maximum_float(col_float));
-        CHECK_EQUAL(1.23f, t.minimum_float(col_float));
-        CHECK_EQUAL(12.3, t.maximum_double(col_double));
-        CHECK_EQUAL(12.3, t.minimum_double(col_double));
+        CHECK_EQUAL(1.23f, t.max(col_float)->get_float());
+        CHECK_EQUAL(1.23f, t.min(col_float)->get_float());
+        CHECK_EQUAL(12.3, t.max(col_double)->get_double());
+        CHECK_EQUAL(12.3, t.min(col_double)->get_double());
 
         CHECK_NOT(obj0.is_null(col_float));
         CHECK_NOT(obj0.is_null(col_double));
@@ -5906,6 +5902,36 @@ TEST(Table_AsymmetricObjects)
     // Incoming link to asymmetric object is not allowed.
     CHECK_THROW(table2->add_column(*table, "link"), LogicError);
     tr->commit();
+}
+
+TEST(Table_FullTextIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(path);
+    ColKey col;
+
+    {
+        auto wt = db->start_write();
+
+        auto t = wt->add_table("foo");
+        col = t->add_column(type_String, "str");
+        t->add_fulltext_index(col);
+        auto index = t->get_search_index(col);
+        CHECK(index->is_fulltext_index());
+
+        t->create_object().set(col, "This is a test, with  spaces!");
+        t->create_object().set(col, "More testing, with normal spaces");
+        t->create_object().set(col, "ål, ø og æbler");
+
+        wt->commit();
+    }
+
+    auto rt = db->start_read();
+    auto t = rt->get_table("foo");
+    auto index = t->get_search_index(col);
+    CHECK(index->is_fulltext_index());
+    TableView res = t->find_all_fulltext(col, "spaces with");
+    CHECK_EQUAL(2, res.size());
 }
 
 #endif // TEST_TABLE

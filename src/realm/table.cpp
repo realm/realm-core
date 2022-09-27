@@ -16,33 +16,34 @@
  *
  **************************************************************************/
 
+#include <realm/table.hpp>
+
+#include <realm/alloc_slab.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_fixed_bytes.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
+#include <realm/db.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/exceptions.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions_tpl.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/features.h>
+#include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
+
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
 #include <iostream>
 #include <iomanip>
 #endif
-
-#include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
-#include <realm/util/serializer.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/exceptions.hpp>
-#include <realm/table.hpp>
-#include <realm/alloc_slab.hpp>
-#include <realm/index_string.hpp>
-#include <realm/db.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query_engine.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_timestamp.hpp>
-#include <realm/array_decimal128.hpp>
-#include <realm/array_fixed_bytes.hpp>
-#include <realm/table_tpl.hpp>
-#include <realm/dictionary.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -911,7 +912,7 @@ void Table::clear_indexes()
     }
 }
 
-void Table::do_add_search_index(ColKey col_key)
+void Table::do_add_search_index(ColKey col_key, IndexType type)
 {
     size_t column_ndx = col_key.get_index().val;
 
@@ -919,7 +920,8 @@ void Table::do_add_search_index(ColKey col_key)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+        (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
@@ -932,7 +934,7 @@ void Table::do_add_search_index(ColKey col_key)
 
     // Create the index
     m_index_accessors[column_ndx] =
-        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key), get_alloc()); // Throws
+        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
     StringIndex* index = m_index_accessors[column_ndx].get();
 
     // Insert ref to index
@@ -942,22 +944,39 @@ void Table::do_add_search_index(ColKey col_key)
     populate_search_index(col_key);
 }
 
-void Table::add_search_index(ColKey col_key)
+void Table::add_search_index(ColKey col_key, IndexType type)
 {
     check_column(col_key);
 
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
-    if (attr.test(col_attr_Indexed)) {
-        REALM_ASSERT(has_search_index(col_key));
-        return;
+    if (type == IndexType::Fulltext) {
+        // Early-out if already indexed
+        if (attr.test(col_attr_FullText_Indexed)) {
+            REALM_ASSERT(has_search_index(col_key));
+            REALM_ASSERT(get_search_index(col_key)->is_fulltext_index());
+            return;
+        }
+        if (attr.test(col_attr_Indexed)) {
+            this->remove_search_index(col_key);
+        }
+    }
+    else {
+        if (attr.test(col_attr_Indexed)) {
+            REALM_ASSERT(has_search_index(col_key));
+            REALM_ASSERT(!get_search_index(col_key)->is_fulltext_index());
+            return;
+        }
+        if (attr.test(col_attr_FullText_Indexed)) {
+            this->remove_search_index(col_key);
+        }
     }
 
-    do_add_search_index(col_key);
+    do_add_search_index(col_key, type);
 
     // Update spec
-    attr.set(col_attr_Indexed);
+    attr.set(type == IndexType::Fulltext ? col_attr_FullText_Indexed : col_attr_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
@@ -982,6 +1001,7 @@ void Table::remove_search_index(ColKey col_key)
     auto spec_ndx = leaf_ndx2spec_ndx(column_ndx);
     auto attr = m_spec.get_column_attr(spec_ndx);
     attr.reset(col_attr_Indexed);
+    attr.reset(col_attr_FullText_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
@@ -1321,7 +1341,8 @@ void Table::migrate_indexes(ColKey pk_col_key)
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
                     // Otherwise create new index. Will be updated when objects are created
                     m_index_accessors[col_ndx] = std::make_unique<StringIndex>(
-                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
+                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx), IndexType::General),
+                        get_alloc()); // Throws
                     auto index = m_index_accessors[col_ndx].get();
                     index->set_parent(&m_index_refs, col_ndx);
                     m_index_refs.set(col_ndx, index->get_ref());
@@ -2221,243 +2242,58 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     return where().equal(col_key, value).count();
 }
 
-// sum ----------------------------------------------
+template <typename T>
+void Table::aggregate(QueryStateBase& st, ColKey column_key) const
+{
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType leaf(get_alloc());
 
-
-int64_t Table::sum_int(ColKey col_key) const
-{
-    QueryStateSum<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    return st.result_sum();
-}
-double Table::sum_float(ColKey col_key) const
-{
-    QueryStateSum<float> st;
-    aggregate<float>(st, col_key);
-    return st.result_sum();
-}
-double Table::sum_double(ColKey col_key) const
-{
-    QueryStateSum<double> st;
-    aggregate<double>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_decimal(ColKey col_key) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_mixed(ColKey col_key) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    return st.result_sum();
-}
-
-// average ----------------------------------------------
-
-double Table::average_int(ColKey col_key, size_t* value_count) const
-{
-    if (is_nullable(col_key)) {
-        return average<util::Optional<int64_t>>(col_key, value_count);
-    }
-    return average<int64_t>(col_key, value_count);
-}
-double Table::average_float(ColKey col_key, size_t* value_count) const
-{
-    return average<float>(col_key, value_count);
-}
-double Table::average_double(ColKey col_key, size_t* value_count) const
-{
-    return average<double>(col_key, value_count);
-}
-Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-Decimal128 Table::average_mixed(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-// minimum ----------------------------------------------
-
-#define USE_COLUMN_AGGREGATE 1
-
-int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Mixed Table::minimum_mixed(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-
-// maximum ----------------------------------------------
-
-int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 max("-Inf");
-    ObjKey ret_key;
-    auto f = [&max, &ret_key, &leaf, col_key](const Cluster* cluster) {
+    auto f = [&leaf, column_key, &st](const Cluster* cluster) {
         // direct aggregate on the leaf
-        cluster->init_leaf(col_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto val = leaf.get(i);
-            if (!val.is_null() && val > max) {
-                max = val;
-                ret_key = cluster->get_real_key(i);
-            }
+        cluster->init_leaf(column_key, &leaf);
+        st.m_key_offset = cluster->get_offset();
+        st.m_key_values = cluster->get_key_array();
+
+        bool cont = true;
+        size_t sz = leaf.size();
+        for (size_t local_index = 0; cont && local_index < sz; local_index++) {
+            auto v = leaf.get(local_index);
+            cont = st.match(local_index, v);
         }
         return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
-    if (return_ndx) {
-        *return_ndx = ObjKey(ret_key);
-    }
-    return max;
 }
 
-Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
+// This template is also used by the query engine
+template void Table::aggregate<int64_t>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<std::optional<int64_t>>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<float>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<double>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Decimal128>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Mixed>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Timestamp>(QueryStateBase&, ColKey) const;
+
+std::optional<Mixed> Table::sum(ColKey col_key) const
 {
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::sum(*this, *this, col_key);
 }
 
-Mixed Table::maximum_mixed(ColKey col_key, ObjKey* return_ndx) const
+std::optional<Mixed> Table::avg(ColKey col_key, size_t* value_count) const
 {
-    QueryStateMax<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::avg(*this, *this, col_key, value_count);
 }
 
+std::optional<Mixed> Table::min(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::min(*this, *this, col_key, return_ndx);
+}
+
+std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
+}
 
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
@@ -2670,6 +2506,11 @@ TableView Table::find_all_null(ColKey col_key)
 TableView Table::find_all_null(ColKey col_key) const
 {
     return const_cast<Table*>(this)->find_all_null(col_key);
+}
+
+TableView Table::find_all_fulltext(ColKey col_key, StringData terms) const
+{
+    return where().fulltext(col_key, terms).find_all();
 }
 
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
@@ -2955,23 +2796,25 @@ void Table::refresh_index_accessors()
     // we can not use for_each_column() here, since the columns may have changed
     // and the index accessor vector is not updated correspondingly.
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
-
-        bool has_old_accessor = bool(m_index_accessors[col_ndx]);
         ref_type ref = m_index_refs.get_as_ref(col_ndx);
 
-        if (has_old_accessor && ref == 0) { // accessor drop
+        if (ref == 0) {
+            // accessor drop
             m_index_accessors[col_ndx].reset();
         }
-        else if (has_old_accessor && ref != 0) { // still there, refresh:
+        else {
+            auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_ndx]);
+            bool fulltext = attr.test(col_attr_FullText_Indexed);
             auto col_key = m_leaf_ndx2colkey[col_ndx];
-            ClusterColumn virtual_col(&m_clusters, col_key);
-            m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
-        }
-        else if (!has_old_accessor && ref != 0) { // new index!
-            auto col_key = m_leaf_ndx2colkey[col_ndx];
-            ClusterColumn virtual_col(&m_clusters, col_key);
-            m_index_accessors[col_ndx] =
-                std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            ClusterColumn virtual_col(&m_clusters, col_key, fulltext ? IndexType::Fulltext : IndexType::General);
+
+            if (m_index_accessors[col_ndx]) { // still there, refresh:
+                m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
+            }
+            else { // new index!
+                m_index_accessors[col_ndx] =
+                    std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            }
         }
     }
 }
@@ -3706,7 +3549,7 @@ void Table::do_set_primary_key_column(ColKey col_key)
 
     if (col_key) {
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
-        do_add_search_index(col_key);
+        do_add_search_index(col_key, IndexType::General);
     }
     else {
         m_top.set(top_position_for_pk_col, 0);
@@ -4025,7 +3868,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
     if (si)
-        do_add_search_index(new_col);
+        do_add_search_index(new_col, IndexType::General);
 
     return new_col;
 }

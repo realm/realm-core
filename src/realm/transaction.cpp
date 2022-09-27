@@ -158,9 +158,7 @@ DB::version_type Transaction::commit()
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(false, VersionID());
     db->release_read_lock(lock_after_commit);
 
     db->end_write_on_correct_thread();
@@ -216,11 +214,9 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // completed commit.
 
     try {
-        DB::ReadLockInfo new_read_lock;
-        VersionID version_id = VersionID(); // Latest available snapshot
         // Grabbing the new lock before releasing the old one prevents m_transaction_count
         // from going shortly to zero
-        db->grab_read_lock(new_read_lock, version_id); // Throws
+        DB::ReadLockInfo new_read_lock = db->grab_read_lock(false, VersionID()); // Throws
 
         m_history = nullptr;
         set_transact_stage(DB::transact_Reading);
@@ -295,9 +291,7 @@ void Transaction::commit_and_continue_writing()
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(false, VersionID());
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
     if (Replication* repl = db->get_replication()) {
@@ -602,7 +596,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_keys) {
             auto t = get_table(k);
             if (auto col = t->get_primary_key_column()) {
-                t->do_add_search_index(col);
+                t->do_add_search_index(col, IndexType::General);
             }
         }
     }
@@ -710,7 +704,7 @@ void Transaction::complete_async_commit()
     // sync to disk:
     DB::ReadLockInfo read_lock;
     try {
-        db->grab_read_lock(read_lock, VersionID());
+        read_lock = db->grab_read_lock(false, VersionID());
         GroupWriter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback

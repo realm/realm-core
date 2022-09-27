@@ -444,8 +444,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 template <class O>
 inline bool Transaction::internal_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
-    DB::ReadLockInfo new_read_lock;
-    db->grab_read_lock(new_read_lock, version_id); // Throws
+    DB::ReadLockInfo new_read_lock = db->grab_read_lock(false, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);

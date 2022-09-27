@@ -383,14 +383,28 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
 RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
-        // FIXME: Support non-object results.
-        auto obj = results->get<Obj>(index);
-        auto table_key = obj.get_table()->get_key();
-        auto obj_key = obj.get_key();
+        auto mixed = results->get_any(index);
         if (out_value) {
-            out_value->type = RLM_TYPE_LINK;
-            out_value->link.target_table = table_key.value;
-            out_value->link.target = obj_key.value;
+            *out_value = to_capi(mixed);
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_results_find(realm_results_t* results, realm_value_t* value, size_t* out_index, bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&]() {
+        auto val = from_capi(*value);
+        if (out_index) {
+            *out_index = results->index_of(val);
+            if (out_found && *out_index != realm::not_found) {
+                *out_found = true;
+            }
         }
         return true;
     });
@@ -402,6 +416,24 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
         auto shared_realm = results->get_realm();
         auto obj = results->get<Obj>(index);
         return new realm_object_t{Object{shared_realm, std::move(obj)}};
+    });
+}
+
+RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
+                                       bool* out_found)
+{
+    if (out_index)
+        *out_index = realm::not_found;
+    if (out_found)
+        *out_found = false;
+
+    return wrap_err([&]() {
+        if (out_index) {
+            *out_index = results->index_of(value->obj());
+            if (out_found && *out_index != realm::not_found)
+                *out_found = true;
+        }
+        return true;
     });
 }
 
@@ -426,9 +458,6 @@ RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->min(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -453,9 +482,6 @@ RLM_API bool realm_results_max(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->max(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -480,9 +506,6 @@ RLM_API bool realm_results_sum(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (out_found) {
             *out_found = results->size() != 0;
         }
@@ -511,9 +534,6 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_property_key_
                                    bool* out_found)
 {
     return wrap_err([&]() {
-        // FIXME: This should be part of Results.
-        results->get_table()->check_column(ColKey(col));
-
         if (auto x = results->average(ColKey(col))) {
             if (out_found) {
                 *out_found = true;

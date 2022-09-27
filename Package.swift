@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "12.7.0"
+let versionStr = "12.8.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -119,6 +119,7 @@ let notSyncServerSources: [String] = [
     "realm/table.cpp",
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
+    "realm/tokenizer.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
