@@ -19,6 +19,7 @@
 
 ### Internals
 * Reenable sync benchmark.
+* Add util/http.hpp to the release package.
 
 ----------------------------------------------
 
