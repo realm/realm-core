@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/tokenizer.hpp>
-#include <realm/unicode.hpp>
 
 namespace realm {
 
@@ -47,34 +46,83 @@ public:
     bool next() override;
 };
 
+// Mapping of Latin-1 characters into the corresponding lowercase character with diacritics removed
+static const uint8_t utf8_map[64] = {
+    0x61, 0x61, 0x61, 0x61, 0x61, 0xe5, 0xe6, 0x63, 0x65, 0x65, 0x65, 0x65, 0x69, 0x69, 0x69, 0x69,
+    0xf0, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f, 0x6f, 0x0,  0xf8, 0x75, 0x75, 0x75, 0x75, 0x79, 0xfe, 0xdf,
+    0x61, 0x61, 0x61, 0x61, 0x61, 0xe5, 0xe6, 0x63, 0x65, 0x65, 0x65, 0x65, 0x69, 0x69, 0x69, 0x69,
+    0xf0, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f, 0x6f, 0x0,  0xf8, 0x75, 0x75, 0x75, 0x75, 0x79, 0xfe, 0xff,
+};
+
 bool DefaultTokenizer::next()
 {
-    const char* str = nullptr;
-    while (m_cur_pos < m_end_pos) {
-        signed char c = static_cast<signed char>(*m_cur_pos); // char may not be signed by default
+    char* bufp = m_buffer;
+    char* end_buffer = &m_buffer[sizeof(m_buffer)];
+    enum { searching, building, finished } state = searching;
 
-        // Words are alnum + unicode chars above 128 (special unicode whitespace
-        // chars are not used as word separators)
-        bool is_alnum = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                        c < 0; // sign bit is set = unicode above 128
+    using traits = std::char_traits<char>;
+    while (m_cur_pos < m_end_pos && state != finished) {
+        signed char c = static_cast<signed char>(*m_cur_pos); // char may not be signed by default
+        bool is_alnum = false;
+        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')) {
+            // c is a lowercase ASCII character. Can be added directly.
+            is_alnum = true;
+            if (bufp < end_buffer)
+                *bufp++ = c;
+        }
+        else if ((c >= 'A' && c <= 'Z')) {
+            // c is an uppercase ASCII character. Can be added after adding 0x20.
+            is_alnum = true;
+            if (bufp < end_buffer)
+                *bufp++ = c + 0x20;
+        }
+        else if (traits::to_int_type(c) > 0x7f) {
+            auto i = traits::to_int_type(c);
+            if ((i & 0xE0) == 0xc0) {
+                // 2 byte utf-8
+                m_cur_pos++;
+                // Construct unicode value
+                auto u = ((i << 6) + (traits::to_int_type(*m_cur_pos) & 0x3F)) & 0x7FF;
+                if ((u >= 0xC0) && (u < 0xff)) {
+                    // u is a letter from Latin-1 Supplement block - map to output
+                    is_alnum = true;
+                    if (auto o = utf8_map[u & 0x3f]) {
+                        if (o < 0x80) {
+                            // ASCII
+                            if (bufp < end_buffer)
+                                *bufp++ = char(o);
+                        }
+                        else {
+                            if (bufp < end_buffer - 1) {
+                                *bufp++ = static_cast<char>((o >> 6) | 0xC0);
+                                *bufp++ = static_cast<char>((o & 0x3f) | 0x80);
+                            }
+                        }
+                    }
+                }
+            }
+            else if ((i & 0xF0) == 0xE0) {
+                // 3 byte utf-8
+                m_cur_pos += 2;
+            }
+            else if ((i & 0xF8) == 0xF0) {
+                // 4 byte utf-8
+                m_cur_pos += 3;
+            }
+        }
 
         if (is_alnum) {
-            if (!str)
-                str = m_cur_pos;
+            state = building;
         }
         else {
-            if (str) {
-                break;
+            if (state == building) {
+                state = finished;
             }
         }
         ++m_cur_pos;
     }
-    if (str) {
-        StringData w(str, m_cur_pos - str);
-        m_buffer = case_map(w, false);
-        return bool(m_buffer);
-    }
-    return false;
+    m_size = bufp - m_buffer;
+    return state != searching;
 }
 
 std::unique_ptr<Tokenizer> Tokenizer::get_instance()

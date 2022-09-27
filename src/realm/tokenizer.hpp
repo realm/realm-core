@@ -36,7 +36,7 @@ public:
 
     std::string_view get_token()
     {
-        return *m_buffer;
+        return {m_buffer, m_size};
     }
     std::set<std::string> get_all_tokens();
 
@@ -47,7 +47,9 @@ protected:
     const char* m_start_pos = nullptr;
     const char* m_cur_pos = nullptr;
     const char* m_end_pos = nullptr;
-    std::optional<std::string> m_buffer;
+    size_t m_size = 0;
+    // Words longer than 64 chars will be truncated
+    char m_buffer[64];
 };
 
 } // namespace realm

@@ -5859,7 +5859,7 @@ TEST(Query_FullText)
 
     // Add before index creation
     table->create_object().set(col, " This is a test, with  spaces!");
-    Obj obj2 = table->create_object().set(col, "Ål, ø og Æbler");
+    Obj obj2 = table->create_object().set(col, "Ål, ø og 你好世界Æbler"); // "Hello world" should be filtered out
     Obj obj3 = table->create_object().set(
         col,
         "An object database (also object-oriented database management system) is a database management system in "
@@ -5885,6 +5885,7 @@ TEST(Query_FullText)
 
     table->create_object().set(col, "Alle elsker John");
     table->create_object().set(col, "Johns ven kender John godt");
+    table->create_object().set(col, "Ich wohne in Großarl");
 
     auto tv = table->where().fulltext(col, "object").find_all();
     CHECK_EQUAL(2, tv.size());
@@ -5944,6 +5945,12 @@ TEST(Query_FullText)
     tv = table->where().fulltext(col, "æbler").find_all();
     CHECK_EQUAL(2, tv.size());
 
+    table->create_object().set(
+        col, "The song \"Supercalifragilisticexpialidocious\" is from the 1964 Disney musical film \"Mary Poppins\"");
+
+    tv = table->where().fulltext(col, "supercalifragilisticexpialidocious mary").find_all();
+    CHECK_EQUAL(1, tv.size());
+
     obj2.remove();
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
@@ -5952,6 +5959,8 @@ TEST(Query_FullText)
     CHECK_EQUAL(1, tv.size());
     tv = table->where().fulltext(col, "John").find_all();
     CHECK_EQUAL(2, tv.size());
+    tv = table->where().fulltext(col, "Großarl").find_all();
+    CHECK_EQUAL(1, tv.size());
 
     table->clear();
     CHECK(table->get_search_index(col)->is_empty());
@@ -6004,6 +6013,11 @@ TEST(Query_FullTextMulti)
         "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
         "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
 
+    table->create_object().set(
+        col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
+             "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
+             "recherche français ou étrangers, des laboratoires publics ou privés.");
+
     int64_t id = 1000;
     for (auto& o : *table) {
         auto ll = origin->create_object_with_primary_key(id++).get_linklist(col_link);
@@ -6025,6 +6039,10 @@ TEST(Query_FullTextMulti)
     auto obj = tv.get_object(0);
     auto ll = obj.get_linklist(col_link);
     tv = table->where(ll).fulltext(col, "object gemstone").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    // Diacritics ignorant
+    tv = table->where().fulltext(col, "depot emanant").find_all();
     CHECK_EQUAL(1, tv.size());
 
     // search for combination that is not present
