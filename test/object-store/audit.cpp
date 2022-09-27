@@ -1101,10 +1101,11 @@ TEST_CASE("audit management") {
 
     SECTION("cannot nest scopes") {
         audit->begin_scope("name");
-        REQUIRE_THROWS(audit->begin_scope("name"));
+        REQUIRE_EXCEPTION(audit->begin_scope("name"), WrongTransactionState,
+                          "Cannot begin audit scope: audit already in progress");
     }
     SECTION("cannot end nonexistent scope") {
-        REQUIRE_THROWS(audit->end_scope());
+        REQUIRE_EXCEPTION(audit->end_scope(), WrongTransactionState, "Cannot end audit scope: no audit in progress");
     }
 
     SECTION("config validation") {
@@ -1112,20 +1113,28 @@ TEST_CASE("audit management") {
         config.audit_config = std::make_shared<AuditConfig>();
         SECTION("invalid prefix") {
             config.audit_config->partition_value_prefix = "";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Audit partition prefix must not be empty");
             config.audit_config->partition_value_prefix = "/audit";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit parition prefix '/audit': prefix must not contain slashes");
         }
         SECTION("invalid metadata") {
             config.audit_config->metadata = {{"", "a"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-            std::string long_name('a', 64);
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key '': keys must be 1-63 characters long");
+            std::string long_name(64, 'a');
             config.audit_config->metadata = {{long_name, "b"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), InvalidName,
+                "Invalid audit metadata key 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': keys "
+                "must be 1-63 characters long");
             config.audit_config->metadata = {{"activity", "c"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key 'activity': metadata keys cannot overlap with the audit "
+                              "event properties");
             config.audit_config->metadata = {{"a", "d"}, {"a", "e"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName, "Duplicate audit metadata key 'a'");
         }
     }
 
