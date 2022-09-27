@@ -3601,3 +3601,25 @@ TEST_CASE("KeyPathMapping generation") {
         REQUIRE(q.count() == 0);
     }
 }
+
+TEST_CASE("collections with non nullable mixed should throw") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    constexpr std::string_view expected_msg = "Property 'object.value' of type 'Mixed' must be nullable";
+    SECTION("array") {
+        config.schema = Schema{{"object", {{"value", PropertyType::Array | PropertyType::Mixed}}}};
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), std::string(expected_msg));
+    }
+
+    SECTION("dictionary") {
+        config.schema = Schema{{"object", {{"value", PropertyType::Dictionary | PropertyType::Mixed}}}};
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), std::string(expected_msg));
+    }
+
+    SECTION("set") {
+        config.schema = Schema{{"object", {{"value", PropertyType::Set | PropertyType::Mixed}}}};
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), std::string(expected_msg));
+    }
+}
