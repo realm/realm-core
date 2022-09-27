@@ -149,6 +149,8 @@ functions:
               exit 1
           fi
 
+          export UNITTEST_THREADS=1
+
           BENCHMARK=$(./evergreen/abspath.sh ./build/test/benchmark-${benchmark_name}/${cmake_build_type|Debug}/realm-benchmark-${benchmark_name})
           echo "Going to run benchmark $BENCHMARK"
 
@@ -524,6 +526,14 @@ tasks:
   - func: "run benchmark"
     vars:
       benchmark_name: crud
+
+- name: benchmark-sync
+  exec_timeout_secs: 1800
+  tags: [ "benchmark" ]
+  commands:
+  - func: "run benchmark"
+    vars:
+      benchmark_name: sync
 
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]

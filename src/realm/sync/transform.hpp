@@ -127,6 +127,8 @@ class Transformer {
 public:
     class RemoteChangeset;
 
+    using iterator = util::Span<Changeset>::iterator;
+
     /// Produce operationally transformed versions of the specified changesets,
     /// which are assumed to be received from a particular remote peer, P,
     /// represented by the specified transform history. Note that P is not
@@ -136,7 +138,7 @@ public:
     /// changesets and all causally unrelated changesets in the local history. A
     /// changeset in the local history is causally unrelated if, and only if it
     /// occurs after the local changeset that produced
-    /// `remote_changeset.last_integrated_local_version` and is not a produced
+    /// `remote_changeset.last_integrated_local_version` and it is not produced
     /// by integration of a changeset received from P. This assumes that
     /// `remote_changeset.last_integrated_local_version` is set to the local
     /// version produced by the last local changeset, that was integrated by P
@@ -164,14 +166,20 @@ public:
     /// changeset is of local origin. The specified identifier must never be
     /// zero.
     ///
+    /// \param changeset_applier Called to to apply each transformed changeset.
+    /// Returns true if it can continue applying the changests, false otherwise.
+    ///
+    /// \return The number of changesets that have been transformed and applied.
+    ///
     /// \throw TransformError Thrown if operational transformation fails due to
     /// a problem with the specified changeset.
     ///
     /// FIXME: Consider using std::error_code instead of throwing
     /// TransformError.
-    virtual void transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
-                                             version_type current_local_version, util::Span<Changeset> changesets,
-                                             util::Logger* = nullptr) = 0;
+    virtual size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
+                                               version_type current_local_version, util::Span<Changeset> changesets,
+                                               util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                               util::Logger* = nullptr) = 0;
 
     virtual ~Transformer() noexcept {}
 };
@@ -194,8 +202,8 @@ public:
 
     TransformerImpl();
 
-    void transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
-                                     util::Logger*) override;
+    size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
+                                       util::UniqueFunction<bool(const Changeset*)>, util::Logger*) override;
 
     struct Side;
     struct MajorSide;

@@ -617,6 +617,42 @@ public:
             });
     }
 
+    // Use either the methods below or `start()`.
+    void start_server(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_servers);
+        m_server_threads[index].start([this, index] {
+            run_server(index);
+        });
+    }
+
+    void start_client(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_clients);
+        m_client_threads[index].start([this, index] {
+            run_client(index);
+        });
+    }
+
+    void stop_server(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_servers);
+        m_servers[index]->stop();
+        unit_test::TestContext& test_context = m_test_context;
+        if (m_server_threads[index].joinable())
+            CHECK(!m_server_threads[index].join());
+        CHECK_LESS_EQUAL(m_servers[index]->errors_seen(), m_allow_server_errors[index]);
+    }
+
+    void stop_client(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_clients);
+        m_clients[index]->stop();
+        unit_test::TestContext& test_context = m_test_context;
+        if (m_client_threads[index].joinable())
+            CHECK(!m_client_threads[index].join());
+    }
+
     void stop()
     {
         for (int i = 0; i < m_num_clients; ++i)
