@@ -1186,12 +1186,10 @@ TEST_CASE("SharedRealm: async writes") {
                     auto write = db->start_write();
                     sema.add_stone();
 
-                    // We want to wait until the main thread is waiting for the
-                    // lock, which we can't do deterministically. If this sleep
-                    // is too short the test will still pass and it'll just fail
-                    // to test the intended code path.
-                    std::chrono::milliseconds wait_time{500};
-                    std::this_thread::sleep_for(wait_time);
+                    // Wait until the main thread is waiting for the lock.
+                    while (!db->other_writers_waiting_for_lock()) {
+                        millisleep(1);
+                    }
                     write->close();
                 });
 

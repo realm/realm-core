@@ -408,6 +408,10 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+    /// Returns true if there are threads waiting to acquire the write lock, false otherwise.
+    /// To be used only when already holding the lock.
+    bool other_writers_waiting_for_lock() const;
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 

@@ -22,7 +22,7 @@ stepwise for a concatenated changeset:
     S(α, A + B)  =  S(S(α, A), B)                                            (1)
 
 **Definition:** Two changesets `A` and `B`, having the same base state, `α`, are
-*equivalent*, written as `A ~ B`, if, and onlæy if they produce the same final
+*equivalent*, written as `A ~ B`, if, and only if they produce the same final
 state, that is, if, and only if `S(α, A) = S(α, B)`. This does not mean that `A`
 and `B` are equal.
 
