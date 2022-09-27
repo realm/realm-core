@@ -50,7 +50,6 @@ using util::any_cast;
     do {                                                                                                             \
         REQUIRE_NOTHROW((r).update_schema(s, version));                                                              \
         VERIFY_SCHEMA(r, false);                                                                                     \
-        auto schema = (r).schema();                                                                                  \
         REQUIRE(schema == s);                                                                                        \
     } while (0)
 
