@@ -775,31 +775,32 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.timeout_ms = m_request_timeout_ms;
 
     auto http_completion = HttpCompletionImpl::make_completion(
-        std::move(req), [completion = std::move(completion), anchor = shared_from_this()](
-            Request&&, const Response& response) mutable {
-        // If the response contains an error, then pass it up
-        if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
-            return completion(response); // early return
-        }
+        std::move(req), [completion = std::move(completion),
+                         anchor = shared_from_this()](Request&&, const Response& response) mutable {
+            // If the response contains an error, then pass it up
+            if (response.http_status_code >= 300 ||
+                (response.http_status_code < 200 && response.http_status_code != 0)) {
+                return completion(response); // early return
+            }
 
-        try {
-            auto json = parse<BsonDocument>(response.body);
-            auto hostname = get<std::string>(json, "hostname");
-            auto ws_hostname = get<std::string>(json, "ws_hostname");
-            auto deployment_model = get<std::string>(json, "deployment_model");
-            auto location = get<std::string>(json, "location");
-            anchor->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
-                manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
-            });
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                auto hostname = get<std::string>(json, "hostname");
+                auto ws_hostname = get<std::string>(json, "ws_hostname");
+                auto deployment_model = get<std::string>(json, "deployment_model");
+                auto location = get<std::string>(json, "location");
+                anchor->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+                    manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
+                });
 
-            anchor->update_hostname(anchor->m_sync_manager->app_metadata());
-        }
-        catch (const AppError&) {
-            // Pass the response back to completion
-            return completion(response);
-        }
-        completion(util::none);
-    });
+                anchor->update_hostname(anchor->m_sync_manager->app_metadata());
+            }
+            catch (const AppError&) {
+                // Pass the response back to completion
+                return completion(response);
+            }
+            completion(util::none);
+        });
     m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
 }
 
@@ -839,15 +840,15 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
             }
 
             auto http_completion = HttpCompletionImpl::make_completion(
-                std::move(request), [completion = std::move(completion), anchor = anchor](
-                    Request&& request, const Response& response) mutable {
-                if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
-                    anchor->handle_redirect_response(std::move(request), response, std::move(completion));
-                }
-                else {
-                    completion(response);
-                }
-            });
+                std::move(request), [completion = std::move(completion),
+                                     anchor = anchor](Request&& request, const Response& response) mutable {
+                    if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
+                        anchor->handle_redirect_response(std::move(request), response, std::move(completion));
+                    }
+                    else {
+                        completion(response);
+                    }
+                });
 
             // Retry the original request with the updated url
             anchor->m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
@@ -862,16 +863,16 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     // Normal do_request operation, just send the request to the server and return the response
     if (m_sync_manager->app_metadata()) {
         auto http_completion = HttpCompletionImpl::make_completion(
-            std::move(request), [completion = std::move(completion), anchor = shared_from_this()](
-                Request&& request, const Response& response) mutable {
-            // If the response contains a redirection, then process it
-            if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
-                anchor->handle_redirect_response(std::move(request), response, std::move(completion));
-            }
-            else {
-                completion(response);
-            }
-        });
+            std::move(request), [completion = std::move(completion),
+                                 anchor = shared_from_this()](Request&& request, const Response& response) mutable {
+                // If the response contains a redirection, then process it
+                if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
+                    anchor->handle_redirect_response(std::move(request), response, std::move(completion));
+                }
+                else {
+                    completion(response);
+                }
+            });
         m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
         return; // early return
     }

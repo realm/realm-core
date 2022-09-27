@@ -22,11 +22,10 @@ namespace realm::app {
 
 HttpCompletion HttpCompletionImpl::make_completion(Request&& request, CompletionFunction&& completion)
 {
-    return HttpCompletion(std::make_unique<HttpCompletionImpl>(std::move(request),
-                                                                std::move(completion)));
+    return HttpCompletion(std::make_unique<HttpCompletionImpl>(std::move(request), std::move(completion)));
 }
 
-void HttpCompletion::operator()(const Response & response)
+void HttpCompletion::operator()(const Response& response)
 {
     REALM_ASSERT(impl != nullptr);
     impl->call(response);
@@ -39,7 +38,7 @@ const Request& HttpCompletion::request() const
 }
 
 // Needed for testing purposes
-void HttpCompletion::operator()(Request&& request, const Response & response)
+void HttpCompletion::operator()(Request&& request, const Response& response)
 {
     REALM_ASSERT(impl != nullptr);
     impl->call(std::move(request), response);

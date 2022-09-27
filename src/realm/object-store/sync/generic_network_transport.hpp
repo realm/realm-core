@@ -236,19 +236,27 @@ struct Response {
 
 struct HttpCompletionImpl;
 
-struct HttpCompletion
-{
+struct HttpCompletion {
     HttpCompletion() noexcept = default;
-    HttpCompletion(HttpCompletion&& copy) noexcept : impl(std::move(copy.impl)) {}
-    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) noexcept : impl(std::move(impl)) {}
+    HttpCompletion(HttpCompletion&& copy) noexcept
+        : impl(std::move(copy.impl))
+    {
+    }
+    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) noexcept
+        : impl(std::move(impl))
+    {
+    }
     HttpCompletion& operator=(HttpCompletion&& copy) noexcept
     {
         impl = std::move(copy.impl);
         return *this;
     }
 
-    operator bool() const noexcept { return impl != nullptr; }
-    void operator()(const Response & response);
+    operator bool() const noexcept
+    {
+        return impl != nullptr;
+    }
+    void operator()(const Response& response);
 
     const Request& request() const;
 
@@ -258,10 +266,13 @@ struct HttpCompletion
         REALM_ASSERT(impl != nullptr);
         return impl.release();
     }
-    HttpCompletion(void* context) : impl(static_cast<HttpCompletionImpl*>(context)) {}
+    HttpCompletion(void* context)
+        : impl(static_cast<HttpCompletionImpl*>(context))
+    {
+    }
 
     // Needed for testing purposes
-    void operator()(Request&& request, const Response & response);
+    void operator()(Request&& request, const Response& response);
 
 protected:
     std::unique_ptr<HttpCompletionImpl> impl;
@@ -275,14 +286,16 @@ struct GenericNetworkTransport {
 };
 
 
-struct HttpCompletionImpl
-{
+struct HttpCompletionImpl {
     using CompletionFunction = util::UniqueFunction<void(Request&&, const Response&)>;
 
     static HttpCompletion make_completion(Request&& request, CompletionFunction&& completion);
 
     HttpCompletionImpl(Request&& request, CompletionFunction&& completion)
-        : m_request(std::move(request)), m_completion(std::move(completion)) {}
+        : m_request(std::move(request))
+        , m_completion(std::move(completion))
+    {
+    }
 
     inline void call(const Response& response)
     {
@@ -291,14 +304,20 @@ struct HttpCompletionImpl
     }
 
     // Needed for testing purposes
-    inline void call(Request&& request, const Response & response)
+    inline void call(Request&& request, const Response& response)
     {
         REALM_ASSERT(m_completion);
         m_completion(std::move(request), response);
     }
 
-    inline const Request& request() const { return m_request; }
-    inline const CompletionFunction& completion() const { return m_completion; }
+    inline const Request& request() const
+    {
+        return m_request;
+    }
+    inline const CompletionFunction& completion() const
+    {
+        return m_completion;
+    }
 
 protected:
     Request m_request;

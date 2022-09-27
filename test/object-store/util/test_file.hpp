@@ -265,8 +265,7 @@ public:
         {
         }
 
-        void send_request_to_server(const realm::app::Request&,
-                                    realm::app::HttpCompletion&& completion) override
+        void send_request_to_server(const realm::app::Request&, realm::app::HttpCompletion&& completion) override
         {
             *network_callback = TransportCallback{std::move(completion)};
         }

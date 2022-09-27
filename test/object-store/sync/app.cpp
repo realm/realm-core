@@ -4185,8 +4185,7 @@ public:
     void add_work_item(Response&& response, HttpCompletion&& completion)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(
-            ResponseWorkItem{std::move(response), std::move(completion)});
+        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion)});
         transport_work_cond.notify_one();
     }
 
@@ -4298,8 +4297,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
                 mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
-                    std::move(completion));
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 // simulated bad token request
@@ -4312,16 +4310,14 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 }
                 else if (cur_state == TestState::login) {
                     state.advance_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(Response{401, 0, {}},
-                                                        std::move(completion));
+                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
                     state.advance_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                        std::move(completion));
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
                 else if (state.get() == TestState::profile_2) {
                     state.advance_to(TestState::refresh_2);
@@ -4332,8 +4328,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                     CHECK(state.get() == TestState::refresh_2);
                     state.advance_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                        std::move(completion));
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
             }
             else if (request.url.find("/location") != std::string::npos) {
@@ -4395,11 +4390,14 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                completion({200, 0, {}, nlohmann::json({{"deployment_model", "LOCAL"},
-                                                        {"location", "IE"},
-                                                        {"hostname", test_hostname},
-                                                        {"ws_hostname", test_ws_hostname}})
-                                            .dump()});
+                completion({200,
+                            0,
+                            {},
+                            nlohmann::json({{"deployment_model", "LOCAL"},
+                                            {"location", "IE"},
+                                            {"hostname", test_hostname},
+                                            {"ws_hostname", test_ws_hostname}})
+                                .dump()});
             }
             else if (request.url.find("functions/call") != std::string::npos) {
                 REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
