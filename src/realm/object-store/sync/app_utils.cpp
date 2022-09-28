@@ -22,8 +22,30 @@
 
 #include <external/json/json.hpp>
 
+#include <algorithm>
+
 namespace realm {
 namespace app {
+
+static bool string_iequals(const std::string& a, const std::string& b)
+{
+    return std::equal(a.begin(), a.end(),
+                      b.begin(), b.end(),
+                      [](char a, char b) {
+                          return tolower(a) == tolower(b);
+                      });
+}
+
+util::Optional<std::pair<const std::string, std::string>> AppUtils::find_header(
+    const std::string& key_name, const std::map<std::string, std::string>& search_map)
+{
+    for (auto current : search_map) {
+        if (string_iequals(key_name, current.first)) {
+            return current;
+        }
+    }
+    return std::nullopt;
+}
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
@@ -32,8 +54,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
     try {
-        auto ct = response.headers.find("content-type");
-        if (ct != response.headers.end() && ct->second == "application/json") {
+        auto ct = find_header("content-type", response.headers);
+        if (ct && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");

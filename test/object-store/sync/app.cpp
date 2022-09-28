@@ -21,6 +21,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -2089,23 +2090,24 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request&, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
         {
+            auto request_ptr = std::make_unique<Request>(std::move(request));
+            auto& request_ref = *request_ptr;
             if (request_hook) {
-                request_hook(const_cast<Request&>(completion.request()));
+                request_hook(request_ref);
             }
             if (simulated_response) {
                 return completion(*simulated_response);
             }
-            auto http_completion = realm::app::HttpCompletionImpl::make_completion(
-                std::move(const_cast<Request&>(completion.request())),
-                [&](Request&& request, const Response& response) mutable {
+            SynchronousTestTransport::send_request_to_server(
+                request_ref,  [this, completion = std::move(completion),
+                               request_ptr = std::move(request_ptr)](const Response& response) mutable {
                     if (response_hook) {
-                        response_hook(request, const_cast<Response&>(response));
+                        response_hook(*request_ptr, const_cast<Response&>(response));
                     }
-                    completion(std::move(request), response);
+                    completion(response);
                 });
-            SynchronousTestTransport::send_request_to_server(http_completion.request(), std::move(http_completion));
         }
         // Optional handler for the request and response before it is returned to completion
         util::UniqueFunction<void(Request&, Response&)> response_hook;
@@ -3083,7 +3085,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
 
         void send_request_to_server(const Request&, HttpCompletion&& completion) override
         {
-            completion(Response{0, m_code, util::HTTPHeaders(), m_message});
+            completion(Response{0, m_code, HttpHeaders(), m_message});
         }
 
     private:
@@ -3165,11 +3167,15 @@ public:
     }
 
 private:
-    void handle_profile(const Request& request, HttpCompletion& completion)
+    void handle_profile(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
-        CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
+        auto content_type = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(content_type);
+        CHECK(content_type->second == "application/json;charset=utf-8");
+        auto authorization = AppUtils::find_header("Authorization", request.headers);
+        CHECK(authorization);
+        CHECK(authorization->second == "Bearer " + access_token);
         CHECK(request.body.empty());
         CHECK(request.timeout_ms == 60000);
 
@@ -3184,10 +3190,12 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_login(const Request& request, HttpCompletion& completion)
+    void handle_login(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
@@ -3207,7 +3215,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_location(const Request& request, HttpCompletion& completion)
+    void handle_location(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -3221,10 +3229,12 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(const Request& request, HttpCompletion& completion)
+    void handle_create_api_key(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
         CHECK(request.timeout_ms == 60000);
 
@@ -3235,10 +3245,12 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(const Request& request, HttpCompletion& completion)
+    void handle_fetch_api_key(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -3249,10 +3261,12 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(const Request& request, HttpCompletion& completion)
+    void handle_fetch_api_keys(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -3265,10 +3279,12 @@ private:
         completion(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(const Request& request, HttpCompletion& completion)
+    void handle_token_refresh(const Request& request, HttpCompletion&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -3283,29 +3299,29 @@ public:
     void send_request_to_server(const Request& request, HttpCompletion&& completion) override
     {
         if (request.url.find("/login") != std::string::npos) {
-            handle_login(request, completion);
+            handle_login(request, std::move(completion));
         }
         else if (request.url.find("/profile") != std::string::npos) {
-            handle_profile(request, completion);
+            handle_profile(request, std::move(completion));
         }
         else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
             completion(Response{200, 0, {}, ""});
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
-            handle_create_api_key(request, completion);
+            handle_create_api_key(request, std::move(completion));
         }
         else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos &&
                  request.method == HttpMethod::get) {
-            handle_fetch_api_key(request, completion);
+            handle_fetch_api_key(request, std::move(completion));
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
-            handle_fetch_api_keys(request, completion);
+            handle_fetch_api_keys(request, std::move(completion));
         }
         else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-            handle_token_refresh(request, completion);
+            handle_token_refresh(request, std::move(completion));
         }
         else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
-            handle_location(request, completion);
+            handle_location(request, std::move(completion));
         }
         else {
             completion(Response{200, 0, {}, "something arbitrary"});
@@ -3743,7 +3759,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("session error code") {
-        response.headers = util::HTTPHeaders{{"Content-Type", "application/json"}};
+        response.headers = HttpHeaders{{"Content-Type", "application/json"}};
         response.http_status_code = 400;
         response.body = nlohmann::json({{"error_code", "MongoDBError"},
                                         {"error", "a fake MongoDB error message!"},
@@ -4129,7 +4145,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 else if (request.url.find("/profile") != std::string::npos) {
                     CHECK(login_hit);
 
-                    auto access_token = request.headers.at("Authorization");
+                    auto item = AppUtils::find_header("Authorization", request.headers);
+                    CHECK(item);
+                    auto access_token = item->second;
                     // simulated bad token request
                     if (access_token.find(good_access_token2) != std::string::npos) {
                         CHECK(login_hit);

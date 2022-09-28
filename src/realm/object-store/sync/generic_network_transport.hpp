@@ -21,7 +21,6 @@
 
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/http.hpp>
 
 #include <iosfwd>
 #include <map>
@@ -166,6 +165,11 @@ std::ostream& operator<<(std::ostream& os, AppError error);
 enum class HttpMethod { get, post, patch, put, del };
 
 /**
+ * Request/Response headers type
+ */
+using HttpHeaders = std::map<std::string, std::string>;
+
+/**
  * An HTTP request that can be made to an arbitrary server.
  */
 struct Request {
@@ -188,7 +192,7 @@ struct Request {
     /**
      * The HTTP headers of this request - keys are case insensitive.
      */
-    util::HTTPHeaders headers;
+    HttpHeaders headers;
 
     /**
      * The body of the request.
@@ -221,7 +225,7 @@ struct Response {
     /**
      * The headers of the HTTP response - keys are case insensitive.
      */
-    util::HTTPHeaders headers;
+    HttpHeaders headers;
 
     /**
      * The body of the HTTP response.
@@ -234,94 +238,24 @@ struct Response {
     util::Optional<ClientErrorCode> client_error_code;
 };
 
-struct HttpCompletionImpl;
-
-struct HttpCompletion {
-    HttpCompletion() noexcept = default;
-    HttpCompletion(HttpCompletion&& copy) noexcept
-        : impl(std::move(copy.impl))
-    {
-    }
-    HttpCompletion(std::unique_ptr<HttpCompletionImpl>&& impl) noexcept
-        : impl(std::move(impl))
-    {
-    }
-    HttpCompletion& operator=(HttpCompletion&& copy) noexcept
-    {
-        impl = std::move(copy.impl);
-        return *this;
-    }
-
-    operator bool() const noexcept
-    {
-        return impl != nullptr;
-    }
-    void operator()(const Response& response);
-
-    const Request& request() const;
-
-    // Helper functions for the c_api interface
-    inline void* release()
-    {
-        REALM_ASSERT(impl != nullptr);
-        return impl.release();
-    }
-    HttpCompletion(void* context)
-        : impl(static_cast<HttpCompletionImpl*>(context))
-    {
-    }
-
-    // Needed for testing purposes
-    void operator()(Request&& request, const Response& response);
-
-protected:
-    std::unique_ptr<HttpCompletionImpl> impl;
-};
-
+using HttpCompletion = util::UniqueFunction<void(const Response&)>;
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(const Request& request, HttpCompletion&& completion) = 0;
     virtual ~GenericNetworkTransport() = default;
-};
+    virtual void send_request_to_server(const Request& request,
+                                        HttpCompletion&& completion) = 0;
 
-
-struct HttpCompletionImpl {
-    using CompletionFunction = util::UniqueFunction<void(Request&&, const Response&)>;
-
-    static HttpCompletion make_completion(Request&& request, CompletionFunction&& completion);
-
-    HttpCompletionImpl(Request&& request, CompletionFunction&& completion)
-        : m_request(std::move(request))
-        , m_completion(std::move(completion))
+    virtual void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(Request&&, const Response&)>&& completion)
     {
+        auto request_ptr = std::make_unique<Request>(std::move(request));
+        const auto& request_ref = *request_ptr;
+        send_request_to_server(
+            request_ref, [request_ptr = std::move(request_ptr), completion = std::move(completion)](const Response& response) {
+                completion(std::move(*request_ptr), response);
+            });
     }
-
-    inline void call(const Response& response)
-    {
-        REALM_ASSERT(m_completion);
-        m_completion(std::move(m_request), response);
-    }
-
-    // Needed for testing purposes
-    inline void call(Request&& request, const Response& response)
-    {
-        REALM_ASSERT(m_completion);
-        m_completion(std::move(request), response);
-    }
-
-    inline const Request& request() const
-    {
-        return m_request;
-    }
-    inline const CompletionFunction& completion() const
-    {
-        return m_completion;
-    }
-
-protected:
-    Request m_request;
-    CompletionFunction m_completion;
 };
 
 } // namespace realm::app

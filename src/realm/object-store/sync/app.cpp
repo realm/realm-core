@@ -134,10 +134,10 @@ enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 
 // generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is
 // passed
-util::HTTPHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
-                                      RequestTokenType token_type = RequestTokenType::RefreshToken)
+HttpHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
+                                RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
-    util::HTTPHeaders headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
+    HttpHeaders headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
 
     if (with_user_authorization) {
         switch (token_type) {
@@ -774,9 +774,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
 
-    auto http_completion = HttpCompletionImpl::make_completion(
-        std::move(req), [completion = std::move(completion),
-                         anchor = shared_from_this()](Request&&, const Response& response) mutable {
+    m_config.transport->send_request_to_server(req, [completion = std::move(completion), anchor = shared_from_this()](const Response& response) mutable {
             // If the response contains an error, then pass it up
             if (response.http_status_code >= 300 ||
                 (response.http_status_code < 200 && response.http_status_code != 0)) {
@@ -801,7 +799,6 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             }
             completion(util::none);
         });
-    m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
 }
 
 void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion, const BsonDocument& body)
@@ -838,10 +835,9 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
                 app_metadata->hostname != base_url) {
                 request.url.replace(0, base_url.size(), app_metadata->hostname);
             }
-
-            auto http_completion = HttpCompletionImpl::make_completion(
-                std::move(request), [completion = std::move(completion),
-                                     anchor = anchor](Request&& request, const Response& response) mutable {
+            // Retry the original request with the updated url
+            anchor->m_config.transport->send_request_to_server(
+                request, [completion = std::move(completion), anchor = std::move(anchor)](Request&& request, const Response& response) mutable {
                     if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
                         anchor->handle_redirect_response(std::move(request), response, std::move(completion));
                     }
@@ -849,9 +845,6 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
                         completion(response);
                     }
                 });
-
-            // Retry the original request with the updated url
-            anchor->m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
         },
         new_hostname);
 }
@@ -862,9 +855,8 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
 
     // Normal do_request operation, just send the request to the server and return the response
     if (m_sync_manager->app_metadata()) {
-        auto http_completion = HttpCompletionImpl::make_completion(
-            std::move(request), [completion = std::move(completion),
-                                 anchor = shared_from_this()](Request&& request, const Response& response) mutable {
+        m_config.transport->send_request_to_server(
+            request, [completion = std::move(completion), anchor = shared_from_this()](Request&& request, const Response& response) mutable {
                 // If the response contains a redirection, then process it
                 if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
                     anchor->handle_redirect_response(std::move(request), response, std::move(completion));
@@ -873,7 +865,6 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
                     completion(response);
                 }
             });
-        m_config.transport->send_request_to_server(http_completion.request(), std::move(http_completion));
         return; // early return
     }
 
@@ -886,8 +877,8 @@ void App::handle_redirect_response(Request&& request, const Response& response,
 {
     // Permanent redirect - get the location and init the metadata again
     // Look for case insensitive redirect "location" in headers
-    auto location = response.headers.find("location");
-    if (location == response.headers.end() || location->second.empty()) {
+    auto location = AppUtils::find_header("location", response.headers);
+    if (!location || location->second.empty()) {
         // Location not found in the response, pass error response up the chain
         Response error;
         error.http_status_code = response.http_status_code;
