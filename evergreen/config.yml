@@ -885,9 +885,9 @@ buildvariants:
     distros:
     - rhel70-large
 
-- name: rhel70-valgrind
-  display_name: "RHEL 7 x86_64 Valgrind"
-  run_on: rhel70-small
+- name: ubuntu-valgrind
+  display_name: "Ubuntu 2204 Valgrind"
+  run_on: ubuntu2204-small
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
@@ -902,7 +902,7 @@ buildvariants:
   tasks:
   - name: valgrind
     distros:
-    - rhel70-large
+    - ubuntu2204-small
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
