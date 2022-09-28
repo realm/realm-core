@@ -43,7 +43,7 @@ TEST(Compaction_WhileGrowing)
     for (int i = 0; i < 5000; ++i) {
         w[i] = '0' + (i % 64);
     }
-    int num = 1490;
+    int num = (REALM_MAX_BPNODE_SIZE == 1000) ? 1490 : 1400;
     tr->promote_to_write();
     for (int j = 0; j < num; ++j) {
         table1->create_object().set(col_bin1, BinaryData(w, 400));
@@ -57,7 +57,7 @@ TEST(Compaction_WhileGrowing)
 
     tr->promote_to_write();
     auto objp = table1->begin();
-    for (int j = 0; j < 1460; ++j, ++objp) {
+    for (int j = 0; j < num - 30; ++j, ++objp) {
         objp->set(col_bin1, BinaryData());
         if (j % 10 == 0) {
             tr->commit_and_continue_as_read();
@@ -68,7 +68,10 @@ TEST(Compaction_WhileGrowing)
     tr->commit_and_continue_as_read();
     db->get_stats(free_space, used_space);
     // The file is now subject to compaction
-    CHECK(free_space > 2 * used_space);
+    if (!CHECK(free_space > 2 * used_space)) {
+        std::cout << "Free space: " << free_space << std::endl;
+        std::cout << "Used space: " << used_space << std::endl;
+    }
 
     // During the following, the space kept in "m_under_evacuation" will be used
     // before all elements have been moved, which will terminate that session
