@@ -85,6 +85,11 @@ functions:
               set_cmake_var realm_vars REALM_USAN BOOL On
           fi
 
+          if [ -n "${enable_valgrind|}" ]; then
+              set_cmake_var realm_vars REALM_VALGRIND BOOL On
+              set_cmake_var realm_vars REALM_ENABLE_ALLOC_SET_ZERO BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -389,6 +394,19 @@ tasks:
       working_dir: realm-core/build
       shell: /bin/bash
       script: ../tools/run-tests-on-exfat.sh
+
+- name: valgrind
+  exec_timeout_secs: 3600
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test
+      shell: /bin/bash
+      script: |-
+        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./realm-tests
 
 - name: bloaty
   exec_timeout_secs: 1800
@@ -864,6 +882,25 @@ buildvariants:
     ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
   tasks:
   - name: compile_test_and_package
+    distros:
+    - rhel70-large
+
+- name: rhel70-valgrind
+  display_name: "RHEL 7 x86_64 Valgrind"
+  run_on: rhel70-small
+  expansions:
+    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
+    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    enable_valgrind: On
+    cmake_build_type: RelWithDebInfo
+    curl: "/opt/mongodbtoolchain/v3/bin/curl"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
+  tasks:
+  - name: valgrind
     distros:
     - rhel70-large
 

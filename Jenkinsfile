@@ -158,7 +158,6 @@ jobWrapper {
                 //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
                 // FIXME: https://github.com/realm/realm-core/issues/4162
                 //coverage                      : doBuildCoverage(),
-                // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
         }
@@ -456,42 +455,6 @@ def doBuildLinuxClang(String buildType) {
                 def stashName = "linux___${buildType}"
                 stash includes:"*.tar.gz", name:stashName
                 publishingStashes << stashName
-            }
-        }
-    }
-}
-
-def doCheckValgrind() {
-    return {
-        rlmNode('docker') {
-            getArchive()
-
-            def environment = environment()
-            environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
-            environment << 'UNITTEST_SUITE_NAME=Linux-Valgrind'
-
-            buildDockerEnv('testing.Dockerfile').inside {
-                withEnv(environment) {
-                    try {
-                        sh '''
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
-                        '''
-                        runAndCollectWarnings(
-                            script: 'cd build-dir && ninja',
-                            name: "linux-valgrind",
-                            filters: warningFilters,
-                        )
-                        sh '''
-                            cd build-dir/test
-                            valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$WORKSPACE/test/valgrind.suppress --error-exitcode=1 ./realm-tests
-                        '''
-                    } finally {
-                        junit testResults: 'build-dir/test/unit-test-report.xml'
-                    }
-                }
             }
         }
     }
