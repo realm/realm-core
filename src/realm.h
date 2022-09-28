@@ -1336,7 +1336,8 @@ RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, real
  * @param prop_index The index of the property in the class properties array the realm was opened with.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index, realm_value_t* out_value);
+RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index,
+                                               realm_value_t* out_value);
 
 /**
  * Find a property by its column key.
