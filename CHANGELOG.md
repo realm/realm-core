@@ -11,7 +11,7 @@
 * Fix a data race reported by thread sanitizer when preparing to deliver change notifications. This probably did not cause observable problems in practice ([PR #5892](https://github.com/realm/realm-core/pull/5892) since 12.7.0).
 
 ### Breaking changes
-* None.
+* Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()`.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
