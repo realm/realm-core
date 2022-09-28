@@ -2385,7 +2385,8 @@ RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t*);
  * Fetch the backlinks for the object passed as argument.
  * @return a valid ptr to realm results that contais all the backlinks for the object, or null in case of errors.
  */
-RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class_key_t source_table_key, realm_property_key_t property_key);
+RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class_key_t source_table_key,
+                                             realm_property_key_t property_key);
 
 /**
  * Delete all objects matched by a query.
