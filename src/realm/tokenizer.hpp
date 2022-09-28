@@ -49,7 +49,8 @@ protected:
     const char* m_end_pos = nullptr;
     size_t m_size = 0;
     // Words longer than 64 chars will be truncated
-    char m_buffer[64];
+    static constexpr int s_buffer_size = 64;
+    char m_buffer[s_buffer_size];
 };
 
 } // namespace realm

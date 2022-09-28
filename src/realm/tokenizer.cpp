@@ -57,7 +57,7 @@ static const uint8_t utf8_map[64] = {
 bool DefaultTokenizer::next()
 {
     char* bufp = m_buffer;
-    char* end_buffer = &m_buffer[sizeof(m_buffer)];
+    char* end_buffer = m_buffer + s_buffer_size;
     enum { searching, building, finished } state = searching;
 
     using traits = std::char_traits<char>;
