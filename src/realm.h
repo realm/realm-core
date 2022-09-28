@@ -1332,11 +1332,9 @@ RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, real
                                      size_t max, size_t* out_n);
 
 /**
- * Fetch the property value for the index passed as argument
- * @param object to fetch the property from
- * @param prop_index the index of the propery wanted
- * @param out_value the value fetched
- * @return the true if the value was fetched correctly doe the property index passed as argument
+ * Get the value for the property at the specified index in the object's schema.
+ * @param prop_index The index of the property in the class properties array the realm was opened with.
+ * @return True if no exception occurred.
  */
 RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index, realm_value_t* out_value);
 
