@@ -2101,8 +2101,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 return completion(*simulated_response);
             }
             SynchronousTestTransport::send_request_to_server(
-                request_ref,  [this, completion = std::move(completion),
-                               request_ptr = std::move(request_ptr)](const Response& response) mutable {
+                request_ref, [this, completion = std::move(completion),
+                              request_ptr = std::move(request_ptr)](const Response& response) mutable {
                     if (response_hook) {
                         response_hook(*request_ptr, const_cast<Response&>(response));
                     }

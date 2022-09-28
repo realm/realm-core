@@ -51,7 +51,8 @@ public:
     }
 
 private:
-    void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion_block) final
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion_block) final
     {
         auto completion_data = std::make_unique<HttpCompletion>(std::move(completion_block));
 

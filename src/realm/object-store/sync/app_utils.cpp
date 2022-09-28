@@ -29,15 +29,13 @@ namespace app {
 
 static bool string_iequals(const std::string& a, const std::string& b)
 {
-    return std::equal(a.begin(), a.end(),
-                      b.begin(), b.end(),
-                      [](char a, char b) {
-                          return tolower(a) == tolower(b);
-                      });
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char a, char b) {
+        return tolower(a) == tolower(b);
+    });
 }
 
-util::Optional<std::pair<const std::string, std::string>> AppUtils::find_header(
-    const std::string& key_name, const std::map<std::string, std::string>& search_map)
+util::Optional<std::pair<const std::string, std::string>>
+AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
 {
     for (auto current : search_map) {
         if (string_iequals(key_name, current.first)) {
