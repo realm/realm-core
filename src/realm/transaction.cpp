@@ -872,8 +872,11 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #if REALM_METRICS
     REALM_ASSERT(m_metrics == db->m_metrics);
     if (m_metrics) { // null if metrics are disabled
-        size_t total_size = db->m_used_space + db->m_free_space;
-        size_t free_space = db->m_free_space;
+        size_t free_space;
+        size_t used_space;
+        db->get_stats(free_space, used_space);
+        size_t total_size = used_space + free_space;
+
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
         size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();

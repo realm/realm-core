@@ -438,7 +438,7 @@ private:
     class ReadLockGuard;
 
     // Member variables
-    std::recursive_mutex m_mutex;
+    mutable std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
@@ -582,6 +582,7 @@ private:
 
 inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked_space) const
 {
+    std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
     free_space = m_free_space;
     used_space = m_used_space;
     if (locked_space) {
