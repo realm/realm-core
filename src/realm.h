@@ -1332,6 +1332,15 @@ RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, real
                                      size_t max, size_t* out_n);
 
 /**
+ * Fetch the property value for the index passed as argument
+ * @param object to fetch the property from
+ * @param prop_index the index of the propery wanted
+ * @param out_value the value fetched
+ * @return the true if the value was fetched correctly doe the property index passed as argument
+ */
+RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index, realm_value_t* out_value);
+
+/**
  * Find a property by its column key.
  *
  * It is an error to pass a property @a key that is not present in this class.
