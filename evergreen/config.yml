@@ -396,11 +396,13 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 7200
+  exec_timeout_secs: 18000
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
   - func: "compile"
+    vars:
+      target_to_build: "CoreTests"
   - command: shell.exec
     params:
       working_dir: realm-core/build/test
