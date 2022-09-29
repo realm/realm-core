@@ -1650,6 +1650,14 @@ TEST_CASE("C API", "[c_api]") {
         REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
 
+        SECTION("realm_get_value_by_property_index") {
+            realm_value value;
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 0, &value)));
+            CHECK(value.integer == int_val1.integer);
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 16, &value)));
+            CHECK(value.string.data == std::string{"Hello, World!"});
+        }
+
         SECTION("realm_clone()") {
             auto obj1a = clone_cptr(obj1);
             CHECK(realm_equals(obj1a.get(), obj1.get()));

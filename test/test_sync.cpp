@@ -4304,6 +4304,88 @@ TEST(Sync_MergeLargeChangesets)
     CHECK_EQUAL(table->size(), 2 * number_of_rows);
 }
 
+
+TEST(Sync_MergeMultipleChangesets)
+{
+    constexpr int number_of_changesets = 100;
+    constexpr int number_of_instructions = 10;
+
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        WriteTransaction wt(db_1);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(db_2);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_1);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_2);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j + 1);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(2, 1, dir, test_context);
+
+        Session session_1 = fixture.make_session(0, db_1);
+        fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
+        // Start server and upload changes of first client.
+        fixture.start_server(0);
+        fixture.start_client(0);
+        session_1.wait_for_upload_complete_or_client_stopped();
+        session_1.wait_for_download_complete_or_client_stopped();
+        // Stop first client.
+        fixture.stop_client(0);
+
+        // Start the second client and upload their changes.
+        // Wait to integrate changes from the first client.
+        fixture.start_client(1);
+        session_2.wait_for_upload_complete_or_client_stopped();
+        session_2.wait_for_download_complete_or_client_stopped();
+    }
+
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
+    const Group& group1 = read_1;
+    const Group& group2 = read_2;
+    ConstTableRef table1 = group1.get_table("class_table name");
+    ConstTableRef table2 = group2.get_table("class_table name");
+    CHECK_EQUAL(table1->size(), number_of_changesets * number_of_instructions);
+    CHECK_EQUAL(table2->size(), 2 * number_of_changesets * number_of_instructions);
+}
+
+
 #endif // REALM_PLATFORM_WIN32
 
 
@@ -6610,7 +6692,7 @@ TEST(Sync_NonIncreasingServerVersions)
     VersionInfo version_info;
     util::StderrLogger logger;
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::LastInBatch, logger);
+                                        DownloadBatchState::SteadyState, logger);
 }
 
 TEST(Sync_InvalidChangesetFromServer)
