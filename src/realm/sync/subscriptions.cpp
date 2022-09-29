@@ -700,9 +700,9 @@ SubscriptionSet SubscriptionStore::get_active() const
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
     auto res = sub_sets->where()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete))
                    .Or()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
@@ -725,14 +725,14 @@ SubscriptionStore::VersionInfo SubscriptionStore::get_active_and_latest_versions
     descriptor_ordering.append_limit(LimitDescriptor{1});
 
     auto res = sub_sets->where()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete))
                    .Or()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
     ret.active = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
     res = sub_sets->where()
-              .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::AwaitingMark))
+              .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
               .find_all(descriptor_ordering);
     ret.pending_mark = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
@@ -752,9 +752,9 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
     auto res = sub_sets->where()
                    .greater(sub_sets->get_primary_key_column(), last_query_version)
                    .group()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Pending))
                    .Or()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Bootstrapping))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Bootstrapping))
                    .end_group()
                    .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
