@@ -2071,6 +2071,66 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
         wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
 }
 
+TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("bootstrap_full_sync");
+
+    SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto triggered_realm = Realm::get_shared_realm(triggered_config);
+
+    wait_for_upload(*triggered_realm);
+    wait_for_download(*triggered_realm);
+
+    nlohmann::json command_request = {
+        {"command", "PAUSE_ROUTER_SESSION"},
+    };
+    auto resp_body =
+        SyncSession::OnlyForTesting::send_test_command(*triggered_realm->sync_session(), command_request.dump())
+            .get();
+    REQUIRE(resp_body == "{}");
+
+    auto bar_obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", bar_obj_id},
+                                        {"queryable_str_field", std::string{"bar"}},
+                                        {"queryable_int_field", static_cast<int64_t>(10)},
+                                        {"non_queryable_field", std::string{"non queryable 2"}}}));
+    });
+
+    auto setup_subs = [](SharedRealm& realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.clear();
+        auto col = table->get_column_key("queryable_str_field");
+        new_query.insert_or_assign(Query(table).equal(col, StringData("bar")).Or().equal(col, StringData("bizz")));
+        std::move(new_query).commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_advance(*realm);
+    };
+
+    auto bizz_obj_id = ObjectId::gen();
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        setup_subs(realm);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table->find_primary_key(bar_obj_id));
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", bizz_obj_id},
+                                        {"queryable_str_field", std::string{"bizz"}},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", std::string{"non queryable 3"}}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    });
+
+    setup_subs(triggered_realm);
+
+    auto table = triggered_realm->read_group().get_table("class_TopLevel");
+    REQUIRE(table->find_primary_key(bar_obj_id));
+    REQUIRE(table->find_primary_key(bizz_obj_id));
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS

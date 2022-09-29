@@ -57,6 +57,63 @@ constexpr static std::string_view c_flx_sub_query_str_field("query");
 
 using OptionalString = util::Optional<std::string>;
 
+enum class SubscriptionStateForStorage : int64_t {
+    // This subscription set has not been persisted and has not been sent to the server. This state is only valid
+    // for MutableSubscriptionSets
+    Uncommitted = 0,
+    // The subscription set has been persisted locally but has not been acknowledged by the server yet.
+    Pending = 1,
+    // The server is currently sending the initial state that represents this subscription set to the client.
+    Bootstrapping = 2,
+    // This subscription set is the active subscription set that is currently being synchronized with the server.
+    Complete = 3,
+    // An error occurred while processing this subscription set on the server. Check error_str() for details.
+    Error = 4,
+    // The last bootstrap message containing the initial state for this subscription set has been received. The
+    // client is awaiting a mark message to mark this subscription as fully caught up to history.
+    AwaitingMark = 6,
+};
+
+SubscriptionSet::State state_from_storage(int64_t value)
+{
+    switch (static_cast<SubscriptionStateForStorage>(value)) {
+        case SubscriptionStateForStorage::Uncommitted:
+            return SubscriptionSet::State::Uncommitted;
+        case SubscriptionStateForStorage::Pending:
+            return SubscriptionSet::State::Pending;
+        case SubscriptionStateForStorage::Bootstrapping:
+            return SubscriptionSet::State::Bootstrapping;
+        case SubscriptionStateForStorage::AwaitingMark:
+            return SubscriptionSet::State::AwaitingMark;
+        case SubscriptionStateForStorage::Complete:
+            return SubscriptionSet::State::Complete;
+        case SubscriptionStateForStorage::Error:
+            return SubscriptionSet::State::Error;
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
+int64_t state_to_storage(SubscriptionSet::State state)
+{
+    switch (state) {
+        case SubscriptionSet::State::Uncommitted:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Uncommitted);
+        case SubscriptionSet::State::Pending:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Pending);
+        case SubscriptionSet::State::Bootstrapping:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Bootstrapping);
+        case SubscriptionSet::State::AwaitingMark:
+            return static_cast<int64_t>(SubscriptionStateForStorage::AwaitingMark);
+        case SubscriptionSet::State::Complete:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Complete);
+        case SubscriptionSet::State::Error:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Error);
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
@@ -139,7 +196,7 @@ void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
 
     m_cur_version = tr.get_version();
     m_version = obj.get_primary_key().get_int();
-    m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
+    m_state = state_from_storage(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
@@ -429,8 +486,23 @@ void MutableSubscriptionSet::process_notifications()
     mgr->m_pending_notifications_cv.wait(lk, [&] {
         return mgr->m_outstanding_requests == 0;
     });
+
+    auto cmp_states_gte = [](SubscriptionSet::State lhs, SubscriptionSet::State rhs) {
+        static std::array<int64_t, 7> orders = {
+            0, // SubscriptionSet::State::Uncommitted
+            1, // SubscriptionSet::State::Pending
+            2, // SubscriptionSet::State::Bootstrapping
+            4, // SubscriptionSet::State::Complete
+            5, // SubscriptionSet::State::Error
+            6, // SubscriptionSet::State::Superseded
+            3, // SubscriptionSet::State::AwaitingMark
+        };
+        return orders.at(static_cast<size_t>(lhs)) >= orders.at(static_cast<size_t>(rhs));
+    };
+
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
+        if ((it->version == my_version &&
+             (new_state == State::Error || cmp_states_gte(new_state, it->notify_when))) ||
             (new_state == State::Complete && it->version < my_version)) {
             to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
         }
@@ -486,7 +558,7 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
             new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string()));
         }
     }
-    m_obj.set(mgr->m_sub_set_state, static_cast<int64_t>(m_state));
+    m_obj.set(mgr->m_sub_set_state, state_to_storage(m_state));
     if (!m_error_str.empty()) {
         m_obj.set(mgr->m_sub_set_error_str, StringData(m_error_str));
     }

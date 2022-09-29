@@ -99,7 +99,7 @@ public:
      *                    └────────────────────────────────────────┘
      *
      */
-    enum class State : int64_t {
+    enum class State {
         // This subscription set has not been persisted and has not been sent to the server. This state is only valid
         // for MutableSubscriptionSets
         Uncommitted = 0,
@@ -107,6 +107,9 @@ public:
         Pending,
         // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
+        // The last bootstrap message containing the initial state for this subscription set has been received. The
+        // client is awaiting a mark message to mark this subscription as fully caught up to history.
+        AwaitingMark,
         // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
         // An error occurred while processing this subscription set on the server. Check error_str() for details.
@@ -114,9 +117,6 @@ public:
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
         Superseded,
-        // The last bootstrap message containing the initial state for this subscription set has been received. The
-        // client is awaiting a mark message to mark this subscription as fully caught up to history.
-        AwaitingMark,
     };
 
     static constexpr int64_t EmptyVersion = int64_t(-1);
