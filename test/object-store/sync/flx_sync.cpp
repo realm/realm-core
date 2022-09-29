@@ -277,7 +277,6 @@ static auto make_client_reset_handler()
     };
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
-
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     Schema schema{
         {"TopLevel",
