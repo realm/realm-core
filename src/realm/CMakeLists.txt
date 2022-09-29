@@ -277,7 +277,7 @@ set(REALM_NOINST_HEADERS
     util/demangle.hpp
     util/duplicating_logger.hpp
     util/enum.hpp
-    util/ez_websocket.hpp
+    util/default_websocket.hpp
     util/file_is_regular.hpp
     util/from_chars.hpp
     util/get_file_size.hpp
@@ -319,7 +319,7 @@ add_library(Storage STATIC
 )
 add_library(Realm::Storage ALIAS Storage)
 
-set_target_properties(Storage PROPERTIES 
+set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
