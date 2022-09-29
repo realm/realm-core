@@ -332,7 +332,7 @@ private:
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
                          const std::string& context_message) REQUIRES(!m_state_mutex, !m_config_mutex);
-    void cancel_pending_waits(util::CheckedRecursiveLock, std::error_code) RELEASE(m_state_mutex);
+    void cancel_pending_waits(util::CheckedUniqueLock, std::error_code) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -345,12 +345,11 @@ private:
     void did_drop_external_reference()
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
     void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
-    void close(util::CheckedRecursiveLock) RELEASE(m_state_mutex)
-        REQUIRES(!m_config_mutex, !m_connection_state_mutex);
+    void close(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
-    void become_dying(util::CheckedRecursiveLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
-    void become_inactive(util::CheckedRecursiveLock, std::error_code ec = {}) RELEASE(m_state_mutex)
+    void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
+    void become_inactive(util::CheckedUniqueLock, std::error_code ec = {}) RELEASE(m_state_mutex)
         REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
 
@@ -368,7 +367,7 @@ private:
 
     void assert_mutex_unlocked() ASSERT_CAPABILITY(!m_state_mutex) ASSERT_CAPABILITY(!m_config_mutex) {}
 
-    mutable util::CheckedRecursiveMutex m_state_mutex;
+    mutable util::CheckedMutex m_state_mutex;
     mutable util::CheckedMutex m_connection_state_mutex;
 
     State m_state GUARDED_BY(m_state_mutex) = State::Inactive;
@@ -388,6 +387,7 @@ private:
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;
+    bool m_detaching_from_sync_manager GUARDED_BY(m_state_mutex) = false;
 
     int64_t m_completion_request_counter GUARDED_BY(m_state_mutex) = 0;
     CompletionCallbacks m_completion_callbacks GUARDED_BY(m_state_mutex);
