@@ -3135,6 +3135,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
 
+    clear_mappings_before_test_forks();
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {

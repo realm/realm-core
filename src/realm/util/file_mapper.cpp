@@ -249,10 +249,13 @@ struct ReclaimerThreadStopper {
 #else // REALM_PLATFORM_APPLE
 static dispatch_source_t reclaimer_timer;
 static dispatch_queue_t reclaimer_queue;
+static bool did_init_reclaimer = false;
+static int pid_of_creator = -1;
 
 static void ensure_reclaimer_thread_runs()
 {
-    if (!reclaimer_timer) {
+    if (!did_init_reclaimer) {
+        pid_of_creator = getpid();
         if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
             reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
                                                                 dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
@@ -266,19 +269,21 @@ static void ensure_reclaimer_thread_runs()
             reclaim_pages();
         });
         dispatch_resume(reclaimer_timer);
+        did_init_reclaimer = true;
     }
 }
 
 struct ReclaimerThreadStopper {
     ~ReclaimerThreadStopper()
     {
-        if (reclaimer_timer) {
+        if (did_init_reclaimer && getpid() == pid_of_creator) {
             dispatch_source_cancel(reclaimer_timer);
             // Block until any currently-running timer tasks are done
             dispatch_sync(reclaimer_queue, ^{
                           });
             dispatch_release(reclaimer_timer);
             dispatch_release(reclaimer_queue);
+            did_init_reclaimer = false;
         }
     }
 } reclaimer_thread_stopper;
@@ -290,6 +295,22 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     UniqueLock lock(mapping_mutex);
     governor = new_governor ? new_governor : &default_governor;
     ensure_reclaimer_thread_runs();
+}
+
+void clear_mappings_before_test_forks()
+{
+#if !REALM_PLATFORM_APPLE
+    if (reclaimer_thread) {
+        reclaimer_shutdown = true;
+        reclaimer_thread->join();
+        reclaimer_thread = nullptr;
+        reclaimer_shutdown = false;
+    }
+#endif
+    UniqueLock lock(mapping_mutex);
+    mappings_by_addr.clear();
+    mappings_by_file.clear();
+    num_decrypted_pages = 0;
 }
 
 size_t get_num_decrypted_pages()
