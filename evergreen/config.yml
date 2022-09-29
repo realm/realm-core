@@ -406,7 +406,7 @@ tasks:
       working_dir: realm-core/build/test
       shell: /bin/bash
       script: |-
-        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./realm-tests
+        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
 - name: bloaty
   exec_timeout_secs: 1800
