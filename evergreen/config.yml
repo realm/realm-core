@@ -396,7 +396,7 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 3600
+  exec_timeout_secs: 7200
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -406,6 +406,7 @@ tasks:
       working_dir: realm-core/build/test
       shell: /bin/bash
       script: |-
+        export UNITTEST_PROGRESS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
 - name: bloaty
@@ -887,7 +888,7 @@ buildvariants:
 
 - name: ubuntu-valgrind
   display_name: "Ubuntu 2204 Valgrind"
-  run_on: ubuntu2204-small
+  run_on: ubuntu2204-large
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
@@ -902,7 +903,7 @@ buildvariants:
   tasks:
   - name: valgrind
     distros:
-    - ubuntu2204-small
+    - ubuntu2204-large
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
