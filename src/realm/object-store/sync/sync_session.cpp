@@ -143,9 +143,14 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     std::swap(waits, m_completion_callbacks);
 
     m_session = nullptr;
-    auto& sync_manager = *m_sync_manager;
+    std::shared_ptr<SyncManager> sync_manager;
+    if (m_sync_manager) {
+        sync_manager = m_sync_manager->shared_from_this();
+    }
     m_state_mutex.unlock(lock);
-    sync_manager.unregister_session(m_db->get_path());
+    if (sync_manager) {
+        sync_manager->unregister_session(m_db->get_path());
+    }
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
     if (old_state != new_state) {
@@ -295,10 +300,6 @@ std::shared_ptr<SyncManager> SyncSession::sync_manager() const
 
 void SyncSession::detach_from_sync_manager()
 {
-    {
-        util::CheckedUniqueLock lock(m_state_mutex);
-        m_detaching_from_sync_manager = true;
-    }
     shutdown_and_wait();
     util::CheckedLockGuard lk(m_state_mutex);
     m_sync_manager = nullptr;
@@ -958,17 +959,13 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Inactive: {
-            auto& sync_manager = *m_sync_manager;
-            auto needs_to_unregister = !m_detaching_from_sync_manager;
+            std::shared_ptr<SyncManager> sync_manager;
+            if (m_sync_manager) {
+                sync_manager = m_sync_manager->shared_from_this();
+            }
             m_state_mutex.unlock(lock);
-            // There is a race if `detach_from_sync_manager()` and `close()` are called at the same time (the
-            // SyncManager may get deallocated just before unregistering the session). So if at this point
-            // `detach_from_sync_manager()` was called, we skip unregistration.
-            // Note: The session will not be unregistered if `detach_from_sync_manager()` is called while the session
-            // is in its initial state (i.e, `State::Inactive`), but that's not a problem since the SyncManager is
-            // being destroyed anyway.
-            if (needs_to_unregister) {
-                sync_manager.unregister_session(m_db->get_path());
+            if (sync_manager) {
+                sync_manager->unregister_session(m_db->get_path());
             }
             break;
         }
