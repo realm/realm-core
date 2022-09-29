@@ -266,6 +266,8 @@ static auto make_error_handler()
     return std::make_pair(std::move(error_future), std::move(fn));
 }
 
+// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
+#if 0
 static auto make_client_reset_handler()
 {
     auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
@@ -276,8 +278,6 @@ static auto make_client_reset_handler()
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
 
-// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
-#if 0
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     Schema schema{
         {"TopLevel",

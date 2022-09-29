@@ -27,7 +27,7 @@ namespace {
 class LegacyWebsocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
     LegacyWebsocketImpl(const SocketFactoryConfig& config, const DefaultSocketFactoryConfig& legacy_config,
-               SocketObserver& observer, Endpoint&& endpoint)
+                        SocketObserver& observer, Endpoint&& endpoint)
         : m_config(config)
         , m_legacy_config(legacy_config)
         , m_observer(observer)
@@ -175,7 +175,7 @@ void LegacyWebsocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_legacy_config.service);               // Throws
+    m_resolver.emplace(m_legacy_config.service);                     // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
@@ -206,7 +206,8 @@ void LegacyWebsocketImpl::initiate_tcp_connect(util::network::Endpoint::List end
     logger().detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
-void LegacyWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
+void LegacyWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints,
+                                             std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);

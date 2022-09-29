@@ -66,13 +66,14 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     logger->set_level_threshold(TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off);
 
     TestAppSession session(
-//        get_runtime_app_session(get_base_url()), nullptr, true);
+        // get_runtime_app_session(get_base_url()), nullptr, true);
         get_runtime_app_session(get_base_url()), nullptr, true,
         std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"},
                                             DefaultSocketFactoryConfig{
                                                 *logger,
                                                 random,
-                                                service, },
+                                                service,
+                                            },
                                             [&]() {
                                                 didCallConnect = true;
                                             }));

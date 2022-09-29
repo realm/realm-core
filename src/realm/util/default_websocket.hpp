@@ -36,7 +36,7 @@ struct DefaultSocketFactoryConfig {
 };
 
 // Legacy Core websocket implementation
-class DefaultSocketFactory  : public SocketFactory {
+class DefaultSocketFactory : public SocketFactory {
 public:
     DefaultSocketFactory(const SocketFactoryConfig& config, const DefaultSocketFactoryConfig& legacy_config)
         : SocketFactory(config)
