@@ -740,9 +740,10 @@ void SyncSession::create_sync_session()
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     if (sync_config.on_download_message_received_hook) {
         session_config.on_download_message_received_hook =
-            [hook = sync_config.on_download_message_received_hook, anchor = weak_from_this()](
-                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
-                hook(anchor, progress, query_version, batch_state);
+            [hook = sync_config.on_download_message_received_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
             };
     }
     if (sync_config.on_bootstrap_message_processed_hook) {
@@ -752,6 +753,14 @@ void SyncSession::create_sync_session()
                                         sync::DownloadBatchState batch_state) -> bool {
             return hook(anchor, progress, query_version, batch_state);
         };
+    }
+    if (sync_config.on_download_message_integrated_hook) {
+        session_config.on_download_message_integrated_hook =
+            [hook = sync_config.on_download_message_integrated_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
+            };
     }
 
     {
@@ -1042,24 +1051,6 @@ void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::er
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     add_completion_callback(std::move(callback), ProgressDirection::download);
-}
-
-bool SyncSession::wait_for_upload_completion()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_upload_complete_or_client_stopped();
-    }
-    return false;
-}
-
-bool SyncSession::wait_for_download_completion()
-{
-    util::CheckedUniqueLock lock(m_state_mutex);
-    if (m_session) {
-        return m_session->wait_for_download_complete_or_client_stopped();
-    }
-    return false;
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,

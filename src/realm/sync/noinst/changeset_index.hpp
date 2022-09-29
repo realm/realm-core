@@ -30,7 +30,7 @@ namespace _impl {
 
 /// The ChangesetIndex is responsible for keeping track of exactly which
 /// instructions touch which objects. It does this by recording ranges of
-/// instructions in changesets, such that the merge algorithm can make do with
+/// instructions in changesets, such that the merge algorithm can do with
 /// just merging the "relevant" instructions. Due to the semantics of link
 /// nullification, instruction ranges for objects that have ever been
 /// "connected" by a link instruction must be joined together. In other words,
