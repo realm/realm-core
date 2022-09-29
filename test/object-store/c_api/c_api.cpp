@@ -1650,6 +1650,14 @@ TEST_CASE("C API", "[c_api]") {
         REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
 
+        SECTION("realm_get_value_by_property_index") {
+            realm_value value;
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 0, &value)));
+            CHECK(value.integer == int_val1.integer);
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 16, &value)));
+            CHECK(value.string.data == std::string{"Hello, World!"});
+        }
+
         SECTION("realm_clone()") {
             auto obj1a = clone_cptr(obj1);
             CHECK(realm_equals(obj1a.get(), obj1.get()));
@@ -3342,6 +3350,16 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_set_size(bars.get(), &size)));
                     CHECK(size == 1);
+
+                    auto results =
+                        cptr_checked(realm_get_backlinks(obj2.get(), class_foo.key, foo_properties["link_set"]));
+                    CHECK(results->size() == 1);
+                    auto mixed_link = results->get_any(0);
+                    CHECK(!mixed_link.is_unresolved_link());
+                    CHECK(mixed_link.is_type(type_TypedLink));
+                    auto link = mixed_link.get_link();
+                    CHECK(link.get_obj_key() == obj1->obj().get_key());
+                    CHECK(link.get_table_key() == obj1->obj().get_table()->get_key());
                 });
 
                 SECTION("get") {

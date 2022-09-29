@@ -233,6 +233,7 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
+    util/http.hpp
     util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp

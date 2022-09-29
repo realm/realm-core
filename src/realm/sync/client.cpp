@@ -244,8 +244,9 @@ private:
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
-    std::function<void(const SyncProgress&, int64_t, DownloadBatchState)> m_on_download_message_received_hook;
+    std::function<void(const SyncProgress&, int64_t, DownloadBatchState, size_t)> m_on_download_message_received_hook;
     std::function<bool(const SyncProgress&, int64_t, DownloadBatchState)> m_on_bootstrap_message_processed_hook;
+    std::function<void(const SyncProgress&, int64_t, DownloadBatchState, size_t)> on_download_message_integrated_hook;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -731,12 +732,7 @@ void SessionImpl::on_resumed()
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
 {
-    if (!m_is_flx_sync_session) {
-        return false;
-    }
-
-    // If this is a steady state DOWNLOAD, no need for special handling.
-    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
+    if (is_steady_state_download_message(batch_state, query_version)) {
         return false;
     }
 
@@ -810,11 +806,14 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            [&](const TransactionRef& tr) {
-                bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
+            [&](const TransactionRef& tr, size_t count) {
+                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, count);
             },
             get_transact_reporter());
         progress = *pending_batch.progress;
+
+        download_message_integrated_hook(progress, query_version, batch_state, pending_batch.changesets.size());
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
@@ -860,12 +859,40 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
 }
 
 void SessionImpl::receive_download_message_hook(const SyncProgress& progress, int64_t query_version,
-                                                DownloadBatchState batch_state)
+                                                DownloadBatchState batch_state, size_t num_changesets)
 {
     if (REALM_LIKELY(!m_wrapper.m_on_download_message_received_hook)) {
         return;
     }
-    m_wrapper.m_on_download_message_received_hook(progress, query_version, batch_state);
+    m_wrapper.m_on_download_message_received_hook(progress, query_version, batch_state, num_changesets);
+}
+
+void SessionImpl::download_message_integrated_hook(const SyncProgress& progress, int64_t query_version,
+                                                   DownloadBatchState batch_state, size_t num_changesets)
+{
+    if (REALM_LIKELY(!m_wrapper.on_download_message_integrated_hook)) {
+        return;
+    }
+
+    m_wrapper.on_download_message_integrated_hook(progress, query_version, batch_state, num_changesets);
+}
+
+bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
+{
+    if (batch_state == DownloadBatchState::SteadyState) {
+        return true;
+    }
+
+    if (!m_is_flx_sync_session) {
+        return true;
+    }
+
+    // If this is a steady state DOWNLOAD, no need for special handling.
+    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
+        return true;
+    }
+
+    return false;
 }
 
 // ################ SessionWrapper ################
@@ -891,6 +918,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_on_download_message_received_hook(std::move(config.on_download_message_received_hook))
     , m_on_bootstrap_message_processed_hook(config.on_bootstrap_message_processed_hook)
+    , on_download_message_integrated_hook{std::move(config.on_download_message_integrated_hook)}
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);
@@ -967,10 +995,14 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     }
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
+    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
     switch (batch_state) {
+        case DownloadBatchState::SteadyState:
+            // Cannot be called with this value.
+            REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
             if (m_flx_active_version == new_version) {
                 return;

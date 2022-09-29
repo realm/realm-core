@@ -266,6 +266,7 @@ static auto make_error_handler()
     return std::make_pair(std::move(error_future), std::move(fn));
 }
 
+#if 0
 static auto make_client_reset_handler()
 {
     auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
@@ -275,7 +276,7 @@ static auto make_client_reset_handler()
     };
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
-
+// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     Schema schema{
         {"TopLevel",
@@ -740,6 +741,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             ->run();
     }
 }
+#endif
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
@@ -1037,7 +1039,8 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         config.sync_config->on_download_message_received_hook = [promise = std::move(shared_promise)](
                                                                     std::weak_ptr<SyncSession> weak_session,
                                                                     const sync::SyncProgress&, int64_t query_version,
-                                                                    sync::DownloadBatchState batch_state) mutable {
+                                                                    sync::DownloadBatchState batch_state,
+                                                                    size_t) mutable {
             auto session = weak_session.lock();
             if (!session) {
                 return;
@@ -1693,13 +1696,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         interrupted_realm_config.sync_config->on_download_message_received_hook =
             [&, promise = std::move(shared_saw_valid_state_promise)](std::weak_ptr<SyncSession> weak_session,
                                                                      const sync::SyncProgress&, int64_t query_version,
-                                                                     sync::DownloadBatchState batch_state) {
+                                                                     sync::DownloadBatchState batch_state, size_t) {
                 auto session = weak_session.lock();
                 if (!session) {
                     return;
                 }
 
-                if (query_version != 1 || batch_state != sync::DownloadBatchState::LastInBatch) {
+                if (query_version != 1 || batch_state == sync::DownloadBatchState::MoreToCome) {
                     return;
                 }
 

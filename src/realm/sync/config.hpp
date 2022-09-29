@@ -174,12 +174,17 @@ struct SyncConfig {
 
     // Will be called after a download message is received and validated by the client but befefore it's been
     // transformed or applied. To be used in testing only.
-    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState,
+                       size_t)>
         on_download_message_received_hook;
     // Will be called after each bootstrap message is added to the pending bootstrap store, but before
     // processing a finalized bootstrap. For testing only.
     std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_bootstrap_message_processed_hook;
+    // Will be called after a download message is integrated. For testing only.
+    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState,
+                       size_t)>
+        on_download_message_integrated_hook;
 
     bool simulate_integration_error = false;
 
