@@ -64,19 +64,20 @@ namespace realm {
 namespace util {
 
 // std::unique_lock with thread safety annotations
-class SCOPED_CAPABILITY CheckedUniqueLock {
-    using Impl = std::unique_lock<std::mutex>;
+template <typename mutex_type>
+class SCOPED_CAPABILITY CheckedLock {
+    using Impl = std::unique_lock<mutex_type>;
 
 public:
     template <typename Mutex>
-    CheckedUniqueLock(Mutex const& m) ACQUIRE(m)
+    CheckedLock(Mutex const& m) ACQUIRE(m)
         : m_impl(m.lock())
     {
     }
-    ~CheckedUniqueLock() RELEASE() {}
+    ~CheckedLock() RELEASE() {}
 
-    CheckedUniqueLock(CheckedUniqueLock&&) = default;
-    CheckedUniqueLock& operator=(CheckedUniqueLock&&) = default;
+    CheckedLock(CheckedLock&&) = default;
+    CheckedLock& operator=(CheckedLock&&) = default;
 
     void lock() ACQUIRE()
     {
@@ -107,6 +108,9 @@ public:
 private:
     Impl m_impl;
 };
+
+using CheckedUniqueLock = CheckedLock<std::mutex>;
+using CheckedRecursiveLock = CheckedLock<std::recursive_mutex>;
 
 // std::lock_guard with thread safety annotations
 class SCOPED_CAPABILITY CheckedLockGuard {
@@ -156,12 +160,45 @@ public:
 
 private:
     mutable std::mutex m_mutex;
-    friend class CheckedUniqueLock;
+    friend CheckedUniqueLock;
     friend class CheckedLockGuard;
 
     std::unique_lock<std::mutex> lock() const
     {
         return std::unique_lock<std::mutex>(m_mutex);
+    }
+};
+
+// std::recursive_mutex with thread safety annotations
+class CAPABILITY("recursive_mutex") CheckedRecursiveMutex {
+public:
+    CheckedRecursiveMutex() = default;
+
+    // Required for REQUIRE(!m); do not actually call
+    CheckedRecursiveMutex const& operator!() const
+    {
+        return *this;
+    }
+
+    // Thread-safety analysis is purely function-local, so when we pass a
+    // UniqueLock to a function, the analysis doesn't know what mutex is
+    // released by unlock(). Unlocking via this function tells it which one is
+    // used.
+    void unlock(CheckedRecursiveLock& lock) RELEASE()
+    {
+        REALM_ASSERT(lock.owns_lock());
+        REALM_ASSERT(lock.native_handle().mutex() == &m_mutex);
+        lock.unlock_unchecked();
+    }
+
+private:
+    mutable std::recursive_mutex m_mutex;
+    friend CheckedRecursiveLock;
+    friend class CheckedLockGuard;
+
+    std::unique_lock<std::recursive_mutex> lock() const
+    {
+        return std::unique_lock<std::recursive_mutex>(m_mutex);
     }
 };
 
@@ -184,7 +221,7 @@ public:
 
 private:
     mutable std::unique_ptr<std::mutex> m_mutex;
-    friend class CheckedUniqueLock;
+    friend CheckedUniqueLock;
     friend class CheckedLockGuard;
 
     std::unique_lock<std::mutex> lock() const;
