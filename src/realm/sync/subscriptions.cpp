@@ -487,22 +487,8 @@ void MutableSubscriptionSet::process_notifications()
         return mgr->m_outstanding_requests == 0;
     });
 
-    auto cmp_states_gte = [](SubscriptionSet::State lhs, SubscriptionSet::State rhs) {
-        static std::array<int64_t, 7> orders = {
-            0, // SubscriptionSet::State::Uncommitted
-            1, // SubscriptionSet::State::Pending
-            2, // SubscriptionSet::State::Bootstrapping
-            4, // SubscriptionSet::State::Complete
-            5, // SubscriptionSet::State::Error
-            6, // SubscriptionSet::State::Superseded
-            3, // SubscriptionSet::State::AwaitingMark
-        };
-        return orders.at(static_cast<size_t>(lhs)) >= orders.at(static_cast<size_t>(rhs));
-    };
-
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version &&
-             (new_state == State::Error || cmp_states_gte(new_state, it->notify_when))) ||
+        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
             (new_state == State::Complete && it->version < my_version)) {
             to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
         }
