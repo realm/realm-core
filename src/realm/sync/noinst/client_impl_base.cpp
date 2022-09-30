@@ -423,7 +423,7 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
 void Connection::websocket_protocol_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
+    bool is_fatal = true;                                       // A WebSocket protocol violation is a fatal error
     close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
@@ -1060,7 +1060,7 @@ void Connection::close_due_to_missing_protocol_feature()
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
     std::error_code ec = ClientError::missing_protocol_feature;
-    bool is_fatal = true;                         // A missing protocol feature is a fatal error
+    bool is_fatal = true;                                       // A missing protocol feature is a fatal error
     close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
@@ -1339,6 +1339,23 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = sess->m_ident;
         m_sessions.erase(ident);
+    }
+}
+
+
+void Connection::receive_test_command_response(session_ident_type session_ident, request_ident_type request_ident,
+                                               std::string_view body)
+{
+    Session* sess = get_session(session_ident);
+    if (REALM_UNLIKELY(!sess)) {
+        logger.error("Bad session identifier in TEST_COMMAND response message, session_ident = %1",
+                     session_ident);                                 // Throws
+        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
+        return;
+    }
+
+    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
+        close_due_to_protocol_error(ec);
     }
 }
 
@@ -1645,6 +1662,14 @@ void Session::send_message()
         if (have_client_file_ident())
             send_ident_message(); // Throws
         return;
+    }
+
+    const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                                                      [](const PendingTestCommand& command) {
+                                                          return command.pending;
+                                                      });
+    if (has_pending_test_command) {
+        return send_test_command_message();
     }
 
     if (m_error_to_send)
@@ -1982,6 +2007,30 @@ void Session::send_json_error_message()
 
     // Connection is waiting to be closed
     enlist_to_send(); // Throws
+}
+
+
+void Session::send_test_command_message()
+{
+    REALM_ASSERT(m_state == Active);
+
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [](const PendingTestCommand& command) {
+                               return command.pending;
+                           });
+    REALM_ASSERT(it != m_pending_test_commands.end());
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    auto session_ident = get_ident();
+
+    logger.info("Sending: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", it->body, session_ident, it->id);
+    protocol.make_test_command_message(out, session_ident, it->id, it->body);
+
+    m_conn.initiate_write_message(out, this); // Throws;
+    it->pending = false;
+
+    enlist_to_send();
 }
 
 
@@ -2337,6 +2386,24 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         ensure_enlisted_to_send(); // Throws
 
     return std::error_code{}; // Success;
+}
+
+std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)
+{
+    logger.info("Received: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", body, m_ident, ident);
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [&](const PendingTestCommand& command) {
+                               return command.id == ident;
+                           });
+    if (it == m_pending_test_commands.end()) {
+        logger.error("No matching pending test command for id %1", ident);
+        return ClientError::bad_request_ident;
+    }
+
+    it->promise.emplace_value(std::string{body});
+    m_pending_test_commands.erase(it);
+
+    return {};
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)

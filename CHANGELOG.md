@@ -23,6 +23,7 @@
 ### Internals
 * Reenable sync benchmark.
 * Add util/http.hpp to the release package.
+* Implement test commands in sync wire protocol to be used in flx sync testing.
 
 ----------------------------------------------
 

@@ -178,6 +178,9 @@ public:
 
     void make_json_error_message(OutputBuffer&, session_ident_type, int error_code, std::string_view error_body);
 
+    void make_test_command_message(OutputBuffer&, session_ident_type session, request_ident_type request_ident,
+                                   std::string_view body);
+
     class UploadMessageBuilder {
     public:
         util::Logger& logger;
@@ -340,6 +343,14 @@ public:
                 client_file_ident.salt = msg.read_next<salt_type>('\n');
 
                 connection.receive_ident_message(session_ident, client_file_ident); // Throws
+            }
+            else if (message_type == "test_command") {
+                session_ident_type session_ident = msg.read_next<session_ident_type>();
+                request_ident_type request_ident = msg.read_next<request_ident_type>();
+                auto body_size = msg.read_next<size_t>('\n');
+                auto body = msg.read_sized_data<std::string_view>(body_size);
+
+                connection.receive_test_command_response(session_ident, request_ident, body);
             }
             else {
                 return report_error(Error::unknown_message, "Unknown input message type '%1'", msg_data);
