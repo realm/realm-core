@@ -299,18 +299,16 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
             ++j;
         }
         else if (cmp < 0) {
-            add_missing_classes(object_schema);
             func(&object_schema, nullptr);
             ++i;
         }
         else {
-            add_missing_classes(matching_schema);
             func(nullptr, &matching_schema);
+            add_missing_classes(matching_schema);
             ++j;
         }
     }
     for (; i < a.size(); ++i) {
-        add_missing_classes(a[i]);
         func(&a[i], nullptr);
     }
     for (; j < b.size(); ++j) {
