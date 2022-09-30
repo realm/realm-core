@@ -525,7 +525,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
+void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missing)
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
 
@@ -533,8 +533,16 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr,
-                            static_cast<size_t>(1ULL << m_page_shift));
+        size_t size = static_cast<size_t>(1ULL << m_page_shift);
+        bool did_read = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
+        if (!did_read) {
+            if (allow_missing) {
+                memset(addr, 0, size);
+            }
+            else {
+                throw DecryptionFailed();
+            }
+        }
     }
     if (is_not(m_page_state[local_page_ndx], UpToDate | RefetchRequired))
         m_num_decrypted++;
@@ -814,7 +822,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     }
 }
 
-void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size,
+                                        bool allow_missing)
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
 
@@ -824,7 +833,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(first_accessed_local_page);
+            refresh_page(first_accessed_local_page, allow_missing);
     }
 
     // force the page reclaimer to look into pages in this chunk:
@@ -833,7 +842,6 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         m_chunk_dont_scan[chunk_ndx] = 0;
 
     if (header_to_size) {
-
         // We know it's an array, and array headers are 8-byte aligned, so it is
         // included in the first page which was handled above.
         size = header_to_size(static_cast<const char*>(addr));
@@ -845,7 +853,6 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
-
         // force the page reclaimer to look into pages in this chunk
         chunk_ndx = idx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx])
@@ -855,7 +862,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(idx);
+            refresh_page(idx, allow_missing);
     }
 }
 

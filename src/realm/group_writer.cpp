@@ -154,7 +154,7 @@ char* GroupWriter::MapWindow::translate(ref_type ref)
 
 void GroupWriter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
-    realm::util::encryption_read_barrier(start_addr, size, m_map.get_encrypted_mapping());
+    realm::util::encryption_read_barrier_for_write(start_addr, size, m_map.get_encrypted_mapping());
 }
 
 void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
