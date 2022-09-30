@@ -23,6 +23,7 @@
 #include <map>
 
 #include <realm/sync/config.hpp>
+#include <realm/util/assert.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/network.hpp>
 
@@ -101,9 +102,63 @@ protected:
 
 class WebSocket {
 public:
+    WebSocket(std::shared_ptr<util::network::Service>& service, std::shared_ptr<std::mt19937_64>& random)
+        : m_service(service)
+        , m_random(random)
+    {
+    }
+
     virtual ~WebSocket();
 
     virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
+
+protected:
+    /// Register the sepcified completion handler for immediate asynchronous
+    /// execution. The specified handler will be executed by an expression on
+    /// the form `handler()`. If the the handler object is movable, it will
+    /// never be copied. Otherwise, it will be copied as necessary.
+    ///
+    /// This function is thread-safe, that is, it may be called by any
+    /// thread. It may also be called from other completion handlers.
+    ///
+    /// The handler will never be called as part of the execution of post(). It
+    /// will always be called by a thread that is executing run(). If no thread
+    /// is currently executing run(), the handler will not be executed until a
+    /// thread starts executing run(). If post() is called while another thread
+    /// is executing run(), the handler may be called before post() returns. If
+    /// post() is called from another completion handler, the submitted handler
+    /// is guaranteed to not be called during the execution of post().
+    ///
+    /// Completion handlers added through post() will be executed in the order
+    /// that they are added. More precisely, if post() is called twice to add
+    /// two handlers, A and B, and the execution of post(A) ends before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
+    virtual void post(util::UniqueFunction<void()>&& handler)
+    {
+        REALM_ASSERT(m_service != nullptr);
+        m_service->post(std::move(handler));
+    }
+
+    virtual util::network::Service& get_service()
+    {
+        REALM_ASSERT(m_service != nullptr);
+        return *m_service;
+    }
+
+    virtual std::mt19937_64& get_random()
+    {
+        REALM_ASSERT(m_random != nullptr);
+        return *m_random;
+    }
+
+    // Until we can update the client's dependency on service (timers and triggers),
+    // the custom websocket will need access to the service for posting callbacks
+    // on the sync's thread
+    std::shared_ptr<util::network::Service> m_service;
+
+    // Randomizer with the same seed as the client
+    std::shared_ptr<std::mt19937_64> m_random;
 };
 
 class SocketFactory {
@@ -140,10 +195,41 @@ public:
     /// two handlers, A and B, and the execution of post(A) ends before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    virtual void post(util::UniqueFunction<void()>&& handler) = 0;
+    virtual void post(util::UniqueFunction<void()>&& handler)
+    {
+        REALM_ASSERT(m_service != nullptr);
+        m_service->post(std::move(handler));
+    }
+
+    virtual void initialize(std::shared_ptr<util::network::Service>& service,
+                            std::shared_ptr<std::mt19937_64>& random)
+    {
+        m_service = service;
+        m_random = random;
+    }
+
+    virtual util::network::Service& get_service()
+    {
+        REALM_ASSERT(m_service != nullptr);
+        return *m_service;
+    }
+
+    virtual std::mt19937_64& get_random()
+    {
+        REALM_ASSERT(m_random != nullptr);
+        return *m_random;
+    }
 
 protected:
     const SocketFactoryConfig m_config;
+
+    // Until we can update the client's dependency on service (timers and triggers),
+    // the custom websocket will need access to the service for posting callbacks
+    // on the sync's thread
+    std::shared_ptr<util::network::Service> m_service;
+
+    // Randomizer with the same seed as the client
+    std::shared_ptr<std::mt19937_64> m_random;
 };
 
 } // namespace realm::util::websocket

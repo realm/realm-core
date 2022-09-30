@@ -40,9 +40,9 @@ using namespace realm::util::websocket;
 
 class TestSocketFactory : public DefaultSocketFactory {
 public:
-    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig legacy_config,
+    TestSocketFactory(const std::string& user_agent, util::Logger& logger,
                       util::UniqueFunction<void()>&& factoryCallback)
-        : DefaultSocketFactory(config, legacy_config)
+        : DefaultSocketFactory(user_agent, logger)
         , didCallHandler(std::move(factoryCallback))
     {
     }
@@ -57,26 +57,23 @@ public:
     util::UniqueFunction<void()> didCallHandler;
 };
 
+#if REALM_ENABLE_AUTH_TESTS
+
 TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     bool didCallConnect = false;
 
     auto logger = std::make_unique<util::StderrLogger>();
     std::mt19937_64 random;
     util::network::Service service;
-    logger->set_level_threshold(TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off);
+    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+
 
     TestAppSession session(
         // get_runtime_app_session(get_base_url()), nullptr, true);
         get_runtime_app_session(get_base_url()), nullptr, true,
-        std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"},
-                                            DefaultSocketFactoryConfig{
-                                                *logger,
-                                                random,
-                                                service,
-                                            },
-                                            [&]() {
-                                                didCallConnect = true;
-                                            }));
+        std::make_shared<TestSocketFactory>("test-user-agent", *logger, [&]() {
+            didCallConnect = true;
+        }));
     auto app = session.app();
 
     auto schema = default_app_config("").schema;
@@ -103,4 +100,7 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
         REQUIRE(didCallConnect);
     }
 }
+
+#endif // REALM_ENABLE_AUTH_TESTS
+
 #endif

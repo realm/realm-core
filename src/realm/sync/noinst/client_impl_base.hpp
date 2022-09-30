@@ -173,8 +173,8 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    util::network::Service m_service;
-    std::mt19937_64 m_random;
+    std::shared_ptr<util::network::Service> m_service;
+    std::shared_ptr<std::mt19937_64> m_random;
     std::shared_ptr<util::websocket::SocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
@@ -1123,12 +1123,14 @@ inline bool ClientImpl::is_dry_run() const noexcept
 
 inline util::network::Service& ClientImpl::get_service() noexcept
 {
-    return m_service;
+    REALM_ASSERT(m_service != nullptr);
+    return *m_service;
 }
 
 inline std::mt19937_64& ClientImpl::get_random() noexcept
 {
-    return m_random;
+    REALM_ASSERT(m_random != nullptr);
+    return *m_random;
 }
 
 inline auto ClientImpl::get_next_session_ident() noexcept -> session_ident_type

@@ -15,8 +15,8 @@
  * limitations under the License.
  *
  **************************************************************************/
-#ifndef REALM_LEGACY_WEBSOCKET_HPP
-#define REALM_LEGACY_WEBSOCKET_HPP
+#ifndef REALM_DEFAULT_WEBSOCKET_HPP
+#define REALM_DEFAULT_WEBSOCKET_HPP
 
 #include <random>
 #include <system_error>
@@ -28,33 +28,27 @@
 
 namespace realm::util::websocket {
 
-// Legacy socket configuration
-struct DefaultSocketFactoryConfig {
-    util::Logger& logger;
-    std::mt19937_64& random;
-    util::network::Service& service;
-};
-
-// Legacy Core websocket implementation
+// Default Core websocket implementation
 class DefaultSocketFactory : public SocketFactory {
 public:
-    DefaultSocketFactory(const SocketFactoryConfig& config, const DefaultSocketFactoryConfig& legacy_config)
+    DefaultSocketFactory(const std::string& user_agent, util::Logger& logger)
+        : SocketFactory(SocketFactoryConfig{user_agent})
+        , logger(logger)
+    {
+    }
+
+    DefaultSocketFactory(const SocketFactoryConfig& config, util::Logger& logger)
         : SocketFactory(config)
-        , m_legacy_config(legacy_config)
+        , logger(logger)
     {
     }
 
     virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
 
-    virtual void post(util::UniqueFunction<void()>&& handler) override
-    {
-        m_legacy_config.service.post(std::move(handler)); // Throws
-    }
-
 private:
-    const DefaultSocketFactoryConfig m_legacy_config;
+    util::Logger& logger;
 };
 
 } // namespace realm::util::websocket
 
-#endif // REALM_CLIENT_WEBSOCKET_HPP
+#endif // REALM_DEFAULT_WEBSOCKET_HPP

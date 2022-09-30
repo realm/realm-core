@@ -39,7 +39,7 @@
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#ifndef REALM_NO_LEGACY_WEBSOCKET
+#ifndef REALM_NO_DEFAULT_WEBSOCKET
 #include <realm/util/default_websocket.hpp>
 #endif
 
@@ -139,9 +139,10 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
-    , m_user_agent_string{make_user_agent_string(config)} // Throws
-    , m_service{}                                         // Throws
-    , m_client_protocol{}                                 // Throws
+    , m_user_agent_string{make_user_agent_string(config)}   // Throws
+    , m_service(std::make_shared<util::network::Service>()) // Throws
+    , m_random(std::make_shared<std::mt19937_64>())
+    , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -149,24 +150,18 @@ ClientImpl::ClientImpl(ClientConfig config)
         m_socket_factory = config.socket_factory;
     }
     else {
-#ifdef REALM_NO_LEGACY_WEBSOCKET
+#ifdef REALM_NO_DEFAULT_WEBSOCKET
         throw util::invalid_argument("No websocket implementation provided to client config");
 #else
-        logger.debug("Using legacy websocket");
-        m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(
-            websocket::SocketFactoryConfig{
-                get_user_agent_string(),
-            },
-            websocket::DefaultSocketFactoryConfig{
-                logger,
-                m_random,
-                m_service,
-            });
+        logger.debug("Using default websocket");
+        m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(get_user_agent_string(), logger);
 #endif
     }
+    REALM_ASSERT(m_socket_factory != nullptr);
+    m_socket_factory->initialize(m_service, m_random);
 
     // FIXME: Would be better if seeding was up to the application.
-    util::seed_prng_nondeterministically(m_random); // Throws
+    util::seed_prng_nondeterministically(*m_random); // Throws
 
     logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
     logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),

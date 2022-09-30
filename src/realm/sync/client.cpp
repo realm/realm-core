@@ -477,19 +477,21 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
+    REALM_ASSERT(m_service != nullptr);
     util::LockGuard lock{m_mutex};
     if (m_stopped)
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
-    m_service.stop();
+    m_service->stop();
 }
 
 
 void ClientImpl::run()
 {
+    REALM_ASSERT(m_service != nullptr);
     auto ta = util::make_temp_assign(m_running, true);
-    m_service.run(); // Throws
+    m_service->run(); // Throws
 }
 
 

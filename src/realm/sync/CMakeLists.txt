@@ -26,7 +26,7 @@ set(SYNC_SOURCES
     ../util/websocket.cpp
 )
 
-if(NOT REALM_NO_LEGACY_WEBSOCKET)
+if(NOT REALM_NO_DEFAULT_WEBSOCKET)
     list(APPEND SYNC_SOURCES
         ../util/network_ssl.cpp
         ../util/default_websocket.cpp)
@@ -88,7 +88,7 @@ target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
-elseif(NOT REALM_NO_LEGACY_WEBSOCKET)
+elseif(NOT REALM_NO_DEFAULT_WEBSOCKET)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 

@@ -18,18 +18,21 @@
 
 #include <realm/util/default_websocket.hpp>
 
+#include <realm/util/assert.hpp>
 #include <realm/util/websocket.hpp>
 #include <realm/util/network_ssl.hpp>
 
 namespace realm::util::websocket {
 
 namespace {
-class LegacyWebsocketImpl final : public WebSocket, public realm::util::websocket::Config {
+class DefaultWebsocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    LegacyWebsocketImpl(const SocketFactoryConfig& config, const DefaultSocketFactoryConfig& legacy_config,
-                        SocketObserver& observer, Endpoint&& endpoint)
-        : m_config(config)
-        , m_legacy_config(legacy_config)
+    DefaultWebsocketImpl(const SocketFactoryConfig& config, util::Logger& logger,
+                         std::shared_ptr<util::network::Service>& service, std::shared_ptr<std::mt19937_64>& random,
+                         SocketObserver& observer, Endpoint&& endpoint)
+        : WebSocket(service, random)
+        , m_config(config)
+        , logger(logger)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
         , m_websocket(*this)
@@ -52,11 +55,12 @@ private:
 
     util::Logger& websocket_get_logger() noexcept override
     {
-        return m_legacy_config.logger;
+        return logger;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
-        return m_legacy_config.random;
+        REALM_ASSERT(m_random != nullptr);
+        return *m_random;
     }
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
@@ -67,12 +71,12 @@ private:
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
-        logger().error("Reading failed: %1", ec.message()); // Throws
+        logger.error("Reading failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
-        logger().error("Writing failed: %1", ec.message()); // Throws
+        logger.error("Writing failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
@@ -105,13 +109,8 @@ private:
     void initiate_websocket_handshake();
     void handle_connection_established();
 
-    util::Logger& logger() const
-    {
-        return m_legacy_config.logger;
-    }
-
     const SocketFactoryConfig& m_config;
-    const DefaultSocketFactoryConfig& m_legacy_config;
+    util::Logger& logger;
     SocketObserver& m_observer;
 
     const Endpoint m_endpoint;
@@ -121,10 +120,10 @@ private:
     util::Optional<util::network::ssl::Stream> m_ssl_stream;
     util::network::ReadAheadBuffer m_read_ahead_buffer;
     util::websocket::Socket m_websocket;
-    util::Optional<util::HTTPClient<LegacyWebsocketImpl>> m_proxy_client;
+    util::Optional<util::HTTPClient<DefaultWebsocketImpl>> m_proxy_client;
 };
 
-void LegacyWebsocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
+void DefaultWebsocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -135,7 +134,7 @@ void LegacyWebsocketImpl::async_read(char* buffer, std::size_t size, ReadComplet
     }
 }
 
-void LegacyWebsocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
+void DefaultWebsocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -146,7 +145,7 @@ void LegacyWebsocketImpl::async_read_until(char* buffer, std::size_t size, char 
     }
 }
 
-void LegacyWebsocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
+void DefaultWebsocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -157,7 +156,7 @@ void LegacyWebsocketImpl::async_write(const char* data, std::size_t size, WriteC
     }
 }
 
-void LegacyWebsocketImpl::initiate_resolve()
+void DefaultWebsocketImpl::initiate_resolve()
 {
     const std::string& address = m_endpoint.proxy ? m_endpoint.proxy->address : m_endpoint.address;
     const port_type& port = m_endpoint.proxy ? m_endpoint.proxy->port : m_endpoint.port;
@@ -166,7 +165,7 @@ void LegacyWebsocketImpl::initiate_resolve()
         // logger.detail("Using %1 proxy", proxy->type); // Throws
     }
 
-    logger().detail("Resolving '%1:%2'", address, port); // Throws
+    logger.detail("Resolving '%1:%2'", address, port); // Throws
 
     util::network::Resolver::Query query(address, util::to_string(port)); // Throws
     auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
@@ -175,60 +174,60 @@ void LegacyWebsocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_legacy_config.service);                     // Throws
+    m_resolver.emplace(get_service());                               // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
-void LegacyWebsocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
+void DefaultWebsocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
 {
     if (ec) {
-        logger().error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
-        m_observer.websocket_connect_error_handler(ec);                                                     // Throws
+        logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
+        m_observer.websocket_connect_error_handler(ec);                                                   // Throws
         return;
     }
 
     initiate_tcp_connect(std::move(endpoints), 0); // Throws
 }
 
-void LegacyWebsocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
+void DefaultWebsocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
-    m_socket.emplace(m_legacy_config.service); // Throws
+    m_socket.emplace(get_service()); // Throws
     m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (ec != util::error::operation_aborted)
             handle_tcp_connect(ec, std::move(endpoints), i); // Throws
     });
-    logger().detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
+    logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
-void LegacyWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints,
-                                             std::size_t i)
+void DefaultWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints,
+                                              std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
-        logger().error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
-                       ec.message()); // Throws
+        logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
+                     ec.message()); // Throws
         std::size_t i_2 = i + 1;
         if (i_2 < endpoints.size()) {
             initiate_tcp_connect(std::move(endpoints), i_2); // Throws
             return;
         }
         // All endpoints failed
-        logger().error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
+        logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
         m_observer.websocket_connect_error_handler(ec); // Throws
         return;
     }
 
     REALM_ASSERT(m_socket);
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
-    logger().info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
-                  ep_2.port()); // Throws
+    logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
+                ep_2.port()); // Throws
 
     // TODO: Handle HTTPS proxies
     if (m_endpoint.proxy) {
@@ -239,7 +238,7 @@ void LegacyWebsocketImpl::handle_tcp_connect(std::error_code ec, util::network::
     initiate_websocket_or_ssl_handshake(); // Throws
 }
 
-void LegacyWebsocketImpl::initiate_websocket_or_ssl_handshake()
+void DefaultWebsocketImpl::initiate_websocket_or_ssl_handshake()
 {
     if (m_endpoint.is_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -249,23 +248,23 @@ void LegacyWebsocketImpl::initiate_websocket_or_ssl_handshake()
     }
 }
 
-void LegacyWebsocketImpl::initiate_http_tunnel()
+void DefaultWebsocketImpl::initiate_http_tunnel()
 {
     HTTPRequest req;
     req.method = HTTPMethod::Connect;
     req.headers.emplace("Host", util::format("%1:%2", m_endpoint.address, m_endpoint.port));
     // TODO handle proxy authorization
 
-    m_proxy_client.emplace(*this, logger());
+    m_proxy_client.emplace(*this, logger);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
-            logger().error("Failed to establish HTTP tunnel: %1", ec.message());
+            logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             m_observer.websocket_connect_error_handler(ec); // Throws
             return;
         }
 
         if (response.status != HTTPStatus::Ok) {
-            logger().error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
+            logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
                 util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
             m_observer.websocket_connect_error_handler(ec2);                 // Throws
@@ -278,7 +277,7 @@ void LegacyWebsocketImpl::initiate_http_tunnel()
     m_proxy_client->async_request(req, std::move(handler)); // Throws
 }
 
-void LegacyWebsocketImpl::initiate_ssl_handshake()
+void DefaultWebsocketImpl::initiate_ssl_handshake()
 {
     using namespace util::network::ssl;
 
@@ -295,7 +294,7 @@ void LegacyWebsocketImpl::initiate_ssl_handshake()
     }
 
     m_ssl_stream.emplace(*m_socket, *m_ssl_context, Stream::client); // Throws
-    m_ssl_stream->set_logger(&logger());
+    m_ssl_stream->set_logger(&logger);
     m_ssl_stream->set_host_name(m_endpoint.address); // Throws
     if (m_endpoint.verify_servers_ssl_certificate) {
         m_ssl_stream->set_verify_mode(VerifyMode::peer); // Throws
@@ -325,7 +324,7 @@ void LegacyWebsocketImpl::initiate_ssl_handshake()
     // FIXME: We also need to perform the SSL shutdown operation somewhere
 }
 
-void LegacyWebsocketImpl::handle_ssl_handshake(std::error_code ec)
+void DefaultWebsocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
@@ -336,7 +335,7 @@ void LegacyWebsocketImpl::handle_ssl_handshake(std::error_code ec)
     initiate_websocket_handshake(); // Throws
 }
 
-void LegacyWebsocketImpl::initiate_websocket_handshake()
+void DefaultWebsocketImpl::initiate_websocket_handshake()
 {
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
@@ -355,7 +354,8 @@ WebSocket::~WebSocket() = default;
 
 std::unique_ptr<WebSocket> DefaultSocketFactory::connect(SocketObserver* observer, Endpoint&& endpoint)
 {
-    return std::make_unique<LegacyWebsocketImpl>(m_config, m_legacy_config, *observer, std::move(endpoint));
+    return std::make_unique<DefaultWebsocketImpl>(m_config, logger, m_service, m_random, *observer,
+                                                  std::move(endpoint));
 }
 
 } // namespace realm::util::websocket
