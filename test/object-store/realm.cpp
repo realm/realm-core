@@ -592,7 +592,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         realm->read_group();
         auto frozen_realm = realm->freeze();
-        auto frozen_schema = frozen_realm->schema();
         REQUIRE(frozen_realm->schema() == schema);
     }
 }

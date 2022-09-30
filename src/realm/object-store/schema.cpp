@@ -318,7 +318,7 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
     return different_classes;
 }
 
-std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode, bool include_table_removals)
+std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode, bool include_table_removals) const
 {
     std::unordered_set<std::string> orphans;
     if (mode == SchemaMode::AdditiveDiscovered) {
