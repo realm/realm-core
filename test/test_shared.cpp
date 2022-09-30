@@ -2199,10 +2199,7 @@ TEST(Shared_EncryptionKeyCheck_2)
 }
 
 // if opened by one key, it cannot be opened by a different key
-// disabled for now... needs to add a check in the encryption layer
-// based on a hash of the key.
-#if 0 // in principle this should be implemented.....
-ONLY(Shared_EncryptionKeyCheck_3)
+TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
@@ -2210,16 +2207,9 @@ ONLY(Shared_EncryptionKeyCheck_3)
     memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     DBRef sg = DB::create(path, false, DBOptions(first_key));
-    bool ok = false;
-    try {
-        DBRef sg_2 = DB::create(path, false, DBOptions(second_key));
-    } catch (std::runtime_error&) {
-        ok = true;
-    }
-    CHECK(ok);
+    CHECK_THROW(DB::create(path, false, DBOptions(second_key)), InvalidDatabase);
     DBRef sg3 = DB::create(path, false, DBOptions(first_key));
 }
-#endif
 
 #endif
 

@@ -47,13 +47,14 @@
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
+#endif
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, FileDesc file_descriptor)
-    : fd(file_descriptor)
-    , cryptor(key)
+#if REALM_ENABLE_ENCRYPTION
+
+SharedFileInfo::SharedFileInfo(const uint8_t* key)
+    : cryptor(key)
 {
 }
 
@@ -146,6 +147,9 @@ AESCryptor::AESCryptor(const uint8_t* key)
     : m_rw_buffer(new char[block_size])
     , m_dst_buffer(new char[block_size])
 {
+    memcpy(m_aesKey, key, 32);
+    memcpy(m_hmacKey, key + 32, 32);
+
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
     // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to
@@ -169,13 +173,9 @@ AESCryptor::AESCryptor(const uint8_t* key)
     REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptGenerateSymmetricKey()", ret);
 #else
     m_ctx = EVP_CIPHER_CTX_new();
-
     if (!m_ctx)
         handle_error();
-
-    memcpy(m_aesKey, key, 32);
 #endif
-    memcpy(m_hmacKey, key + 32, 32);
 }
 
 AESCryptor::~AESCryptor() noexcept
@@ -188,6 +188,12 @@ AESCryptor::~AESCryptor() noexcept
     EVP_CIPHER_CTX_cleanup(m_ctx);
     EVP_CIPHER_CTX_free(m_ctx);
 #endif
+}
+
+void AESCryptor::check_key(const uint8_t* key)
+{
+    if (memcmp(m_aesKey, key, 32) != 0 || memcmp(m_hmacKey, key + 32, 32) != 0)
+        throw DecryptionFailed();
 }
 
 void AESCryptor::handle_error()
@@ -915,9 +921,6 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 
 #else
 
-namespace realm {
-namespace util {
-
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
 {
     return size;
@@ -930,5 +933,4 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 
 #endif // REALM_ENABLE_ENCRYPTION
 
-} // namespace util {
-} // namespace realm {
+} // namespace realm::util
