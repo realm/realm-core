@@ -145,7 +145,9 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     m_session = nullptr;
     std::shared_ptr<SyncManager> sync_manager;
     if (m_sync_manager) {
-        sync_manager = m_sync_manager->shared_from_this();
+        // This method may be called from the SyncManager's destructor. In this case, using 'shared_from_this()' will
+        // throw 'std::bad_weak_ptr' so we use a weak_ptr as intermediate.
+        sync_manager = m_sync_manager->weak_from_this().lock();
     }
     m_state_mutex.unlock(lock);
     if (sync_manager) {
@@ -970,7 +972,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
         case State::Inactive: {
             std::shared_ptr<SyncManager> sync_manager;
             if (m_sync_manager) {
-                sync_manager = m_sync_manager->shared_from_this();
+                sync_manager = m_sync_manager->weak_from_this().lock();
             }
             m_state_mutex.unlock(lock);
             if (sync_manager) {
