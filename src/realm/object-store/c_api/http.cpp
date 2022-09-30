@@ -39,7 +39,8 @@ public:
 
     static void on_response_completed(void* request_context, const realm_http_response_t* response) noexcept
     {
-        std::unique_ptr<HttpCompletion> completion(static_cast<HttpCompletion*>(request_context));
+        std::unique_ptr<util::UniqueFunction<void(const Response&)>> completion(
+            static_cast<util::UniqueFunction<void(const Response&)>*>(request_context));
 
         HttpHeaders headers;
         for (size_t i = 0; i < response->num_headers; i++) {
@@ -54,7 +55,8 @@ private:
     void send_request_to_server(const Request& request,
                                 util::UniqueFunction<void(const Response&)>&& completion_block) final
     {
-        auto completion_data = std::make_unique<HttpCompletion>(std::move(completion_block));
+        auto completion_data =
+            std::make_unique<util::UniqueFunction<void(const Response&)>>(std::move(completion_block));
 
         std::vector<realm_http_header_t> c_headers;
         c_headers.reserve(request.headers.size());

@@ -417,6 +417,13 @@ private:
     /// @param completion Returns the response from the server
     void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
 
+    /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
+    /// @param request The request to be performed (in case it needs to be sent again)
+    /// @param response The response from the send_request_to_server operation
+    /// @param completion Returns the response from the server if not a redirect
+    void handle_possible_redirect_response(Request&& request, const Response& response,
+                                           util::UniqueFunction<void(const Response&)>&& completion);
+
     /// Process the redirect response received from the last request that was sent to the server
     /// @param request The request to be performed (in case it needs to be sent again)
     /// @param response The response from the send_request_to_server operation

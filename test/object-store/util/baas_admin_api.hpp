@@ -201,7 +201,8 @@ AppSession create_app(const AppCreateConfig& config);
 
 class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
-    void send_request_to_server(const app::Request& request, app::HttpCompletion&& completion) override
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
         {
             std::lock_guard barrier(m_mutex);

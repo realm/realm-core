@@ -1410,14 +1410,15 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request_hook) {
-                request_hook(const_cast<Request&>(request));
+                request_hook(request);
             }
             SynchronousTestTransport::send_request_to_server(request, std::move(completion));
         }
-        util::UniqueFunction<void(Request&)> request_hook;
+        util::UniqueFunction<void(const Request&)> request_hook;
     };
 
     auto transport = std::make_shared<HookedTransport>();
@@ -1436,7 +1437,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     bool seen_waiting_for_access_token = false;
     // Commit a subcription set while there is no sync session.
     // A session is created when the access token is refreshed.
-    transport->request_hook = [&](Request&) {
+    transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
         for (auto& session : user->all_sessions()) {

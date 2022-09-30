@@ -238,15 +238,14 @@ struct Response {
     util::Optional<ClientErrorCode> client_error_code;
 };
 
-using HttpCompletion = util::UniqueFunction<void(const Response&)>;
-
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
     virtual ~GenericNetworkTransport() = default;
-    virtual void send_request_to_server(const Request& request, HttpCompletion&& completion) = 0;
-
     virtual void send_request_to_server(const Request& request,
-                                        util::UniqueFunction<void(Request&&, const Response&)>&& completion)
+                                        util::UniqueFunction<void(const Response&)>&& completion) = 0;
+
+    void send_request_to_server(Request&& request,
+                                util::UniqueFunction<void(Request&&, const Response&)>&& completion)
     {
         auto request_ptr = std::make_unique<Request>(std::move(request));
         const auto& request_ref = *request_ptr;

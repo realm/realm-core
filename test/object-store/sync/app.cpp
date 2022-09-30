@@ -2090,29 +2090,26 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
-            auto request_ptr = std::make_unique<Request>(std::move(request));
-            auto& request_ref = *request_ptr;
             if (request_hook) {
-                request_hook(request_ref);
+                request_hook(request);
             }
             if (simulated_response) {
                 return completion(*simulated_response);
             }
-            SynchronousTestTransport::send_request_to_server(
-                request_ref, [this, completion = std::move(completion),
-                              request_ptr = std::move(request_ptr)](const Response& response) mutable {
-                    if (response_hook) {
-                        response_hook(*request_ptr, const_cast<Response&>(response));
-                    }
-                    completion(response);
-                });
+            SynchronousTestTransport::send_request_to_server(request, [&](const Response& response) mutable {
+                if (response_hook) {
+                    response_hook(request, response);
+                }
+                completion(response);
+            });
         }
         // Optional handler for the request and response before it is returned to completion
-        util::UniqueFunction<void(Request&, Response&)> response_hook;
+        util::UniqueFunction<void(const Request&, const Response&)> response_hook;
         // Optional handler for the request before it is sent to the server
-        util::UniqueFunction<void(Request&)> request_hook;
+        util::UniqueFunction<void(const Request&)> request_hook;
         // Optional Response object to return immediately instead of communicating with the server
         util::Optional<Response> simulated_response;
     };
@@ -2137,7 +2134,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("Test invalid redirect response") {
             int request_count = 0;
-            redir_transport->request_hook = [&](Request& request) {
+            redir_transport->request_hook = [&](const Request& request) {
                 if (request_count == 0) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response = {
@@ -2174,16 +2171,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SECTION("Test redirect response") {
             int request_count = 0;
             // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string original_host = "localhost:9090";
             std::string redirect_scheme = "http://";
-            std::string redirect_host = "localhost:9090";
-            std::string redirect_url = "http://localhost:9090";
-            redir_transport->request_hook = [&](Request& request) {
+            std::string redirect_host = "127.0.0.1:9090";
+            std::string redirect_url = "http://127.0.0.1:9090";
+            redir_transport->request_hook = [&](const Request& request) {
                 if (request_count == 0) {
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
-                    if (request.url.find("localhost:9090") != std::string::npos) {
-                        redirect_host = "127.0.0.1:9090";
+                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                        redirect_host = "localhost:9090";
+                        original_host = "127.0.0.1:9090";
                     }
                     redirect_url = redirect_scheme + redirect_host;
                     logger->trace("redirect_url (%1): %2", request_count, redirect_url);
@@ -2209,11 +2208,21 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 else if (request_count == 3) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", redirect_scheme + original_host}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 4) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     // Let the init_app_metadata request go through
                     redir_transport->simulated_response = util::none;
                     request_count++;
                 }
-                else if (request_count == 4) {
+                else if (request_count == 5) {
                     // This is the original request after the init app metadata
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     auto sync_manager = redir_app->sync_manager();
@@ -2224,11 +2233,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("Location: %1", app_metadata->location);
                     logger->trace("Hostname: %1", app_metadata->hostname);
                     logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
-                    REQUIRE(app_metadata->hostname.find(redirect_url) != std::string::npos);
-                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     redir_transport->simulated_response = util::none;
                     // Validate the retry count tracked in the original message
-                    REQUIRE(request.redirect_count == 2);
+                    REQUIRE(request.redirect_count == 3);
                     request_count++;
                 }
             };
@@ -2241,7 +2250,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
         SECTION("Test too many redirects") {
             int request_count = 0;
-            redir_transport->request_hook = [&](Request& request) {
+            redir_transport->request_hook = [&](const Request& request) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
                 redir_transport->simulated_response = {
@@ -2263,7 +2272,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 });
         }
         SECTION("Test server in maintenance") {
-            redir_transport->request_hook = [&](Request&) {
+            redir_transport->request_hook = [&](const Request&) {
                 nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
                                                     {"error", "This service is currently undergoing maintenance"},
                                                     {"link", "https://link.to/server_logs"}};
@@ -2308,7 +2317,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](Request&) {
+        transport->request_hook = [&](const Request&) {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto& session : user->all_sessions()) {
@@ -2367,7 +2376,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             bool seen_waiting_for_access_token = false;
-            transport->request_hook = [&](Request&) {
+            transport->request_hook = [&](const Request&) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto& session : user->all_sessions()) {
@@ -2388,13 +2397,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->response_hook = [&](Request& request, Response& response) {
+            transport->response_hook = [&](const Request& request, const Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
-                    response.http_status_code = 401;
-                    response.body = "fake: refresh token could not be refreshed";
+                    auto& response_ref = const_cast<Response&>(response);
+                    response_ref.http_status_code = 401;
+                    response_ref.body = "fake: refresh token could not be refreshed";
                 }
             };
             SyncTestFile config(app, partition, schema);
@@ -2418,14 +2428,15 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> did_receive_valid_token{false};
             constexpr size_t num_error_responses = 6;
 
-            transport->response_hook = [&](Request& request, Response& response) {
+            transport->response_hook = [&](const Request& request, const Response& response) {
                 // simulate the server experiencing an internal server error
                 if (request.url.find("/session") != std::string::npos) {
                     if (response_times.size() >= num_error_responses) {
                         did_receive_valid_token.store(true);
                         return;
                     }
-                    response.http_status_code = 500;
+                    auto& response_ref = const_cast<Response&>(response);
+                    response_ref.http_status_code = 500;
                 }
             };
             transport->request_hook = [&](const Request& request) {
@@ -3083,7 +3094,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         {
         }
 
-        void send_request_to_server(const Request&, HttpCompletion&& completion) override
+        void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             completion(Response{0, m_code, HttpHeaders(), m_message});
         }
@@ -3167,7 +3178,7 @@ public:
     }
 
 private:
-    void handle_profile(const Request& request, HttpCompletion&& completion)
+    void handle_profile(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         auto content_type = AppUtils::find_header("Content-Type", request.headers);
@@ -3190,7 +3201,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_login(const Request& request, HttpCompletion&& completion)
+    void handle_login(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
@@ -3215,7 +3226,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_location(const Request& request, HttpCompletion&& completion)
+    void handle_location(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -3229,7 +3240,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(const Request& request, HttpCompletion&& completion)
+    void handle_create_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
@@ -3245,7 +3256,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(const Request& request, HttpCompletion&& completion)
+    void handle_fetch_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         auto item = AppUtils::find_header("Content-Type", request.headers);
@@ -3261,7 +3272,7 @@ private:
         completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(const Request& request, HttpCompletion&& completion)
+    void handle_fetch_api_keys(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         auto item = AppUtils::find_header("Content-Type", request.headers);
@@ -3279,7 +3290,7 @@ private:
         completion(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(const Request& request, HttpCompletion&& completion)
+    void handle_token_refresh(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
@@ -3296,7 +3307,8 @@ private:
     }
 
 public:
-    void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion) override
     {
         if (request.url.find("/login") != std::string::npos) {
             handle_login(request, std::move(completion));
@@ -3482,7 +3494,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
     SECTION("login_anonymous bad") {
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     completion({200, 0, {}, user_json(bad_access_token).dump()});
@@ -3699,7 +3712,7 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(const Request&, HttpCompletion&& completion) override
+    void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
     {
         completion(Response(*m_response));
     }
@@ -4064,7 +4077,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -4094,7 +4108,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -4136,7 +4151,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             bool get_profile_2_hit = false;
             bool refresh_hit = false;
 
-            void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     login_hit = true;
@@ -4200,7 +4216,7 @@ public:
     {
     }
 
-    void add_work_item(Response&& response, HttpCompletion&& completion)
+    void add_work_item(Response&& response, util::UniqueFunction<void(const Response&)>&& completion)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
         transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion)});
@@ -4226,7 +4242,7 @@ public:
 private:
     struct ResponseWorkItem {
         Response response;
-        HttpCompletion completion;
+        util::UniqueFunction<void(const Response&)> completion;
     };
 
     void worker_routine()
@@ -4309,7 +4325,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
@@ -4404,7 +4421,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_ws_hostname = "wsproto://host:1234";
 
     struct transport : UnitTestTransport {
-        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
@@ -4601,7 +4619,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(const Request& request, HttpCompletion&& completion) override
+        void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 state.advance_to(TestState::login);
