@@ -43,7 +43,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
+    std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
 
 private:
     util::Logger& logger;

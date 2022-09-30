@@ -27,11 +27,9 @@ namespace realm::util::websocket {
 namespace {
 class DefaultWebsocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    DefaultWebsocketImpl(const SocketFactoryConfig& config, util::Logger& logger,
-                         std::shared_ptr<util::network::Service>& service, std::shared_ptr<std::mt19937_64>& random,
-                         SocketObserver& observer, Endpoint&& endpoint)
-        : WebSocket(service, random)
-        , m_config(config)
+    DefaultWebsocketImpl(const SocketFactoryConfig& config, util::Logger& logger, util::network::Service& service,
+                         std::mt19937_64& random, SocketObserver& observer, Endpoint&& endpoint)
+        : WebSocket(config, service, random)
         , logger(logger)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
@@ -59,8 +57,7 @@ private:
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
-        REALM_ASSERT(m_random != nullptr);
-        return *m_random;
+        return get_random();
     }
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
@@ -109,7 +106,6 @@ private:
     void initiate_websocket_handshake();
     void handle_connection_established();
 
-    const SocketFactoryConfig& m_config;
     util::Logger& logger;
     SocketObserver& m_observer;
 
@@ -338,7 +334,7 @@ void DefaultWebsocketImpl::handle_ssl_handshake(std::error_code ec)
 void DefaultWebsocketImpl::initiate_websocket_handshake()
 {
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
-    headers["User-Agent"] = m_config.user_agent;
+    headers["User-Agent"] = get_config().user_agent;
 
     // Compute the value of the "Host" header.
     const std::uint_fast16_t default_port = (m_endpoint.is_ssl ? 443 : 80);

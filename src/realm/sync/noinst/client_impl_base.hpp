@@ -174,15 +174,13 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    std::shared_ptr<util::network::Service> m_service;
-    std::shared_ptr<std::mt19937_64> m_random;
     std::shared_ptr<util::websocket::SocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
-    util::network::DeadlineTimer m_keep_running_timer;
+    std::unique_ptr<util::network::DeadlineTimer> m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -1138,14 +1136,14 @@ inline bool ClientImpl::is_dry_run() const noexcept
 
 inline util::network::Service& ClientImpl::get_service() noexcept
 {
-    REALM_ASSERT(m_service != nullptr);
-    return *m_service;
+    REALM_ASSERT(m_socket_factory != nullptr);
+    return m_socket_factory->get_service();
 }
 
 inline std::mt19937_64& ClientImpl::get_random() noexcept
 {
-    REALM_ASSERT(m_random != nullptr);
-    return *m_random;
+    REALM_ASSERT(m_socket_factory != nullptr);
+    return m_socket_factory->get_random();
 }
 
 inline auto ClientImpl::get_next_session_ident() noexcept -> session_ident_type

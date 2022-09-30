@@ -26,6 +26,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/network.hpp>
+#include <realm/util/random.hpp>
 
 namespace realm::util::network {
 class Service;
@@ -102,8 +103,9 @@ protected:
 
 class WebSocket {
 public:
-    WebSocket(std::shared_ptr<util::network::Service>& service, std::shared_ptr<std::mt19937_64>& random)
-        : m_service(service)
+    WebSocket(const SocketFactoryConfig& config, util::network::Service& service, std::mt19937_64& random)
+        : m_config(config)
+        , m_service(service)
         , m_random(random)
     {
     }
@@ -112,7 +114,6 @@ public:
 
     virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 
-protected:
     /// Register the sepcified completion handler for immediate asynchronous
     /// execution. The specified handler will be executed by an expression on
     /// the form `handler()`. If the the handler object is movable, it will
@@ -136,36 +137,45 @@ protected:
     /// before B.
     virtual void post(util::UniqueFunction<void()>&& handler)
     {
-        REALM_ASSERT(m_service != nullptr);
-        m_service->post(std::move(handler));
+        m_service.post(std::move(handler));
     }
 
     virtual util::network::Service& get_service()
     {
-        REALM_ASSERT(m_service != nullptr);
-        return *m_service;
+        return m_service;
     }
 
     virtual std::mt19937_64& get_random()
     {
-        REALM_ASSERT(m_random != nullptr);
-        return *m_random;
+        return m_random;
     }
+
+    virtual const SocketFactoryConfig& get_config()
+    {
+        return m_config;
+    }
+
+protected:
+    const SocketFactoryConfig& m_config;
 
     // Until we can update the client's dependency on service (timers and triggers),
     // the custom websocket will need access to the service for posting callbacks
     // on the sync's thread
-    std::shared_ptr<util::network::Service> m_service;
+    util::network::Service& m_service;
 
     // Randomizer with the same seed as the client
-    std::shared_ptr<std::mt19937_64> m_random;
+    std::mt19937_64& m_random;
 };
 
 class SocketFactory {
 public:
     SocketFactory(SocketFactoryConfig config)
         : m_config(config)
+        , m_service{}
+        , m_random{}
     {
+        // FIXME: Would be better if seeding was up to the application.
+        util::seed_prng_nondeterministically(m_random); // Throws
     }
 
     virtual ~SocketFactory() {}
@@ -197,27 +207,17 @@ public:
     /// before B.
     virtual void post(util::UniqueFunction<void()>&& handler)
     {
-        REALM_ASSERT(m_service != nullptr);
-        m_service->post(std::move(handler));
-    }
-
-    virtual void initialize(std::shared_ptr<util::network::Service>& service,
-                            std::shared_ptr<std::mt19937_64>& random)
-    {
-        m_service = service;
-        m_random = random;
+        m_service.post(std::move(handler));
     }
 
     virtual util::network::Service& get_service()
     {
-        REALM_ASSERT(m_service != nullptr);
-        return *m_service;
+        return m_service;
     }
 
     virtual std::mt19937_64& get_random()
     {
-        REALM_ASSERT(m_random != nullptr);
-        return *m_random;
+        return m_random;
     }
 
 protected:
@@ -226,10 +226,10 @@ protected:
     // Until we can update the client's dependency on service (timers and triggers),
     // the custom websocket will need access to the service for posting callbacks
     // on the sync's thread
-    std::shared_ptr<util::network::Service> m_service;
+    util::network::Service m_service;
 
     // Randomizer with the same seed as the client
-    std::shared_ptr<std::mt19937_64> m_random;
+    std::mt19937_64 m_random;
 };
 
 } // namespace realm::util::websocket

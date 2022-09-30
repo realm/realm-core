@@ -479,31 +479,33 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
-    REALM_ASSERT(m_service != nullptr);
     util::LockGuard lock{m_mutex};
     if (m_stopped)
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
-    m_service->stop();
+    get_service().stop();
 }
 
 
 void ClientImpl::run()
 {
-    REALM_ASSERT(m_service != nullptr);
     auto ta = util::make_temp_assign(m_running, true);
-    m_service->run(); // Throws
+    get_service().run(); // Throws
 }
 
 
 void ClientImpl::start_keep_running_timer()
 {
+    // Delay creation of time since websocket factory needs to be set first
+    if (m_keep_running_timer == nullptr) {
+        m_keep_running_timer = std::make_unique<util::network::DeadlineTimer>(get_service());
+    }
     auto handler = [this](std::error_code ec) {
         if (ec != util::error::operation_aborted)
             start_keep_running_timer();
     };
-    m_keep_running_timer.async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
+    m_keep_running_timer->async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
 }
 
 
