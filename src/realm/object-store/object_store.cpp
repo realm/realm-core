@@ -492,25 +492,34 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
     return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
-void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes)
+void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes,
+                                                bool is_schema_additive)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {
         using SchemaDifferenceExplainer::operator();
 
+        Verifier(bool additive_schema) : m_additive_schema(additive_schema)
+        {}
+        
         // Adding new things is fine
         void operator()(AddTable) {}
         void operator()(AddInitialProperties) {}
         void operator()(AddProperty) {}
         void operator()(AddIndex) {}
         void operator()(RemoveIndex) {}
+        void operator()(RemoveProperty prop) {
+            if(!m_additive_schema)
+                SchemaDifferenceExplainer::operator()(prop);
+        }
 
         // Deleting tables is not okay
         void operator()(RemoveTable op)
         {
             errors.emplace_back("Class '%1' has been removed.", op.object->name);
         }
-    } verifier;
+        bool m_additive_schema;
+    } verifier{is_schema_additive};
     verify_no_errors<InvalidExternalSchemaChangeException>(verifier, changes);
 }
 

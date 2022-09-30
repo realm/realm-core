@@ -208,7 +208,6 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             }
         };
 
-
         Schema schema1 = {};
         Schema schema2 = add_table(schema1, {"A", {{"value", PropertyType::Int}}});
         Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});

@@ -303,8 +303,8 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
             ++i;
         }
         else {
-            func(nullptr, &matching_schema);
             add_missing_classes(matching_schema);
+            func(nullptr, &matching_schema);
             ++j;
         }
     }
@@ -336,7 +336,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
     });
-
+    
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && existing)
@@ -360,8 +360,6 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
 
 void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive) noexcept
 {
-    // compute properties for objects that are in common between the current schema and the new schema.
-    // Append to the end of the new schema peristed properties, all those properties that have been deleted
     auto other_classes = zip_matching(
         *this, other,
         [&](ObjectSchema* existing, const ObjectSchema* other) {
@@ -386,10 +384,11 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
             }
         },
         is_schema_additive);
-    // append mismatching classes and sort them if needed
-    if (!other_classes.empty()) {
+   
+    if(!other_classes.empty())
+    {
         insert(end(), other_classes.begin(), other_classes.end());
-        std::sort(begin(), end(), [](ObjectSchema& lft, ObjectSchema& rgt) {
+        std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
             return lft.name < rgt.name;
         });
     }

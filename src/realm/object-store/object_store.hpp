@@ -71,7 +71,8 @@ public:
     // check if the schema changes made by a different process made any changes
     // which will prevent us from being able to continue (such as removing a
     // property we were relying on)
-    static void verify_valid_external_changes(std::vector<SchemaChange> const& changes);
+    static void verify_valid_external_changes(std::vector<SchemaChange> const& changes,
+                                              bool is_schema_additive = false);
 
     static void verify_compatible_for_immutable_and_readonly(std::vector<SchemaChange> const& changes);
 
