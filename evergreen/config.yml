@@ -409,6 +409,7 @@ tasks:
       shell: /bin/bash
       script: |-
         export UNITTEST_PROGRESS=1
+        export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
 - name: bloaty
