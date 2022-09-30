@@ -1,7 +1,7 @@
 # NEXT MAJOR RELEASE
 
 ### Enhancements
-* Full text index supported. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
+* Full text index supported. The words stored in the index will be converted to lower case and diacritics will be removed. The index will support Basic Latin and Latin-1 Supplement characters. All others will be ignored. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
 
 ### Fixed
 * Set<Mixed> consider string and binary data equivalent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
