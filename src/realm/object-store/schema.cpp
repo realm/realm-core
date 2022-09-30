@@ -318,7 +318,8 @@ std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool i
     return different_classes;
 }
 
-std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode, bool include_table_removals) const
+std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
+                                          bool include_table_removals) const
 {
     std::unordered_set<std::string> orphans;
     if (mode == SchemaMode::AdditiveDiscovered) {
@@ -336,7 +337,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
     });
-    
+
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && existing)
@@ -384,9 +385,8 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
             }
         },
         is_schema_additive);
-   
-    if(!other_classes.empty())
-    {
+
+    if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
         std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
             return lft.name < rgt.name;
