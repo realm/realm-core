@@ -273,6 +273,11 @@ public:
         {
             return session.m_db;
         }
+
+        static util::Future<std::string> send_test_command(SyncSession& session, std::string request)
+        {
+            return session.send_test_command(std::move(request));
+        }
     };
 
 private:
@@ -355,6 +360,8 @@ private:
 
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
+
+    util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
     util::UniqueFunction<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 

@@ -5,6 +5,7 @@
 * Prioritize integration of local changes over remote changes - shorten the time users may have to wait when committing local changes. Stop storing downloaded changesets in history. ([PR #5844](https://github.com/realm/realm-core/pull/5844)).
 * Greatly improve the performance of sorting or distincting a Dictionary's keys or values. The most expensive operation is now performed O(log N) rather than O(N log N) times, and large Dictionaries can see upwards of 99% reduction in time to sort. ([PR #5166](https://github.com/realm/realm-core/pulls/5166))
 * Expose `realm_get_value_by_property_index` to the C API. ([PR #5906](https://github.com/realm/realm-core/pull/5906))
+* Add support for fetching directly backlinks in the C API. ([PR #5904](https://github.com/realm/realm-core/pull/5904))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -22,6 +23,7 @@
 ### Internals
 * Reenable sync benchmark.
 * Add util/http.hpp to the release package.
+* Implement test commands in sync wire protocol to be used in flx sync testing.
 
 ----------------------------------------------
 
