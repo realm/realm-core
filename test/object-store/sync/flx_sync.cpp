@@ -2075,19 +2075,22 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     FLXSyncTestHarness harness("bootstrap_full_sync");
 
     SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    auto triggered_realm = Realm::get_shared_realm(triggered_config);
+    auto problem_realm = Realm::get_shared_realm(triggered_config);
 
-    wait_for_upload(*triggered_realm);
-    wait_for_download(*triggered_realm);
+    // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
+    // on the server should have no new history entries, and then pause the router so it doesn't get any of
+    // the changes we're about to create.
+    wait_for_upload(*problem_realm);
+    wait_for_download(*problem_realm);
 
     nlohmann::json command_request = {
         {"command", "PAUSE_ROUTER_SESSION"},
     };
     auto resp_body =
-        SyncSession::OnlyForTesting::send_test_command(*triggered_realm->sync_session(), command_request.dump())
-            .get();
+        SyncSession::OnlyForTesting::send_test_command(*problem_realm->sync_session(), command_request.dump()).get();
     REQUIRE(resp_body == "{}");
 
+    // Put some data into the server, this will be the data that will be in the broker cache.
     auto bar_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
@@ -2110,9 +2113,13 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
 
     auto bizz_obj_id = ObjectId::gen();
     harness.do_with_new_realm([&](SharedRealm realm) {
+        // first set a subscription to force the creation/cacheing of a broker snapshot on the server.
         setup_subs(realm);
         auto table = realm->read_group().get_table("class_TopLevel");
         REQUIRE(table->find_primary_key(bar_obj_id));
+
+        // Then create an object that won't be in the cached snapshot - this is the object that if we didn't
+        // wait for a MARK message to come back, we'd miss it in our results.
         CppContext c(realm);
         realm->begin_transaction();
         Object::create(c, realm, "TopLevel",
@@ -2124,9 +2131,12 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         wait_for_upload(*realm);
     });
 
-    setup_subs(triggered_realm);
+    // Setup queries on the problem realm to bootstrap from the cached object. Bootstrapping will also resume
+    // the router, so all we need to do is wait for the subscription set to be complete and notifications to be
+    // processed.
+    setup_subs(problem_realm);
 
-    auto table = triggered_realm->read_group().get_table("class_TopLevel");
+    auto table = problem_realm->read_group().get_table("class_TopLevel");
     REQUIRE(table->find_primary_key(bar_obj_id));
     REQUIRE(table->find_primary_key(bizz_obj_id));
 }
