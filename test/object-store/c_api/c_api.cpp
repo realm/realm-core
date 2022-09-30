@@ -3350,6 +3350,16 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_set_size(bars.get(), &size)));
                     CHECK(size == 1);
+
+                    auto results =
+                        cptr_checked(realm_get_backlinks(obj2.get(), class_foo.key, foo_properties["link_set"]));
+                    CHECK(results->size() == 1);
+                    auto mixed_link = results->get_any(0);
+                    CHECK(!mixed_link.is_unresolved_link());
+                    CHECK(mixed_link.is_type(type_TypedLink));
+                    auto link = mixed_link.get_link();
+                    CHECK(link.get_obj_key() == obj1->obj().get_key());
+                    CHECK(link.get_table_key() == obj1->obj().get_table()->get_key());
                 });
 
                 SECTION("get") {
