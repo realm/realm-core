@@ -593,9 +593,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm->read_group();
         auto frozen_realm = realm->freeze();
         auto frozen_schema = frozen_realm->schema();
-        for (auto& object_schema : schema) {
-            REQUIRE(frozen_schema.find(object_schema.name) != frozen_schema.end());
-        }
+        REQUIRE(frozen_realm->schema() == schema);
     }
 }
 
