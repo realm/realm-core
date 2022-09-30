@@ -242,7 +242,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
         dg.release();
     }
     m_evacuation_limit = 0;
-    m_backoff = 0;
+    m_backoff = false;
     if (top.size() > Group::s_evacuation_point_ndx) {
         if (auto val = top.get(Group::s_evacuation_point_ndx)) {
             Array arr(m_alloc);
@@ -258,7 +258,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                 auto sz = arr.size();
                 REALM_ASSERT(sz >= 2);
                 m_evacuation_limit = size_t(arr.get(0));
-                m_backoff = int(arr.get(1));
+                m_backoff = arr.get(1) != 0;
                 for (size_t i = 2; i < sz; i++)
                     m_evacuation_progress.push_back(size_t(arr.get(i)));
             }

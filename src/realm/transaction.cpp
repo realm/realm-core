@@ -24,8 +24,6 @@
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
 
-#include <iostream>
-
 namespace {
 
 using namespace realm;
@@ -917,7 +915,6 @@ public:
     }
     ~NodeTree()
     {
-        // std::cout << "Moved: " << m_moved << std::endl;
     }
 
     /// Function used to traverse the node tree and "copy on write" nodes
@@ -951,6 +948,7 @@ public:
             if (progress.size() == level) {
                 progress.push_back(0);
             }
+            REALM_ASSERT_EX(level < progress.size(), level, progress.size());
             size_t ndx = progress[level];
             while (ndx < sz) {
                 auto val = current_node.get(ndx);

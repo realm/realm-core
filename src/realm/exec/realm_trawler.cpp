@@ -264,7 +264,7 @@ public:
             }
             if (size() > 7) {
                 // Must be a Core-6 file.
-                m_clustes.init(alloc, get_ref(2));
+                m_clusters.init(alloc, get_ref(2));
                 m_opposite_table.init(alloc, get_ref(7));
             }
             if (size() > 11) {
@@ -282,17 +282,17 @@ public:
     size_t get_size(realm::Allocator& alloc) const
     {
         size_t ret = 0;
-        if (m_clustes.valid()) {
-            if (m_clustes.is_inner_bptree_node()) {
-                ret = size_t(m_clustes.get_val(2));
+        if (m_clusters.valid()) {
+            if (m_clusters.is_inner_bptree_node()) {
+                ret = size_t(m_clusters.get_val(2));
             }
             else {
-                if (uint64_t key_ref = m_clustes.get_ref(0)) {
+                if (uint64_t key_ref = m_clusters.get_ref(0)) {
                     auto header = alloc.translate(key_ref);
                     ret = realm::NodeHeader::get_size_from_header(header);
                 }
                 else {
-                    ret = m_clustes.get_val(0);
+                    ret = m_clusters.get_val(0);
                 }
             }
         }
@@ -324,7 +324,7 @@ private:
     Array m_column_subspecs;
     Array m_column_colkeys;
     Array m_opposite_table;
-    Array m_clustes;
+    Array m_clusters;
     realm::ColKey m_pk_col;
     realm::Table::Type m_table_type = realm::Table::Type::TopLevel;
 };
