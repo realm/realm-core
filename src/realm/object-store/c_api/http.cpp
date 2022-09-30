@@ -71,7 +71,7 @@ private:
                                        c_headers.size(),
                                        request.body.data(),
                                        request.body.size()};
-        m_request_executor(m_userdata.get(), c_request, completion_block.release());
+        m_request_executor(m_userdata.get(), c_request, completion_data.release());
     }
 
     UserdataPtr m_userdata;
