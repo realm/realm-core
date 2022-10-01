@@ -60,7 +60,7 @@ private:
 
         std::vector<realm_http_header_t> c_headers;
         c_headers.reserve(request.headers.size());
-        for (auto& header : request.headers) {
+        for (auto&& header : request.headers) {
             c_headers.push_back({header.first.c_str(), header.second.c_str()});
         }
 

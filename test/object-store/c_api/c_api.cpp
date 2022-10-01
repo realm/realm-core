@@ -9,6 +9,7 @@
 #include "sync/flx_sync_harness.hpp"
 #include "util/test_file.hpp"
 #include "util/event_loop.hpp"
+#include "realm/util/logger.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
@@ -4760,6 +4761,80 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     }
 }
 
+std::unique_ptr<SynchronousTestTransport> test_transport;
+bool user_data_initialized = false;
+auto logger = std::make_unique<util::StderrLogger>();
+
+static void user_data_free(void*)
+{
+    // Don't really delete user_data
+    logger->trace("CAPI: user_data free called");
+    user_data_initialized = false;
+}
+
+static const char* httpmethod_to_string(realm::app::HttpMethod method)
+{
+    using namespace realm::app;
+    switch (method) {
+        case HttpMethod::get:
+            return "GET";
+        case HttpMethod::post:
+            return "POST";
+        case HttpMethod::patch:
+            return "PATCH";
+        case HttpMethod::put:
+            return "PUT";
+        case HttpMethod::del:
+            return "DEL";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+static void send_request_to_server(realm_userdata_t userdata, const realm_http_request_t request,
+                                   void* request_context)
+{
+    using namespace realm::app;
+
+    constexpr uint64_t default_timeout_ms = 60000;
+    REQUIRE(user_data_initialized);
+    REQUIRE(userdata != nullptr);
+    REQUIRE(std::string(static_cast<const char*>(userdata)) == "test-user-data");
+    REQUIRE(strlen(request.url) > 0);
+    HttpHeaders headers;
+    for (size_t i = 0; i < request.num_headers; i++) {
+        REQUIRE(request.headers[i].name != nullptr);
+        REQUIRE(request.headers[i].value != nullptr);
+        std::string name(request.headers[i].name);
+        std::string value(request.headers[i].value);
+        REQUIRE(!name.empty());
+        REQUIRE(!value.empty());
+        headers.emplace(name, value);
+    }
+    REQUIRE(request_context != nullptr);
+    auto new_request = Request{HttpMethod(request.method), request.url, default_timeout_ms, std::move(headers),
+                               std::string(request.body, request.body_size)};
+    logger->trace("CAPI: Request URL (%1): %2", httpmethod_to_string(new_request.method), new_request.url);
+    logger->trace("CAPI: Request body: %1", new_request.body);
+    test_transport->send_request_to_server(new_request, [&](const Response& response) mutable {
+        std::vector<realm_http_header_t> c_headers;
+        c_headers.reserve(response.headers.size());
+        for (auto&& header : response.headers) {
+            c_headers.push_back({header.first.c_str(), header.second.c_str()});
+        }
+
+        auto c_response = std::make_unique<realm_http_response_t>();
+        c_response->status_code = response.http_status_code;
+        c_response->custom_status_code = response.custom_status_code;
+        c_response->headers = c_headers.data();
+        c_response->num_headers = c_headers.size();
+        c_response->body = response.body.data();
+        c_response->body_size = response.body.size();
+        logger->trace("CAPI: Response (%1): %2", c_response->status_code,
+                      std::string(c_response->body, c_response->body_size));
+        realm_http_transport_complete_request(request_context, c_response.get());
+    });
+}
 
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
@@ -4781,8 +4856,15 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
     }
 }
 
-TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
-    TestAppSession session;
+TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
+    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    REQUIRE(!user_data_initialized);
+    std::string user_data = "test-user-data";
+    user_data_initialized = true;
+    test_transport = std::make_unique<SynchronousTestTransport>();
+    auto http_transport = realm_http_transport_new(send_request_to_server, user_data.data(), user_data_free);
+    auto app_session = get_runtime_app_session(get_base_url());
+    TestAppSession session(app_session, *http_transport, DeleteApp{false});
     realm_app app(session.app());
 
     SECTION("remove_user integration") {
@@ -4935,6 +5017,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
             realm_release(current_user);
         }
     }
+    realm_release(http_transport);
 }
 
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
