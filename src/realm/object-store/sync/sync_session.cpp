@@ -143,16 +143,10 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     std::swap(waits, m_completion_callbacks);
 
     m_session = nullptr;
-    std::shared_ptr<SyncManager> sync_manager;
     if (m_sync_manager) {
-        // This method may be called from the SyncManager's destructor. In this case, using 'shared_from_this()' will
-        // throw 'std::bad_weak_ptr' so we use a weak_ptr as intermediate.
-        sync_manager = m_sync_manager->weak_from_this().lock();
+        m_sync_manager->unregister_session(m_db->get_path());
     }
     m_state_mutex.unlock(lock);
-    if (sync_manager) {
-        sync_manager->unregister_session(m_db->get_path());
-    }
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
     if (old_state != new_state) {
@@ -970,14 +964,10 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Inactive: {
-            std::shared_ptr<SyncManager> sync_manager;
             if (m_sync_manager) {
-                sync_manager = m_sync_manager->weak_from_this().lock();
+                m_sync_manager->unregister_session(m_db->get_path());
             }
             m_state_mutex.unlock(lock);
-            if (sync_manager) {
-                sync_manager->unregister_session(m_db->get_path());
-            }
             break;
         }
         case State::WaitingForAccessToken:

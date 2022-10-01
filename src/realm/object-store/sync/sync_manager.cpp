@@ -492,19 +492,16 @@ void SyncManager::delete_user(const std::string& user_id)
 
 SyncManager::~SyncManager() NO_THREAD_SAFETY_ANALYSIS
 {
-    // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
-    // session->shutdown_and_wait() will modify the m_sessions map.
-    auto current_sessions = [&] {
+    // Grab the current sessions under a lock so we can shut them down. We have to
+    // release the lock before calling them as shutdown_and_wait() will call
+    // back into us.
+    decltype(m_sessions) current_sessions;
+    {
         util::CheckedLockGuard lk(m_session_mutex);
-        std::vector<std::shared_ptr<SyncSession>> current_sessions;
-        std::transform(m_sessions.begin(), m_sessions.end(), std::back_inserter(current_sessions),
-                       [](const auto& session_kv) {
-                           return session_kv.second;
-                       });
-        return current_sessions;
-    }();
+        m_sessions.swap(current_sessions);
+    }
 
-    for (auto& session : current_sessions) {
+    for (auto& [_, session] : current_sessions) {
         session->detach_from_sync_manager();
     }
 
@@ -710,7 +707,10 @@ void SyncManager::unregister_session(const std::string& path)
         return;
     }
 
-    m_sessions.erase(path);
+    // Release the lock before we destroy the session in case the session's
+    // destructor wants to call back into us
+    auto session = m_sessions.extract(it);
+    lock.unlock();
 }
 
 void SyncManager::enable_session_multiplexing()
