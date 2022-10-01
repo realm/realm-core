@@ -31,7 +31,11 @@ const std::pair<const std::string, std::string>*
 AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
 {
     for (auto&& current : search_map) {
+#ifdef _MSC_VER
+        if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
+#else
         if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+#endif
             return &current;
         }
     }
