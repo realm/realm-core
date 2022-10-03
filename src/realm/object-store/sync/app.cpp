@@ -775,8 +775,8 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
 
-    m_config.transport->send_request_to_server(req, [self = shared_from_this(), completion = std::move(completion)](
-                                                        const Response& response) mutable {
+    m_config.transport->send_request_to_server(req, [self = shared_from_this(),
+                                                     completion = std::move(completion)](const Response& response) {
         // If the response contains an error, then pass it up
         if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
             return completion(response); // early return

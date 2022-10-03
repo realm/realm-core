@@ -261,7 +261,7 @@ public:
         send_request_to_server(const realm::app::Request&,
                                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
         {
-            network_callback.swap(completion);
+            network_callback = std::move(completion);
         }
 
         realm::util::UniqueFunction<void(const realm::app::Response&)>& network_callback;
