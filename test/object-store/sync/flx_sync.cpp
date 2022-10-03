@@ -292,6 +292,7 @@ static auto make_error_handler()
     return std::make_pair(std::move(error_future), std::move(fn));
 }
 
+// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
 #if 0
 static auto make_client_reset_handler()
 {
@@ -302,7 +303,7 @@ static auto make_client_reset_handler()
     };
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
-// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
+
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     Schema schema{
         {"TopLevel",
@@ -1435,17 +1436,15 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(
-                std::move(request), [&](const Request& request, const Response& response) {
-                    completion_block(std::move(request), std::move(response));
-                });
+            SynchronousTestTransport::send_request_to_server(request, std::move(completion));
         }
-        util::UniqueFunction<void(Request&)> request_hook;
+        util::UniqueFunction<void(const Request&)> request_hook;
     };
 
     auto transport = std::make_shared<HookedTransport>();
@@ -1464,7 +1463,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     bool seen_waiting_for_access_token = false;
     // Commit a subcription set while there is no sync session.
     // A session is created when the access token is refreshed.
-    transport->request_hook = [&](Request&) {
+    transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
         for (auto& session : user->all_sessions()) {

@@ -14,7 +14,7 @@
 * Fix a use-after-free when a sync session is closed and the app is destroyed at the same time ([#5752](https://github.com/realm/realm-core/issues/5752), since v11.5.2).
 
 ### Breaking changes
-* None.
+* Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()`.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
