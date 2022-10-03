@@ -325,6 +325,8 @@ public:
         /// Will be called after a download message is integrated. For testing only.
         std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState, size_t)>
             on_download_message_integrated_hook;
+
+        std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.

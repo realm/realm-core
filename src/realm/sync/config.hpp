@@ -130,6 +130,25 @@ enum class ClientResyncMode : unsigned char {
     RecoverOrDiscard,
 };
 
+enum class SyncClientHookEvent {
+    DownloadMessageReceived,
+    DownloadMessageIntegrated,
+    BootstrapMessageProcessed,
+};
+
+enum class SyncClientHookAction {
+    NoAction,
+    EarlyReturn,
+};
+
+struct SyncClientHookData {
+    SyncClientHookEvent event;
+    sync::SyncProgress progress;
+    int64_t query_version;
+    sync::DownloadBatchState batch_state;
+    size_t num_changesets;
+};
+
 struct SyncConfig {
     struct FLXSyncEnabled {
     };
@@ -172,19 +191,10 @@ struct SyncConfig {
     std::function<void(std::shared_ptr<Realm> before_frozen, ThreadSafeReference after, bool did_recover)>
         notify_after_client_reset;
 
-    // Will be called after a download message is received and validated by the client but befefore it's been
-    // transformed or applied. To be used in testing only.
-    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState,
-                       size_t)>
-        on_download_message_received_hook;
-    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
-    // processing a finalized bootstrap. For testing only.
-    std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-        on_bootstrap_message_processed_hook;
-    // Will be called after a download message is integrated. For testing only.
-    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState,
-                       size_t)>
-        on_download_message_integrated_hook;
+    // Used by core testing to hook into the sync client when various events occur and maybe inject
+    // errors/disconnects deterministically.
+    std::function<SyncClientHookAction(std::weak_ptr<SyncSession>, const SyncClientHookData&)>
+        on_sync_client_event_hook;
 
     bool simulate_integration_error = false;
 
