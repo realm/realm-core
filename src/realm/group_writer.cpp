@@ -202,8 +202,9 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     m_free_lengths.set_parent(&top, Group::s_free_size_ndx);
     m_free_versions.set_parent(&top, Group::s_free_version_ndx);
 
-    if (ref_type ref = m_free_positions.get_ref_from_parent()) {
-        m_free_positions.init_from_ref(ref);
+    ref_type free_positions_ref = m_free_positions.get_ref_from_parent();
+    if (free_positions_ref) {
+        m_free_positions.init_from_ref(free_positions_ref);
     }
     else {
         m_free_positions.create(Array::type_Normal); // Throws
@@ -242,7 +243,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
         dg.release();
     }
     m_evacuation_limit = 0;
-    m_backoff = false;
+    m_backoff = 0;
     if (top.size() > Group::s_evacuation_point_ndx) {
         if (auto val = top.get(Group::s_evacuation_point_ndx)) {
             Array arr(m_alloc);
@@ -258,14 +259,21 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                 auto sz = arr.size();
                 REALM_ASSERT(sz >= 2);
                 m_evacuation_limit = size_t(arr.get(0));
-                m_backoff = arr.get(1) != 0;
-                for (size_t i = 2; i < sz; i++)
-                    m_evacuation_progress.push_back(size_t(arr.get(i)));
-            }
-            // If cleanup potential is less than 25 % - give up
-            auto cleanup_potential = m_logical_size - m_evacuation_limit;
-            if (cleanup_potential < m_logical_size / 4) {
-                m_evacuation_limit = 0;
+                m_backoff = arr.get(1);
+                if (m_backoff > 0) {
+                    --m_backoff;
+                }
+                else {
+                    for (size_t i = 2; i < sz; i++) {
+                        m_evacuation_progress.push_back(size_t(arr.get(i)));
+                    }
+                }
+                // We give up if the freelists were allocated above the evacuation limit
+                if (m_evacuation_limit > 0 && free_positions_ref > m_evacuation_limit) {
+                    // Wait 10 commits until trying again
+                    m_backoff = 10;
+                    m_evacuation_limit = 0;
+                }
             }
         }
     }
@@ -589,14 +597,20 @@ ref_type GroupWriter::write_group()
     }
     if (top.size() > Group::s_evacuation_point_ndx) {
         ref_type ref = top.get_as_ref(Group::s_evacuation_point_ndx);
-        if (m_evacuation_limit) {
+        if (m_evacuation_limit || m_backoff) {
             REALM_ASSERT(ref);
             Array arr(m_alloc);
             arr.init_from_ref(ref);
             arr.truncate(2);
 
             arr.set(0, int64_t(m_evacuation_limit));
-            arr.set(1, m_evacuation_progress.empty() ? 1 : 0); // Backoff from scanning
+            if (m_backoff == 0 && m_evacuation_progress.empty()) {
+                // We have done a scan - Now we should just wait for the nodes still
+                // being in the evacuation zone being released by the transactions
+                // still holding on to them. This could take many commits.
+                m_backoff = 1000;
+            }
+            arr.set(1, m_backoff); // Backoff from scanning
             for (auto index : m_evacuation_progress) {
                 arr.add(int64_t(index));
             }
@@ -687,8 +701,11 @@ ref_type GroupWriter::write_group()
             Array::destroy(ref, m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
+
+            // std::cout << "New logical size = " << m_logical_size << std::endl;
         }
     }
+
     // At this point we have allocated all the space we need, so we can add to
     // the free-lists any free space created during the current transaction (or
     // since last commit). Had we added it earlier, we would have risked
@@ -738,24 +755,6 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_free_size_ndx, from_ref(free_sizes_ref));                  // Throws
     top.set(Group::s_free_version_ndx, from_ref(free_versions_ref));            // Throws
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
-    if (m_evacuation_limit == 0) {
-        size_t used_space = m_logical_size - m_free_space_size;
-        // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
-        static constexpr size_t minimal_compaction_size = 0x100000;
-        // If we make the file too small, there is a big chance it will grow immediately afterwards
-        static constexpr size_t minimal_evac_limit = 0x10000;
-        if (m_logical_size >= minimal_compaction_size && m_free_space_size - m_locked_space_size > 2 * used_space) {
-            // Clean up potential
-            auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
-            m_evacuation_limit = std::max(minimal_evac_limit, limit);
-            // From now on, we will only allocate below this limit
-            // Save the limit in the file
-            while (top.size() <= Group::s_evacuation_point_ndx) {
-                top.add(0);
-            }
-            top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
-        }
-    }
 
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
@@ -781,6 +780,26 @@ ref_type GroupWriter::write_group()
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
     m_free_space_size += rest;
+
+    if (m_evacuation_limit == 0 && m_backoff == 0) {
+        size_t used_space = m_logical_size - m_free_space_size;
+        // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
+        static constexpr size_t minimal_compaction_size = 0x100000;
+        // If we make the file too small, there is a big chance it will grow immediately afterwards
+        static constexpr size_t minimal_evac_limit = 0x10000;
+        if (m_logical_size >= minimal_compaction_size && m_free_space_size - m_locked_space_size > 2 * used_space) {
+            // Clean up potential
+            auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
+            m_evacuation_limit = std::max(minimal_evac_limit, limit);
+            // From now on, we will only allocate below this limit
+            // Save the limit in the file
+            while (top.size() <= Group::s_evacuation_point_ndx) {
+                top.add(0);
+            }
+            top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
+            // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
+        }
+    }
 
 #if REALM_ALLOC_DEBUG
     std::cout << "  Final Freelist:" << std::endl;
@@ -1094,41 +1113,15 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
     while (chunk == m_size_map.end()) {
         if (!m_under_evacuation.empty()) {
             // We have been too aggressive in setting the evacuation limit
-            // release chunks until we can fulfill the request
-            // Reverse sort according to position in file - we release from the back
-            std::sort(m_under_evacuation.begin(), m_under_evacuation.end(), [](const auto& a, const auto& b) {
-                return a.ref > b.ref;
-            });
-            bool found_or_give_up = false;
-            while (!found_or_give_up) {
-                auto& elem = m_under_evacuation.back();
-                if (elem.size >= size) {
-                    m_size_map.emplace(size, elem.ref);
-                    if (elem.size == size) {
-                        m_under_evacuation.pop_back();
-                    }
-                    else {
-                        elem.ref += size;
-                        elem.size -= size;
-                    }
-                    found_or_give_up = true;
-                }
-                else {
-                    // Chunk too small - just recycle so that we can try the next
-                    m_size_map.emplace(elem.size, elem.ref);
-                    m_under_evacuation.pop_back();
-                    found_or_give_up = m_under_evacuation.empty();
-                }
+            // Just give up
+            // But first we will release all kept back elements
+            for (auto& elem : m_under_evacuation) {
+                m_size_map.emplace(elem.size, elem.ref);
             }
-            // Set new limit
-            if (m_under_evacuation.empty()) {
-                m_evacuation_limit = 0;
-                // std::cout << "Give up" << std::endl;
-            }
-            else {
-                m_evacuation_limit = m_under_evacuation.back().ref;
-                // std::cout << "New limit = " << std::hex << m_evacuation_limit << std::dec << std::endl;
-            }
+            m_under_evacuation.clear();
+            m_evacuation_limit = 0;
+            m_backoff = 10;
+            // std::cout << "Give up" << std::endl;
             chunk = search_free_space_in_part_of_freelist(size);
         }
         else {
@@ -1211,6 +1204,8 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // Update the logical file size
     m_logical_size = new_file_size;
     m_group.m_top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
+
+    // std::cout << "New file size = " << std::hex << m_logical_size << std::dec << std::endl;
 
     return it;
 }

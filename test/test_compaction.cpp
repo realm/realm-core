@@ -89,12 +89,15 @@ TEST(Compaction_WhileGrowing)
     table1->clear();
     table2->clear();
     tr->commit_and_continue_as_read();
+    // Now there should be room for compaction
 
+    auto n = 20; // Ensure that test will end
     do {
         tr->promote_to_write();
         tr->commit_and_continue_as_read();
         db->get_stats(free_space, used_space);
-    } while (free_space < 0x1000);
+    } while (free_space > 0x10000 && --n > 0);
+    CHECK_LESS(free_space, 0x10000);
 }
 
 TEST(Compaction_Large)

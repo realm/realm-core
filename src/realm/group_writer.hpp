@@ -154,7 +154,7 @@ private:
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
     size_t m_evacuation_limit;
-    bool m_backoff;
+    int64_t m_backoff;
     size_t m_logical_size = 0;
     Durability m_durability;
 
