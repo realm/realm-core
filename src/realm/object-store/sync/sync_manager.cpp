@@ -492,19 +492,16 @@ void SyncManager::delete_user(const std::string& user_id)
 
 SyncManager::~SyncManager() NO_THREAD_SAFETY_ANALYSIS
 {
-    // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
-    // session->shutdown_and_wait() will modify the m_sessions map.
-    auto current_sessions = [&] {
+    // Grab the current sessions under a lock so we can shut them down. We have to
+    // release the lock before calling them as shutdown_and_wait() will call
+    // back into us.
+    decltype(m_sessions) current_sessions;
+    {
         util::CheckedLockGuard lk(m_session_mutex);
-        std::vector<std::shared_ptr<SyncSession>> current_sessions;
-        std::transform(m_sessions.begin(), m_sessions.end(), std::back_inserter(current_sessions),
-                       [](const auto& session_kv) {
-                           return session_kv.second;
-                       });
-        return current_sessions;
-    }();
+        m_sessions.swap(current_sessions);
+    }
 
-    for (auto& session : current_sessions) {
+    for (auto& [_, session] : current_sessions) {
         session->detach_from_sync_manager();
     }
 
@@ -688,29 +685,39 @@ void SyncManager::unregister_session(const std::string& path)
     util::CheckedUniqueLock lock(m_session_mutex);
     auto it = m_sessions.find(path);
     if (it == m_sessions.end()) {
-        // There was a race to unregister and there's nothing left to do here.
-        // This is known to happen if the sync session is closing down at the
-        // same time that a local Realm reference is being cleaned up.
+        // The session may already be unregistered. This always happens in the
+        // SyncManager destructor, and can also happen due to multiple threads
+        // tearing things down at once.
         return;
     }
 
-    // If the session has an active external reference, leave it be. This will happen if the session
-    // moves to an inactive state while still externally reference, for instance, as a result of
-    // the session's user being logged out.
+    // Sync session teardown calls this function, so we need to be careful with
+    // locking here. We need to unlock `m_session_mutex` before we do anything
+    // which could result in a re-entrant call or we'll deadlock, which in this
+    // function means unlocking before we destroy a `shared_ptr<SyncSession>`
+    // (either the external reference or internal reference versions).
+    // The external reference version will only be the final reference if
+    // another thread drops a reference while we're in this function.
+    // Dropping the final internal reference does not appear to ever actually
+    // result in a recursive call to this function at the time this comment was
+    // written, but releasing the lock in that case as well is still safer.
+
     if (auto existing_session = it->second->existing_external_reference()) {
-        // The lock must be released before `existing_session` is released. This prevents a
-        // deadlock in the scenario where a strong reference to the existing session is
-        // acquired here but other references are cleaned up before this method is
-        // finished. In that case, `existing_session` becomes the last strong external
-        // reference and the session will attempt to close when it goes out of scope. If
-        // that happens while we still hold the lock here, `unregister_session` will be
-        // called again and will block on `m_session_mutex` which is already held.
-        // Releasing the lock before `existing_session` expires prevents this.
+        // We got here because the session entered the inactive state, but
+        // there's still someone referencing it so we should leave it be. This
+        // can happen if the user was logged out, or if all Realms using the
+        // session were destroyed but the SDK user is holding onto the session.
+
+        // Explicit unlock so that `existing_session`'s destructor runs after
+        // the unlock for the reasons noted above
         lock.unlock();
         return;
     }
 
-    m_sessions.erase(path);
+    // Remove the session from the map while holding the lock, but then defer
+    // destroying it until after we unlock the mutex for the reasons noted above.
+    auto session = m_sessions.extract(it);
+    lock.unlock();
 }
 
 void SyncManager::enable_session_multiplexing()
