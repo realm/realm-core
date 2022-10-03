@@ -1554,6 +1554,58 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     }
 }
 
+TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema(
+        {{"Transaction",
+          {{"_id", PropertyType::String, Property::IsPrimary{true}},
+           {"date", PropertyType::Date},
+           {"account", PropertyType::Object | PropertyType::Nullable, "Account"}}},
+         {"Account", {{"_id", PropertyType::String, Property::IsPrimary{true}}, {"name", PropertyType::String}}}});
+
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+    auto transaction_table = r->read_group().get_table("class_Transaction");
+    auto date_col = transaction_table->get_column_key("date");
+    auto account_col = transaction_table->get_column_key("account");
+    auto account_table = r->read_group().get_table("class_Account");
+    auto account_name_col = account_table->get_column_key("name");
+
+    r->begin_transaction();
+    auto t1 = transaction_table->create_object_with_primary_key("t");
+    auto a1 = account_table->create_object_with_primary_key("a");
+    t1.set(account_col, a1.get_key());
+    r->commit_transaction();
+
+    Results results(r, transaction_table);
+    auto sorted = results.sort({{"date", false}});
+    auto sectioned_results = sorted.sectioned_results([](Mixed value, SharedRealm realm) {
+        auto obj = Object(realm, value.get_link());
+        auto ts = obj.get_column_value<Timestamp>("date");
+        auto tp = ts.get_time_point();
+        auto day = std::chrono::floor<std::chrono::hours>(tp);
+        return Timestamp{day};
+    });
+
+    REQUIRE(sectioned_results.size() == 1);
+    REQUIRE(sectioned_results[0].size() == 1);
+
+    SectionedResultsChangeSet changes;
+    auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
+        changes = c;
+    });
+    coordinator->on_change();
+
+    r->begin_transaction();
+    a1.set(account_name_col, "a2");
+    r->commit_transaction();
+    advance_and_notify(*r);
+}
+
 namespace cf = realm::sectioned_results_fixtures;
 
 TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool,
