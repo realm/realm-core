@@ -459,13 +459,6 @@ Group::~Group() noexcept
 }
 
 
-void Group::remap(size_t new_file_size)
-{
-    m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers(m_is_writable);
-}
-
-
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
