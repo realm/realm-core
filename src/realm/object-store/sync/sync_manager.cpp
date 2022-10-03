@@ -490,7 +490,7 @@ void SyncManager::delete_user(const std::string& user_id)
     }
 }
 
-SyncManager::~SyncManager()
+SyncManager::~SyncManager() NO_THREAD_SAFETY_ANALYSIS
 {
     // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
     // session->shutdown_and_wait() will modify the m_sessions map.
@@ -507,14 +507,6 @@ SyncManager::~SyncManager()
     for (auto& session : current_sessions) {
         session->detach_from_sync_manager();
     }
-
-    // At this point we should have drained all the sessions.
-#ifdef REALM_DEBUG
-    {
-        util::CheckedLockGuard lk(m_session_mutex);
-        REALM_ASSERT(m_sessions.empty());
-    }
-#endif
 
     {
         util::CheckedLockGuard lk(m_user_mutex);
