@@ -191,6 +191,9 @@ public:
     // longer be open on behalf of it.
     void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
+    // DO NOT CALL OUTSIDE OF TESTING CODE.
+    void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
     void update_access_token(const std::string& signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
@@ -273,6 +276,11 @@ public:
         {
             return session.m_db;
         }
+
+        static util::Future<std::string> send_test_command(SyncSession& session, std::string request)
+        {
+            return session.send_test_command(std::move(request));
+        }
     };
 
 private:
@@ -344,7 +352,6 @@ private:
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
     void did_drop_external_reference()
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
-    void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
     void close(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
@@ -355,6 +362,8 @@ private:
 
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
+
+    util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
     util::UniqueFunction<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 

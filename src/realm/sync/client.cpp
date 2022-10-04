@@ -212,6 +212,8 @@ public:
 
     void on_new_flx_subscription_set(int64_t new_version);
 
+    util::Future<std::string> send_test_command(std::string body);
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -895,6 +897,33 @@ bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_stat
     return false;
 }
 
+util::Future<std::string> SessionImpl::send_test_command(std::string body)
+{
+    try {
+        auto json_body = nlohmann::json::parse(body.begin(), body.end());
+        if (auto it = json_body.find("command"); it == json_body.end() || !it->is_string()) {
+            return Status{ErrorCodes::LogicError,
+                          "Must supply command name in \"command\" field of test command json object"};
+        }
+        if (json_body.size() > 1 && json_body.find("args") == json_body.end()) {
+            return Status{ErrorCodes::LogicError, "Only valid fields in a test command are \"command\" and \"args\""};
+        }
+    }
+    catch (const nlohmann::json::parse_error& e) {
+        return Status{ErrorCodes::LogicError, util::format("Invalid json input to send_test_command: %1", e.what())};
+    }
+
+    auto pf = util::make_promise_future<std::string>();
+
+    get_client().get_service().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
+        auto id = ++m_last_pending_test_command_ident;
+        m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
+        ensure_enlisted_to_send();
+    });
+
+    return std::move(pf.future);
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
@@ -1489,6 +1518,16 @@ void SessionWrapper::report_progress()
                        snapshot_version);
 }
 
+util::Future<std::string> SessionWrapper::send_test_command(std::string body)
+{
+    if (!m_sess) {
+        return util::Future<std::string>::make_ready(
+            Status{ErrorCodes::RuntimeError, "session must be activated to send a test command"});
+    }
+
+    return m_sess->send_test_command(std::move(body));
+}
+
 // ################ ClientImpl::Connection ################
 
 ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ident, ServerEndpoint endpoint,
@@ -1748,6 +1787,11 @@ void Session::abandon() noexcept
 void Session::on_new_flx_sync_subscription(int64_t new_version)
 {
     m_impl->on_new_flx_subscription_set(new_version);
+}
+
+util::Future<std::string> Session::send_test_command(std::string body)
+{
+    return m_impl->send_test_command(std::move(body));
 }
 
 const std::error_category& client_error_category() noexcept

@@ -21,13 +21,18 @@
 
 #include <realm/util/optional.hpp>
 
+#include <map>
+
 namespace realm::app {
 struct AppError;
 struct Response;
 
+
 class AppUtils {
 public:
     static util::Optional<AppError> check_for_errors(const Response& response);
+    static const std::pair<const std::string, std::string>*
+    find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map);
 };
 } // namespace realm::app
 

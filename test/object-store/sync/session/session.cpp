@@ -248,6 +248,13 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
         session->close();
         REQUIRE(sessions_are_inactive(*session));
     }
+
+    SECTION("Close session after it was detached from the SyncManager") {
+        auto session = sync_session(
+            user, "/test-close-after-detach", [](auto, auto) {}, SyncSessionStopPolicy::Immediately);
+        session->detach_from_sync_manager();
+        REQUIRE_NOTHROW(session->close());
+    }
 }
 
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {

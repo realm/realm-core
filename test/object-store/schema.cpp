@@ -786,6 +786,22 @@ TEST_CASE("Schema") {
                                       "Property 'object.dictionary' of type 'object' must be nullable.");
         }
 
+        SECTION("rejects non-nullable Mixed dictionary properties") {
+            Schema schema = {{"object", {{"dictionary", PropertyType::Dictionary | PropertyType::Mixed}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                                      "Property 'object.dictionary' of type 'Mixed' must be nullable.");
+        }
+
+        SECTION("rejects non-nullable Mixed list properties") {
+            Schema schema = {{"object", {{"array", PropertyType::Array | PropertyType::Mixed}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.array' of type 'Mixed' must be nullable.");
+        }
+
+        SECTION("rejects non-nullable Mixed set properties") {
+            Schema schema = {{"object", {{"set", PropertyType::Set | PropertyType::Mixed}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.set' of type 'Mixed' must be nullable.");
+        }
+
         SECTION("rejects nullable array properties") {
             Schema schema = {
                 {"object",

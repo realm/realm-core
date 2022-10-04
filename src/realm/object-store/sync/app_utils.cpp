@@ -22,8 +22,25 @@
 
 #include <external/json/json.hpp>
 
+#include <algorithm>
+
 namespace realm {
 namespace app {
+
+const std::pair<const std::string, std::string>*
+AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
+{
+    for (auto&& current : search_map) {
+#ifdef _MSC_VER
+        if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
+#else
+        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+#endif
+            return &current;
+        }
+    }
+    return nullptr;
+}
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
@@ -32,8 +49,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
     try {
-        auto ct = response.headers.find("content-type");
-        if (ct != response.headers.end() && ct->second == "application/json") {
+        auto ct = find_header("content-type", response.headers);
+        if (ct && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");
