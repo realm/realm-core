@@ -893,8 +893,6 @@ buildvariants:
   display_name: "Ubuntu 2204 Valgrind"
   run_on: ubuntu2204-large
   expansions:
-    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
-    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
