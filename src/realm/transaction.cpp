@@ -915,6 +915,7 @@ public:
     }
     ~NodeTree()
     {
+        // std::cout << "Moved: " << m_moved << std::endl;
     }
 
     /// Function used to traverse the node tree and "copy on write" nodes
@@ -945,6 +946,7 @@ public:
 
         if (current_node.has_refs()) {
             auto sz = current_node.size();
+            m_work_limit -= sz;
             if (progress.size() == level) {
                 progress.push_back(0);
             }

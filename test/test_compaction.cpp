@@ -17,9 +17,25 @@
  **************************************************************************/
 
 #include <realm.hpp>
+#include <realm/util/scope_exit.hpp>
 #include "test.hpp"
 
 #include <iostream>
+#include <chrono>
+
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
+// valgrind --tool=callgrind --instr-atstart=no realm-tests
+
+using namespace std::chrono;
 
 using namespace realm;
 using namespace realm::util;
@@ -45,6 +61,7 @@ TEST(Compaction_WhileGrowing)
     }
     int num = (REALM_MAX_BPNODE_SIZE == 1000) ? 1490 : 1400;
     tr->promote_to_write();
+    CHECK(db->get_evacuation_stage() == DB::EvacStage::idle);
     for (int j = 0; j < num; ++j) {
         table1->create_object().set(col_bin1, BinaryData(w, 400));
         table2->create_object().set(col_bin2, BinaryData(w, 200));
@@ -63,8 +80,11 @@ TEST(Compaction_WhileGrowing)
             tr->commit_and_continue_as_read();
             tr->promote_to_write();
         }
+        if (db->get_evacuation_stage() == DB::EvacStage::evacuating)
+            break;
     }
 
+    CHECK(db->get_evacuation_stage() == DB::EvacStage::evacuating);
     tr->commit_and_continue_as_read();
     db->get_stats(free_space, used_space);
     // The file is now subject to compaction
@@ -79,6 +99,8 @@ TEST(Compaction_WhileGrowing)
     table1->create_object().set(col_bin1, BinaryData(w, 4500));
     table1->create_object().set(col_bin1, BinaryData(w, 4500));
     tr->commit_and_continue_as_read();
+
+    CHECK(db->get_evacuation_stage() == DB::EvacStage::blocked);
 
     // db->get_stats(free_space, used_space);
     // std::cout << "Total: " << free_space + used_space << ", "
@@ -96,7 +118,7 @@ TEST(Compaction_WhileGrowing)
         tr->promote_to_write();
         tr->commit_and_continue_as_read();
         db->get_stats(free_space, used_space);
-    } while (free_space > 0x10000 && --n > 0);
+    } while (db->get_evacuation_stage() != DB::EvacStage::idle && --n > 0);
     CHECK_LESS(free_space, 0x10000);
 }
 
@@ -170,4 +192,65 @@ TEST(Compaction_Large)
     }
     // std::cout << "Size : " << f.get_size() << std::endl;
     CHECK(f.get_size() == total);
+}
+
+NONCONCURRENT_TEST(Compaction_Performance)
+{
+    auto old_disable_sync_to_disk = get_disable_sync_to_disk();
+    disable_sync_to_disk(false);
+    util::ScopeExit on_exit([old_disable_sync_to_disk]() noexcept {
+        disable_sync_to_disk(old_disable_sync_to_disk);
+    });
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table_foo = tr->add_table("foo");
+    auto col_bin = table_foo->add_column(type_Binary, "bin", true);
+    std::string big_string(0x10000, 'a');
+    for (int i = 0; i < 1200; ++i) {
+        table_foo->create_object().set(col_bin, BinaryData(big_string.data(), 0x10000));
+    }
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    auto table_bar = tr->add_table("bar");
+    auto col_str = table_bar->add_column(type_String, "str");
+    std::string str_b(512, 'b');
+    std::string str_c(512, 'c');
+    std::string str_d(512, 'd');
+    for (int i = 0; i < 10000; ++i) {
+        table_bar->create_object().set(col_str, str_b);
+    }
+    tr->commit_and_continue_as_read();
+
+    auto objp = table_bar->begin();
+
+    auto run = [&](std::string& s) {
+        auto t1 = steady_clock::now();
+
+        // CALLGRIND_START_INSTRUMENTATION;
+
+        for (size_t i = 0; i < 10; i++) {
+            tr->promote_to_write();
+            for (size_t t = 0; t < 100; t++) {
+                objp->set(col_str, s);
+                ++objp;
+            }
+            tr->commit_and_continue_as_read();
+        }
+
+        // CALLGRIND_STOP_INSTRUMENTATION;
+
+        auto t2 = steady_clock::now();
+
+        return duration_cast<microseconds>(t2 - t1).count();
+    };
+
+    auto t0 = run(str_c);
+    tr->promote_to_write();
+    table_foo->clear();
+    tr->commit_and_continue_as_read();
+    auto t1 = run(str_d);
+    std::cout << "Normal: " << t0 << " us" << std::endl;
+    std::cout << "Compacting: " << t1 << " us" << std::endl;
 }

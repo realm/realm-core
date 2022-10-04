@@ -2117,7 +2117,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     if (auto limit = out.get_evacuation_limit()) {
         // Get a work limit based on the size of the transaction we're about to commit
         // Assume at least 4K on top of that for the top arrays
-        size_t work_limit = 4 * 1024 + m_alloc.get_commit_size();
+        size_t work_limit = 4 * 1024 + m_alloc.get_commit_size() / 2;
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 
@@ -2134,6 +2134,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_logical_size() - m_free_space;
+        m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:

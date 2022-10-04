@@ -266,6 +266,13 @@ public:
         transact_Frozen,
     };
 
+    enum class EvacStage { idle, evacuating, waiting, blocked };
+
+    EvacStage get_evacuation_stage() const
+    {
+        return m_evac_stage;
+    }
+
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
     /// a read transaction will not immediately release any versions.
@@ -447,6 +454,7 @@ private:
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
+    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer

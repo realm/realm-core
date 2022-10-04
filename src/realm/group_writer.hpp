@@ -61,6 +61,7 @@ using VersionVector = std::vector<uint64_t>;
 /// particular, do not reuse it in case any of the functions throw.
 class GroupWriter : public _impl::ArrayWriterBase {
 public:
+    enum class EvacuationStage { idle, evacuating, waiting, blocked };
     // For groups in transactional mode (Group::m_is_shared), this constructor
     // must be called while a write transaction is in progress.
     //
@@ -119,6 +120,27 @@ public:
     {
         return m_evacuation_progress;
     }
+
+    EvacuationStage get_evacuation_stage() const noexcept
+    {
+        if (m_evacuation_limit == 0) {
+            if (m_backoff == 0) {
+                return EvacuationStage::idle;
+            }
+            else {
+                return EvacuationStage::blocked;
+            }
+        }
+        else {
+            if (m_backoff == 0) {
+                return EvacuationStage::evacuating;
+            }
+            else {
+                return EvacuationStage::waiting;
+            }
+        }
+    }
+
 
     // Flush all cached memory mappings
     void flush_all_mappings();
