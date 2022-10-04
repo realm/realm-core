@@ -350,14 +350,6 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
-void RealmCoordinator::create_session(const Realm::Config& config)
-{
-    REALM_ASSERT(config.sync_config);
-    util::CheckedLockGuard lock(m_realm_mutex);
-    set_config(config);
-    open_db();
-}
-
 #endif
 
 void RealmCoordinator::open_db()

@@ -189,7 +189,7 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
 {
     auto* config = new realm_app_config_t;
     config->app_id = app_id;
-    config->transport = *http_transport; // realm_http_transport_t is a shard_ptr
+    config->transport = *http_transport; // realm_http_transport_t is a shared_ptr
     return config;
 }
 

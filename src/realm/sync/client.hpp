@@ -723,6 +723,8 @@ public:
 
     void on_new_flx_sync_subscription(int64_t new_version);
 
+    util::Future<std::string> send_test_command(std::string command_body);
+
 private:
     SessionWrapper* m_impl = nullptr;
 

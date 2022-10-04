@@ -22,7 +22,6 @@
 #include <realm/exceptions.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/http.hpp>
 
 #include <iosfwd>
 #include <map>
@@ -74,6 +73,11 @@ std::ostream& operator<<(std::ostream& os, AppError error);
 enum class HttpMethod { get, post, patch, put, del };
 
 /**
+ * Request/Response headers type
+ */
+using HttpHeaders = std::map<std::string, std::string>;
+
+/**
  * An HTTP request that can be made to an arbitrary server.
  */
 struct Request {
@@ -96,7 +100,7 @@ struct Request {
     /**
      * The HTTP headers of this request - keys are case insensitive.
      */
-    util::HTTPHeaders headers;
+    HttpHeaders headers;
 
     /**
      * The body of the request.
@@ -129,7 +133,7 @@ struct Response {
     /**
      * The headers of the HTTP response - keys are case insensitive.
      */
-    util::HTTPHeaders headers;
+    HttpHeaders headers;
 
     /**
      * The body of the HTTP response.
@@ -142,13 +146,22 @@ struct Response {
     util::Optional<ErrorCodes::Error> client_error_code;
 };
 
-
-using HttpCompletion = util::UniqueFunction<void(const Request&, const Response&)>;
-
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request, HttpCompletion&& completion_block) = 0;
     virtual ~GenericNetworkTransport() = default;
+    virtual void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) = 0;
+
+    void send_request_to_server(Request&& request,
+                                util::UniqueFunction<void(Request&&, const Response&)>&& completion)
+    {
+        auto request_ptr = std::make_unique<Request>(std::move(request));
+        const auto& request_ref = *request_ptr;
+        send_request_to_server(request_ref, [request_ptr = std::move(request_ptr),
+                                             completion = std::move(completion)](const Response& response) {
+            completion(std::move(*request_ptr), response);
+        });
+    }
 };
 
 } // namespace realm::app

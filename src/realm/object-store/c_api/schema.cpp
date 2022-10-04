@@ -176,6 +176,22 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
     });
 }
 
+RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index,
+                                               realm_value_t* out_value)
+{
+    return wrap_err([&] {
+        object->verify_attached();
+        auto& peristed_properties = object->get_object_schema().persisted_properties;
+        REALM_ASSERT(prop_index < peristed_properties.size());
+        auto col_key = peristed_properties[prop_index].column_key;
+        auto o = object->obj();
+        auto val = o.get_any(col_key);
+        auto converted = objkey_to_typed_link(val, col_key, *o.get_table());
+        *out_value = to_capi(converted);
+        return true;
+    });
+}
+
 RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_key, realm_property_key_t key,
                                 realm_property_info_t* out_property_info)
 {

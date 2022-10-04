@@ -135,10 +135,10 @@ enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 
 // generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is
 // passed
-util::HTTPHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
-                                      RequestTokenType token_type = RequestTokenType::RefreshToken)
+HttpHeaders get_request_headers(const std::shared_ptr<SyncUser>& with_user_authorization = nullptr,
+                                RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
-    util::HTTPHeaders headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
+    HttpHeaders headers{{"Content-Type", "application/json;charset=utf-8"}, {"Accept", "application/json"}};
 
     if (with_user_authorization) {
         switch (token_type) {
@@ -489,7 +489,7 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
     do_authenticated_request(
         std::move(req), sync_user,
-        [completion = std::move(completion), this, sync_user](const Response& profile_response) {
+        [completion = std::move(completion), self = shared_from_this(), sync_user](const Response& profile_response) {
             if (auto error = AppUtils::check_for_errors(profile_response)) {
                 return completion(nullptr, std::move(error));
             }
@@ -509,8 +509,8 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                 sync_user->update_identities(identities);
                 sync_user->update_user_profile(SyncUserProfile(get<BsonDocument>(profile_json, "data")));
                 sync_user->set_state(SyncUser::State::LoggedIn);
-                m_sync_manager->set_current_user(sync_user->identity());
-                emit_change_to_subscribers(*this);
+                self->m_sync_manager->set_current_user(sync_user->identity());
+                self->emit_change_to_subscribers(*self);
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -561,7 +561,7 @@ void App::log_in_with_credentials(
     do_request({HttpMethod::post, route, m_request_timeout_ms,
                 get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
                [completion = std::move(completion), credentials, linking_user,
-                anchor = shared_from_this()](const Response& response) mutable {
+                self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
                        return completion(nullptr, std::move(error));
                    }
@@ -573,7 +573,7 @@ void App::log_in_with_credentials(
                            linking_user->update_access_token(get<std::string>(json, "access_token"));
                        }
                        else {
-                           sync_user = anchor->m_sync_manager->get_user(
+                           sync_user = self->m_sync_manager->get_user(
                                get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
                                get<std::string>(json, "access_token"), credentials.provider_as_string(),
                                get<std::string>(json, "device_id"));
@@ -583,7 +583,7 @@ void App::log_in_with_credentials(
                        return completion(nullptr, e);
                    }
 
-                   anchor->get_profile(sync_user, std::move(completion));
+                   self->get_profile(sync_user, std::move(completion));
                });
 }
 
@@ -618,10 +618,10 @@ void App::log_out(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Opt
     }
 
     do_request(std::move(req),
-               [anchor = shared_from_this(), completion = std::move(completion)](const Response& response) {
+               [self = shared_from_this(), completion = std::move(completion)](const Response& response) {
                    auto error = AppUtils::check_for_errors(response);
                    if (!error) {
-                       anchor->emit_change_to_subscribers(*anchor);
+                       self->emit_change_to_subscribers(*self);
                    }
                    completion(error);
                });
@@ -668,8 +668,9 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     }
 
     if (user->is_logged_in()) {
-        log_out(user, [user, completion = std::move(completion), this](const Optional<AppError>& error) {
-            m_sync_manager->remove_user(user->identity());
+        log_out(user, [user, completion = std::move(completion),
+                       self = shared_from_this()](const Optional<AppError>& error) {
+            self->m_sync_manager->remove_user(user->identity());
             return completion(error);
         });
     }
@@ -697,12 +698,12 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     req.timeout_ms = m_request_timeout_ms;
     req.url = url_for_path("/auth/delete");
     do_authenticated_request(std::move(req), user,
-                             [anchor = shared_from_this(), completion = std::move(completion),
+                             [self = shared_from_this(), completion = std::move(completion),
                               identitiy = user->identity()](const Response& response) {
                                  auto error = AppUtils::check_for_errors(response);
                                  if (!error) {
-                                     anchor->emit_change_to_subscribers(*anchor);
-                                     anchor->m_sync_manager->delete_user(identitiy);
+                                     self->emit_change_to_subscribers(*self);
+                                     self->m_sync_manager->delete_user(identitiy);
                                  }
                                  completion(error);
                              });
@@ -768,11 +769,11 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
 
-    m_config.transport->send_request_to_server(std::move(req), [this, completion = std::move(completion)](
-                                                                   const Request&, const Response& response) {
+    m_config.transport->send_request_to_server(req, [self = shared_from_this(),
+                                                     completion = std::move(completion)](const Response& response) {
         // If the response contains an error, then pass it up
         if (response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0)) {
-            return completion(std::move(response)); // early return
+            return completion(response); // early return
         }
 
         try {
@@ -781,15 +782,15 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             auto ws_hostname = get<std::string>(json, "ws_hostname");
             auto deployment_model = get<std::string>(json, "deployment_model");
             auto location = get<std::string>(json, "location");
-            m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+            self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
                 manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
             });
 
-            update_hostname(m_sync_manager->app_metadata());
+            self->update_hostname(self->m_sync_manager->app_metadata());
         }
         catch (const AppError&) {
             // Pass the response back to completion
-            return completion(std::move(response));
+            return completion(response);
         }
         completion(util::none);
     });
@@ -810,38 +811,24 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
     // the metadata with the updated location info
     init_app_metadata(
         [completion = std::move(completion), request = std::move(request), base_url = m_base_url,
-         anchor = shared_from_this()](const util::Optional<Response>& response) mutable {
+         self = shared_from_this()](const util::Optional<Response>& response) mutable {
             if (response) {
-                if (util::HTTPStatus(response->http_status_code) == util::HTTPStatus::MovedPermanently) {
-                    anchor->handle_redirect_response(std::move(request), std::move(const_cast<Response&>(*response)),
-                                                     std::move(completion));
-                }
-                else {
-                    completion(std::move(*response));
-                }
-                return; // early return
+                return self->handle_possible_redirect_response(std::move(request), *response, std::move(completion));
             }
 
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            auto app_metadata = anchor->m_sync_manager->app_metadata();
+            auto app_metadata = self->m_sync_manager->app_metadata();
             if (app_metadata && request.url.rfind(base_url, 0) != std::string::npos &&
                 app_metadata->hostname != base_url) {
                 request.url.replace(0, base_url.size(), app_metadata->hostname);
             }
-
             // Retry the original request with the updated url
-            anchor->m_config.transport->send_request_to_server(
-                std::move(request), [completion = std::move(completion), anchor = std::move(anchor)](
-                                        const Request& request, const Response& response) mutable {
-                    if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
-                        anchor->handle_redirect_response(std::move(const_cast<Request&>(request)), response,
-                                                         std::move(completion));
-                    }
-                    else {
-                        completion(std::move(response));
-                    }
+            self->m_config.transport->send_request_to_server(
+                std::move(request), [self = std::move(self), completion = std::move(completion)](
+                                        Request&& request, const Response& response) mutable {
+                    self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
                 });
         },
         new_hostname);
@@ -854,16 +841,9 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     // Normal do_request operation, just send the request to the server and return the response
     if (m_sync_manager->app_metadata()) {
         m_config.transport->send_request_to_server(
-            std::move(request), [completion = std::move(completion), anchor = shared_from_this()](
-                                    const Request& request, const Response& response) mutable {
-                // If the response contains a redirection, then process it
-                if (response.http_status_code == static_cast<int>(realm::util::HTTPStatus::MovedPermanently)) {
-                    anchor->handle_redirect_response(std::move(const_cast<Request&>(request)), response,
-                                                     std::move(completion));
-                }
-                else {
-                    completion(std::move(response));
-                }
+            std::move(request), [self = shared_from_this(), completion = std::move(completion)](
+                                    Request&& request, const Response& response) mutable {
+                self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
             });
         return; // early return
     }
@@ -872,19 +852,31 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     update_metadata_and_resend(std::move(request), std::move(completion));
 }
 
+void App::handle_possible_redirect_response(Request&& request, const Response& response,
+                                            UniqueFunction<void(const Response&)>&& completion)
+{
+    // If the response contains a redirection, then process it
+    if (util::HTTPStatus(response.http_status_code) == util::HTTPStatus::MovedPermanently) {
+        handle_redirect_response(std::move(request), response, std::move(completion));
+    }
+    else {
+        completion(response);
+    }
+}
+
 void App::handle_redirect_response(Request&& request, const Response& response,
                                    UniqueFunction<void(const Response&)>&& completion)
 {
     // Permanent redirect - get the location and init the metadata again
     // Look for case insensitive redirect "location" in headers
-    auto location = response.headers.find("location");
-    if (location == response.headers.end() || location->second.empty()) {
+    auto location = AppUtils::find_header("location", response.headers);
+    if (!location || location->second.empty()) {
         // Location not found in the response, pass error response up the chain
         Response error;
         error.http_status_code = response.http_status_code;
         error.client_error_code = ErrorCodes::ClientRedirectError;
         error.body = "Redirect response missing location header";
-        return completion(std::move(error)); // early return
+        return completion(error); // early return
     }
 
     // Make sure we don't do too many redirects (max_http_redirects (20) is an arbitrary number)
@@ -894,7 +886,7 @@ void App::handle_redirect_response(Request&& request, const Response& response,
         error.custom_status_code = 0;
         error.client_error_code = ErrorCodes::ClientTooManyRedirects;
         error.body = util::format("number of redirections exceeded %1", max_http_redirects);
-        return completion(std::move(error)); // early return
+        return completion(error); // early return
     }
 
     // Update the metadata from the new location after trimming the url (limit to `scheme://host[:port]`)
@@ -917,10 +909,10 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
                                                                                 : RequestTokenType::AccessToken);
 
     auto completion_2 = [completion = std::move(completion), request, sync_user,
-                         anchor = shared_from_this()](const Response& response) mutable {
+                         self = shared_from_this()](const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {
-            anchor->handle_auth_failure(std::move(*error), std::move(response), std::move(request), sync_user,
-                                        std::move(completion));
+            self->handle_auth_failure(std::move(*error), std::move(response), std::move(request), sync_user,
+                                      std::move(completion));
         }
         else {
             completion(std::move(response));
@@ -948,13 +940,13 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
         return;
     }
 
-    App::refresh_access_token(sync_user, [this, request = std::move(request), completion = std::move(completion),
-                                          response = std::move(response),
+    App::refresh_access_token(sync_user, [self = shared_from_this(), request = std::move(request),
+                                          completion = std::move(completion), response = std::move(response),
                                           sync_user](Optional<AppError>&& error) mutable {
         if (!error) {
             // assign the new access_token to the auth header
             request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            do_request(std::move(request), std::move(completion));
+            self->do_request(std::move(request), std::move(completion));
         }
         else {
             // pass the error back up the chain

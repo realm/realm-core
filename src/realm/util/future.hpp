@@ -466,7 +466,7 @@ public:
     Promise& operator=(Promise&&) = delete;
 
     // The default move construction is fine.
-    Promise(Promise&&) = default;
+    Promise(Promise&&) noexcept = default;
 
     /**
      * Sets the value into this Promise when the passed-in Future completes, which may have already

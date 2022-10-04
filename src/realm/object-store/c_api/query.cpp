@@ -297,6 +297,18 @@ RLM_API realm_results_t* realm_dictionary_to_results(realm_dictionary_t* diction
     });
 }
 
+RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class_key_t source_table_key,
+                                             realm_property_key_t property_key)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+        auto realm = object->realm();
+        auto source_table = realm->read_group().get_table(TableKey{source_table_key});
+        auto backlink_view = object->obj().get_backlink_view(source_table, ColKey{property_key});
+        return new realm_results_t{Results{realm, backlink_view}};
+    });
+}
+
 RLM_API bool realm_results_count(realm_results_t* results, size_t* out_count)
 {
     return wrap_err([&]() {

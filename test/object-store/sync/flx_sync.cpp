@@ -256,6 +256,32 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     });
 }
 
+TEST_CASE("flx: test commands work") {
+    FLXSyncTestHarness harness("test_commands");
+    harness.do_with_new_realm([&](const SharedRealm& realm) {
+        wait_for_upload(*realm);
+        nlohmann::json command_request = {
+            {"command", "PAUSE_ROUTER_SESSION"},
+        };
+        auto resp_body =
+            SyncSession::OnlyForTesting::send_test_command(*realm->sync_session(), command_request.dump()).get();
+        REQUIRE(resp_body == "{}");
+
+        auto bad_status =
+            SyncSession::OnlyForTesting::send_test_command(*realm->sync_session(), "foobar: }").get_no_throw();
+        REQUIRE(bad_status.get_status() == ErrorCodes::LogicError);
+        REQUIRE_THAT(bad_status.get_status().reason(),
+                     Catch::Matchers::ContainsSubstring("Invalid json input to send_test_command"));
+
+        bad_status =
+            SyncSession::OnlyForTesting::send_test_command(*realm->sync_session(), "{\"cmd\": \"\"}").get_no_throw();
+        REQUIRE_FALSE(bad_status.is_ok());
+        REQUIRE(bad_status.get_status() == ErrorCodes::LogicError);
+        REQUIRE(bad_status.get_status().reason() ==
+                "Must supply command name in \"command\" field of test command json object");
+    });
+}
+
 static auto make_error_handler()
 {
     auto [error_promise, error_future] = util::make_promise_future<SyncError>();
@@ -266,6 +292,8 @@ static auto make_error_handler()
     return std::make_pair(std::move(error_future), std::move(fn));
 }
 
+// Re-enable these tests in RCORE-1264 when the server websocket disconnect issues are resolved.
+#if 0
 static auto make_client_reset_handler()
 {
     auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
@@ -744,6 +772,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             ->run();
     }
 }
+#endif
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
@@ -1411,17 +1440,15 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request, HttpCompletion&& completion_block) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(
-                std::move(request), [&](const Request& request, const Response& response) {
-                    completion_block(std::move(request), std::move(response));
-                });
+            SynchronousTestTransport::send_request_to_server(request, std::move(completion));
         }
-        util::UniqueFunction<void(Request&)> request_hook;
+        util::UniqueFunction<void(const Request&)> request_hook;
     };
 
     auto transport = std::make_shared<HookedTransport>();
@@ -1440,7 +1467,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     bool seen_waiting_for_access_token = false;
     // Commit a subcription set while there is no sync session.
     // A session is created when the access token is refreshed.
-    transport->request_hook = [&](Request&) {
+    transport->request_hook = [&](const Request&) {
         auto user = app->current_user();
         REQUIRE(user);
         for (auto& session : user->all_sessions()) {
