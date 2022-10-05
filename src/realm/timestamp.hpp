@@ -89,6 +89,43 @@ public:
         m_nanoseconds = static_cast<int32_t>(native_nano % nanoseconds_per_second);
     }
 
+    explicit Timestamp(std::string_view str)
+        : m_is_null(false)
+    {
+        struct tm buf;
+        char* p;
+        memset(&buf, 0, sizeof(buf));
+        buf.tm_year = int(strtol(str.data(), &p, 10));
+        if (*p == '-') {
+            p++;
+            buf.tm_mon = int(strtol(p, &p, 10));
+            if (*p == '-') {
+                p++;
+                buf.tm_mday = int(strtol(p, &p, 10));
+                if (*p == ' ') {
+                    p++;
+                    buf.tm_hour = int(strtol(p, &p, 10));
+                    if (*p == ':') {
+                        p++;
+                        buf.tm_min = int(strtol(p, &p, 10));
+                        if (*p == ':') {
+                            p++;
+                            buf.tm_sec = int(strtol(p, &p, 10));
+                        }
+                    }
+                }
+                if (*p == '\0') {
+                    time_t t = mktime(&buf);
+                    m_seconds = int64_t(t);
+                    m_nanoseconds = 0;
+                    return;
+                }
+
+            }
+        }
+        m_is_null = true;
+    }
+
     constexpr bool is_null() const
     {
         return m_is_null;

@@ -31,6 +31,8 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <set>
+#include <map>
 
 constexpr const int signature = 0x41414141;
 uint64_t current_logical_file_size;
@@ -130,6 +132,15 @@ public:
     {
         return (m_header[4] & 0x40) != 0;
     }
+    bool is_inner() const
+    {
+        return (m_header[4] & 0x80) != 0;
+    }
+    bool context() const
+    {
+        return (m_header[4] & 0x20) != 0;
+    }
+
     unsigned width() const
     {
         return (1 << (unsigned(m_header[4]) & 0x07)) >> 1;
@@ -242,10 +253,72 @@ public:
         return str;
     }
 
+    void collect_children(std::map<uint64_t, Array>& trees)
+    {
+        if (!m_done) {
+            if (has_refs()) {
+                m_children.resize(m_size);
+                for (size_t i = 0; i < m_size; i++) {
+                    if (auto ref = get_ref(i)) {
+                        if (auto it = trees.find(ref); it != trees.end()) {
+                            m_children[i] = it->second;
+                            trees.erase(it);
+                            m_children[i].collect_children(trees);
+                        }
+                    }
+                }
+            }
+            m_done = true;
+        }
+    }
+
+    void dump(std::string indent = "")
+    {
+        std::cout << indent << "0x" << m_ref;
+        if (is_inner()) {
+            std::cout << " inner";
+        }
+        if (context()) {
+            std::cout << " context";
+        }
+        std::cout << std::endl;
+        if (has_refs()) {
+            indent += "   ";
+            for (size_t i = 0; i < m_size; i++) {
+                int64_t val = realm::get_direct(m_data, width(), i);
+                if (val & 1) {
+                    val >>= 1;
+                    std::cout << indent << "val: " << std::dec << val << std::hex << std::endl;
+                }
+                else {
+                    if (m_children[i].valid()) {
+                        m_children[i].dump(indent);
+                    }
+                    else {
+                        if (val) {
+                            std::cout << indent << "unresolved: 0x" << val << std::endl;
+                        }
+                        else {
+                            std::cout << indent << "void" << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool operator<(const Array& other) const
+    {
+        return m_ref < other.m_ref;
+    }
+
 private:
-    char* m_data;
+    char* m_data = nullptr;
     bool m_has_refs = false;
+    bool m_done = false;
+    std::vector<Array> m_children;
 };
+
 
 class Group;
 class Table : public Array {
@@ -741,6 +814,7 @@ RealmFile::RealmFile(const std::string& file_path, const char* encryption_key, u
 void RealmFile::node_scan()
 {
     std::map<uint64_t, unsigned> sizes;
+    std::map<uint64_t, Array> trees;
     uint64_t ref = m_start_pos;
     auto free_list = m_group->get_free_list();
     auto free_entry = free_list.begin();
@@ -759,13 +833,7 @@ void RealmFile::node_scan()
             ++free_entry;
         }
         else {
-            while (free_entry != free_list.end() && ref > free_entry->start) {
-                std::cout << "*** Bad free list entry: "
-                          << "Start: 0x" << free_entry->start << "..0x" << free_entry->start + free_entry->length
-                          << std::endl;
-                ++free_entry;
-            }
-            Node n(m_alloc, ref);
+            Array n(m_alloc, ref);
             if (n.valid()) {
                 if (bad_ref) {
                     std::cout << "*** Unaccounted space: "
@@ -773,8 +841,18 @@ void RealmFile::node_scan()
                     bad_ref = 0;
                 }
                 auto size_in_bytes = n.size_in_bytes();
-                sizes[size_in_bytes]++;
-                ref += size_in_bytes;
+                auto end = ref + size_in_bytes;
+                if (free_entry != free_list.end() && end > free_entry->start) {
+                    std::cout << "*** Node: 0x" << ref << "..0x" << end << " extends into free space" << std::endl;
+                    // Restart after current free space end
+                    ref = free_entry->start + free_entry->length;
+                    ++free_entry;
+                }
+                else {
+                    trees.emplace(ref, n);
+                    sizes[size_in_bytes]++;
+                    ref += size_in_bytes;
+                }
             }
             else {
                 if (!bad_ref) {
@@ -787,6 +865,15 @@ void RealmFile::node_scan()
     if (bad_ref) {
         std::cout << "*** Unaccounted space: "
                   << "Start: 0x" << bad_ref << "..0x" << end << std::endl;
+    }
+    auto it = trees.begin();
+    while (it != trees.end()) {
+        it->second.collect_children(trees);
+        ++it;
+    }
+    for (auto t : trees) {
+        std::cout << "Top - ";
+        t.second.dump();
     }
     std::cout << std::dec;
     std::cout << "Allocated space:" << std::endl;
