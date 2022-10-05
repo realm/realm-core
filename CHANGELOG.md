@@ -18,6 +18,7 @@
 
 ### Internals
 * Remove the unused utility function `copy_dir_recursive()`.
+* StringData and Timestamp are now constexpr-constructible.
 
 ----------------------------------------------
 
