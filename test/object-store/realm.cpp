@@ -2367,6 +2367,12 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         WriteTransaction wt(db);
         auto& table = *wt.get_table("class_object");
 
+        SECTION("removing a property (no error relative to the property just remove)") {
+            table.remove_column(table.get_column_key("value"));
+            wt.commit();
+            REQUIRE_THROWS_CONTAINING(r->refresh(), "Primary Key for class 'object' has been removed.");
+        }
+
         SECTION("change property type") {
             table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Float, "value 2");

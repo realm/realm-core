@@ -51,6 +51,11 @@ Schema::Schema(std::initializer_list<ObjectSchema> types)
 Schema::Schema(base types) noexcept
     : base(std::move(types))
 {
+    sort_schema();
+}
+
+void Schema::sort_schema()
+{
     std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
         return lft.name < rgt.name;
     });
@@ -388,9 +393,7 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
 
     if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
-        std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
-            return lft.name < rgt.name;
-        });
+        sort_schema();
     }
 }
 

@@ -170,6 +170,8 @@ private:
     template <typename T, typename U, typename Func>
     static std::vector<ObjectSchema> zip_matching(T&& a, U&& b, Func&& func,
                                                   bool is_schema_additive = false) noexcept;
+    //sort all the classes by name in order to speed up find(StringData name)
+    void sort_schema();
 };
 
 namespace schema_change {
