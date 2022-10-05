@@ -898,13 +898,8 @@ buildvariants:
     fetch_missing_dependencies: On
     enable_valgrind: On
     cmake_build_type: RelWithDebInfo
-    curl: "/opt/mongodbtoolchain/v3/bin/curl"
-    python3: "/opt/mongodbtoolchain/v3/bin/python3"
-    ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
   tasks:
   - name: valgrind
-    distros:
-    - ubuntu2204-large
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
