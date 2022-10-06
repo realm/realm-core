@@ -26,8 +26,6 @@ namespace realm {
 /// Populate the mapping from public name to internal name for queries.
 inline void populate_keypath_mapping(query_parser::KeyPathMapping& mapping, Realm& realm)
 {
-    mapping.set_backlink_class_prefix("class_");
-
     for (auto& object_schema : realm.schema()) {
         TableRef table;
         auto get_table = [&] {
