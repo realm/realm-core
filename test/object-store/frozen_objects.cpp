@@ -165,7 +165,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     realm->commit_transaction();
 
     Results results(realm, table);
-    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
+    auto frozen_realm = realm->freeze();
     Results frozen_results = results.freeze(frozen_realm);
 
     SECTION("is_frozen") {

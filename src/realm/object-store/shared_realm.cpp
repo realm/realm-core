@@ -90,6 +90,17 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     m_coordinator = std::move(coordinator);
 }
 
+Realm::Realm(const Realm& other, MakeFrozenTag)
+    : m_coordinator(other.m_coordinator)
+    , m_config(other.m_config)
+    , m_auto_refresh(false)
+    , m_transaction(other.m_transaction->freeze())
+    , m_schema_version(other.m_schema_version)
+    , m_schema(other.m_schema)
+{
+    m_frozen_version = m_transaction->get_version_of_current_transaction();
+}
+
 Realm::~Realm()
 {
     if (m_transaction) {
@@ -1295,12 +1306,7 @@ bool Realm::is_frozen() const
 
 SharedRealm Realm::freeze()
 {
-    auto config = m_config;
-    auto version = read_transaction_version();
-    config.scheduler = util::Scheduler::make_frozen(version);
-    config.schema = m_schema;
-    config.schema_version = m_schema_version;
-    return Realm::get_frozen_realm(std::move(config), version);
+    return std::make_shared<Realm>(*this, MakeFrozenTag{});
 }
 
 void Realm::close()
