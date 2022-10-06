@@ -1173,9 +1173,19 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
 
         for (size_t i = 0; i < size; ++i) {
             if (incoming_link_count[i] == LinkCount::None) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format("Cannot convert '%1' to embedded: at least one object has no "
+                                                        "incoming links and would be deleted.",
+                                                        get_class_name()));
+                }
                 orphans.push_back(cluster->get_real_key(i));
             }
             else if (incoming_link_count[i] == LinkCount::Multiple) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format(
+                        "Cannot convert '%1' to embedded: at least one object has more than one incoming link.",
+                        get_class_name()));
+                }
                 multiple_incoming_links.push_back(cluster->get_real_key(i));
             }
         }
@@ -1183,27 +1193,14 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
         return IteratorControl::AdvanceToNext;
     });
 
-    if (handle_backlinks) {
-        for (auto key : orphans) {
-            remove_object(key);
-        }
-        for (auto key : multiple_incoming_links) {
-            auto obj = get_object(key);
-            obj.handle_multiple_backlinks_during_schema_migration();
-            obj.remove();
-        }
+    // orphans and multiple_incoming_links will always be empty if `handle_backlinks = false`
+    for (auto key : orphans) {
+        remove_object(key);
     }
-    else {
-        if (!orphans.empty()) {
-            throw std::logic_error(util::format(
-                "Cannot convert '%1' to embedded: at least one object has no incoming links and would be deleted.",
-                get_class_name()));
-        }
-        if (!multiple_incoming_links.empty()) {
-            throw std::logic_error(
-                util::format("Cannot convert '%1' to embedded: at least one object has more than one incoming link.",
-                             get_class_name()));
-        }
+    for (auto key : multiple_incoming_links) {
+        auto obj = get_object(key);
+        obj.handle_multiple_backlinks_during_schema_migration();
+        obj.remove();
     }
 
     do_set_table_type(Type::Embedded);
