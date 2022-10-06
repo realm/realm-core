@@ -492,7 +492,8 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
     return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
-void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes, bool allow_complete_schema_view)
+void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes,
+                                                bool allow_complete_schema_view)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {
