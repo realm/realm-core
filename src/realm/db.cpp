@@ -1435,6 +1435,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             logical_file_size = Group::get_logical_file_size(top);
         }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
+        m_last_encryption_page_reader =
+            m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, get_version_id_of_latest_snapshot());
     }
     return true;
 }

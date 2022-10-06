@@ -2704,7 +2704,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
 // and can make very very large files so it is not suited to automatic testing.
 TEST_IF(Shared_encrypted_pin_and_write, false)
 {
-    const size_t num_rows = 1000;
+    const size_t num_objects = 1000;
     const size_t num_transactions = 1000000;
     const size_t num_writer_threads = 8;
     SHARED_GROUP_TEST_PATH(path);
@@ -2715,11 +2715,14 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         Group& group = wt.get_group();
         TableRef t = group.add_table("table");
         t->add_column(type_String, "string_col", true);
-        t->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_objects; ++i) {
+            t->create_object();
+        }
         wt.commit();
     }
 
-    DB sg_reader(path, false, DBOptions(crypt_key(true)));
+    DBRef sg_reader = DB::create(path, false, DBOptions(crypt_key(true)));
+
     ReadTransaction rt(sg_reader); // hold first version
 
     auto do_many_writes = [&]() {
@@ -2729,19 +2732,21 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         // write many transactions to grow the file
         // around 4.6 GB seems to be the breaking size
         for (size_t t = 0; t < num_transactions; ++t) {
-            std::vector<std::string> rows(num_rows);
+            std::vector<std::string> rows(num_objects);
             // change a character so there's no storage optimizations
-            for (size_t row = 0; row < num_rows; ++row) {
-                base[(t * num_rows + row)%base_size] = 'a' + (row % 52);
+            for (size_t row = 0; row < num_objects; ++row) {
+                base[(t * num_objects + row)%base_size] = 'a' + (row % 52);
                 rows[row] = base;
             }
             WriteTransaction wt(sg);
             Group& g = wt.get_group();
-            auto keys = g.get_keys();
+            auto keys = g.get_table_keys();
             TableRef table = g.get_table(keys[0]);
-            for (size_t row = 0; row < num_rows; ++row) {
-                StringData c(rows[row]);
-                table->set_string(0, row, c);
+            ColKey str_col = table->get_column_key("string_col");
+            size_t count = 0;
+            for (auto it = table->begin(); it != table->end(); ++it, ++count) {
+                StringData c(rows[count]);
+                it->set(str_col, c);
             }
             wt.commit();
         }
@@ -2795,7 +2800,6 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg->close();
 }
 
-#if !REALM_ANDROID // FIXME
 TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2839,7 +2843,6 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         }
     }
 }
-#endif
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)

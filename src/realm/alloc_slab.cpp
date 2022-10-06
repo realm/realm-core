@@ -1259,6 +1259,11 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     Array prev_freelist_lengths(*this);
     bool processed_first_version = false;
     for (auto& read_lock : read_locks) {
+        if (read_lock.top_ref == 0) {
+            // a top_ref of zero can happen if the lock was requested on an empty Realm
+            // this also means that there is nothing to refresh there, so skip it
+            continue;
+        }
         Array top_array(*this), free_positions(*this), free_lengths(*this);
         top_array.init_from_ref(read_lock.top_ref);
         REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
