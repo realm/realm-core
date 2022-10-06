@@ -216,7 +216,7 @@ sync::SubscriptionSet Realm::get_active_subscription_set()
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference, m_config.is_schema_additive());
+    schema.copy_keys_from(reference, m_config.allow_complete_schema_view());
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -255,7 +255,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode),
-                                                   m_config.is_schema_additive());
+                                                   m_config.allow_complete_schema_view());
         m_schema.copy_keys_from(schema);
     }
     notify_schema_changed();
@@ -438,10 +438,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     uint64_t old_schema_version = m_schema_version;
-    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
-                    m_config.schema_mode == SchemaMode::ReadOnly;
-    if (migration_function && !additive) {
+    bool allow_complete_schema_view = m_config.allow_complete_schema_view();
+    if (migration_function && !allow_complete_schema_view) {
         auto wrapper = [&] {
             auto config = m_config;
             config.schema_mode = SchemaMode::ReadOnly;
@@ -471,7 +469,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
                                           required_changes, m_config.automatic_handle_backlicks_in_migrations);
-        REALM_ASSERT_DEBUG(additive ||
+        REALM_ASSERT_DEBUG(allow_complete_schema_view ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
@@ -516,7 +514,7 @@ void Realm::add_schema_change_handler()
         if (m_dynamic_schema)
             m_schema = *m_new_schema;
         else
-            m_schema.copy_keys_from(*m_new_schema, m_config.is_schema_additive());
+            m_schema.copy_keys_from(*m_new_schema, m_config.allow_complete_schema_view());
         notify_schema_changed();
     });
 }

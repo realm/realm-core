@@ -364,7 +364,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive) noexcept
+void Schema::copy_keys_from(realm::Schema const& other, bool allow_complete_schema_view) noexcept
 {
     auto other_classes = zip_matching(
         *this, other,
@@ -379,17 +379,17 @@ void Schema::copy_keys_from(realm::Schema const& other, bool is_schema_additive)
                 if (target_prop) {
                     target_prop->column_key = current_prop.column_key;
                 }
-                else if (is_schema_additive) {
+                else if (allow_complete_schema_view) {
                     unmatched_properties.push_back(current_prop);
                 }
             }
 
-            if (is_schema_additive) {
+            if (allow_complete_schema_view) {
                 existing->persisted_properties.insert(existing->persisted_properties.end(),
                                                       unmatched_properties.begin(), unmatched_properties.end());
             }
         },
-        is_schema_additive);
+        allow_complete_schema_view);
 
     if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());

@@ -151,7 +151,7 @@ public:
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,
                                       bool include_removals = false) const;
 
-    void copy_keys_from(Schema const&, bool is_schema_additive = false) noexcept;
+    void copy_keys_from(Schema const&, bool allow_complete_schema_view = false) noexcept;
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
     friend bool operator!=(Schema const& a, Schema const& b) noexcept
