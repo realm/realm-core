@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an assertion failure when observing change notifications on a sectioned result, if the first modification was to a linked property that did not cause the state of the sections to change. ([#5912](https://github.com/realm/realm-core/issues/5912), since the introduction of sectioned results in v12.3.0)
  
 ### Breaking changes
 * None.

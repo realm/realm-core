@@ -401,6 +401,14 @@ void SectionedResults::calculate_sections()
             m_row_to_index_path[i] = {section.index, section.indices.size() - 1};
         }
     }
+    if (!has_performed_initial_evalutation) {
+        m_previous_key_to_index_lookup.clear();
+        m_prev_section_index_to_key.clear();
+        for (auto& [key, section] : m_sections) {
+            m_previous_key_to_index_lookup[key] = section.index;
+            m_prev_section_index_to_key[section.index] = section.key;
+        }
+    }
 }
 
 size_t SectionedResults::size()

@@ -1570,7 +1570,7 @@ TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto transaction_table = r->read_group().get_table("class_Transaction");
-    auto date_col = transaction_table->get_column_key("date");
+    transaction_table->get_column_key("date");
     auto account_col = transaction_table->get_column_key("account");
     auto account_table = r->read_group().get_table("class_Account");
     auto account_name_col = account_table->get_column_key("name");
@@ -1595,15 +1595,27 @@ TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
     REQUIRE(sectioned_results[0].size() == 1);
 
     SectionedResultsChangeSet changes;
+    size_t callback_count = 0;
     auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
         changes = c;
+        ++callback_count;
     });
     coordinator->on_change();
+
+    REQUIRE(callback_count == 0);
 
     r->begin_transaction();
     a1.set(account_name_col, "a2");
     r->commit_transaction();
     advance_and_notify(*r);
+
+    REQUIRE(callback_count == 2);
+    REQUIRE(changes.sections_to_insert.empty());
+    REQUIRE(changes.sections_to_delete.empty());
+    REQUIRE(changes.insertions.size() == 0);
+    REQUIRE(changes.deletions.size() == 0);
+    REQUIRE(changes.modifications.size() == 1);
+    REQUIRE_INDICES(changes.modifications[0], 0);
 }
 
 namespace cf = realm::sectioned_results_fixtures;
