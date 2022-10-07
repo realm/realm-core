@@ -1601,8 +1601,13 @@ TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
         ++callback_count;
     });
     coordinator->on_change();
-
-    REQUIRE(callback_count == 0);
+    advance_and_notify(*r);
+    REQUIRE(callback_count == 1);
+    REQUIRE(changes.sections_to_insert.empty());
+    REQUIRE(changes.sections_to_delete.empty());
+    REQUIRE(changes.insertions.size() == 0);
+    REQUIRE(changes.deletions.size() == 0);
+    REQUIRE(changes.modifications.size() == 0);
 
     r->begin_transaction();
     a1.set(account_name_col, "a2");

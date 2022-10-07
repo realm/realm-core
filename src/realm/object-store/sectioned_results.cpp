@@ -402,8 +402,8 @@ void SectionedResults::calculate_sections()
         }
     }
     if (!has_performed_initial_evalutation) {
-        m_previous_key_to_index_lookup.clear();
-        m_prev_section_index_to_key.clear();
+        REALM_ASSERT_EX(m_previous_key_to_index_lookup.size() == 0, m_previous_key_to_index_lookup.size());
+        REALM_ASSERT_EX(m_prev_section_index_to_key.size() == 0, m_prev_section_index_to_key.size());
         for (auto& [key, section] : m_sections) {
             m_previous_key_to_index_lookup[key] = section.index;
             m_prev_section_index_to_key[section.index] = section.key;
