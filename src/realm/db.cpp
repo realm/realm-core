@@ -211,6 +211,7 @@ struct VersionList {
         const auto index_of_newest = newest.load();
         if (auto a = allocating.load(); a != index_of_newest) {
             data()[a].deactivate();
+        }
         // determine fully locked versions - after one of those all versions are considered live.
         for (auto* rc = data(); rc < data() + entries; ++rc) {
             if (!rc->is_active())

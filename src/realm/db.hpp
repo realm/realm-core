@@ -606,7 +606,8 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {};
+struct DB::BadVersion : std::exception {
+};
 
 inline bool DB::is_attached() const noexcept
 {
