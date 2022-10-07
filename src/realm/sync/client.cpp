@@ -246,9 +246,7 @@ private:
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
-    std::function<void(const SyncProgress&, int64_t, DownloadBatchState, size_t)> m_on_download_message_received_hook;
-    std::function<bool(const SyncProgress&, int64_t, DownloadBatchState)> m_on_bootstrap_message_processed_hook;
-    std::function<void(const SyncProgress&, int64_t, DownloadBatchState, size_t)> on_download_message_integrated_hook;
+    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -754,8 +752,8 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
-    if (m_wrapper.m_on_bootstrap_message_processed_hook &&
-        !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
+    if (call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version, batch_state,
+                        received_changesets.size()) == SyncClientHookAction::EarlyReturn) {
         return true;
     }
 
@@ -816,7 +814,8 @@ void SessionImpl::process_pending_flx_bootstrap()
             get_transact_reporter());
         progress = *pending_batch.progress;
 
-        download_message_integrated_hook(progress, query_version, batch_state, pending_batch.changesets.size());
+        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
@@ -861,23 +860,21 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
     m_wrapper.on_flx_sync_version_complete(version);
 }
 
-void SessionImpl::receive_download_message_hook(const SyncProgress& progress, int64_t query_version,
-                                                DownloadBatchState batch_state, size_t num_changesets)
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const SyncProgress& progress,
+                                                  int64_t query_version, DownloadBatchState batch_state,
+                                                  size_t num_changesets)
 {
-    if (REALM_LIKELY(!m_wrapper.m_on_download_message_received_hook)) {
-        return;
-    }
-    m_wrapper.m_on_download_message_received_hook(progress, query_version, batch_state, num_changesets);
-}
-
-void SessionImpl::download_message_integrated_hook(const SyncProgress& progress, int64_t query_version,
-                                                   DownloadBatchState batch_state, size_t num_changesets)
-{
-    if (REALM_LIKELY(!m_wrapper.on_download_message_integrated_hook)) {
-        return;
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
     }
 
-    m_wrapper.on_download_message_integrated_hook(progress, query_version, batch_state, num_changesets);
+    SyncClientHookData data;
+    data.event = event;
+    data.batch_state = batch_state;
+    data.progress = progress;
+    data.num_changesets = num_changesets;
+    data.query_version = query_version;
+    return m_wrapper.m_debug_hook(data);
 }
 
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
@@ -946,9 +943,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
-    , m_on_download_message_received_hook(std::move(config.on_download_message_received_hook))
-    , m_on_bootstrap_message_processed_hook(config.on_bootstrap_message_processed_hook)
-    , on_download_message_integrated_hook{std::move(config.on_download_message_integrated_hook)}
+    , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);

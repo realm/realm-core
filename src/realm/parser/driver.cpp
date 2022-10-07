@@ -535,7 +535,7 @@ Query BetweenNode::visit(ParserDriver* drv)
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
         util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
-        if (!cmp_type || *cmp_type != ExpressionComparisonType::All) {
+        if (cmp_type.value_or(ExpressionComparisonType::Any) != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }

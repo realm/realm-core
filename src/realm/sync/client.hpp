@@ -313,18 +313,7 @@ public:
         /// This feature exists exclusively for testing purposes at this time.
         bool simulate_integration_error = false;
 
-        /// Will be called after a download message is received and validated by
-        /// the client but befefore it's been transformed or applied. To be used in
-        /// testing only.
-        std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState, size_t)>
-            on_download_message_received_hook;
-        /// Will be called after each bootstrap message is added to the pending bootstrap store,
-        /// but before processing a finalized bootstrap. For testing only.
-        std::function<bool(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-            on_bootstrap_message_processed_hook;
-        /// Will be called after a download message is integrated. For testing only.
-        std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState, size_t)>
-            on_download_message_integrated_hook;
+        std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.

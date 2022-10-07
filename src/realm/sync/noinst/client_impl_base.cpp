@@ -2201,7 +2201,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook(progress, query_version, batch_state, received_changesets.size());
+    auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
+                                       batch_state, received_changesets.size());
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();
@@ -2210,7 +2212,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
-    download_message_integrated_hook(progress, query_version, batch_state, received_changesets.size());
+    hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                  batch_state, received_changesets.size());
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
