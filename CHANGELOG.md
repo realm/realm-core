@@ -19,6 +19,7 @@
 ### Internals
 * Remove the unused utility function `copy_dir_recursive()`.
 * StringData and Timestamp are now constexpr-constructible.
+* Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
 
 ----------------------------------------------
 
