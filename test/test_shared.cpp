@@ -55,6 +55,7 @@
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "util/misc.hpp"
 
 extern unsigned int unit_test_random_seed;
 
@@ -2185,15 +2186,14 @@ TEST(Shared_EncryptionKeyCheck)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
-    bool ok = false;
-    try {
-        DBRef sg_2 = DB::create(path, false, DBOptions());
-    }
-    catch (std::runtime_error&) {
-        ok = true;
-    }
-    CHECK(ok);
-    DBRef sg3 = DB::create(path, false, DBOptions(crypt_key(true)));
+    CHECK_THROW_EX(DB::create(path, false, DBOptions()), std::runtime_error,
+                   std::string(e.what()).find("Realm file initial open failed: Invalid mnemonic") !=
+                       std::string::npos);
+
+    CHECK_THROW_EX(DB::create(path, false, DBOptions(crypt_key(true))), std::runtime_error,
+                   std::string(e.what()).find(util::format(
+                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
+                       std::string::npos);
 }
 
 // opposite - if opened unencrypted, attempt to share it encrypted
@@ -2202,22 +2202,17 @@ TEST(Shared_EncryptionKeyCheck_2)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions());
-    bool ok = false;
-    try {
-        DBRef sg_2 = DB::create(path, false, DBOptions(crypt_key(true)));
-    }
-    catch (std::runtime_error&) {
-        ok = true;
-    }
-    CHECK(ok);
+
+    CHECK_THROW_EX(DB::create(path, false, DBOptions(crypt_key(true))), std::runtime_error,
+                   std::string(e.what()) == "Attempt to open unencrypted file with encryption key");
     DBRef sg3 = DB::create(path, false, DBOptions());
+    CHECK(sg3);
 }
 
+#ifndef _WIN32 // FIXME: we need a fork() on windows
+
 // if opened by one key, it cannot be opened by a different key
-// disabled for now... needs to add a check in the encryption layer
-// based on a hash of the key.
-#if 0 // in principle this should be implemented.....
-ONLY(Shared_EncryptionKeyCheck_3)
+NONCONCURRENT_TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
@@ -2225,16 +2220,35 @@ ONLY(Shared_EncryptionKeyCheck_3)
     memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     DBRef sg = DB::create(path, false, DBOptions(first_key));
-    bool ok = false;
-    try {
-        DBRef sg_2 = DB::create(path, false, DBOptions(second_key));
-    } catch (std::runtime_error&) {
-        ok = true;
+
+    // No more than one DBRef instance is allowed per process
+    CHECK_THROW_EX(DB::create(path, false, DBOptions(second_key)), std::runtime_error,
+                   std::string(e.what()).find(util::format(
+                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
+                       std::string::npos);
+
+    CHECK_THROW_EX(DB::create(path, false, DBOptions(first_key)), std::runtime_error,
+                   std::string(e.what()).find(util::format(
+                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
+                       std::string::npos);
+
+    clear_mappings_before_test_forks();
+    int pid = fork();
+
+    if (pid == 0) {
+        CHECK_THROW_EX(DB::create(path, false, DBOptions(second_key)), std::runtime_error,
+                       std::string(e.what()).find("Realm file initial open failed: Invalid mnemonic") !=
+                           std::string::npos);
+        DBRef sg3 = DB::create(path, false, DBOptions(first_key));
+        CHECK(sg3);
+        exit(0);
     }
-    CHECK(ok);
-    DBRef sg3 = DB::create(path, false, DBOptions(first_key));
+    else {
+        test_util::waitpid_checked(pid, 0, "opening db with different key");
+    }
 }
-#endif
+
+#endif // not(win32)
 
 #endif
 

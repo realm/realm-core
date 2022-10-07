@@ -18,6 +18,11 @@
 
 #include "misc.hpp"
 
+#include <realm/util/assert.hpp>
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 
 namespace realm {
 namespace test_util {
@@ -41,6 +46,33 @@ bool equal_without_cr(std::string s1, std::string s2)
     replace_all(s2, "\r", "");
     return (s1 == s2);
 }
+
+#ifndef _WIN32
+
+int waitpid_checked(int pid, int options, const std::string& info)
+{
+    int ret = 0;
+    int status = 0;
+    do {
+        ret = waitpid(pid, &status, options);
+    } while (ret == -1 && errno == EINTR);
+    REALM_ASSERT_RELEASE_EX(ret != -1, errno, pid, info);
+
+    bool signaled_to_stop = WIFSIGNALED(status);
+    REALM_ASSERT_RELEASE_EX(!signaled_to_stop, WTERMSIG(status), WCOREDUMP(status), pid, info);
+
+    bool stopped = WIFSTOPPED(status);
+    REALM_ASSERT_RELEASE_EX(!stopped, WSTOPSIG(status), pid, info);
+
+    bool exited_normally = WIFEXITED(status);
+    REALM_ASSERT_RELEASE_EX(exited_normally, pid, info);
+
+    auto exit_status = WEXITSTATUS(status);
+    REALM_ASSERT_RELEASE_EX(exit_status == 0, exit_status, pid, info);
+    return status;
+}
+
+#endif // _WIN32
 
 } // namespace test_util
 } // namespace realm

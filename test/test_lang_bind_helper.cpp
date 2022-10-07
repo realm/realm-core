@@ -41,9 +41,9 @@
 #include <windows.h>
 #endif
 
-
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "util/misc.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -3169,29 +3169,9 @@ static void signal_handler(int signal)
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
 NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
-// ONLY(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
-    auto waitpid_checked = [](int pid, int* status, int options, const std::string& info) {
-        int ret;
-        do {
-            ret = waitpid(pid, status, options);
-        } while (ret == -1 && errno == EINTR);
-        REALM_ASSERT_RELEASE_EX(ret != -1, errno, pid, info);
-
-        bool signaled_to_stop = WIFSIGNALED(*status);
-        REALM_ASSERT_RELEASE_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
-
-        bool stopped = WIFSTOPPED(*status);
-        REALM_ASSERT_RELEASE_EX(!stopped, WSTOPSIG(*status), pid, info);
-
-        bool exited_normally = WIFEXITED(*status);
-        REALM_ASSERT_RELEASE_EX(exited_normally, pid, info);
-
-        auto exit_status = WEXITSTATUS(*status);
-        REALM_ASSERT_RELEASE_EX(exit_status == 0, exit_status, pid, info);
-    };
 
     int readpids[read_process_count];
     int writepids[write_process_count];
@@ -3226,8 +3206,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         exit(0);
     }
     else {
-        int status;
-        waitpid_checked(pid, &status, 0, "populate");
+        test_util::waitpid_checked(pid, 0, "populate");
     }
 
     // intialization complete. Start writers:
@@ -3257,8 +3236,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
 
     // Wait for all writer threads to complete
     for (int i = 0; i < write_process_count; ++i) {
-        int status = 0;
-        waitpid_checked(writepids[i], &status, 0, util::format("writer[%1]", i));
+        test_util::waitpid_checked(writepids[i], 0, util::format("writer[%1]", i));
     }
 
     // Allow readers time to catch up
@@ -3278,7 +3256,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     // Wait for all reader threads to complete
     for (int i = 0; i < read_process_count; ++i) {
         int status;
-        waitpid_checked(readpids[i], &status, 0, util::format("reader[%1]", i));
+        test_util::waitpid_checked(readpids[i], 0, util::format("reader[%1]", i));
     }
 }
 
