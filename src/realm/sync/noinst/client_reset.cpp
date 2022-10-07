@@ -329,8 +329,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         }
     }
 
-    std::shared_ptr<converters::EmbeddedObjectConverter> embedded_tracker =
-        std::make_shared<converters::EmbeddedObjectConverter>();
+    converters::EmbeddedObjectConverter embedded_tracker;
 
     // Now src and dst have identical schemas and no extraneous objects from dst.
     // There may be missing object from src and the values of existing objects may
@@ -354,7 +353,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                      table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
                      pk_col.get_type());
 
-        converters::InterRealmObjectConverter converter(table_src, table_dst, embedded_tracker);
+        converters::InterRealmObjectConverter converter(table_src, table_dst, &embedded_tracker);
 
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
@@ -368,7 +367,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 logger.debug("  updating %1", src_pk);
             }
         }
-        embedded_tracker->process_pending();
+        embedded_tracker.process_pending();
     }
 }
 

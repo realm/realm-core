@@ -109,7 +109,7 @@ public:
         : m_count(num_args)
     {
     }
-    virtual ~Arguments();
+    virtual ~Arguments() = default;
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;

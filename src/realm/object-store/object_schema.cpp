@@ -449,4 +449,17 @@ bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
     return std::tie(a.name, a.table_type, a.primary_key, a.persisted_properties, a.computed_properties) ==
            std::tie(b.name, b.table_type, b.primary_key, b.persisted_properties, b.computed_properties);
 }
+
+std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
+{
+    switch (table_type) {
+        case ObjectSchema::ObjectType::TopLevel:
+            return o << "TopLevel";
+        case ObjectSchema::ObjectType::Embedded:
+            return o << "Embedded";
+        case ObjectSchema::ObjectType::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
 } // namespace realm

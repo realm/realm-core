@@ -689,7 +689,6 @@ TEST(Table_AggregateFuzz)
         ObjKey key;
         size_t cnt;
         int64_t i;
-        Timestamp ts;
         Mixed m;
 
         // Test methods on Table

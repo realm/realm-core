@@ -83,7 +83,7 @@ static std::map<int, std::string> opstr = {
     {CompareNode::IN, "in"},
 };
 
-std::string print_pretty_objlink(const ObjLink& link, const Group* g, ParserDriver* drv)
+std::string print_pretty_objlink(const ObjLink& link, const Group* g)
 {
     REALM_ASSERT(g);
     if (link.is_null()) {
@@ -96,8 +96,7 @@ std::string print_pretty_objlink(const ObjLink& link, const Group* g, ParserDriv
         }
         auto obj = table->get_object(link.get_obj_key());
         Mixed pk = obj.get_primary_key();
-        return util::format("'%1' with primary key '%2'", drv->get_printable_name(table->get_name()),
-                            util::serializer::print_value(pk));
+        return util::format("'%1' with primary key '%2'", table->get_class_name(), util::serializer::print_value(pk));
     }
     catch (...) {
         return "invalid link";
@@ -294,13 +293,10 @@ namespace query_parser {
 
 NoArguments ParserDriver::s_default_args;
 query_parser::KeyPathMapping ParserDriver::s_default_mapping;
-using util::serializer::get_printable_table_name;
 
-Arguments::~Arguments() {}
+ParserNode::~ParserNode() = default;
 
-ParserNode::~ParserNode() {}
-
-QueryNode::~QueryNode() {}
+QueryNode::~QueryNode() = default;
 
 Query NotNode::visit(ParserDriver* drv)
 {
@@ -391,7 +387,7 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
         }
     }
     if (!Mixed::is_numeric(left->get_type(), right->get_type())) {
-        util::serializer::SerialisationState state("", nullptr);
+        util::serializer::SerialisationState state;
         std::string op(&m_op, 1);
         throw std::invalid_argument(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
                                                  left->description(state), right->description(state)));
@@ -438,8 +434,8 @@ Query EqualityNode::visit(ParserDriver* drv)
                     throw std::invalid_argument(util::format(
                         "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
                         link_column->link_map().description(drv->m_serializer_state),
-                        drv->get_printable_name(link_column->link_map().get_target_table()->get_name()),
-                        print_pretty_objlink(right->get_mixed().get_link(), g, drv)));
+                        link_column->link_map().get_target_table()->get_class_name(),
+                        print_pretty_objlink(right->get_mixed().get_link(), g)));
                 }
             }
         }
@@ -553,7 +549,7 @@ Query BetweenNode::visit(ParserDriver* drv)
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
         util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
-        if (!cmp_type || *cmp_type != ExpressionComparisonType::All) {
+        if (cmp_type.value_or(ExpressionComparisonType::Any) != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
@@ -1268,7 +1264,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         explain_value_message =
                             util::format("%1 which links to %2", explain_value_message,
                                          print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
-                                                              drv->m_base_table->get_parent_group(), drv));
+                                                              drv->m_base_table->get_parent_group()));
                         break;
                     default:
                         break;
@@ -1330,36 +1326,28 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
 LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
-    for (std::string path_elem : path_elems) {
-        path_elem = drv->translate(link_chain, path_elem);
+    for (const std::string& raw_path_elem : path_elems) {
+        auto path_elem = drv->translate(link_chain, raw_path_elem);
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
+            continue;
         }
-        else if (path_elem == "@values") {
+        if (path_elem == "@values") {
             if (!link_chain.get_current_col().is_dictionary()) {
                 throw InvalidQueryError("@values only allowed on dictionaries");
             }
             continue;
         }
-        else if (path_elem.empty()) {
+        if (path_elem.empty()) {
             continue; // this element has been removed, this happens in subqueries
         }
-        else {
-            try {
-                link_chain.link(path_elem);
-            }
-            // In case of exception, we have to throw InvalidQueryError
-            catch (const std::runtime_error& e) {
-                auto str = e.what();
-                StringData table_name = drv->get_printable_name(link_chain.get_current_table()->get_name());
-                if (strstr(str, "no property")) {
-                    throw InvalidQueryError(util::format("'%1' has no property: '%2'", table_name, path_elem));
-                }
-                else {
-                    throw InvalidQueryError(
-                        util::format("Property '%1' in '%2' is not an Object", path_elem, table_name));
-                }
-            }
+
+        try {
+            link_chain.link(path_elem);
+        }
+        // In case of exception, we have to throw InvalidQueryError
+        catch (const LogicError& e) {
+            throw InvalidQueryError(e.what());
         }
     }
     return link_chain;
@@ -1391,8 +1379,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
                     if (!col_key) {
                         throw InvalidQueryError(
                             util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path],
-                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
+                                         col_names[ndx_in_path], link_chain.get_current_table()->get_class_name(),
                                          is_distinct ? "distinct" : "sort"));
                     }
                     columns.push_back(col_key);
@@ -1437,8 +1424,7 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
 }
 
 ParserDriver::ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping)
-    : m_serializer_state(mapping.get_backlink_class_prefix(), nullptr)
-    , m_base_table(t)
+    : m_base_table(t)
     , m_args(args)
     , m_mapping(mapping)
 {
@@ -1493,8 +1479,8 @@ auto ParserDriver::column(LinkChain& link_chain, std::string identifier) -> Sube
     if (auto col = link_chain.column(identifier)) {
         return col;
     }
-    throw InvalidQueryError(util::format("'%1' has no property: '%2'",
-                                         get_printable_name(link_chain.get_current_table()->get_name()), identifier));
+    throw InvalidQueryError(
+        util::format("'%1' has no property '%2'", link_chain.get_current_table()->get_class_name(), identifier));
 }
 
 void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier)
@@ -1512,10 +1498,10 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
         origin_column = origin_table->get_column_key(column_name);
     }
     if (!origin_column) {
-        auto current_table_name = link_chain.get_current_table()->get_name();
+        auto origin_table_name = Group::table_name_to_class_name(table_name);
+        auto current_table_name = link_chain.get_current_table()->get_class_name();
         throw InvalidQueryError(util::format("No property '%1' found in type '%2' which links to type '%3'",
-                                             column_name, get_printable_name(table_name),
-                                             get_printable_name(current_table_name)));
+                                             column_name, origin_table_name, current_table_name));
     }
     link_chain.backlink(*origin_table, origin_column);
 }
@@ -1523,11 +1509,6 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
 std::string ParserDriver::translate(LinkChain& link_chain, const std::string& identifier)
 {
     return m_mapping.translate(link_chain, identifier);
-}
-
-StringData ParserDriver::get_printable_name(StringData table_name) const
-{
-    return util::serializer::get_printable_table_name(table_name, m_serializer_state.class_prefix);
 }
 
 int ParserDriver::parse(const std::string& str)
@@ -1540,8 +1521,7 @@ int ParserDriver::parse(const std::string& str)
     parse.set_debug_level(trace_parsing);
     int res = parse();
     if (parse_error) {
-        std::string msg = "Invalid predicate: '" + str + "': " + error_string;
-        throw SyntaxError(msg);
+        throw SyntaxError(util::format("Invalid predicate: '%1': %2", str, error_string));
     }
     return res;
 }

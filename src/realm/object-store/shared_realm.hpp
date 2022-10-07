@@ -168,10 +168,12 @@ struct RealmConfig {
     // Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
 
-    // delete embedded orphan objects
-    bool automatic_handle_backlicks_in_migrations = false;
+    // By default converting a top-level table to embedded will fail if there
+    // are any objects without exactly one incoming link. Enabling this makes
+    // it instead delete orphans and duplicate objects with multiple incoming links.
+    bool automatically_handle_backlinks_in_migrations = false;
 
-    // Only for internal testing. Not to be used by SDKs.
+    // Only for internal testing. Not to be exposed by SDKs.
     //
     // Disable the background worker thread for producing change
     // notifications. Useful for tests for those notifications so that

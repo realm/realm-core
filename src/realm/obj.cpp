@@ -2067,21 +2067,20 @@ private:
 void Obj::handle_multiple_backlinks_during_schema_migration()
 {
     REALM_ASSERT(!m_table->get_primary_key_column());
-    auto copy_links = [this](ColKey col) {
-        auto embedded_obj_tracker = std::make_shared<converters::EmbeddedObjectConverter>();
+    converters::EmbeddedObjectConverter embedded_obj_tracker;
+    auto copy_links = [&](ColKey col) {
         auto opposite_table = m_table->get_opposite_table(col);
         auto opposite_column = m_table->get_opposite_column(col);
         auto backlinks = get_all_backlinks(col);
         for (auto backlink : backlinks) {
             // create a new obj
             auto obj = m_table->create_object();
-            embedded_obj_tracker->track(*this, obj);
+            embedded_obj_tracker.track(*this, obj);
             auto linking_obj = opposite_table->get_object(backlink);
             // change incoming links to point to the newly created object
-            EmbeddedObjectLinkMigrator migrator{linking_obj, opposite_column, *this, obj};
-            migrator.run();
+            EmbeddedObjectLinkMigrator{linking_obj, opposite_column, *this, obj}.run();
         }
-        embedded_obj_tracker->process_pending();
+        embedded_obj_tracker.process_pending();
         return IteratorControl::AdvanceToNext;
     };
     m_table->for_each_backlink_column(copy_links);

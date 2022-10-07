@@ -909,6 +909,14 @@ void TestContext::throw_any_failed(const char* file, long line, const char* expr
     check_failed(file, line, out.str());
 }
 
+bool TestContext::check_string_contains(std::string_view a, std::string_view b, const char* file, long line,
+                                        const char* a_text, const char* b_text)
+{
+    bool cond = a.find(b) != a.npos;
+    return check_compare(cond, a, b, file, line, "CHECK_STRING_CONTAINS", a_text, b_text);
+}
+
+
 namespace {
 std::locale locale_classic = std::locale::classic();
 }

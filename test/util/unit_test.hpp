@@ -89,6 +89,8 @@
 
 #define CHECK_GREATER_EQUAL(a, b) test_context.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
+#define CHECK_STRING_CONTAINS(a, b) test_context.check_string_contains((a), (b), __FILE__, __LINE__, #a, #b)
+
 #define CHECK_OR_RETURN(cond)                                                                                        \
     do {                                                                                                             \
         if (!CHECK(cond))                                                                                            \
@@ -144,9 +146,20 @@
             (expr);                                                                                                  \
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
         }                                                                                                            \
-        catch (std::exception & e) {                                                                                 \
+        catch (const std::exception& e) {                                                                            \
             test_context.check_succeeded();                                                                          \
             message = e.what();                                                                                      \
+        }                                                                                                            \
+    }())
+
+#define CHECK_THROW_CONTAINING_MESSAGE(expr, message)                                                                \
+    ([&] {                                                                                                           \
+        try {                                                                                                        \
+            (expr);                                                                                                  \
+            test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
+        }                                                                                                            \
+        catch (const std::exception& e) {                                                                            \
+            CHECK_STRING_CONTAINS(e.what(), message);                                                                \
         }                                                                                                            \
     }())
 
@@ -504,6 +517,9 @@ public:
     template <class A, class B>
     bool check_greater_equal(const A& a, const B& b, const char* file, long line, const char* a_text,
                              const char* b_text);
+
+    bool check_string_contains(std::string_view a, std::string_view b, const char* file, long line,
+                               const char* a_text, const char* b_text);
 
     bool check_approximately_equal(long double a, long double b, long double eps, const char* file, long line,
                                    const char* a_text, const char* b_text, const char* eps_text);

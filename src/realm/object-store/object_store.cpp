@@ -606,7 +606,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type), false);
         }
         void operator()(AddProperty op)
         {
@@ -827,51 +827,14 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            if (handle_backlinks_automatically)
-                post_migration_embedded_objects_backlinks_handling(op.object);
-            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type),
+                                            handle_backlinks_automatically);
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
-
-        void post_migration_embedded_objects_backlinks_handling(const ObjectSchema* object_schema)
-        {
-            // check if we are doing a migration from TopLevel Object to Embedded.
-            // check back link count.
-            //  1. if object is an orphan (no backlicks, then delete it if instructed to do so)
-            //  2. if object has multiple backlicks, then just clone N times the object (for each backlick) and assign
-            //  to each a different parent
-            // object_schema->handle_automatically_backlinks_for_embedded_object = true;
-
-            if (object_schema->table_type == ObjectSchema::ObjectType::Embedded) {
-                auto original_object_schema = initial_schema.find(object_schema->name);
-                if (original_object_schema != initial_schema.end() &&
-                    (original_object_schema->table_type == ObjectSchema::ObjectType::TopLevel ||
-                     original_object_schema->table_type == ObjectSchema::ObjectType::TopLevelAsymmetric)) {
-                    auto table = table_for_object_schema(group, *original_object_schema);
-                    std::vector<Obj> objects_to_erase;
-                    std::vector<Obj> objects_to_fix_backlinks;
-                    for (auto& object : *table) {
-                        size_t backlink_count = object.get_backlink_count();
-                        if (backlink_count == 0)
-                            objects_to_erase.push_back(object);
-                        else if (backlink_count > 1)
-                            objects_to_fix_backlinks.push_back(object);
-                    }
-
-                    for (auto& object : objects_to_erase)
-                        object.remove();
-
-                    for (auto& object : objects_to_fix_backlinks) {
-                        object.handle_multiple_backlinks_during_schema_migration();
-                        object.remove();
-                    }
-                }
-            }
-        }
     } applier{group, initial_schema, did_reread_schema, handle_backlinks_automatically};
 
     for (auto& change : changes) {
@@ -1073,10 +1036,13 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 }
 
-InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
+InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version,
+                                                             bool must_exactly_equal)
     : LogicError(
           ErrorCodes::InvalidSchemaVersion,
-          util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
+                 util::format(must_exactly_equal ? "Provided schema version %1 does not equal last set version %2."
+                                                  : "Provided schema version %1 is less than last set version %2.",
+                               new_version, old_version))
     , m_old_version(old_version)
     , m_new_version(new_version)
 {
