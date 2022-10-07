@@ -149,7 +149,8 @@ struct SyncClientHookData {
 };
 
 struct SyncConfig {
-    struct FLXSyncEnabled {};
+    struct FLXSyncEnabled {
+    };
 
     struct ProxyConfig {
         using port_type = sync::port_type;

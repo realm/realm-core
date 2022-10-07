@@ -16,10 +16,13 @@
  *
  **************************************************************************/
 
-#include "realm/error_codes.hpp"
+#include <realm/error_codes.hpp>
+#include <realm/util/assert.hpp>
+
+#include <iostream>
 #include <string_view>
-#include <ostream>
-#include <map>
+#include <algorithm>
+#include <cstring>
 
 namespace realm {
 
@@ -28,323 +31,386 @@ ErrorCategory ErrorCodes::error_categories(Error code)
     switch (code) {
         case OK:
             break;
-        case RuntimeError:
-        case RangeError:
-        case BrokenInvariant:
-        case OutOfMemory:
-        case OutOfDiskSpace:
+
         case AddressSpaceExhausted:
-        case MaximumFileSizeExceeded:
-        case IncompatibleSession:
-        case IncompatibleLockFile:
-        case InvalidQuery:
-        case DuplicatePrimaryKeyValue:
-        case UnsupportedFileFormatVersion:
-        case MultipleSyncAgents:
-        case ObjectAlreadyExists:
-        case CallbackFailed:
-        case NotCloneable:
         case BadChangeset:
-        case SubscriptionFailed:
-        case SchemaVersionMismatch:
+        case BrokenInvariant:
+        case CallbackFailed:
+        case DuplicatePrimaryKeyValue:
+        case IncompatibleLockFile:
+        case IncompatibleSession:
+        case InvalidQuery:
+        case MaximumFileSizeExceeded:
+        case MultipleSyncAgents:
         case NoSubscriptionForWrite:
+        case NotCloneable:
+        case ObjectAlreadyExists:
+        case OutOfDiskSpace:
+        case OutOfMemory:
+        case RangeError:
+        case RuntimeError:
+        case SchemaVersionMismatch:
+        case SubscriptionFailed:
+        case UnsupportedFileFormatVersion:
             return ErrorCategory().set(ErrorCategory::runtime_error);
-        case FileOperationFailed:
-        case PermissionDenied:
-        case FileNotFound:
-        case FileAlreadyExists:
-        case InvalidDatabase:
+
         case DecryptionFailed:
-        case IncompatibleHistories:
+        case FileAlreadyExists:
         case FileFormatUpgradeRequired:
+        case FileNotFound:
+        case FileOperationFailed:
+        case IncompatibleHistories:
+        case InvalidDatabase:
+        case PermissionDenied:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);
+
         case SystemError:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::system_error);
-        case LogicError:
-        case NotSupported:
+
         case BrokenPromise:
+        case ClosedRealm:
         case CrossTableLinkTarget:
-        case KeyAlreadyUsed:
-        case WrongTransactionState:
-        case WrongThread:
+        case DeleteOnOpenRealm:
         case IllegalOperation:
+        case InvalidAdditiveSchemaChange:
+        case InvalidExternalSchemaChange:
+        case InvalidReadOnlySchemaChange:
+        case InvalidSchemaVersion:
+        case InvalidTableRef:
+        case InvalidatedObject:
+        case KeyAlreadyUsed:
+        case LogicError:
+        case MismatchedConfig:
+        case NotSupported:
+        case ReadOnlyDB:
+        case SchemaMismatch:
+        case SchemaValidationFailed:
         case SerializationError:
         case StaleAccessor:
-        case InvalidatedObject:
-        case ReadOnlyDB:
-        case DeleteOnOpenRealm:
-        case MismatchedConfig:
-        case ClosedRealm:
-        case InvalidTableRef:
-        case SchemaValidationFailed:
-        case SchemaMismatch:
-        case InvalidSchemaVersion:
-        case InvalidAdditiveSchemaChange:
-        case InvalidReadOnlySchemaChange:
-        case InvalidExternalSchemaChange:
+        case WrongThread:
+        case WrongTransactionState:
             return ErrorCategory().set(ErrorCategory::logic_error);
+
+        case IllegalCombination:
         case InvalidArgument:
+        case InvalidDictionaryKey:
+        case InvalidDictionaryValue:
+        case InvalidEncryptionKey:
+        case InvalidName:
+        case InvalidProperty:
+        case InvalidQueryArg:
+        case InvalidSortDescriptor:
+        case KeyNotFound:
+        case LimitExceeded:
+        case MissingPrimaryKey:
+        case MissingPropertyValue:
+        case ModifyPrimaryKey:
+        case NoSuchTable:
+        case ObjectTypeMismatch:
+        case OutOfBounds:
         case PropertyNotNullable:
         case ReadOnlyProperty:
-        case MissingPropertyValue:
-        case MissingPrimaryKey:
-        case UnexpectedPrimaryKey:
-        case ModifyPrimaryKey:
         case SyntaxError:
-        case InvalidProperty:
-        case InvalidName:
-        case InvalidDictionaryValue:
-        case InvalidSortDescriptor:
-        case InvalidDictionaryKey:
-        case InvalidEncryptionKey:
-        case InvalidQueryArg:
-        case KeyNotFound:
-        case OutOfBounds:
-        case LimitExceeded:
-        case TypeMismatch:
-        case ObjectTypeMismatch:
-        case NoSuchTable:
         case TableNameInUse:
-        case IllegalCombination:
+        case TypeMismatch:
+        case UnexpectedPrimaryKey:
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+
         case CustomError:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::custom_error);
+
         case HTTPError:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::http_error);
-        case ClientUserNotFound:
-        case ClientUserNotLoggedIn:
+
         case ClientAppDeallocated:
         case ClientRedirectError:
         case ClientTooManyRedirects:
+        case ClientUserNotFound:
+        case ClientUserNotLoggedIn:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::client_error);
+
+        case BadBsonParse:
         case BadToken:
         case MalformedJson:
         case MissingJsonKey:
-        case BadBsonParse:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::json_error);
-        case MissingAuthReq:
-        case InvalidSession:
-        case UserAppDomainMismatch:
-        case DomainNotAllowed:
-        case ReadSizeLimitExceeded:
-        case InvalidParameter:
-        case MissingParameter:
-        case TwilioError:
-        case GCMError:
+
+        case APIKeyAlreadyExists:
+        case APIKeyNotFound:
         case AWSError:
-        case MongoDBError:
+        case AccountNameInUse:
+        case AppUnknownError:
         case ArgumentsNotAllowed:
-        case FunctionExecutionError:
-        case NoMatchingRule:
-        case InternalServerError:
-        case AuthProviderNotFound:
+        case AuthError:
         case AuthProviderAlreadyExists:
-        case ServiceNotFound:
-        case ServiceTypeNotFound:
-        case ServiceAlreadyExists:
-        case ServiceCommandNotFound:
-        case ValueNotFound:
-        case ValueAlreadyExists:
-        case ValueDuplicateName:
-        case FunctionNotFound:
+        case AuthProviderDuplicateName:
+        case AuthProviderNotFound:
+        case BadRequest:
+        case DomainNotAllowed:
+        case ExecutionTimeLimitExceeded:
         case FunctionAlreadyExists:
         case FunctionDuplicateName:
-        case FunctionSyntaxError:
+        case FunctionExecutionError:
         case FunctionInvalid:
-        case IncomingWebhookNotFound:
+        case FunctionNotFound:
+        case FunctionSyntaxError:
+        case GCMError:
         case IncomingWebhookAlreadyExists:
+        case IncomingWebhookAuthFailed:
         case IncomingWebhookDuplicateName:
-        case RuleNotFound:
-        case APIKeyNotFound:
+        case IncomingWebhookNotFound:
+        case InternalServerError:
+        case InvalidParameter:
+        case InvalidPassword:
+        case InvalidSession:
+        case MaintenanceInProgress:
+        case MissingAuthReq:
+        case MissingParameter:
+        case MongoDBError:
+        case NoMatchingRule:
+        case NotCallable:
+        case ReadSizeLimitExceeded:
+        case RestrictedHost:
         case RuleAlreadyExists:
         case RuleDuplicateName:
-        case AuthProviderDuplicateName:
-        case RestrictedHost:
-        case APIKeyAlreadyExists:
-        case IncomingWebhookAuthFailed:
-        case ExecutionTimeLimitExceeded:
-        case NotCallable:
-        case UserAlreadyConfirmed:
-        case UserNotFound:
-        case UserDisabled:
-        case AuthError:
-        case BadRequest:
-        case AccountNameInUse:
-        case InvalidPassword:
+        case RuleNotFound:
         case SchemaValidationFailedWrite:
-        case AppUnknownError:
-        case MaintenanceInProgress:
+        case ServiceAlreadyExists:
+        case ServiceCommandNotFound:
+        case ServiceNotFound:
+        case ServiceTypeNotFound:
+        case TwilioError:
+        case UserAlreadyConfirmed:
+        case UserAppDomainMismatch:
+        case UserDisabled:
+        case UserNotFound:
+        case ValueAlreadyExists:
+        case ValueDuplicateName:
+        case ValueNotFound:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::service_error);
+
         case UnknownError:
             break;
     }
     return {};
 }
 
-static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
-    {"OK", ErrorCodes::OK},
-    {"AppUnknownError", ErrorCodes::AppUnknownError},
-    {"RuntimeError", ErrorCodes::RuntimeError},
-    {"LogicError", ErrorCodes::LogicError},
-    {"InvalidArgument", ErrorCodes::InvalidArgument},
-    {"BrokenPromise", ErrorCodes::BrokenPromise},
-    {"InvalidName", ErrorCodes::InvalidName},
-    {"OutOfMemory", ErrorCodes::OutOfMemory},
-    {"NoSuchTable", ErrorCodes::NoSuchTable},
-    {"CrossTableLinkTarget", ErrorCodes::CrossTableLinkTarget},
-    {"UnsupportedFileFormatVersion", ErrorCodes::UnsupportedFileFormatVersion},
-    {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
-    {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
+
+struct MapElem {
+    const char* name;
+    ErrorCodes::Error code;
+};
+
+// Note: this array must be kept in sorted order
+static const MapElem string_to_error_code[] = {
+    {"APIKeyAlreadyExists", ErrorCodes::APIKeyAlreadyExists},
+    {"APIKeyNotFound", ErrorCodes::APIKeyNotFound},
+    {"AWSError", ErrorCodes::AWSError},
+    {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
-    {"OutOfDiskSpace", ErrorCodes::OutOfDiskSpace},
-    {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
-    {"KeyNotFound", ErrorCodes::KeyNotFound},
-    {"OutOfBounds", ErrorCodes::OutOfBounds},
-    {"IllegalOperation", ErrorCodes::IllegalOperation},
-    {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
-    {"SerializationError", ErrorCodes::SerializationError},
-    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
-    {"SyntaxError", ErrorCodes::SyntaxError},
-    {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
-    {"InvalidQuery", ErrorCodes::InvalidQuery},
-    {"WrongTransactionState", ErrorCodes::WrongTransactionState},
-    {"WrongThread", ErrorCodes::WrongThread},
-    {"InvalidatedObject", ErrorCodes::InvalidatedObject},
-    {"InvalidProperty", ErrorCodes::InvalidProperty},
-    {"MissingPrimaryKey", ErrorCodes::MissingPrimaryKey},
-    {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
-    {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
-    {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
-    {"ReadOnlyDB", ErrorCodes::ReadOnlyDB},
-    {"PropertyNotNullable", ErrorCodes::PropertyNotNullable},
-    {"TableNameInUse", ErrorCodes::TableNameInUse},
-    {"InvalidTableRef", ErrorCodes::InvalidTableRef},
+    {"AppUnknownError", ErrorCodes::AppUnknownError},
+    {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
+    {"AuthError", ErrorCodes::AuthError},
+    {"AuthProviderAlreadyExists", ErrorCodes::AuthProviderAlreadyExists},
+    {"AuthProviderDuplicateName", ErrorCodes::AuthProviderDuplicateName},
+    {"AuthProviderNotFound", ErrorCodes::AuthProviderNotFound},
+    {"BadBsonParse", ErrorCodes::BadBsonParse},
     {"BadChangeset", ErrorCodes::BadChangeset},
-    {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
-    {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
-    {"StaleAccessor", ErrorCodes::StaleAccessor},
-    {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
-    {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
-    {"DecryptionFailed", ErrorCodes::DecryptionFailed},
-    {"IncompatibleSession", ErrorCodes::IncompatibleSession},
+    {"BadRequest", ErrorCodes::BadRequest},
+    {"BadToken", ErrorCodes::BadToken},
     {"BrokenInvariant", ErrorCodes::BrokenInvariant},
-    {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
-    {"RangeError", ErrorCodes::RangeError},
-    {"TypeMismatch", ErrorCodes::TypeMismatch},
-    {"ObjectTypeMismatch", ErrorCodes::ObjectTypeMismatch},
-    {"LimitExceeded", ErrorCodes::LimitExceeded},
-    {"MissingPropertyValue", ErrorCodes::MissingPropertyValue},
-    {"ReadOnlyProperty", ErrorCodes::ReadOnlyProperty},
+    {"BrokenPromise", ErrorCodes::BrokenPromise},
     {"CallbackFailed", ErrorCodes::CallbackFailed},
-    {"NotCloneable", ErrorCodes::NotCloneable},
-    {"PermissionDenied", ErrorCodes::PermissionDenied},
-    {"FileOperationFailed", ErrorCodes::FileOperationFailed},
-    {"FileNotFound", ErrorCodes::FileNotFound},
-    {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
-    {"SystemError", ErrorCodes::SystemError},
-    {"InvalidDatabase", ErrorCodes::InvalidDatabase},
-    {"IncompatibleHistories", ErrorCodes::IncompatibleHistories},
-    {"InvalidEncryptionKey", ErrorCodes::InvalidEncryptionKey},
-    {"InvalidCombination", ErrorCodes::IllegalCombination},
-    {"MismatchedConfig", ErrorCodes::MismatchedConfig},
-    {"ClosedRealm", ErrorCodes::ClosedRealm},
-    {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
-    {"SchemaValidationFailed", ErrorCodes::SchemaValidationFailed},
-    {"SchemaMismatch", ErrorCodes::SchemaMismatch},
-    {"InvalidAdditiveSchemaChange", ErrorCodes::InvalidAdditiveSchemaChange},
-    {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
-    {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
-    {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
-    {"NotSupported", ErrorCodes::NotSupported},
-    {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
-    {"ClientUserNotLoggedIn", ErrorCodes::ClientUserNotLoggedIn},
     {"ClientAppDeallocated", ErrorCodes::ClientAppDeallocated},
     {"ClientRedirectError", ErrorCodes::ClientRedirectError},
     {"ClientTooManyRedirects", ErrorCodes::ClientTooManyRedirects},
-    {"BadToken", ErrorCodes::BadToken},
-    {"MalformedJson", ErrorCodes::MalformedJson},
-    {"MissingJsonKey", ErrorCodes::MissingJsonKey},
-    {"BadBsonParse", ErrorCodes::BadBsonParse},
-    {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
-
+    {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
+    {"ClientUserNotLoggedIn", ErrorCodes::ClientUserNotLoggedIn},
+    {"ClosedRealm", ErrorCodes::ClosedRealm},
+    {"CrossTableLinkTarget", ErrorCodes::CrossTableLinkTarget},
     {"CustomError", ErrorCodes::CustomError},
-    {"MissingAuthReq", ErrorCodes::MissingAuthReq},
-    {"InvalidSession", ErrorCodes::InvalidSession},
-    {"UserAppDomainMismatch", ErrorCodes::UserAppDomainMismatch},
+    {"DecryptionFailed", ErrorCodes::DecryptionFailed},
+    {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"DomainNotAllowed", ErrorCodes::DomainNotAllowed},
-    {"ReadSizeLimitExceeded", ErrorCodes::ReadSizeLimitExceeded},
-    {"InvalidParameter", ErrorCodes::InvalidParameter},
-    {"MissingParameter", ErrorCodes::MissingParameter},
-    {"TwilioError", ErrorCodes::TwilioError},
-    {"GCMError", ErrorCodes::GCMError},
-    {"HTTPError", ErrorCodes::HTTPError},
-    {"AWSError", ErrorCodes::AWSError},
-    {"MongoDBError", ErrorCodes::MongoDBError},
-    {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
-    {"FunctionExecutionError", ErrorCodes::FunctionExecutionError},
-    {"NoMatchingRule", ErrorCodes::NoMatchingRule},
-    {"InternalServerError", ErrorCodes::InternalServerError},
-    {"AuthProviderNotFound", ErrorCodes::AuthProviderNotFound},
-    {"AuthProviderAlreadyExists", ErrorCodes::AuthProviderAlreadyExists},
-    {"ServiceNotFound", ErrorCodes::ServiceNotFound},
-    {"ServiceTypeNotFound", ErrorCodes::ServiceTypeNotFound},
-    {"ServiceAlreadyExists", ErrorCodes::ServiceAlreadyExists},
-    {"ServiceCommandNotFound", ErrorCodes::ServiceCommandNotFound},
-    {"ValueNotFound", ErrorCodes::ValueNotFound},
-    {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
-    {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
-    {"FunctionNotFound", ErrorCodes::FunctionNotFound},
+    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
+    {"ExecutionTimeLimitExceeded", ErrorCodes::ExecutionTimeLimitExceeded},
+    {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
+    {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
+    {"FileNotFound", ErrorCodes::FileNotFound},
+    {"FileOperationFailed", ErrorCodes::FileOperationFailed},
     {"FunctionAlreadyExists", ErrorCodes::FunctionAlreadyExists},
     {"FunctionDuplicateName", ErrorCodes::FunctionDuplicateName},
-    {"FunctionSyntaxError", ErrorCodes::FunctionSyntaxError},
+    {"FunctionExecutionError", ErrorCodes::FunctionExecutionError},
     {"FunctionInvalid", ErrorCodes::FunctionInvalid},
-    {"IncomingWebhookNotFound", ErrorCodes::IncomingWebhookNotFound},
+    {"FunctionNotFound", ErrorCodes::FunctionNotFound},
+    {"FunctionSyntaxError", ErrorCodes::FunctionSyntaxError},
+    {"GCMError", ErrorCodes::GCMError},
+    {"HTTPError", ErrorCodes::HTTPError},
+    {"IllegalOperation", ErrorCodes::IllegalOperation},
     {"IncomingWebhookAlreadyExists", ErrorCodes::IncomingWebhookAlreadyExists},
+    {"IncomingWebhookAuthFailed", ErrorCodes::IncomingWebhookAuthFailed},
     {"IncomingWebhookDuplicateName", ErrorCodes::IncomingWebhookDuplicateName},
-    {"RuleNotFound", ErrorCodes::RuleNotFound},
-    {"APIKeyNotFound", ErrorCodes::APIKeyNotFound},
+    {"IncomingWebhookNotFound", ErrorCodes::IncomingWebhookNotFound},
+    {"IncompatibleHistories", ErrorCodes::IncompatibleHistories},
+    {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
+    {"IncompatibleSession", ErrorCodes::IncompatibleSession},
+    {"InternalServerError", ErrorCodes::InternalServerError},
+    {"InvalidAdditiveSchemaChange", ErrorCodes::InvalidAdditiveSchemaChange},
+    {"InvalidArgument", ErrorCodes::InvalidArgument},
+    {"InvalidCombination", ErrorCodes::IllegalCombination},
+    {"InvalidDatabase", ErrorCodes::InvalidDatabase},
+    {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
+    {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
+    {"InvalidEncryptionKey", ErrorCodes::InvalidEncryptionKey},
+    {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
+    {"InvalidName", ErrorCodes::InvalidName},
+    {"InvalidParameter", ErrorCodes::InvalidParameter},
+    {"InvalidPassword", ErrorCodes::InvalidPassword},
+    {"InvalidProperty", ErrorCodes::InvalidProperty},
+    {"InvalidQuery", ErrorCodes::InvalidQuery},
+    {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
+    {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
+    {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
+    {"InvalidSession", ErrorCodes::InvalidSession},
+    {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
+    {"InvalidTableRef", ErrorCodes::InvalidTableRef},
+    {"InvalidatedObject", ErrorCodes::InvalidatedObject},
+    {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
+    {"KeyNotFound", ErrorCodes::KeyNotFound},
+    {"LimitExceeded", ErrorCodes::LimitExceeded},
+    {"LogicError", ErrorCodes::LogicError},
+    {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
+    {"MalformedJson", ErrorCodes::MalformedJson},
+    {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
+    {"MismatchedConfig", ErrorCodes::MismatchedConfig},
+    {"MissingAuthReq", ErrorCodes::MissingAuthReq},
+    {"MissingJsonKey", ErrorCodes::MissingJsonKey},
+    {"MissingParameter", ErrorCodes::MissingParameter},
+    {"MissingPrimaryKey", ErrorCodes::MissingPrimaryKey},
+    {"MissingPropertyValue", ErrorCodes::MissingPropertyValue},
+    {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
+    {"MongoDBError", ErrorCodes::MongoDBError},
+    {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
+    {"NoMatchingRule", ErrorCodes::NoMatchingRule},
+    {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
+    {"NoSuchTable", ErrorCodes::NoSuchTable},
+    {"NotCallable", ErrorCodes::NotCallable},
+    {"NotCloneable", ErrorCodes::NotCloneable},
+    {"NotSupported", ErrorCodes::NotSupported},
+    {"OK", ErrorCodes::OK},
+    {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
+    {"ObjectTypeMismatch", ErrorCodes::ObjectTypeMismatch},
+    {"OutOfBounds", ErrorCodes::OutOfBounds},
+    {"OutOfDiskSpace", ErrorCodes::OutOfDiskSpace},
+    {"OutOfMemory", ErrorCodes::OutOfMemory},
+    {"PermissionDenied", ErrorCodes::PermissionDenied},
+    {"PropertyNotNullable", ErrorCodes::PropertyNotNullable},
+    {"RangeError", ErrorCodes::RangeError},
+    {"ReadOnlyDB", ErrorCodes::ReadOnlyDB},
+    {"ReadOnlyProperty", ErrorCodes::ReadOnlyProperty},
+    {"ReadSizeLimitExceeded", ErrorCodes::ReadSizeLimitExceeded},
+    {"RestrictedHost", ErrorCodes::RestrictedHost},
     {"RuleAlreadyExists", ErrorCodes::RuleAlreadyExists},
     {"RuleDuplicateName", ErrorCodes::RuleDuplicateName},
-    {"AuthProviderDuplicateName", ErrorCodes::AuthProviderDuplicateName},
-    {"RestrictedHost", ErrorCodes::RestrictedHost},
-    {"APIKeyAlreadyExists", ErrorCodes::APIKeyAlreadyExists},
-    {"IncomingWebhookAuthFailed", ErrorCodes::IncomingWebhookAuthFailed},
-    {"ExecutionTimeLimitExceeded", ErrorCodes::ExecutionTimeLimitExceeded},
-    {"NotCallable", ErrorCodes::NotCallable},
-    {"UserAlreadyConfirmed", ErrorCodes::UserAlreadyConfirmed},
-    {"UserNotFound", ErrorCodes::UserNotFound},
-    {"UserDisabled", ErrorCodes::UserDisabled},
-    {"AuthError", ErrorCodes::AuthError},
-    {"BadRequest", ErrorCodes::BadRequest},
-    {"AccountNameInUse", ErrorCodes::AccountNameInUse},
-    {"InvalidPassword", ErrorCodes::InvalidPassword},
-    {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
+    {"RuleNotFound", ErrorCodes::RuleNotFound},
+    {"RuntimeError", ErrorCodes::RuntimeError},
+    {"SchemaMismatch", ErrorCodes::SchemaMismatch},
+    {"SchemaValidationFailed", ErrorCodes::SchemaValidationFailed},
     {"SchemaValidationFailedWrite", ErrorCodes::SchemaValidationFailedWrite},
     {"SchemaVersionMismatch", ErrorCodes::SchemaVersionMismatch},
+    {"SerializationError", ErrorCodes::SerializationError},
+    {"ServiceAlreadyExists", ErrorCodes::ServiceAlreadyExists},
+    {"ServiceCommandNotFound", ErrorCodes::ServiceCommandNotFound},
+    {"ServiceNotFound", ErrorCodes::ServiceNotFound},
+    {"ServiceTypeNotFound", ErrorCodes::ServiceTypeNotFound},
+    {"StaleAccessor", ErrorCodes::StaleAccessor},
+    {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
+    {"SyntaxError", ErrorCodes::SyntaxError},
+    {"SystemError", ErrorCodes::SystemError},
+    {"TableNameInUse", ErrorCodes::TableNameInUse},
+    {"TwilioError", ErrorCodes::TwilioError},
+    {"TypeMismatch", ErrorCodes::TypeMismatch},
+    {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
+    {"UnsupportedFileFormatVersion", ErrorCodes::UnsupportedFileFormatVersion},
+    {"UserAlreadyConfirmed", ErrorCodes::UserAlreadyConfirmed},
+    {"UserAppDomainMismatch", ErrorCodes::UserAppDomainMismatch},
+    {"UserDisabled", ErrorCodes::UserDisabled},
+    {"UserNotFound", ErrorCodes::UserNotFound},
+    {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
+    {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
+    {"ValueNotFound", ErrorCodes::ValueNotFound},
+    {"WrongThread", ErrorCodes::WrongThread},
+    {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
+
+namespace {
+
+class ErrorCodesMap {
+public:
+    ErrorCodesMap()
+    {
+#if REALM_DEBUG
+        bool is_valid =
+            std::is_sorted(std::begin(string_to_error_code), std::end(string_to_error_code), [](auto& a, auto& b) {
+                if (strcmp(a.name, b.name) < 0) {
+                    std::cout << a.name << " comes before " << b.name << std::endl;
+                    return true;
+                }
+                return false;
+            });
+
+        REALM_ASSERT_DEBUG(is_valid);
+#endif
+    }
+
+    ErrorCodes::Error operator[](std::string_view name)
+    {
+        auto it = std::lower_bound(std::begin(string_to_error_code), std::end(string_to_error_code), name,
+                                   [](auto& ec_pair, auto name) {
+                                       return strncmp(ec_pair.name, name.data(), name.size()) < 0;
+                                   });
+        if (it != std::end(string_to_error_code) && it->name == name) {
+            return it->code;
+        }
+        return ErrorCodes::UnknownError;
+    }
+
+    std::string_view operator[](ErrorCodes::Error code)
+    {
+        for (auto [name, c] : string_to_error_code) {
+            if (code == c) {
+                return name;
+            }
+        }
+        return "unknown";
+    }
+} error_codes_map;
+
+} // namespace
 
 std::string_view ErrorCodes::error_string(Error code)
 {
-    for (auto it : error_codes_map) {
-        if (it.second == code) {
-            return it.first;
-        }
-    }
-    return "unknown";
+    return error_codes_map[code];
 }
 
 ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
 {
-    auto it = error_codes_map.find(name);
-    if (it != error_codes_map.end()) {
-        return it->second;
+    return error_codes_map[name];
+}
+
+std::vector<ErrorCodes::Error> ErrorCodes::get_all_codes()
+{
+    std::vector<ErrorCodes::Error> ret;
+    for (auto it : string_to_error_code) {
+        ret.push_back(it.code);
     }
-    return UnknownError;
+    return ret;
 }
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code)
 {
     return stream << ErrorCodes::error_string(code);
 }
+
 
 } // namespace realm

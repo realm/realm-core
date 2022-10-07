@@ -29,7 +29,9 @@ TEST(Status)
     auto ok_status = Status::OK();
     CHECK_EQUAL(ok_status.code(), ErrorCodes::OK);
     CHECK(ok_status.is_ok());
-    CHECK_EQUAL(ok_status.code_string(), ErrorCodes::error_string(ok_status.code()));
+    auto code_string = ErrorCodes::error_string(ok_status.code());
+    CHECK_EQUAL(ok_status.code_string(), code_string);
+    CHECK_EQUAL(ErrorCodes::from_string(code_string), ErrorCodes::OK);
     CHECK(ok_status.reason().empty());
 
     const auto err_status_reason = "runtime error 1";
@@ -78,6 +80,17 @@ TEST(StatusWith)
     result = StatusWith<int>(ErrorCodes::RuntimeError, err_status_reason);
     CHECK_EQUAL(result.get_status().code(), ErrorCodes::RuntimeError);
     CHECK(!result.is_ok());
+}
+
+TEST(ErrorCodes)
+{
+    auto all_codes = ErrorCodes::get_all_codes();
+    for (auto code : all_codes) {
+        auto code_string = ErrorCodes::error_string(code);
+        CHECK_EQUAL(ErrorCodes::from_string(code_string), code);
+    }
+    CHECK_EQUAL(ErrorCodes::from_string("InvalidDictionary"), ErrorCodes::UnknownError);
+    CHECK_EQUAL(ErrorCodes::from_string("Zzzzz"), ErrorCodes::UnknownError);
 }
 
 } // namespace

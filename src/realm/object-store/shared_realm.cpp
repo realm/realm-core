@@ -1331,9 +1331,9 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
         return;
     }
     if (!lock_successful) {
-        throw FileAccessError(ErrorCodes::DeleteOnOpenRealm,
-                              util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path),
-                              realm_file_path, 0);
+        throw LogicError(
+            ErrorCodes::DeleteOnOpenRealm,
+            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
     }
 }
 
