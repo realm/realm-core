@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Remove the unused utility function `copy_dir_recursive()`.
 
 ----------------------------------------------
 
