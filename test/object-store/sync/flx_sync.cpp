@@ -1063,28 +1063,34 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         Realm::Config config = interrupted_realm_config;
         config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
         auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-        config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise)](
-                                                            std::weak_ptr<SyncSession> weak_session,
-                                                            const SyncClientHookData& data) mutable {
-            if (data.event != SyncClientHookEvent::DownloadMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
+        config.sync_config->on_sync_client_event_hook =
+            [promise = std::move(shared_promise), seen_version_one = false](std::weak_ptr<SyncSession> weak_session,
+                                                                            const SyncClientHookData& data) mutable {
+                if (data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                    return SyncClientHookAction::NoAction;
+                }
 
-            auto session = weak_session.lock();
-            if (!session) {
-                return SyncClientHookAction::NoAction;
-            }
+                auto session = weak_session.lock();
+                if (!session) {
+                    return SyncClientHookAction::NoAction;
+                }
 
-            auto latest_subs = session->get_flx_subscription_store()->get_latest();
-            if (latest_subs.version() == 1 && latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping) {
+                // If we haven't seen at least one download message for query version 1, then do nothing yet.
+                if (data.query_version == 0 || (data.query_version == 1 && !std::exchange(seen_version_one, true))) {
+                    return SyncClientHookAction::NoAction;
+                }
+
                 REQUIRE(data.query_version == 1);
                 REQUIRE(data.batch_state == sync::DownloadBatchState::MoreToCome);
+                auto latest_subs = session->get_flx_subscription_store()->get_latest();
+                REQUIRE(latest_subs.version() == 1);
+                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
+
                 session->close();
                 promise->emplace_value();
-            }
 
-            return SyncClientHookAction::NoAction;
-        };
+                return SyncClientHookAction::NoAction;
+            };
 
         auto realm = Realm::get_shared_realm(config);
         {
