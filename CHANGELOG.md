@@ -2,14 +2,14 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
-* None.
+* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -18,6 +18,7 @@
 
 ### Internals
 * Remove the unused utility function `copy_dir_recursive()`.
+* StringData and Timestamp are now constexpr-constructible.
 
 ----------------------------------------------
 

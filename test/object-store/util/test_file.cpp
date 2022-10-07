@@ -235,7 +235,9 @@ static std::error_code wait_for_session(Realm& realm,
     bool completed = cv.wait_for(lock, timeout, [&]() {
         return wait_flag == true;
     });
-    REALM_ASSERT_RELEASE(completed);
+    if (!completed) {
+        throw std::runtime_error("wait_For_session() timed out");
+    }
     return ec;
 }
 

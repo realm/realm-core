@@ -316,6 +316,19 @@ const char* get_data_type_name(DataType type) noexcept
     }
     return "unknown";
 }
+
+std::ostream& operator<<(std::ostream& o, Table::Type table_type)
+{
+    switch (table_type) {
+        case Table::Type::TopLevel:
+            return o << "TopLevel";
+        case Table::Type::Embedded:
+            return o << "Embedded";
+        case Table::Type::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
 } // namespace realm
 
 void LinkChain::add(ColKey ck)
@@ -1069,7 +1082,7 @@ Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
     return Query(m_own_ref, dictionary_of_links);
 }
 
-void Table::set_table_type(Type table_type)
+void Table::set_table_type(Type table_type, bool handle_backlinks)
 {
     if (table_type == m_table_type) {
         return;
@@ -1080,17 +1093,11 @@ void Table::set_table_type(Type table_type)
     }
 
     REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);
-    set_embedded(table_type == Type::Embedded);
+    set_embedded(table_type == Type::Embedded, handle_backlinks);
 }
 
-void Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded, bool handle_backlinks)
 {
-    if (Replication* repl = get_repl()) {
-        if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error(util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
-        }
-    }
-
     if (embedded == false) {
         do_set_table_type(Type::TopLevel);
         return;
@@ -1098,52 +1105,102 @@ void Table::set_embedded(bool embedded)
 
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
-        throw std::logic_error(util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
+        throw std::logic_error(
+            util::format("Cannot change '%1' to embedded when using a primary key.", get_class_name()));
     }
 
-    // `has_backlink_columns` indicates if the table is embedded in any other table.
-    bool has_backlink_columns = false;
-    for_each_backlink_column([&has_backlink_columns](ColKey) {
-        has_backlink_columns = true;
-        return IteratorControl::Stop;
-    });
-    if (!has_backlink_columns) {
-        throw std::logic_error(
-            util::format("Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
-                         "at least one other class.",
-                         get_name()));
+    if (size() == 0) {
+        do_set_table_type(Type::Embedded);
+        return;
     }
-    else if (size() > 0) {
-        for (auto object : *this) {
-            size_t backlink_count = 0;
-            for_each_backlink_column([&](ColKey backlink_col_key) {
-                size_t cur_backlinks = object.get_backlink_cnt(backlink_col_key);
-                if (cur_backlinks > 0) {
-                    // Make sure this link is not an untyped ObjLink which lacks core support in many places
-                    ColKey source_col = get_opposite_column(backlink_col_key);
-                    REALM_ASSERT(source_col); // backlink columns should always have a source
-                    TableRef source_table = get_opposite_table(backlink_col_key);
-                    ColKey forward_col_mapped = source_table->get_opposite_column(source_col);
-                    if (!forward_col_mapped) {
-                        throw std::logic_error(util::format("There is a dynamic/untyped link from a Mixed property "
-                                                            "'%1.%2' which prevents migrating class '%3' to embedded",
-                                                            source_table->get_name(),
-                                                            source_table->get_column_name(source_col), get_name()));
+
+    // Check all of the objects for invalid incoming links. Each embedded object
+    // must have exactly one incoming link, and it must be from a non-Mixed property.
+    // Objects with no incoming links are either deleted or an error (depending
+    // on `handle_backlinks`), and objects with multiple incoming links are either
+    // cloned for each of the incoming links or an error (again depending on `handle_backlinks`).
+    // Incoming links from a Mixed property are always an error, as those can't
+    // link to embedded objects
+    ArrayInteger leaf(get_alloc());
+    enum class LinkCount : int8_t { None, One, Multiple };
+    std::vector<LinkCount> incoming_link_count;
+    std::vector<ObjKey> orphans;
+    std::vector<ObjKey> multiple_incoming_links;
+    traverse_clusters([&](const Cluster* cluster) {
+        size_t size = cluster->node_size();
+        incoming_link_count.assign(size, LinkCount::None);
+
+        for_each_backlink_column([&](ColKey col) {
+            cluster->init_leaf(col, &leaf);
+            // Width zero means all the values are zero and there can't be any backlinks
+            if (leaf.get_width() == 0) {
+                return IteratorControl::AdvanceToNext;
+            }
+
+            for (size_t i = 0, size = leaf.size(); i < size; ++i) {
+                auto value = leaf.get_as_ref_or_tagged(i);
+                if (value.is_ref() && value.get_as_ref() == 0) {
+                    // ref of zero means there's no backlinks
+                    continue;
+                }
+
+                if (value.is_ref()) {
+                    // Any other ref indicates an array of backlinks, which will
+                    // always have more than one entry
+                    incoming_link_count[i] = LinkCount::Multiple;
+                }
+                else {
+                    // Otherwise it's a tagged ref to the single linking object
+                    if (incoming_link_count[i] == LinkCount::None) {
+                        incoming_link_count[i] = LinkCount::One;
+                    }
+                    else if (incoming_link_count[i] == LinkCount::One) {
+                        incoming_link_count[i] = LinkCount::Multiple;
                     }
                 }
-                backlink_count += cur_backlinks;
-                if (backlink_count > 1) {
-                    throw std::logic_error(
-                        util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
-                }
-                return IteratorControl::AdvanceToNext; // continue
-            });
 
-            if (backlink_count == 0) {
-                throw std::logic_error(util::format(
-                    "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
+                auto source_col = get_opposite_column(col);
+                if (source_col.get_type() == col_type_Mixed) {
+                    auto source_table = get_opposite_table(col);
+                    throw std::logic_error(util::format(
+                        "Cannot convert '%1' to embedded: there is an incoming link from the Mixed property '%2.%3', "
+                        "which does not support linking to embedded objects.",
+                        get_class_name(), source_table->get_class_name(), source_table->get_column_name(source_col)));
+                }
+            }
+            return IteratorControl::AdvanceToNext;
+        });
+
+        for (size_t i = 0; i < size; ++i) {
+            if (incoming_link_count[i] == LinkCount::None) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format("Cannot convert '%1' to embedded: at least one object has no "
+                                                        "incoming links and would be deleted.",
+                                                        get_class_name()));
+                }
+                orphans.push_back(cluster->get_real_key(i));
+            }
+            else if (incoming_link_count[i] == LinkCount::Multiple) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format(
+                        "Cannot convert '%1' to embedded: at least one object has more than one incoming link.",
+                        get_class_name()));
+                }
+                multiple_incoming_links.push_back(cluster->get_real_key(i));
             }
         }
+
+        return IteratorControl::AdvanceToNext;
+    });
+
+    // orphans and multiple_incoming_links will always be empty if `handle_backlinks = false`
+    for (auto key : orphans) {
+        remove_object(key);
+    }
+    for (auto key : multiple_incoming_links) {
+        auto obj = get_object(key);
+        obj.handle_multiple_backlinks_during_schema_migration();
+        obj.remove();
     }
 
     do_set_table_type(Type::Embedded);
@@ -1893,6 +1950,11 @@ StringData Table::get_name() const noexcept
         return StringData("");
     REALM_ASSERT(dynamic_cast<Group*>(parent));
     return static_cast<Group*>(parent)->get_table_name(get_key());
+}
+
+StringData Table::get_class_name() const noexcept
+{
+    return Group::table_name_to_class_name(get_name());
 }
 
 const char* Table::get_state() const noexcept
@@ -3482,7 +3544,7 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        throw DuplicatePrimaryKeyValueException(get_class_name(), get_column_name(col));
     }
 }
 

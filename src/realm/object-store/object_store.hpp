@@ -117,7 +117,7 @@ private:
 
 class InvalidSchemaVersionException : public std::logic_error {
 public:
-    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version);
+    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version, bool must_exactly_equal);
     uint64_t old_version() const
     {
         return m_old_version;
