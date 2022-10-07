@@ -1063,24 +1063,34 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         Realm::Config config = interrupted_realm_config;
         config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
         auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-        config.sync_config->on_download_message_received_hook = [promise = std::move(shared_promise)](
-                                                                    std::weak_ptr<SyncSession> weak_session,
-                                                                    const sync::SyncProgress&, int64_t query_version,
-                                                                    sync::DownloadBatchState batch_state,
-                                                                    size_t) mutable {
-            auto session = weak_session.lock();
-            if (!session) {
-                return;
-            }
+        config.sync_config->on_sync_client_event_hook =
+            [promise = std::move(shared_promise), seen_version_one = false](std::weak_ptr<SyncSession> weak_session,
+                                                                            const SyncClientHookData& data) mutable {
+                if (data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                    return SyncClientHookAction::NoAction;
+                }
 
-            auto latest_subs = session->get_flx_subscription_store()->get_latest();
-            if (latest_subs.version() == 1 && latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping) {
-                REQUIRE(query_version == 1);
-                REQUIRE(batch_state == sync::DownloadBatchState::MoreToCome);
+                auto session = weak_session.lock();
+                if (!session) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                // If we haven't seen at least one download message for query version 1, then do nothing yet.
+                if (data.query_version == 0 || (data.query_version == 1 && !std::exchange(seen_version_one, true))) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                REQUIRE(data.query_version == 1);
+                REQUIRE(data.batch_state == sync::DownloadBatchState::MoreToCome);
+                auto latest_subs = session->get_flx_subscription_store()->get_latest();
+                REQUIRE(latest_subs.version() == 1);
+                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
+
                 session->close();
                 promise->emplace_value();
-            }
-        };
+
+                return SyncClientHookAction::NoAction;
+            };
 
         auto realm = Realm::get_shared_realm(config);
         {
@@ -1521,21 +1531,23 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             Realm::Config config = interrupted_realm_config;
             config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
             auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-            config.sync_config->on_bootstrap_message_processed_hook =
+            config.sync_config->on_sync_client_event_hook =
                 [promise = std::move(shared_promise)](std::weak_ptr<SyncSession> weak_session,
-                                                      const sync::SyncProgress&, int64_t query_version,
-                                                      sync::DownloadBatchState batch_state) mutable {
+                                                      const SyncClientHookData& data) mutable {
+                    if (data.event != SyncClientHookEvent::BootstrapMessageProcessed) {
+                        return SyncClientHookAction::NoAction;
+                    }
                     auto session = weak_session.lock();
                     if (!session) {
-                        return true;
+                        return SyncClientHookAction::NoAction;
                     }
 
-                    if (query_version == 1 && batch_state == sync::DownloadBatchState::LastInBatch) {
+                    if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
                         session->close();
                         promise->emplace_value();
-                        return false;
+                        return SyncClientHookAction::EarlyReturn;
                     }
-                    return true;
+                    return SyncClientHookAction::NoAction;
                 };
             auto realm = Realm::get_shared_realm(config);
             {
@@ -1586,21 +1598,23 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             Realm::Config config = interrupted_realm_config;
             config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
             auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-            config.sync_config->on_bootstrap_message_processed_hook =
+            config.sync_config->on_sync_client_event_hook =
                 [promise = std::move(shared_promise)](std::weak_ptr<SyncSession> weak_session,
-                                                      const sync::SyncProgress&, int64_t query_version,
-                                                      sync::DownloadBatchState batch_state) mutable {
+                                                      const SyncClientHookData& data) mutable {
+                    if (data.event != SyncClientHookEvent::BootstrapMessageProcessed) {
+                        return SyncClientHookAction::NoAction;
+                    }
                     auto session = weak_session.lock();
                     if (!session) {
-                        return true;
+                        return SyncClientHookAction::NoAction;
                     }
 
-                    if (query_version == 1 && batch_state == sync::DownloadBatchState::MoreToCome) {
+                    if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::MoreToCome) {
                         session->close();
                         promise->emplace_value();
-                        return false;
+                        return SyncClientHookAction::EarlyReturn;
                     }
-                    return true;
+                    return SyncClientHookAction::NoAction;
                 };
             auto realm = Realm::get_shared_realm(config);
             {
@@ -1661,21 +1675,23 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             Realm::Config config = interrupted_realm_config;
             config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
             auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-            config.sync_config->on_bootstrap_message_processed_hook =
+            config.sync_config->on_sync_client_event_hook =
                 [promise = std::move(shared_promise)](std::weak_ptr<SyncSession> weak_session,
-                                                      const sync::SyncProgress, int64_t query_version,
-                                                      sync::DownloadBatchState batch_state) mutable {
+                                                      const SyncClientHookData& data) mutable {
+                    if (data.event != SyncClientHookEvent::BootstrapMessageProcessed) {
+                        return SyncClientHookAction::NoAction;
+                    }
                     auto session = weak_session.lock();
                     if (!session) {
-                        return true;
+                        return SyncClientHookAction::NoAction;
                     }
 
-                    if (query_version == 1 && batch_state == sync::DownloadBatchState::LastInBatch) {
+                    if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
                         session->close();
                         promise->emplace_value();
-                        return false;
+                        return SyncClientHookAction::EarlyReturn;
                     }
-                    return true;
+                    return SyncClientHookAction::NoAction;
                 };
             auto realm = Realm::get_shared_realm(config);
             {
@@ -1718,17 +1734,19 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         // This hook will let us check what the state of the realm is before it's integrated any new download
         // messages from the server. This should be the full 5 object bootstrap that was received before we
         // called mutate_realm().
-        interrupted_realm_config.sync_config->on_download_message_received_hook =
+        interrupted_realm_config.sync_config->on_sync_client_event_hook =
             [&, promise = std::move(shared_saw_valid_state_promise)](std::weak_ptr<SyncSession> weak_session,
-                                                                     const sync::SyncProgress&, int64_t query_version,
-                                                                     sync::DownloadBatchState batch_state, size_t) {
+                                                                     const SyncClientHookData& data) {
+                if (data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                    return SyncClientHookAction::NoAction;
+                }
                 auto session = weak_session.lock();
                 if (!session) {
-                    return;
+                    return SyncClientHookAction::NoAction;
                 }
 
-                if (query_version != 1 || batch_state == sync::DownloadBatchState::MoreToCome) {
-                    return;
+                if (data.query_version != 1 || data.batch_state == sync::DownloadBatchState::MoreToCome) {
+                    return SyncClientHookAction::NoAction;
                 }
 
                 auto latest_sub_set = session->get_flx_subscription_store()->get_latest();
@@ -1746,6 +1764,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 }
 
                 promise->emplace_value();
+                return SyncClientHookAction::NoAction;
             };
 
         // Finally re-open the realm whose bootstrap we interrupted and just wait for it to finish downloading.
