@@ -85,6 +85,11 @@ functions:
               set_cmake_var realm_vars REALM_USAN BOOL On
           fi
 
+          if [ -n "${enable_valgrind|}" ]; then
+              set_cmake_var realm_vars REALM_VALGRIND BOOL On
+              set_cmake_var realm_vars REALM_ENABLE_ALLOC_SET_ZERO BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -389,6 +394,23 @@ tasks:
       working_dir: realm-core/build
       shell: /bin/bash
       script: ../tools/run-tests-on-exfat.sh
+
+- name: valgrind
+  exec_timeout_secs: 18000
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: "CoreTests"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test
+      shell: /bin/bash
+      script: |-
+        export UNITTEST_PROGRESS=1
+        export UNITTEST_THREADS=1
+        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
 - name: bloaty
   exec_timeout_secs: 1800
@@ -866,6 +888,18 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - rhel70-large
+
+- name: ubuntu-valgrind
+  display_name: "Ubuntu 2204 Valgrind"
+  run_on: ubuntu2204-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    enable_valgrind: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: valgrind
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
