@@ -786,6 +786,7 @@ void SessionImpl::process_pending_flx_bootstrap()
     VersionInfo new_version;
     SyncProgress progress;
     int64_t query_version = -1;
+    size_t changesets_processed = 0;
     while (bootstrap_store->has_pending()) {
         auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
         if (!pending_batch.progress) {
@@ -804,7 +805,6 @@ void SessionImpl::process_pending_flx_bootstrap()
             throw IntegrationException(ClientError::bad_changeset, "simulated failure");
         }
 
-
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
             [&](const TransactionRef& tr, size_t count) {
@@ -813,9 +813,7 @@ void SessionImpl::process_pending_flx_bootstrap()
             },
             get_transact_reporter());
         progress = *pending_batch.progress;
-
-        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
+        changesets_processed += pending_batch.changesets.size();
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
@@ -827,6 +825,10 @@ void SessionImpl::process_pending_flx_bootstrap()
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
+
+    auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
+                                  DownloadBatchState::LastInBatch, changesets_processed);
+    REALM_ASSERT(action == SyncClientHookAction::NoAction);
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)

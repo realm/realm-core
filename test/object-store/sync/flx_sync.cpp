@@ -2092,71 +2092,167 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
 TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     FLXSyncTestHarness harness("bootstrap_full_sync");
 
-    SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    auto problem_realm = Realm::get_shared_realm(triggered_config);
-
-    // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
-    // on the server should have no new history entries, and then pause the router so it doesn't get any of
-    // the changes we're about to create.
-    wait_for_upload(*problem_realm);
-    wait_for_download(*problem_realm);
-
-    nlohmann::json command_request = {
-        {"command", "PAUSE_ROUTER_SESSION"},
-    };
-    auto resp_body =
-        SyncSession::OnlyForTesting::send_test_command(*problem_realm->sync_session(), command_request.dump()).get();
-    REQUIRE(resp_body == "{}");
-
-    // Put some data into the server, this will be the data that will be in the broker cache.
-    auto bar_obj_id = ObjectId::gen();
-    harness.load_initial_data([&](SharedRealm realm) {
-        CppContext c(realm);
-        Object::create(c, realm, "TopLevel",
-                       std::any(AnyDict{{"_id", bar_obj_id},
-                                        {"queryable_str_field", std::string{"bar"}},
-                                        {"queryable_int_field", static_cast<int64_t>(10)},
-                                        {"non_queryable_field", std::string{"non queryable 2"}}}));
-    });
-
     auto setup_subs = [](SharedRealm& realm) {
         auto table = realm->read_group().get_table("class_TopLevel");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
         new_query.clear();
         auto col = table->get_column_key("queryable_str_field");
         new_query.insert_or_assign(Query(table).equal(col, StringData("bar")).Or().equal(col, StringData("bizz")));
-        std::move(new_query).commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-        wait_for_advance(*realm);
+        return std::move(new_query).commit();
     };
 
+    auto bar_obj_id = ObjectId::gen();
     auto bizz_obj_id = ObjectId::gen();
-    harness.do_with_new_realm([&](SharedRealm realm) {
-        // first set a subscription to force the creation/cacheing of a broker snapshot on the server.
-        setup_subs(realm);
-        auto table = realm->read_group().get_table("class_TopLevel");
+    auto setup_and_poison_cache = [&] {
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "TopLevel",
+                           std::any(AnyDict{{"_id", bar_obj_id},
+                                            {"queryable_str_field", std::string{"bar"}},
+                                            {"queryable_int_field", static_cast<int64_t>(10)},
+                                            {"non_queryable_field", std::string{"non queryable 2"}}}));
+        });
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            // first set a subscription to force the creation/caching of a broker snapshot on the server.
+            setup_subs(realm).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            wait_for_advance(*realm);
+            auto table = realm->read_group().get_table("class_TopLevel");
+            REQUIRE(table->find_primary_key(bar_obj_id));
+
+            // Then create an object that won't be in the cached snapshot - this is the object that if we didn't
+            // wait for a MARK message to come back, we'd miss it in our results.
+            CppContext c(realm);
+            realm->begin_transaction();
+            Object::create(c, realm, "TopLevel",
+                           std::any(AnyDict{{"_id", bizz_obj_id},
+                                            {"queryable_str_field", std::string{"bizz"}},
+                                            {"queryable_int_field", static_cast<int64_t>(15)},
+                                            {"non_queryable_field", std::string{"non queryable 3"}}}));
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        });
+    };
+
+    SECTION("regular subscription change") {
+        SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+        std::atomic<bool> saw_truncated_bootstrap{false};
+        triggered_config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_sess,
+                                                                      const SyncClientHookData& data) {
+            auto sess = weak_sess.lock();
+            if (!sess || data.event != SyncClientHookEvent::BootstrapProcessed || data.query_version != 1) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto latest_subs = sess->get_flx_subscription_store()->get_latest();
+            REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::AwaitingMark);
+            REQUIRE(data.num_changesets == 1);
+            auto db = SyncSession::OnlyForTesting::get_db(*sess);
+            auto read_tr = db->start_read();
+            auto table = read_tr->get_table("class_TopLevel");
+            REQUIRE(table->find_primary_key(bar_obj_id));
+            REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
+            saw_truncated_bootstrap.store(true);
+
+            return SyncClientHookAction::NoAction;
+        };
+        auto problem_realm = Realm::get_shared_realm(triggered_config);
+
+        // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
+        // on the server should have no new history entries, and then pause the router so it doesn't get any of
+        // the changes we're about to create.
+        wait_for_upload(*problem_realm);
+        wait_for_download(*problem_realm);
+
+        nlohmann::json command_request = {
+            {"command", "PAUSE_ROUTER_SESSION"},
+        };
+        auto resp_body =
+            SyncSession::OnlyForTesting::send_test_command(*problem_realm->sync_session(), command_request.dump())
+                .get();
+        REQUIRE(resp_body == "{}");
+
+        // Put some data into the server, this will be the data that will be in the broker cache.
+        setup_and_poison_cache();
+
+        // Setup queries on the problem realm to bootstrap from the cached object. Bootstrapping will also resume
+        // the router, so all we need to do is wait for the subscription set to be complete and notifications to be
+        // processed.
+        setup_subs(problem_realm).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_advance(*problem_realm);
+
+        REQUIRE(saw_truncated_bootstrap.load());
+        auto table = problem_realm->read_group().get_table("class_TopLevel");
         REQUIRE(table->find_primary_key(bar_obj_id));
+        REQUIRE(table->find_primary_key(bizz_obj_id));
+    }
 
-        // Then create an object that won't be in the cached snapshot - this is the object that if we didn't
-        // wait for a MARK message to come back, we'd miss it in our results.
-        CppContext c(realm);
-        realm->begin_transaction();
-        Object::create(c, realm, "TopLevel",
-                       std::any(AnyDict{{"_id", bizz_obj_id},
-                                        {"queryable_str_field", std::string{"bizz"}},
-                                        {"queryable_int_field", static_cast<int64_t>(15)},
-                                        {"non_queryable_field", std::string{"non queryable 3"}}}));
-        realm->commit_transaction();
-        wait_for_upload(*realm);
-    });
+    SECTION("disconnect between bootstrap and mark") {
+        SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+        auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+        auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
+        triggered_config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise), &bizz_obj_id,
+                                                                   &bar_obj_id](std::weak_ptr<SyncSession> weak_sess,
+                                                                                const SyncClientHookData& data) {
+            auto sess = weak_sess.lock();
+            if (!sess || data.event != SyncClientHookEvent::BootstrapProcessed || data.query_version != 1) {
+                return SyncClientHookAction::NoAction;
+            }
 
-    // Setup queries on the problem realm to bootstrap from the cached object. Bootstrapping will also resume
-    // the router, so all we need to do is wait for the subscription set to be complete and notifications to be
-    // processed.
-    setup_subs(problem_realm);
+            auto latest_subs = sess->get_flx_subscription_store()->get_latest();
+            REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::AwaitingMark);
+            REQUIRE(data.num_changesets == 1);
+            auto db = SyncSession::OnlyForTesting::get_db(*sess);
+            auto read_tr = db->start_read();
+            auto table = read_tr->get_table("class_TopLevel");
+            REQUIRE(table->find_primary_key(bar_obj_id));
+            REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-    auto table = problem_realm->read_group().get_table("class_TopLevel");
-    REQUIRE(table->find_primary_key(bar_obj_id));
-    REQUIRE(table->find_primary_key(bizz_obj_id));
+            sess->close();
+            promise->emplace_value();
+            return SyncClientHookAction::NoAction;
+        };
+        auto problem_realm = Realm::get_shared_realm(triggered_config);
+
+        // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
+        // on the server should have no new history entries, and then pause the router so it doesn't get any of
+        // the changes we're about to create.
+        wait_for_upload(*problem_realm);
+        wait_for_download(*problem_realm);
+
+        nlohmann::json command_request = {
+            {"command", "PAUSE_ROUTER_SESSION"},
+        };
+        auto resp_body =
+            SyncSession::OnlyForTesting::send_test_command(*problem_realm->sync_session(), command_request.dump())
+                .get();
+        REQUIRE(resp_body == "{}");
+
+        // Put some data into the server, this will be the data that will be in the broker cache.
+        setup_and_poison_cache();
+
+        // Setup queries on the problem realm to bootstrap from the cached object. Bootstrapping will also resume
+        // the router, so all we need to do is wait for the subscription set to be complete and notifications to be
+        // processed.
+        auto sub_set = setup_subs(problem_realm);
+        auto sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
+        interrupted.get();
+        problem_realm->sync_session()->shutdown_and_wait();
+        REQUIRE(!sub_complete_future.is_ready());
+        sub_set.refresh();
+        REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
+
+        problem_realm->sync_session()->revive_if_needed();
+        sub_complete_future.get();
+        wait_for_advance(*problem_realm);
+
+        sub_set.refresh();
+        REQUIRE(sub_set.state() == sync::SubscriptionSet::State::Complete);
+        auto table = problem_realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table->find_primary_key(bar_obj_id));
+        REQUIRE(table->find_primary_key(bizz_obj_id));
+    }
 }
 
 } // namespace realm::app

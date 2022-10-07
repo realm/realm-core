@@ -134,6 +134,7 @@ enum class SyncClientHookEvent {
     DownloadMessageReceived,
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
+    BootstrapProcessed,
 };
 
 enum class SyncClientHookAction {
