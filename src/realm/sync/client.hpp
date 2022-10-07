@@ -37,12 +37,15 @@ public:
     Client(Client&&) noexcept;
     ~Client() noexcept;
 
-    /// Run the internal event-loop of the client. At most one thread may
-    /// execute run() at any given time. The call will not return until somebody
-    /// calls stop().
-    void run();
+    /// Start the internal event-loop of the client. At most one event loop may
+    /// execute at any given time. This is a non-blocking call.
+    void start();
 
-    /// See run().
+    /// Start the internal event-loop of the client. At most one event loop may
+    /// execute at any given time. This call will block until the client is stopped.
+    void sync_start();
+
+    /// See start().
     ///
     /// Thread-safe.
     void stop() noexcept;
@@ -60,7 +63,7 @@ public:
     ///
     /// Wait for termination of all sessions whose termination was initiated
     /// prior this call (the completion condition), or until the client's event
-    /// loop thread exits from Client::run(), whichever happens
+    /// loop thread has been stopped, whichever happens
     /// first. Termination of a session can be initiated implicitly (e.g., via
     /// destruction of the session object), or explicitly by Session::detach().
     ///
@@ -69,7 +72,7 @@ public:
     /// and the client is guaranteed to no longer have a Realm file open on
     /// behalf of the terminated session.
     ///
-    /// CAUTION: If run() returns while a wait operation is in progress, this
+    /// CAUTION: If the event loop is stopped while a wait operation is in progress, this
     /// waiting function will return immediately, even if the completion
     /// condition is not yet satisfied. The completion condition is guaranteed
     /// to be satisfied only when these functions return true. If it returns
@@ -85,7 +88,7 @@ public:
     /// may happen later.
     ///
     /// \return True only if the completion condition was satisfied. False if
-    /// the client's event loop thread exited from Client::run() in which case
+    /// the client's event loop thread was stopped in which case
     /// the completion condition may, or may not have been satisfied.
     ///
     /// Note: These functions are fully thread-safe. That is, they may be called

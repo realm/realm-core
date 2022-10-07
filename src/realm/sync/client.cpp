@@ -389,7 +389,7 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = m_running;
+    bool client_destroyed_while_still_running = get_event_loop().is_running();
     REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
 
     // Since no other thread is allowed to be accessing this client or any of
@@ -428,7 +428,7 @@ void ClientImpl::cancel_reconnect_delay()
             }
         }
     };
-    get_service().post(std::move(handler)); // Throws
+    get_event_loop().post(std::move(handler)); // Throws
 }
 
 
@@ -463,7 +463,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
     };
-    get_service().post(std::move(handler)); // Throws
+    get_event_loop().post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -479,18 +479,23 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 void ClientImpl::stop() noexcept
 {
     util::LockGuard lock{m_mutex};
-    if (m_stopped)
+    if (!m_stopped)
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
-    m_service.stop();
+    get_event_loop().stop();
+    if (m_stop_promise) {
+        m_stop_promise->emplace_value();
+    }
 }
 
 
-void ClientImpl::run()
+void ClientImpl::start(std::optional<util::Promise<void>>&& promise)
 {
-    auto ta = util::make_temp_assign(m_running, true);
-    m_service.run(); // Throws
+    if (promise) {
+        m_stop_promise.emplace(std::move(*promise));
+    }
+    get_event_loop().start(); // Throws
 }
 
 
@@ -500,7 +505,7 @@ void ClientImpl::start_keep_running_timer()
         if (ec != util::error::operation_aborted)
             start_keep_running_timer();
     };
-    m_keep_running_timer.async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
+    m_keep_running_timer = get_event_loop().create_timer(std::chrono::hours(1000), std::move(handler)); // Throws
 }
 
 
@@ -522,7 +527,8 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        REALM_ASSERT(m_actualize_and_finalize != nullptr);
+    m_actualize_and_finalize->trigger();
 }
 
 
@@ -549,7 +555,8 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        REALM_ASSERT(m_actualize_and_finalize != nullptr);
+    m_actualize_and_finalize->trigger();
 }
 
 
@@ -942,7 +949,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     auto pf = util::make_promise_future<std::string>();
 
-    get_client().get_service().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
+    get_client().get_event_loop().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
         ensure_enlisted_to_send();
@@ -1017,7 +1024,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.get_service().post([new_version, this] {
+    m_client.get_event_loop().post([new_version, this] {
         REALM_ASSERT(m_actualized);
         if (REALM_UNLIKELY(!m_sess)) {
             return; // Already finalized
@@ -1154,7 +1161,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.get_event_loop().post(std::move(handler)); // Throws
 }
 
 
@@ -1173,7 +1180,7 @@ void SessionWrapper::cancel_reconnect_delay()
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.get_event_loop().post(std::move(handler)); // Throws
 }
 
 void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
@@ -1211,7 +1218,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
     };
-    m_client.get_service().post(std::move(handler_2)); // Throws
+    m_client.get_event_loop().post(std::move(handler_2)); // Throws
 }
 
 
@@ -1241,7 +1248,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
             sess.request_upload_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.get_event_loop().post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1280,7 +1287,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
             sess.request_download_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.get_event_loop().post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1298,7 +1305,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    m_client.get_service().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
+    m_client.get_event_loop().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1607,7 +1614,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
             // Connection object may be destroyed now.
         }
     };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    m_on_idle = client.get_event_loop().create_trigger(std::move(handler)); // Throws
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
@@ -1696,9 +1703,18 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
-void Client::run()
+void Client::start()
 {
-    m_impl->run(); // Throws
+    m_impl->start();
+}
+
+
+void Client::sync_start()
+{
+    auto [promise, future] = util::make_promise_future<void>();
+    // Start and wait until the client has been stopped
+    m_impl->start(std::move(promise));
+    future.get();
 }
 
 

@@ -19,10 +19,7 @@
 #ifndef REALM_OS_SYNC_CLIENT_HPP
 #define REALM_OS_SYNC_CLIENT_HPP
 
-#include <realm/object-store/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/client.hpp>
-#include <realm/util/scope_exit.hpp>
 
 #include <thread>
 
@@ -63,23 +60,6 @@ struct SyncClient {
         }())
         , m_logger_ptr(logger)
         , m_logger(*m_logger_ptr)
-        , m_thread([this] {
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->did_create_thread();
-                auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                    g_binding_callback_thread_observer->will_destroy_thread();
-                });
-                try {
-                    m_client.run(); // Throws
-                }
-                catch (std::exception const& e) {
-                    g_binding_callback_thread_observer->handle_error(e);
-                }
-            }
-            else {
-                m_client.run(); // Throws
-            }
-        }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
         , m_reachability_observer(none, [weak_sync_manager](const NetworkReachabilityStatus status) {
             if (status != NotReachable) {
@@ -89,14 +69,15 @@ struct SyncClient {
             }
         })
     {
+        m_client.start();
         if (!m_reachability_observer.start_observing())
             m_logger.error("Failed to set up network reachability observer");
-    }
 #else
     {
+        m_client.start();
         static_cast<void>(weak_sync_manager);
-    }
 #endif
+    }
 
     void cancel_reconnect_delay()
     {
@@ -106,8 +87,6 @@ struct SyncClient {
     void stop()
     {
         m_client.stop();
-        if (m_thread.joinable())
-            m_thread.join();
     }
 
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
@@ -137,7 +116,6 @@ private:
     sync::Client m_client;
     std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
-    std::thread m_thread;
 #if NETWORK_REACHABILITY_AVAILABLE
     NetworkReachabilityObserver m_reachability_observer;
 #endif

@@ -25,7 +25,7 @@ set(SYNC_SOURCES
     ../util/network_ssl.cpp
     ../util/network.cpp
     ../util/websocket.cpp
-    ../util/ez_websocket.cpp
+    ../util/default_websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS
@@ -48,11 +48,13 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+    ../util/client_websocket.hpp
 )
 
 set(NOINST_HEADERS
     ../util/http.hpp
     ../util/websocket.hpp
+    ../util/default_websocket.hpp
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
@@ -90,7 +92,7 @@ if(WIN32 AND NOT WINDOWS_STORE)
     target_link_libraries(Sync INTERFACE Version.lib)
     if(CMAKE_VERSION VERSION_LESS "3.21")
         # This is needed for OpenSSL, but CMake's FindOpenSSL didn't declare it
-        # on the OpenSSL::Crypto target until CMake 3.21.0. 
+        # on the OpenSSL::Crypto target until CMake 3.21.0.
         target_link_libraries(Sync INTERFACE Crypt32.lib)
     endif()
 endif()

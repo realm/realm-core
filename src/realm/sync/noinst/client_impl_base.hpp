@@ -15,8 +15,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network_ssl.hpp>
-#include <realm/util/ez_websocket.hpp>
+#include <realm/util/default_websocket.hpp>
 #include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
@@ -124,15 +123,16 @@ public:
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
-    /// These call stop() and run() on the service object (get_service()) respectively.
+    /// These call stop() and start() on the event loop respectively. If a promise is provided
+    /// to start, it will be triggered when stop() is called.
     void stop() noexcept;
-    void run();
+    void start(std::optional<util::Promise<void>>&& promise = std::nullopt);
     // @}
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
-    util::network::Service& get_service() noexcept;
+    util::websocket::EventLoopClient& get_event_loop() noexcept;
     std::mt19937_64& get_random() noexcept;
 
     /// Returns false if the specified URL is invalid.
@@ -158,15 +158,16 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    util::network::Service m_service;
+    std::shared_ptr<util::websocket::EventLoopClient> m_event_loop;
+    std::optional<util::Promise<void>> m_stop_promise;
     std::mt19937_64 m_random;
-    util::websocket::EZSocketFactory m_socket_factory;
+    std::unique_ptr<util::websocket::WebSocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    util::network::Trigger m_actualize_and_finalize;
-    util::network::DeadlineTimer m_keep_running_timer;
+    util::websocket::EventLoopTrigger m_actualize_and_finalize;
+    util::websocket::EventLoopTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -199,8 +200,6 @@ private:
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
     bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
-
-    std::atomic<bool> m_running{false}; // Debugging facility
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -301,7 +300,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImpl::Connection final : public util::websocket::EZObserver {
+class ClientImpl::Connection final : public util::websocket::WebSocketObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -489,7 +488,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<util::websocket::EZSocket> m_websocket;
+    std::unique_ptr<util::websocket::WebSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -506,7 +505,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    util::network::Trigger m_on_idle;
+    util::websocket::EventLoopTrigger m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -545,16 +544,16 @@ private:
     // before the completion handler of the previous canceled wait operation
     // starts executing. Such an overlap is not allowed for wait operations on
     // the same timer instance.
-    util::Optional<util::network::DeadlineTimer> m_reconnect_disconnect_timer;
+    util::websocket::EventLoopTimer m_reconnect_disconnect_timer;
 
     // Timer for connect operation watchdog. For why this timer is optional, see
     // `m_reconnect_disconnect_timer`.
-    util::Optional<util::network::DeadlineTimer> m_connect_timer;
+    util::websocket::EventLoopTimer m_connect_timer;
 
     // This timer is used to schedule the sending of PING messages, and as a
     // watchdog for timely reception of PONG messages. For why this timer is
     // optional, see `m_reconnect_disconnect_timer`.
-    util::Optional<util::network::DeadlineTimer> m_heartbeat_timer;
+    util::websocket::EventLoopTimer m_heartbeat_timer;
 
     milliseconds_type m_pong_wait_started_at = 0;
     milliseconds_type m_last_ping_sent_at = 0;
@@ -904,7 +903,7 @@ private:
 
     bool m_suspended = false;
 
-    util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
+    util::websocket::EventLoopTimer m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
@@ -1123,9 +1122,9 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
-inline util::network::Service& ClientImpl::get_service() noexcept
+inline util::websocket::EventLoopClient& ClientImpl::get_event_loop() noexcept
 {
-    return m_service;
+    return *m_event_loop;
 }
 
 inline std::mt19937_64& ClientImpl::get_random() noexcept
@@ -1207,11 +1206,11 @@ inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
     }
 }

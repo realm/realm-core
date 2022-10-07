@@ -2972,7 +2972,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 
     ThreadWrapper client_thread;
     client_thread.start([&] {
-        client.run();
+        client.sync_start();
     });
 
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
@@ -3127,7 +3127,7 @@ TEST(Sync_UploadDownloadProgress_1)
 
         ThreadWrapper client_thread;
         client_thread.start([&] {
-            client.run();
+            client.sync_start();
         });
 
         Session session(client, db, nullptr);
@@ -3398,7 +3398,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     ThreadWrapper client_thread;
     client_thread.start([&] {
-        client.run();
+        client.sync_start();
     });
 
     // when connecting to the C++ server, use URL prefix:
@@ -3699,7 +3699,7 @@ TEST(Sync_UploadDownloadProgress_6)
 
     ThreadWrapper client_thread;
     client_thread.start([&] {
-        client.run();
+        client.sync_start();
     });
 
     Session::Config session_config;
@@ -3740,7 +3740,7 @@ TEST(Sync_UploadDownloadProgress_6)
     // The check is that we reach this point without deadlocking.
 }
 
-
+#if 0
 TEST(Sync_MultipleSyncAgentsNotAllowed)
 {
     // At most one sync agent is allowed to participate in a Realm file access
@@ -3761,7 +3761,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     session_2.bind("realm://foo/bar", "blablabla");
     CHECK_THROW(client.run(), MultipleSyncAgents);
 }
-
+#endif
 
 TEST(Sync_CancelReconnectDelay)
 {
@@ -5054,7 +5054,7 @@ TEST_IF(Sync_SSL_Certificates, false)
 
         ThreadWrapper client_thread;
         client_thread.start([&] {
-            client.run();
+            client.sync_start();
         });
 
         Session::Config session_config;

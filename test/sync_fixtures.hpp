@@ -843,10 +843,10 @@ private:
                 using sf = _impl::SimulatedFailure;
                 sf::RandomPrimeGuard pg(sf::sync_client__read_head, sim.first, sim.second,
                                         random_int<uint_fast64_t>()); // Seed from global generator
-                m_clients[i]->run();
+                m_clients[i]->sync_start();
             }
             else {
-                m_clients[i]->run();
+                m_clients[i]->sync_start();
             }
             m_clients[i]->stop();
         };
