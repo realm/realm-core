@@ -297,7 +297,7 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     ensure_reclaimer_thread_runs();
 }
 
-void clear_mappings_before_test_forks()
+void prepare_for_fork_in_parent()
 {
 #if !REALM_PLATFORM_APPLE
     if (reclaimer_thread) {
@@ -307,6 +307,10 @@ void clear_mappings_before_test_forks()
         reclaimer_shutdown = false;
     }
 #endif
+}
+
+void post_fork_in_child()
+{
     UniqueLock lock(mapping_mutex);
     mappings_by_addr.clear();
     mappings_by_file.clear();

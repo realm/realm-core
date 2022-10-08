@@ -22,7 +22,10 @@
 
 #ifndef _WIN32
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
+
+#include <realm/util/file_mapper.hpp>
 
 namespace realm {
 namespace test_util {
@@ -47,10 +50,10 @@ bool equal_without_cr(std::string s1, std::string s2)
     return (s1 == s2);
 }
 
-#ifndef _WIN32
-
+// FIXME: we should implement these for windows as well.
 int waitpid_checked(int pid, int options, const std::string& info)
 {
+#ifndef _WIN32
     int ret = 0;
     int status = 0;
     do {
@@ -70,9 +73,26 @@ int waitpid_checked(int pid, int options, const std::string& info)
     auto exit_status = WEXITSTATUS(status);
     REALM_ASSERT_RELEASE_EX(exit_status == 0, exit_status, pid, info);
     return status;
+#else
+    constexpr bool not_supported_on_windows = false;
+    REALM_ASSERT(not_supported_on_windows);
+#endif
 }
 
-#endif // _WIN32
+int fork_and_update_mappings()
+{
+#ifndef _WIN32
+    util::prepare_for_fork_in_parent();
+    int pid = fork();
+    if (pid == 0) {
+        util::post_fork_in_child();
+    }
+    return pid;
+#else
+    constexpr bool not_supported_on_windows = false;
+    REALM_ASSERT(not_supported_on_windows);
+#endif
+}
 
 } // namespace test_util
 } // namespace realm

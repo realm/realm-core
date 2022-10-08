@@ -184,6 +184,12 @@ static const bool running_with_asan = true;
 static const bool running_with_asan = false;
 #endif
 
+#ifndef _WIN32
+constexpr bool testing_supports_fork = !running_with_valgrind && !running_with_tsan && !running_with_asan;
+#else
+constexpr bool testing_supports_fork = false;
+#endif
+
 //@{
 
 /// These are the four inexact floating point comparisons defined by
