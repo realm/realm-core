@@ -33,6 +33,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/util/misc_ext_errors.hpp>
 #include <realm/util/websocket.hpp>
 
 using namespace realm;
@@ -602,6 +603,19 @@ void SyncSession::handle_error(SyncError error)
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
+                break;
+        }
+    }
+    else if (error_code.category() == realm::util::misc_ext_error_category) {
+        using MiscExtError = realm::util::MiscExtErrors;
+        switch (static_cast<MiscExtError>(error_code.value())) {
+            case MiscExtError::end_of_input:
+            case MiscExtError::premature_end_of_input:
+                // These are potentially normal disconnect errors when the connection
+                // to the server is lost unexpectedly.
+                return;
+            case MiscExtError::delim_not_found:
+            case MiscExtError::operation_not_supported:
                 break;
         }
     }
