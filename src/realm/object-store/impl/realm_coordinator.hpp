@@ -68,11 +68,6 @@ public:
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
-    // Creates the underlying sync session if it doesn't already exists.
-    // This is also created as part of opening a Realm, so only use this
-    // method if the session needs to exist before the Realm does.
-    void create_session(const Realm::Config& config) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-
     std::shared_ptr<SyncSession> sync_session() REQUIRES(!m_realm_mutex)
     {
         util::CheckedLockGuard lock(m_realm_mutex);
@@ -207,7 +202,7 @@ public:
     // Called by NotifierPackage in the cases where we don't know what version
     // we need notifiers for until after we begin advancing (e.g. when
     // starting a write transaction).
-    void package_notifiers(NotifierVector& notifiers, VersionID::version_type)
+    std::optional<VersionID> package_notifiers(NotifierVector& notifiers, VersionID::version_type)
         REQUIRES(!m_notifier_mutex, !m_running_notifiers_mutex);
 
     // testing hook only to verify that notifiers are not being run at times

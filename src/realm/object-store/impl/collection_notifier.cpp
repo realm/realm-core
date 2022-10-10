@@ -413,10 +413,11 @@ NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>
 {
 }
 
-NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers)
-    : m_notifiers(std::move(notifiers))
+NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+                                 std::optional<VersionID> version)
+    : m_version(version)
+    , m_notifiers(std::move(notifiers))
 {
-    set_version();
 }
 
 void NotifierPackage::package_and_wait(VersionID::version_type target_version)
@@ -424,15 +425,9 @@ void NotifierPackage::package_and_wait(VersionID::version_type target_version)
     if (!m_coordinator || !*this)
         return;
 
-    m_coordinator->package_notifiers(m_notifiers, target_version);
-    set_version();
+    m_version = m_coordinator->package_notifiers(m_notifiers, target_version);
     if (m_version && m_version->version < target_version)
         m_version = util::none;
-}
-
-void NotifierPackage::set_version()
-{
-    m_version = m_notifiers.empty() ? util::none : std::make_optional(m_notifiers.front()->version());
 }
 
 void NotifierPackage::before_advance()
