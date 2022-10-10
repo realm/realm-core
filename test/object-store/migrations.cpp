@@ -2578,9 +2578,10 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema() != schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
     }
 
     SECTION("opening new Realms uses the correct schema after an external change") {
@@ -2593,9 +2594,10 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema() != schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
 
         // Gets the schema from the RealmCoordinator
         auto realm3 = Realm::get_shared_realm(config);
@@ -2634,7 +2636,7 @@ TEST_CASE("migration: Additive") {
 
         realm->refresh();
         realm2->refresh();
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
         REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
 
         // No schema specified; should see all of them
@@ -2681,7 +2683,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE_THROWS_CONTAINING(
             realm->update_schema(add_property(schema, "object", {"value 3", PropertyType::Float})),
             "Property 'object.value 3' has been changed from 'int' to 'float'.");
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
     }
 
     SECTION("update_schema() does not begin a write transaction when extra columns are present") {

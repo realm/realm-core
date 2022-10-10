@@ -231,15 +231,16 @@ void Realm::read_schema_from_group_if_needed()
         }
         return;
     }
-
+    
+    auto schema = m_schema;
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
-    if (m_schema_transaction_version == current_version)
-        return;
-
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
-    auto schema = ObjectStore::schema_from_group(group);
+    schema = ObjectStore::schema_from_group(group);
+    
+    load_cached_schema_if_needed(current_version, schema);
+        
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
 
@@ -254,12 +255,29 @@ void Realm::read_schema_from_group_if_needed()
         }
     }
     else {
-        ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode),
-                                                   m_config.allow_complete_schema_view());
+        ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
         m_schema.copy_keys_from(schema);
     }
     notify_schema_changed();
 }
+
+void Realm::load_cached_schema_if_needed(uint64_t current_tr_version, Schema& schema)
+{
+    if(m_coordinator && m_config.allow_complete_schema_view())
+    {
+        Schema local_schema;
+        uint64_t schema_version;
+        uint64_t transaction_version;
+        const auto schema_exist = m_coordinator->get_cached_schema(local_schema, schema_version, transaction_version);
+        if(schema_exist && transaction_version > current_tr_version)
+        {
+            schema = local_schema;
+            m_schema_transaction_version = transaction_version;
+            m_schema_version = schema_version;
+        }
+    }
+}
+
 
 bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_changes)
 {

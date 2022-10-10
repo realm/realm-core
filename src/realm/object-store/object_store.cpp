@@ -492,17 +492,11 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
     return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
-void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes,
-                                                bool allow_complete_schema_view)
+void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {
         using SchemaDifferenceExplainer::operator();
-
-        Verifier(bool allow_complete_schema_view)
-            : m_allow_complete_schema_view(allow_complete_schema_view)
-        {
-        }
 
         // Adding new things is fine
         void operator()(AddTable) {}
@@ -510,19 +504,12 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
         void operator()(AddProperty) {}
         void operator()(AddIndex) {}
         void operator()(RemoveIndex) {}
-        void operator()(RemoveProperty prop)
-        {
-            if (!m_allow_complete_schema_view)
-                SchemaDifferenceExplainer::operator()(prop);
-        }
-
         // Deleting tables is not okay
         void operator()(RemoveTable op)
         {
             errors.emplace_back("Class '%1' has been removed.", op.object->name);
         }
-        bool m_allow_complete_schema_view;
-    } verifier{allow_complete_schema_view};
+    } verifier;
     verify_no_errors<InvalidExternalSchemaChangeException>(verifier, changes);
 }
 

@@ -342,11 +342,13 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
     });
-
+    
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (target && existing)
+        if (target && existing) {
             ::compare(*existing, *target, changes);
+        }
+            
         else if (target && !orphans.count(target->name)) {
             // Target is a new table -- add all properties
             changes.emplace_back(schema_change::AddInitialProperties{target});
@@ -371,29 +373,34 @@ void Schema::copy_keys_from(realm::Schema const& other, bool allow_complete_sche
         [&](ObjectSchema* existing, const ObjectSchema* other) {
             if (!existing || !other)
                 return;
-
-            std::vector<Property> unmatched_properties;
-            existing->table_key = other->table_key;
-            for (auto& current_prop : other->persisted_properties) {
-                auto target_prop = existing->property_for_name(current_prop.name);
-                if (target_prop) {
-                    target_prop->column_key = current_prop.column_key;
-                }
-                else if (allow_complete_schema_view) {
-                    unmatched_properties.push_back(current_prop);
-                }
-            }
-
-            if (allow_complete_schema_view) {
-                existing->persisted_properties.insert(existing->persisted_properties.end(),
-                                                      unmatched_properties.begin(), unmatched_properties.end());
-            }
+            update_or_append_properties(existing, other, allow_complete_schema_view);
         },
         allow_complete_schema_view);
 
     if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
         sort_schema();
+    }
+}
+
+void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSchema* other,
+                                         bool allow_complete_schema_view)
+{
+    std::vector<Property> unmatched_properties;
+    existing->table_key = other->table_key;
+    for (auto& current_prop : other->persisted_properties) {
+        auto target_prop = existing->property_for_name(current_prop.name);
+        if (target_prop) {
+            target_prop->column_key = current_prop.column_key;
+        }
+        else if (allow_complete_schema_view) {
+            unmatched_properties.push_back(current_prop);
+        }
+    }
+
+    if (allow_complete_schema_view) {
+        existing->persisted_properties.insert(existing->persisted_properties.end(),
+                                              unmatched_properties.begin(), unmatched_properties.end());
     }
 }
 
