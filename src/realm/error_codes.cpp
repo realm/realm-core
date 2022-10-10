@@ -37,7 +37,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
-        case DuplicatePrimaryKeyValue:
         case IncompatibleLockFile:
         case IncompatibleSession:
         case InvalidQuery:
@@ -79,6 +78,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidatedObject:
         case KeyAlreadyUsed:
         case LogicError:
+        case MigrationFailed:
         case MismatchedConfig:
         case NotSupported:
         case ReadOnlyDB:
@@ -234,7 +234,6 @@ static const MapElem string_to_error_code[] = {
     {"DecryptionFailed", ErrorCodes::DecryptionFailed},
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"DomainNotAllowed", ErrorCodes::DomainNotAllowed},
-    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
     {"ExecutionTimeLimitExceeded", ErrorCodes::ExecutionTimeLimitExceeded},
     {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
     {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
@@ -282,6 +281,7 @@ static const MapElem string_to_error_code[] = {
     {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
     {"MalformedJson", ErrorCodes::MalformedJson},
     {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
+    {"MigrationFailed", ErrorCodes::MigrationFailed},
     {"MismatchedConfig", ErrorCodes::MismatchedConfig},
     {"MissingAuthReq", ErrorCodes::MissingAuthReq},
     {"MissingJsonKey", ErrorCodes::MissingJsonKey},

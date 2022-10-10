@@ -88,7 +88,6 @@ public:
         IncompatibleSession = RLM_ERR_INCOMPATIBLE_SESSION,
         IncompatibleLockFile = RLM_ERR_INCOMPATIBLE_LOCK_FILE,
         InvalidQuery = RLM_ERR_INVALID_QUERY,
-        DuplicatePrimaryKeyValue = RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
         UnsupportedFileFormatVersion = RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
         MultipleSyncAgents = RLM_ERR_MULTIPLE_SYNC_AGENTS,
         ObjectAlreadyExists = RLM_ERR_OBJECT_ALREADY_EXISTS,
@@ -129,6 +128,7 @@ public:
         SchemaMismatch = RLM_ERR_SCHEMA_MISMATCH,
         InvalidSchemaVersion = RLM_ERR_INVALID_SCHEMA_VERSION,
         InvalidSchemaChange = RLM_ERR_INVALID_SCHEMA_CHANGE,
+        MigrationFailed = RLM_ERR_MIGRATION_FAILED,
 
         BadServerUrl = RLM_ERR_BAD_SERVER_URL,
         InvalidArgument = RLM_ERR_INVALID_ARGUMENT,

@@ -2176,9 +2176,9 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
 
-    CHECK_THROW(table->set_primary_key_column(string_col), DuplicatePrimaryKeyValue);
+    CHECK_THROW(table->set_primary_key_column(string_col), MigrationFailed);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
-    CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValue);
+    CHECK_THROW(table->set_primary_key_column(int_col), MigrationFailed);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
 }
 

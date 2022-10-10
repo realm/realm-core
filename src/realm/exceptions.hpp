@@ -291,12 +291,12 @@ struct NotImplemented : LogicError {
     ~NotImplemented() noexcept override;
 };
 
-struct DuplicatePrimaryKeyValue : RuntimeError {
-    DuplicatePrimaryKeyValue(const std::string& msg)
-        : RuntimeError(ErrorCodes::DuplicatePrimaryKeyValue, msg)
+struct MigrationFailed : LogicError {
+    MigrationFailed(const std::string& msg)
+        : LogicError(ErrorCodes::MigrationFailed, msg)
     {
     }
-    ~DuplicatePrimaryKeyValue() noexcept override;
+    ~MigrationFailed() noexcept override;
 };
 
 struct ObjectAlreadyExists : RuntimeError {
