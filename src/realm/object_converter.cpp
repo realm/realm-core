@@ -230,7 +230,6 @@ void InterRealmValueConverter::copy_dictionary(const Obj& src_obj, Obj& dst_obj,
         to_delete.push_back(dst_ndx++);
     }
 
-    std::sort(to_delete.begin(), to_delete.end());
     for (auto it = to_delete.rbegin(); it != to_delete.rend(); ++it) {
         dst.erase(dst.begin() + *it);
     }
