@@ -9,7 +9,7 @@
 * None.
  
 ### Breaking changes
-* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations.
+* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
 * Allow Realm instances to have a complete view of their schema, if mode is additive. ([PR #5784](https://github.com/realm/realm-core/pull/5784)).
 
 ### Compatibility
