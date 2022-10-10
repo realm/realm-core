@@ -231,6 +231,7 @@ SubscriptionSet::State sub_state_from_c_enum(realm_flx_sync_subscription_set_sta
         case RLM_SYNC_SUBSCRIPTION_UNCOMMITTED:
             return SubscriptionSet::State::Uncommitted;
     }
+    REALM_UNREACHABLE();
 }
 
 realm_flx_sync_subscription_set_state_e sub_state_to_c_enum(SubscriptionSet::State state)
@@ -251,6 +252,7 @@ realm_flx_sync_subscription_set_state_e sub_state_to_c_enum(SubscriptionSet::Sta
         case SubscriptionSet::State::Superseded:
             return RLM_SYNC_SUBSCRIPTION_SUPERSEDED;
     }
+    REALM_UNREACHABLE();
 }
 
 } // namespace
