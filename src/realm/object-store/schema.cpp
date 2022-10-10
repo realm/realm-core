@@ -342,13 +342,13 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
     });
-    
+
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && existing) {
             ::compare(*existing, *target, changes);
         }
-            
+
         else if (target && !orphans.count(target->name)) {
             // Target is a new table -- add all properties
             changes.emplace_back(schema_change::AddInitialProperties{target});
@@ -399,8 +399,8 @@ void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSch
     }
 
     if (allow_complete_schema_view) {
-        existing->persisted_properties.insert(existing->persisted_properties.end(),
-                                              unmatched_properties.begin(), unmatched_properties.end());
+        existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
+                                              unmatched_properties.end());
     }
 }
 

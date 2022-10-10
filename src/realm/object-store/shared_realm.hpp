@@ -551,10 +551,10 @@ private:
     // Ensure that m_schema and m_schema_version match that of the current
     // version of the file
     void read_schema_from_group_if_needed();
-    
-    //check if current transaction version is lower than last transaction version for the latest cached schema.
-    //In case this is happening and we have opened realm in additive mode, we load the cached schema.
-    //This could happed when new properties and classes are added to the schema if realm is open in additive mode.
+
+    // check if current transaction version is lower than last transaction version for the latest cached schema.
+    // In case this is happening and we have opened realm in additive mode, we load the cached schema.
+    // This could happed when new properties and classes are added to the schema if realm is open in additive mode.
     void load_cached_schema_if_needed(uint64_t, Schema&);
 
     void add_schema_change_handler();

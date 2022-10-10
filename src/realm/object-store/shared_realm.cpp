@@ -231,16 +231,16 @@ void Realm::read_schema_from_group_if_needed()
         }
         return;
     }
-    
+
     auto schema = m_schema;
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     schema = ObjectStore::schema_from_group(group);
-    
+
     load_cached_schema_if_needed(current_version, schema);
-        
+
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
 
@@ -263,14 +263,12 @@ void Realm::read_schema_from_group_if_needed()
 
 void Realm::load_cached_schema_if_needed(uint64_t current_tr_version, Schema& schema)
 {
-    if(m_coordinator && m_config.allow_complete_schema_view())
-    {
+    if (m_coordinator && m_config.allow_complete_schema_view()) {
         Schema local_schema;
         uint64_t schema_version;
         uint64_t transaction_version;
         const auto schema_exist = m_coordinator->get_cached_schema(local_schema, schema_version, transaction_version);
-        if(schema_exist && transaction_version > current_tr_version)
-        {
+        if (schema_exist && transaction_version > current_tr_version) {
             schema = local_schema;
             m_schema_transaction_version = transaction_version;
             m_schema_version = schema_version;

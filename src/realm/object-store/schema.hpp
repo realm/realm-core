@@ -172,7 +172,7 @@ private:
                                                   bool is_schema_additive = false) noexcept;
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
-    //append missing properties and update matching properties for schema
+    // append missing properties and update matching properties for schema
     void update_or_append_properties(ObjectSchema*, const ObjectSchema*, bool);
 };
 
