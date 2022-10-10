@@ -354,7 +354,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
         TestHelper::begin_read(old_realm, old_version);
-        REQUIRE(old_realm->schema().size() == 1);
+        REQUIRE(old_realm->schema().size() == 2);
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
