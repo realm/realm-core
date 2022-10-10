@@ -496,9 +496,9 @@ private:
     /// \param options See DBOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
     ///
-    /// \throw util::File::AccessError If the file could not be opened. If the
+    /// \throw FileAccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are derived from
-    /// util::File::AccessError, the derived exception type is thrown. Note that
+    /// FileAccessError, the derived exception type is thrown. Note that
     /// InvalidDatabase is among these derived exception types.
     ///
     /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
@@ -600,7 +600,6 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked
         *locked_space = m_locked_space;
     }
 }
-
 
 
 class DisableReplication {

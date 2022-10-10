@@ -153,6 +153,7 @@ set(REALM_INSTALL_HEADERS
     dictionary.hpp
     dictionary_cluster_tree.hpp
     disable_sync_to_disk.hpp
+    error_codes.h
     error_codes.hpp
     exceptions.hpp
     global_key.hpp

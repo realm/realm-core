@@ -20,6 +20,7 @@
 
 #include <type_traits>
 #include <string>
+#include <vector>
 #include <realm/error_codes.h>
 
 namespace realm {
@@ -40,11 +41,8 @@ struct ErrorCategory {
         http_error = RLM_ERR_CAT_HTTP_ERROR,
         custom_error = RLM_ERR_CAT_CUSTOM_ERROR,
     };
-    constexpr ErrorCategory()
-        : m_value(0)
-    {
-    }
-    bool test(Type cat)
+    constexpr ErrorCategory() = default;
+    constexpr bool test(Type cat)
     {
         return (m_value & cat) != 0;
     }
@@ -53,34 +51,27 @@ struct ErrorCategory {
         m_value |= cat;
         return *this;
     }
-    void reset(Type cat)
+    constexpr void reset(Type cat)
     {
         m_value &= ~cat;
     }
-    bool operator==(const ErrorCategory& other) const
+    constexpr bool operator==(const ErrorCategory& other) const
     {
         return m_value == other.m_value;
     }
-    bool operator!=(const ErrorCategory& other) const
+    constexpr bool operator!=(const ErrorCategory& other) const
     {
         return m_value != other.m_value;
     }
-    int value() const
+    constexpr int value() const
     {
         return m_value;
     }
 
 private:
-    unsigned m_value;
+    unsigned m_value = 0;
 };
 
-/*
- * This is a generated class containing a table of error codes and their corresponding error
- * strings. The class is derived from the definitions in src/realm/error_codes.yml file and the
- * src/realm/error_codes.tpl.hpp template.
- *
- * Do not update this file directly. Update src/realm/error_codes.yml instead.
- */
 class ErrorCodes {
 public:
     // Explicitly 32-bits wide so that non-symbolic values,
@@ -238,6 +229,7 @@ public:
     static ErrorCategory error_categories(Error code);
     static std::string_view error_string(Error code);
     static Error from_string(std::string_view str);
+    static std::vector<Error> get_all_codes();
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

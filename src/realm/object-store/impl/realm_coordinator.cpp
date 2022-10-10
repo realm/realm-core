@@ -441,16 +441,13 @@ void RealmCoordinator::open_db()
                                       util::format("Please use a path where your app has %1 permissions. %2",
                                                    m_config.immutable() ? "read" : "read-write", underlying),
                                       path, ex.get_errno());
-                break;
             case ErrorCodes::FileNotFound:
                 throw FileAccessError(
                     ex.code(),
                     util::format("%1 does not exist. %2", m_config.immutable() ? "File" : "Directory", underlying),
                     path, ex.get_errno());
-                break;
             default:
                 throw;
-                break;
         }
     }
 

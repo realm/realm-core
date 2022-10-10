@@ -185,29 +185,6 @@ struct WindowsFileHandleHolder {
 
 namespace realm::util {
 
-/// Thrown if the user does not have permission to open or create
-/// the specified file in the specified access mode.
-class File::PermissionDenied : public FileAccessError {
-public:
-    PermissionDenied(const std::string& msg, const std::string& path, int err)
-        : FileAccessError(ErrorCodes::PermissionDenied, msg, path, err)
-    {
-    }
-};
-
-
-/// Thrown if the directory part of the specified path was not
-/// found, or create_Never was specified and the file did no
-/// exist.
-class File::NotFound : public FileAccessError {
-public:
-    NotFound(const std::string& msg, const std::string& path, int err)
-        : FileAccessError(ErrorCodes::FileNotFound, msg, path, err)
-    {
-    }
-};
-
-
 /// Thrown if create_Always was specified and the file did already
 /// exist.
 class File::Exists : public FileAccessError {
@@ -236,7 +213,7 @@ bool try_make_dir(const std::string& path)
             return false;
         case EACCES:
         case EROFS:
-            throw File::PermissionDenied(msg, path, err);
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err); // LCOV_EXCL_LINE
     }
@@ -281,7 +258,7 @@ void remove_dir(const std::string& path)
         return;
     int err = ENOENT;
     std::string msg = get_errno_msg("remove() failed: ", err);
-    throw File::NotFound(msg, path, err);
+    throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
 }
 
 
@@ -304,7 +281,7 @@ bool try_remove_dir(const std::string& path)
         case EPERM:
         case EEXIST:
         case ENOTEMPTY:
-            throw File::PermissionDenied(msg, path, err);
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
         case ENOENT:
             return false;
         default:
@@ -320,7 +297,7 @@ void remove_dir_recursive(const std::string& path)
 
     int err = ENOENT;
     std::string msg = get_errno_msg("remove_dir_recursive() failed: ", err);
-    throw File::NotFound(msg, path, ENOENT);
+    throw FileAccessError(ErrorCodes::FileNotFound, msg, path, ENOENT);
 }
 
 
@@ -460,10 +437,10 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
-            throw PermissionDenied(msg, path, int(err));
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, int(err));
         case ERROR_FILE_NOT_FOUND:
         case ERROR_PATH_NOT_FOUND:
-            throw NotFound(msg, path, int(err));
+            throw FileAccessError(ErrorCodes::FileNotFound, msg, path, int(err));
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path, int(err));
         default:
@@ -518,9 +495,9 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EACCES:
         case EROFS:
         case ETXTBSY:
-            throw PermissionDenied(msg, path, err);
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
         case ENOENT:
-            throw NotFound(msg, path, err);
+            throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
         case EEXIST:
             throw Exists(msg, path, err);
         default:
@@ -1442,7 +1419,7 @@ void File::remove(const std::string& path)
         return;
     int err = ENOENT;
     std::string msg = get_errno_msg("remove() failed: ", err);
-    throw NotFound(msg, path, err);
+    throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
 }
 
 
@@ -1464,7 +1441,7 @@ bool File::try_remove(const std::string& path)
         case ETXTBSY:
         case EBUSY:
         case EPERM:
-            throw PermissionDenied(msg, path, err);
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
         case ENOENT:
             return false;
         default:
@@ -1492,9 +1469,9 @@ void File::move(const std::string& old_path, const std::string& new_path)
         case EPERM:
         case EEXIST:
         case ENOTEMPTY:
-            throw PermissionDenied(msg, old_path, err);
+            throw FileAccessError(ErrorCodes::PermissionDenied, msg, old_path, err);
         case ENOENT:
-            throw File::NotFound(msg, old_path, err);
+            throw FileAccessError(ErrorCodes::FileNotFound, msg, old_path, err);
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, old_path, err);
     }
@@ -1892,11 +1869,11 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
         std::string msg = get_errno_msg("opendir() failed: ", err);
         switch (err) {
             case EACCES:
-                throw File::PermissionDenied(msg, path, err);
+                throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
             case ENOENT:
                 if (allow_missing)
                     return;
-                throw File::NotFound(msg, path, err);
+                throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
             default:
                 throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err);
         }

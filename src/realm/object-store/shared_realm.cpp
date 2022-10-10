@@ -72,22 +72,6 @@ public:
 private:
     size_t& m_count;
 };
-
-class InvalidTransactionException : public WrongTransactionState {
-public:
-    InvalidTransactionException(std::string message)
-        : WrongTransactionState(message)
-    {
-    }
-};
-
-class IncorrectThreadException : public LogicError {
-public:
-    IncorrectThreadException()
-        : LogicError(ErrorCodes::WrongThread, "Realm accessed from incorrect thread.")
-    {
-    }
-};
 } // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
@@ -573,13 +557,13 @@ void Realm::notify_schema_changed()
 static void check_can_create_write_transaction(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only()) {
-        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
+        throw WrongTransactionState("Can't perform transactions on read-only Realms.");
     }
     if (realm->is_frozen()) {
-        throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
+        throw WrongTransactionState("Can't perform transactions on a frozen Realm");
     }
     if (!realm->is_closed() && realm->get_number_of_versions() > realm->config().max_number_of_active_versions) {
-        throw InvalidTransactionException(
+        throw WrongTransactionState(
             util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
                          realm->get_number_of_versions(), realm->config().max_number_of_active_versions));
     }
@@ -588,13 +572,13 @@ static void check_can_create_write_transaction(const Realm* realm)
 void Realm::verify_thread() const
 {
     if (m_scheduler && !m_scheduler->is_on_thread())
-        throw IncorrectThreadException();
+        throw LogicError(ErrorCodes::WrongThread, "Realm accessed from incorrect thread.");
 }
 
 void Realm::verify_in_write() const
 {
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Cannot modify managed objects outside of a write transaction.");
+        throw WrongTransactionState("Cannot modify managed objects outside of a write transaction.");
     }
 }
 
@@ -609,18 +593,17 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
 {
     if (is_frozen()) {
         if (throw_on_error)
-            throw InvalidTransactionException(
-                "Notifications are not available on frozen lists since they do not change.");
+            throw WrongTransactionState("Notifications are not available on frozen lists since they do not change.");
         return false;
     }
     if (config().immutable()) {
         if (throw_on_error)
-            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+            throw WrongTransactionState("Cannot create asynchronous query for immutable Realms");
         return false;
     }
     if (is_in_transaction()) {
         if (throw_on_error)
-            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
+            throw WrongTransactionState("Cannot create asynchronous query while in a write transaction");
         return false;
     }
 
@@ -853,11 +836,10 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
     verify_thread();
     check_can_create_write_transaction(this);
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't begin a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't begin a write transaction from inside a commit completion callback.");
     }
     if (!m_scheduler->can_invoke()) {
-        throw InvalidTransactionException(
+        throw WrongTransactionState(
             "Cannot schedule async transaction. Make sure you are running from inside a run loop.");
     }
     REALM_ASSERT(the_write_block);
@@ -879,11 +861,10 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
 {
     verify_thread();
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't commit a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't commit a write transaction from inside a commit completion callback.");
     }
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't commit a non-existing write transaction");
+        throw WrongTransactionState("Can't commit a non-existing write transaction");
     }
 
     m_transaction->promote_to_async();
@@ -966,7 +947,7 @@ void Realm::begin_transaction()
     check_can_create_write_transaction(this);
 
     if (is_in_transaction()) {
-        throw InvalidTransactionException("The Realm is already in a write transaction");
+        throw WrongTransactionState("The Realm is already in a write transaction");
     }
 
     // Any of the callbacks to user code below could drop the last remaining
@@ -1001,7 +982,7 @@ void Realm::commit_transaction()
     verify_thread();
 
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't commit a non-existing write transaction");
+        throw WrongTransactionState("Can't commit a non-existing write transaction");
     }
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
@@ -1030,11 +1011,10 @@ void Realm::cancel_transaction()
     verify_thread();
 
     if (m_is_running_async_commit_completions) {
-        throw InvalidTransactionException(
-            "Can't cancel a write transaction from inside a commit completion callback.");
+        throw WrongTransactionState("Can't cancel a write transaction from inside a commit completion callback.");
     }
     if (!is_in_transaction()) {
-        throw InvalidTransactionException("Can't cancel a non-existing write transaction");
+        throw WrongTransactionState("Can't cancel a non-existing write transaction");
     }
 
     transaction::cancel(transaction(), m_binding_context.get());
@@ -1087,10 +1067,10 @@ bool Realm::compact()
     verify_open();
 
     if (m_config.immutable() || m_config.read_only()) {
-        throw InvalidTransactionException("Can't compact a read-only Realm");
+        throw WrongTransactionState("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Can't compact a Realm within a write transaction");
+        throw WrongTransactionState("Can't compact a Realm within a write transaction");
     }
 
     verify_open();
@@ -1333,22 +1313,27 @@ void Realm::close()
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
 {
+    bool lock_successful = false;
     try {
-        auto lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
+        lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
             DB::delete_files(path, did_delete_realm);
         });
-        if (!lock_successful) {
-            throw LogicError(
-                ErrorCodes::DeleteOnOpenRealm,
-                util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
-        }
     }
-    catch (const FileAccessError&) {
+    catch (const FileAccessError& e) {
+        if (e.code() != ErrorCodes::FileNotFound) {
+            throw;
+        }
         // Thrown only if the parent directory of the lock file does not exist,
         // which obviously indicates that we didn't need to delete anything
         if (did_delete_realm) {
             *did_delete_realm = false;
         }
+        return;
+    }
+    if (!lock_successful) {
+        throw LogicError(
+            ErrorCodes::DeleteOnOpenRealm,
+            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
     }
 }
 

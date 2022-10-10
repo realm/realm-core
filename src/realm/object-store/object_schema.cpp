@@ -28,7 +28,6 @@
 #include <realm/table.hpp>
 
 using namespace realm;
-using namespace realm::schema;
 
 static_assert(uint8_t(ObjectSchema::ObjectType::TopLevel) == uint8_t(Table::Type::TopLevel) &&
                   uint8_t(ObjectSchema::ObjectType::Embedded) == uint8_t(Table::Type::Embedded) &&
