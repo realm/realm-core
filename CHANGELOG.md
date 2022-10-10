@@ -7,7 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
- 
+
 ### Breaking changes
 * Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
 
@@ -20,6 +20,7 @@
 * Remove the unused utility function `copy_dir_recursive()`.
 * StringData and Timestamp are now constexpr-constructible.
 * Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
+* Updated `install_baas.sh` to use files stored on s3 ([#5932](https://github.com/realm/realm-core/issues/5932))
 
 ----------------------------------------------
 
