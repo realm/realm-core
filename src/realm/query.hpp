@@ -306,7 +306,7 @@ public:
     // or empty vector if the query is not associated with a table.
     TableVersions sync_view_if_needed() const;
 
-    std::string get_description(const std::string& class_prefix = "") const;
+    std::string get_description() const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
     Query& set_ordering(util::bind_ptr<DescriptorOrdering> ordering);

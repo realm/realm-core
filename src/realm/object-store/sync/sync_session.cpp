@@ -739,29 +739,11 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = sync_config.ssl_verify_callback;
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
-    if (sync_config.on_download_message_received_hook) {
-        session_config.on_download_message_received_hook =
-            [hook = sync_config.on_download_message_received_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
-                hook(anchor, progress, query_version, batch_state, num_changesets);
-            };
-    }
-    if (sync_config.on_bootstrap_message_processed_hook) {
-        session_config.on_bootstrap_message_processed_hook =
-            [hook = sync_config.on_bootstrap_message_processed_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state) -> bool {
-            return hook(anchor, progress, query_version, batch_state);
+    if (sync_config.on_sync_client_event_hook) {
+        session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
+                                                    anchor = weak_from_this()](const SyncClientHookData& data) {
+            return hook(anchor, data);
         };
-    }
-    if (sync_config.on_download_message_integrated_hook) {
-        session_config.on_download_message_integrated_hook =
-            [hook = sync_config.on_download_message_integrated_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
-                hook(anchor, progress, query_version, batch_state, num_changesets);
-            };
     }
 
     {

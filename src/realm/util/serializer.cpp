@@ -192,14 +192,6 @@ std::string print_value<>(realm::UUID uuid)
     return "uuid(" + uuid.to_string() + ")";
 }
 
-StringData get_printable_table_name(StringData name, const std::string& prefix)
-{
-    if (prefix.size() && name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
-        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
-    }
-    return name;
-}
-
 template <>
 std::string print_value<>(realm::TypeOfValue type)
 {
@@ -251,7 +243,7 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = get_printable_table_name(origin->first->get_name(), class_prefix);
+        std::string source_table_name = origin->first->get_class_name();
         std::string source_col_name = get_column_name(origin->first, origin->second);
 
         return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +

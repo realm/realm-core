@@ -2,14 +2,14 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
-* None.
+* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations.
 * Allow Realm instances to have a complete view of their schema, if mode is additive. ([PR #5784](https://github.com/realm/realm-core/pull/5784)).
 
 ### Compatibility
@@ -19,6 +19,8 @@
 
 ### Internals
 * Remove the unused utility function `copy_dir_recursive()`.
+* StringData and Timestamp are now constexpr-constructible.
+* Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
 
 ----------------------------------------------
 

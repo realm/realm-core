@@ -286,12 +286,12 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
             if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, false);
             return true;
 
         case SchemaMode::Immutable:
             if (version != m_schema_version)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, true);
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
@@ -317,7 +317,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
 
         case SchemaMode::Manual:
             if (version < m_schema_version && m_schema_version != ObjectStore::NotVersioned)
-                throw InvalidSchemaVersionException(m_schema_version, version);
+                throw InvalidSchemaVersionException(m_schema_version, version, false);
             if (version == m_schema_version) {
                 ObjectStore::verify_no_changes_required(changes);
                 REALM_UNREACHABLE(); // changes is non-empty so above line always throws
@@ -463,12 +463,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(transaction(), version, m_schema, m_schema_version, m_config.schema_mode,
-                                          required_changes, m_config.automatic_handle_backlicks_in_migrations,
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations,
                                           wrapper);
     }
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
-                                          required_changes, m_config.automatic_handle_backlicks_in_migrations);
+                                          required_changes, m_config.automatically_handle_backlinks_in_migrations);
         REALM_ASSERT_DEBUG(allow_complete_schema_view ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }

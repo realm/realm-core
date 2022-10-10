@@ -3107,7 +3107,8 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
+                      !running_with_asan && !running_with_tsan && !running_with_valgrind)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;

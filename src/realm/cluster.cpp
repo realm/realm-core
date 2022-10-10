@@ -972,8 +972,8 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound(util::format("When nullify incoming links for key '%1' in '%2'", key.value,
-                                       get_owning_table()->get_name()));
+        throw KeyNotFound(util::format("Key '%1' not found in '%2' when nullifying incoming links", key.value,
+                                       get_owning_table()->get_class_name()));
 
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before

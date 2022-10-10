@@ -17,6 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "keypath_mapping.hpp"
+
+#include <realm/group.hpp>
 #include <realm/util/serializer.hpp>
 
 #include <functional>
@@ -106,8 +108,9 @@ std::string KeyPathMapping::translate_table_name(const std::string& identifier)
         alias = *mapped;
         substitutions++;
     }
-    if (substitutions == 0 && m_backlink_class_prefix.size()) {
-        alias = get_backlink_class_prefix() + alias;
+    if (substitutions == 0) {
+        Group::TableNameBuffer buffer;
+        alias = Group::class_name_to_table_name(alias, buffer);
     }
     return alias;
 }
@@ -119,9 +122,9 @@ std::string KeyPathMapping::translate(ConstTableRef table, const std::string& id
     std::string alias = identifier;
     while (auto mapped = get_mapping(tk, alias)) {
         if (substitutions > max_substitutions_allowed) {
-            throw MappingError(util::format(
-                "Substitution loop detected while processing '%1' -> '%2' found in type '%3'", alias, *mapped,
-                util::serializer::get_printable_table_name(table->get_name(), m_backlink_class_prefix)));
+            throw MappingError(
+                util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'", alias,
+                             *mapped, table->get_class_name()));
         }
         alias = *mapped;
         substitutions++;
@@ -133,11 +136,6 @@ std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& 
 {
     auto table = link_chain.get_current_table();
     return translate(table, identifier);
-}
-
-void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
-{
-    m_backlink_class_prefix = prefix;
 }
 
 } // namespace query_parser
