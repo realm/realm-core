@@ -1721,7 +1721,7 @@ void Session::bind(std::string server_url, std::string signed_access_token)
     port_type port = {};
     std::string path;
     if (!client.decompose_server_url(server_url, protocol, address, port, path)) // Throws
-        throw BadServerUrl();
+        throw BadServerUrl(server_url);
     bind(std::move(address), std::move(path), std::move(signed_access_token), port, protocol); // Throws
 }
 

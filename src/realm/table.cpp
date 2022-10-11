@@ -3529,9 +3529,8 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValue(
-            util::format("Primary key property '%1.%2' has duplicate values after migration.", get_class_name(),
-                         get_column_name(col)));
+        throw MigrationFailed(util::format("Primary key property '%1.%2' has duplicate values after migration.",
+                                           get_class_name(), get_column_name(col)));
     }
 }
 

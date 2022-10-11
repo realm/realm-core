@@ -1075,7 +1075,7 @@ SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidat
 
 InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : LogicError(ErrorCodes::InvalidReadOnlySchemaChange, [&] {
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in read-only schema mode:";
         append_errors(message, errors);
         return message;
@@ -1085,7 +1085,7 @@ InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
 
 InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : LogicError(ErrorCodes::InvalidAdditiveSchemaChange, [&] {
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in additive-only schema mode:";
         append_errors(message, errors);
         return message;
@@ -1095,10 +1095,8 @@ InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
 
 InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : LogicError(ErrorCodes::InvalidExternalSchemaChange, [&] {
-        std::string message = "Unsupported schema changes were made by another client or process. For a "
-                              "synchronized Realm, this may be due to the server reverting schema changes which "
-                              "the local user did not have permission to make.";
+    : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
+        std::string message = "Unsupported schema changes were made by another client or process:";
         append_errors(message, errors);
         return message;
     }())

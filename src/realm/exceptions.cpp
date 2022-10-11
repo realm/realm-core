@@ -17,11 +17,47 @@
  **************************************************************************/
 
 #include <realm/exceptions.hpp>
+
 #include <realm/version.hpp>
 #include <realm/util/to_string.hpp>
-#include "realm/util/demangle.hpp"
+#include <realm/util/demangle.hpp>
 
 namespace realm {
+
+const char* Exception::what() const noexcept
+{
+    return reason().c_str();
+}
+
+const Status& Exception::to_status() const
+{
+    return m_status;
+}
+
+const std::string& Exception::reason() const noexcept
+{
+    return m_status.reason();
+}
+
+ErrorCodes::Error Exception::code() const noexcept
+{
+    return m_status.code();
+}
+
+std::string_view Exception::code_string() const noexcept
+{
+    return m_status.code_string();
+}
+
+Exception::Exception(ErrorCodes::Error err, std::string_view str)
+    : m_status(err, str)
+{
+}
+
+Exception::Exception(Status status)
+    : m_status(std::move(status))
+{
+}
 
 Status exception_to_status() noexcept
 {
@@ -40,93 +76,94 @@ Status exception_to_status() noexcept
     }
 }
 
+UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
+    : Exception(ErrorCodes::UnsupportedFileFormatVersion,
+                util::format("Database has an unsupported version (%1) and cannot be upgraded", version))
+    , source_version(version)
+{
+}
+UnsupportedFileFormatVersion::~UnsupportedFileFormatVersion() noexcept = default;
+
+
+LogicError::LogicError(ErrorCodes::Error code, const std::string& msg)
+    : Exception(code, msg)
+{
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::logic_error));
+}
+LogicError::~LogicError() noexcept = default;
+
+
+RuntimeError::RuntimeError(ErrorCodes::Error code, const std::string& msg)
+    : Exception(code, msg)
+{
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::runtime_error));
+}
+RuntimeError::~RuntimeError() noexcept = default;
+
+
+InvalidArgument::InvalidArgument(ErrorCodes::Error code, const std::string& msg)
+    : LogicError(code, msg)
+{
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::invalid_argument));
+}
+InvalidArgument::~InvalidArgument() noexcept = default;
+
+
 OutOfBounds::OutOfBounds(const std::string& msg, size_t idx, size_t sz)
     : InvalidArgument(ErrorCodes::OutOfBounds,
                       sz == 0 ? util::format("Requested index %1 calling %2 when empty", idx, msg)
                               : util::format("Requested index %1 calling %2 when max is %3", idx, msg, sz - 1))
+    , index(idx)
+    , size(sz)
 {
+}
+OutOfBounds::~OutOfBounds() noexcept = default;
+
+
+FileAccessError::FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path, int err)
+    : RuntimeError(code, path.empty() ? msg : util::format("%1, path: '%2'", msg, path))
+    , m_path(path)
+    , m_errno(err)
+{
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
 }
 
-// LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
-// rely on the contents of these strings, as they are deliberately unspecified.)
-/*
-const char* LogicError::message(ErrorKind kind) noexcept
+FileAccessError::FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path)
+    : RuntimeError(code, msg)
+    , m_path(path)
 {
-    switch (kind) {
-        case string_too_big:
-            return "String too big";
-        case binary_too_big:
-            return "Binary too big";
-        case table_name_too_long:
-            return "Table name too long";
-        case column_name_too_long:
-            return "Column name too long";
-        case column_name_in_use:
-            return "Column name must be unique";
-        case invalid_column_name:
-            return "Column name not found";
-        case table_index_out_of_range:
-            return "Table index out of range";
-        case row_index_out_of_range:
-            return "Row index out of range";
-        case column_index_out_of_range:
-            return "Column index out of range";
-        case string_position_out_of_range:
-            return "String position out of range";
-        case collection_index_out_of_range:
-            return "Collection index out of range";
-        case bad_version:
-            return "Bad version number";
-        case illegal_type:
-            return "Illegal data type";
-        case illegal_combination:
-            return "Illegal combination";
-        case type_mismatch:
-            return "Data type mismatch";
-        case group_mismatch:
-            return "Tables are in different groups";
-        case wrong_kind_of_descriptor:
-            return "Wrong kind of descriptor";
-        case wrong_kind_of_table:
-            return "Wrong kind of table";
-        case detached_accessor:
-            return "Detached accessor";
-        case target_row_index_out_of_range:
-            return "Target table row index out of range";
-        case no_search_index:
-            return "Column has no search index";
-        case unique_constraint_violation:
-            return "Unique constraint violation";
-        case column_not_nullable:
-            return "Attempted to insert null into non-nullable column";
-        case wrong_group_state:
-            return "Wrong state or group accessor (already attached, "
-                   "or managed by a DB object)";
-        case wrong_transact_state:
-            return "Wrong transactional state (no active transaction, wrong type of transaction, "
-                   "or transaction already in progress)";
-        case no_history:
-            return "Continuous transaction through DB object without history information";
-        case mixed_durability:
-            return "Durability setting (as passed to the DB constructor) was "
-                   "not consistent across the session";
-        case mixed_history_type:
-            return "History type (as specified by the Replication implementation passed to "
-                   "the DB constructor) was not consistent across the session";
-        case mixed_history_schema_version:
-            return "History schema version (as specified by the Replication implementation passed "
-                   "to the DB constructor) was not consistent across the session";
-        case table_has_no_columns:
-            return "Table has no columns";
-        case column_does_not_exist:
-            return "Column does not exist";
-        case subtable_of_subtable_index:
-            return "Search index on a subtable of a subtable is not yet supported";
-        case collection_type_mismatch:
-            return "Instantiating a collection object not matching column type";
-    }
-    return "Unknown error";
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
 }
-*/
-// LCOV_EXCL_STOP (LogicError messages)
+FileAccessError::~FileAccessError() noexcept = default;
+
+// Out-of-line virtual destructors for each of the exception types "anchors"
+// the vtable and makes it so that it doesn't have to be emitted into each TU
+// which uses the exception type
+KeyAlreadyUsed::~KeyAlreadyUsed() noexcept = default;
+MaximumFileSizeExceeded::~MaximumFileSizeExceeded() noexcept = default;
+OutOfDiskSpace::~OutOfDiskSpace() noexcept = default;
+MultipleSyncAgents::~MultipleSyncAgents() noexcept = default;
+AddressSpaceExhausted::~AddressSpaceExhausted() noexcept = default;
+InvalidColumnKey::~InvalidColumnKey() noexcept = default;
+NoSuchTable::~NoSuchTable() noexcept = default;
+TableNameInUse::~TableNameInUse() noexcept = default;
+KeyNotFound::~KeyNotFound() noexcept = default;
+NotNullable::~NotNullable() noexcept = default;
+PropertyTypeMismatch::~PropertyTypeMismatch() noexcept = default;
+InvalidEncryptionKey::~InvalidEncryptionKey() noexcept = default;
+StaleAccessor::~StaleAccessor() noexcept = default;
+IllegalOperation::~IllegalOperation() noexcept = default;
+NoSubscriptionForWrite::~NoSubscriptionForWrite() noexcept = default;
+WrongTransactionState::~WrongTransactionState() noexcept = default;
+InvalidTableRef::~InvalidTableRef() noexcept = default;
+SerializationError::~SerializationError() noexcept = default;
+NotImplemented::~NotImplemented() noexcept = default;
+MigrationFailed::~MigrationFailed() noexcept = default;
+ObjectAlreadyExists::~ObjectAlreadyExists() noexcept = default;
+CrossTableLinkTarget::~CrossTableLinkTarget() noexcept = default;
+SystemError::~SystemError() noexcept = default;
+query_parser::SyntaxError::~SyntaxError() noexcept = default;
+query_parser::InvalidQueryError::~InvalidQueryError() noexcept = default;
+query_parser::InvalidQueryArgError::~InvalidQueryArgError() noexcept = default;
+
 } // namespace realm

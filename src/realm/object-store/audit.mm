@@ -966,13 +966,15 @@ void validate_metadata(std::vector<std::pair<std::string, std::string>>& metadat
 {
     for (auto& [key, _] : metadata) {
         if (key.empty() || key.size() > Table::max_column_name_length)
-            throw std::logic_error(
-                util::format("Invalid audit metadata key '%1': keys must be 1-63 characters long", key));
+            throw LogicError(ErrorCodes::InvalidName,
+                             util::format("Invalid audit metadata key '%1': keys must be 1-63 characters long", key));
         static const std::string_view invalid_keys[] = {"_id", "timestamp", "activity", "event", "data"};
         if (std::find(std::begin(invalid_keys), std::end(invalid_keys), key) != std::end(invalid_keys))
-            throw std::logic_error(util::format(
-                "Invalid audit metadata key '%1': metadata keys cannot overlap with the audit event properties",
-                key));
+            throw LogicError(
+                ErrorCodes::InvalidName,
+                util::format(
+                    "Invalid audit metadata key '%1': metadata keys cannot overlap with the audit event properties",
+                    key));
     }
     std::sort(metadata.begin(), metadata.end(), [](auto& a, auto& b) {
         return a.first < b.first;
@@ -981,7 +983,8 @@ void validate_metadata(std::vector<std::pair<std::string, std::string>>& metadat
         return a.first == b.first;
     });
     if (duplicate != metadata.end())
-        throw std::logic_error(util::format("Duplicate audit metadata key '%1'", duplicate->first));
+        throw LogicError(ErrorCodes::InvalidName,
+                         util::format("Duplicate audit metadata key '%1'", duplicate->first));
 }
 
 AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& parent_config,
@@ -1001,8 +1004,8 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
         audit_user = parent_sync_config.user;
 
     if (parent_sync_config.flx_sync_requested && audit_user == parent_sync_config.user) {
-        throw std::logic_error("Auditing a flexible sync realm requires setting the audit user to a user associated "
-                               "with a partition-based sync app.");
+        throw LogicError(ErrorCodes::InvalidArgument, "Auditing a flexible sync realm requires setting the audit "
+                                                      "user to a user associated with a partition-based sync app.");
     }
 
     if (!m_logger)
@@ -1100,7 +1103,7 @@ void AuditContext::begin_scope(std::string_view name)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (m_current_scope)
-        throw std::logic_error("Cannot begin audit scope: audit already in progress");
+        throw WrongTransactionState("Cannot begin audit scope: audit already in progress");
     m_logger->trace("Audit: Beginning audit scope on '%1' named '%2'", m_source_db->get_path(), name);
     m_current_scope = std::make_shared<Scope>(Scope{m_metadata, std::string(name)});
 }
@@ -1109,7 +1112,7 @@ void AuditContext::end_scope(util::UniqueFunction<void(std::exception_ptr)>&& co
 {
     util::CheckedLockGuard lock(m_mutex);
     if (!m_current_scope)
-        throw std::logic_error("Cannot end audit scope: no audit in progress");
+        throw WrongTransactionState("Cannot end audit scope: no audit in progress");
     m_logger->trace("Audit: Comitting audit scope on '%1' with %2 events", m_source_db->get_path(),
                     m_current_scope->events.size());
     m_current_scope->completion = std::move(completion);
@@ -1373,10 +1376,11 @@ std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB> db, Realm
     REALM_ASSERT(config.audit_config);
     auto& audit_config = *config.audit_config;
     if (audit_config.partition_value_prefix.empty())
-        throw std::logic_error("Audit partition prefix must not be empty");
+        throw LogicError(ErrorCodes::InvalidName, "Audit partition prefix must not be empty");
     if (audit_config.partition_value_prefix.find_first_of("\\/") != std::string::npos)
-        throw std::logic_error(util::format("Invalid audit parition prefix '%1': prefix must not contain slashes",
-                                            audit_config.partition_value_prefix));
+        throw LogicError(ErrorCodes::InvalidName,
+                         util::format("Invalid audit parition prefix '%1': prefix must not contain slashes",
+                                      audit_config.partition_value_prefix));
     return std::make_shared<AuditContext>(db, config, audit_config);
 }
 

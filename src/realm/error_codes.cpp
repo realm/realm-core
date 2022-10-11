@@ -34,9 +34,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 
         case AddressSpaceExhausted:
         case BadChangeset:
+        case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
-        case DuplicatePrimaryKeyValue:
         case IncompatibleLockFile:
         case IncompatibleSession:
         case InvalidQuery:
@@ -72,14 +72,13 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case CrossTableLinkTarget:
         case DeleteOnOpenRealm:
         case IllegalOperation:
-        case InvalidAdditiveSchemaChange:
-        case InvalidExternalSchemaChange:
-        case InvalidReadOnlySchemaChange:
+        case InvalidSchemaChange:
         case InvalidSchemaVersion:
         case InvalidTableRef:
         case InvalidatedObject:
         case KeyAlreadyUsed:
         case LogicError:
+        case MigrationFailed:
         case MismatchedConfig:
         case NotSupported:
         case ReadOnlyDB:
@@ -91,6 +90,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case WrongTransactionState:
             return ErrorCategory().set(ErrorCategory::logic_error);
 
+        case BadServerUrl:
         case IllegalCombination:
         case InvalidArgument:
         case InvalidDictionaryKey:
@@ -217,7 +217,9 @@ static const MapElem string_to_error_code[] = {
     {"BadBsonParse", ErrorCodes::BadBsonParse},
     {"BadChangeset", ErrorCodes::BadChangeset},
     {"BadRequest", ErrorCodes::BadRequest},
+    {"BadServerUrl", ErrorCodes::BadServerUrl},
     {"BadToken", ErrorCodes::BadToken},
+    {"BadVersion", ErrorCodes::BadVersion},
     {"BrokenInvariant", ErrorCodes::BrokenInvariant},
     {"BrokenPromise", ErrorCodes::BrokenPromise},
     {"CallbackFailed", ErrorCodes::CallbackFailed},
@@ -232,7 +234,6 @@ static const MapElem string_to_error_code[] = {
     {"DecryptionFailed", ErrorCodes::DecryptionFailed},
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"DomainNotAllowed", ErrorCodes::DomainNotAllowed},
-    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
     {"ExecutionTimeLimitExceeded", ErrorCodes::ExecutionTimeLimitExceeded},
     {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
     {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
@@ -255,21 +256,19 @@ static const MapElem string_to_error_code[] = {
     {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
     {"IncompatibleSession", ErrorCodes::IncompatibleSession},
     {"InternalServerError", ErrorCodes::InternalServerError},
-    {"InvalidAdditiveSchemaChange", ErrorCodes::InvalidAdditiveSchemaChange},
     {"InvalidArgument", ErrorCodes::InvalidArgument},
     {"InvalidCombination", ErrorCodes::IllegalCombination},
     {"InvalidDatabase", ErrorCodes::InvalidDatabase},
     {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
     {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
     {"InvalidEncryptionKey", ErrorCodes::InvalidEncryptionKey},
-    {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
     {"InvalidName", ErrorCodes::InvalidName},
     {"InvalidParameter", ErrorCodes::InvalidParameter},
     {"InvalidPassword", ErrorCodes::InvalidPassword},
     {"InvalidProperty", ErrorCodes::InvalidProperty},
     {"InvalidQuery", ErrorCodes::InvalidQuery},
     {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
-    {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
+    {"InvalidSchemaChange", ErrorCodes::InvalidSchemaChange},
     {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
     {"InvalidSession", ErrorCodes::InvalidSession},
     {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
@@ -282,6 +281,7 @@ static const MapElem string_to_error_code[] = {
     {"MaintenanceInProgress", ErrorCodes::MaintenanceInProgress},
     {"MalformedJson", ErrorCodes::MalformedJson},
     {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
+    {"MigrationFailed", ErrorCodes::MigrationFailed},
     {"MismatchedConfig", ErrorCodes::MismatchedConfig},
     {"MissingAuthReq", ErrorCodes::MissingAuthReq},
     {"MissingJsonKey", ErrorCodes::MissingJsonKey},

@@ -616,7 +616,12 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {
+struct DB::BadVersion : Exception {
+    BadVersion(version_type version)
+        : Exception(ErrorCodes::BadVersion,
+                    util::format("Unable to lock version %1 as it does not exist or has been cleaned up.", version))
+    {
+    }
 };
 
 inline bool DB::is_attached() const noexcept

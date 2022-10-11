@@ -369,8 +369,6 @@ private:
 
 class TransactLogParser {
 public:
-    class BadTransactLog; // Exception
-
     TransactLogParser();
     ~TransactLogParser() noexcept;
 
@@ -397,7 +395,7 @@ private:
     const char* m_input_end;
     std::string m_string_buffer;
 
-    REALM_NORETURN void parser_error() const;
+    REALM_COLD REALM_NORETURN void parser_error() const;
 
     template <class InstructionHandler>
     void parse_one(InstructionHandler&);
@@ -417,15 +415,6 @@ private:
 
     // return true if input was available
     bool read_char(char&); // throws
-};
-
-
-class TransactLogParser::BadTransactLog : public std::exception {
-public:
-    const char* what() const noexcept override
-    {
-        return "Bad transaction log";
-    }
 };
 
 
@@ -942,7 +931,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
     }
 
-    throw BadTransactLog();
+    parser_error();
 }
 
 
@@ -955,19 +944,19 @@ T TransactLogParser::read_int()
     for (int i = 0; i != max_bytes; ++i) {
         char c;
         if (!read_char(c))
-            goto bad_transact_log;
+            parser_error(); // Input ended early
         part = static_cast<unsigned char>(c);
         if (0xFF < part)
-            goto bad_transact_log; // Only the first 8 bits may be used in each byte
+            parser_error(); // Only the first 8 bits may be used in each byte
         if ((part & 0x80) == 0) {
             T p = part & 0x3F;
             if (util::int_shift_left_with_overflow_detect(p, i * 7))
-                goto bad_transact_log;
+                parser_error();
             value |= p;
             break;
         }
         if (i == max_bytes - 1)
-            goto bad_transact_log; // Too many bytes
+            parser_error(); // Too many bytes
         value |= T(part & 0x7F) << (i * 7);
     }
     if (part & 0x40) {
@@ -979,12 +968,9 @@ T TransactLogParser::read_int()
         value = -value;
         REALM_DIAG_POP();
         if (util::int_subtract_with_overflow_detect(value, 1))
-            goto bad_transact_log;
+            parser_error();
     }
     return value;
-
-bad_transact_log:
-    throw BadTransactLog();
 }
 
 inline void TransactLogParser::read_bytes(char* data, size_t size)
@@ -996,7 +982,7 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         const char* to = m_input_begin + avail;
         std::copy(m_input_begin, to, data);
         if (!next_input_buffer())
-            throw BadTransactLog();
+            parser_error();
         data += avail;
         size -= avail;
     }
