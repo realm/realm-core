@@ -330,7 +330,7 @@ public:
     NotifierPackage() = default;
 
     // Create a package which contains notifiers which have already been pacakged for delivery
-    NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers);
+    NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers, std::optional<VersionID> version);
     // Create a package which can have package_and_wait() called on it later
     NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers, RealmCoordinator* coordinator);
 
@@ -362,8 +362,6 @@ private:
     util::Optional<VersionID> m_version;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
     RealmCoordinator* m_coordinator = nullptr;
-
-    void set_version();
 };
 
 } // namespace realm::_impl

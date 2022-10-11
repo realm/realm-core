@@ -178,6 +178,10 @@ struct Changeset {
     /// be part of refactoring the ChangesetIndex
     size_t transform_sequence = 0;
 
+    /// If the changeset was compacted during download, the size of the original
+    /// changeset. Only applies to changesets sent by the server.
+    std::size_t original_changeset_size = 0;
+
     /// Compare for exact equality, including that interned strings have the
     /// same integer values, and there is the same number of interned strings,
     /// same topology of tombstones, etc.

@@ -414,6 +414,10 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+    /// Returns true if there are threads waiting to acquire the write lock, false otherwise.
+    /// To be used only when already holding the lock.
+    bool other_writers_waiting_for_lock() const;
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
@@ -423,11 +427,12 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
+        enum Type { Frozen, Live, Full };
         uint_fast64_t m_version = std::numeric_limits<version_type>::max();
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
-        bool m_is_frozen = false;
+        Type m_type = Live;
         // a little helper
         static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
         {
@@ -540,7 +545,7 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    ReadLockInfo grab_read_lock(bool is_frozen, VersionID);
+    ReadLockInfo grab_read_lock(ReadLockInfo::Type, VersionID);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().

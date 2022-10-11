@@ -1224,7 +1224,7 @@ struct BenchmarkSortInt : BenchmarkWithInts {
 struct BenchmarkSortIntList : Benchmark {
     const char* name() const
     {
-        return "BenchmarkSortIntList";
+        return "SortIntList";
     }
 
     void before_all(DBRef group)
@@ -1267,12 +1267,9 @@ struct BenchmarkSortIntList : Benchmark {
 };
 
 struct BenchmarkSortIntDictionary : Benchmark {
-    // Dictionary sorting is sufficiently slow that we want to use a smaller size
-    static const size_t size = BASE_SIZE / 10;
-
     const char* name() const
     {
-        return "BenchmarkSortIntDictionary";
+        return "SortIntDictionary";
     }
 
     void before_all(DBRef group)
@@ -1285,11 +1282,11 @@ struct BenchmarkSortIntDictionary : Benchmark {
 
         Dictionary dict = obj.get_dictionary(m_col);
         Random r;
-        for (size_t i = 0; i < size; ++i) {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
             dict.insert(util::to_string(i), r.draw_int<int64_t>());
         }
         tr.commit();
-        m_indices.reserve(size);
+        m_indices.reserve(BASE_SIZE);
     }
 
     void after_all(DBRef db)
