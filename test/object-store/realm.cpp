@@ -2483,7 +2483,8 @@ TEST_CASE("Realm::delete_files()") {
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::delete_files(path), ErrorCodes::DeleteOnOpenRealm);
+        std::string msg = util::format("Cannot delete files of an open Realm: '%1' is still in use.", path);
+        REQUIRE_EXCEPTION(Realm::delete_files(path), DeleteOnOpenRealm, msg.c_str());
         REQUIRE(util::File::exists(path + ".lock"));
         REQUIRE(util::File::exists(path));
         REQUIRE(util::File::exists(path + ".management"));

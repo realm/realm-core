@@ -52,6 +52,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::runtime_error);
 
         case DecryptionFailed:
+        case DeleteOnOpenRealm:
         case FileAlreadyExists:
         case FileFormatUpgradeRequired:
         case FileNotFound:
@@ -69,7 +70,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BrokenPromise:
         case ClosedRealm:
         case CrossTableLinkTarget:
-        case DeleteOnOpenRealm:
         case IllegalOperation:
         case InvalidSchemaChange:
         case InvalidSchemaVersion:
