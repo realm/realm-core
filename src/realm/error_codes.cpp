@@ -39,7 +39,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case CallbackFailed:
         case IncompatibleLockFile:
         case IncompatibleSession:
-        case InvalidQuery:
         case MaximumFileSizeExceeded:
         case MultipleSyncAgents:
         case NoSubscriptionForWrite:
@@ -98,6 +97,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidEncryptionKey:
         case InvalidName:
         case InvalidProperty:
+        case InvalidQuery:
         case InvalidQueryArg:
         case InvalidSortDescriptor:
         case KeyNotFound:
