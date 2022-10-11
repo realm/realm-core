@@ -34,25 +34,13 @@
 
 namespace realm::collection_fixtures {
 
-struct less {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return Mixed(a).compare(Mixed(b)) < 0;
-    }
-};
-struct greater {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return Mixed(a).compare(Mixed(b)) > 0;
-    }
-};
+template <typename T>
+constexpr bool always_false = false;
 
 template <typename T>
 inline T get(Mixed)
 {
-    abort();
+    static_assert(always_false<T>);
 }
 
 template <>
@@ -93,12 +81,13 @@ struct Base {
     using Wrapped = T;
     using Boxed = T;
     using AvgType = double;
-    enum { is_optional = false };
+    constexpr static bool is_optional = false;
+    constexpr static bool can_sum = std::is_arithmetic<T>::value;
+    constexpr static bool can_average = std::is_arithmetic<T>::value;
+    constexpr static bool can_minmax = std::is_arithmetic<T>::value;
+    constexpr static bool can_sort = true;
+    constexpr static PropertyType property_type = prop_type;
 
-    static PropertyType property_type()
-    {
-        return prop_type;
-    }
     static std::any to_any(T value)
     {
         return value;
@@ -130,76 +119,54 @@ struct Base {
     {
         return T{};
     }
-    static bool can_sum()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_average()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_minmax()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_sort()
-    {
-        return true;
-    }
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
+    constexpr static const char* name = "int";
     static std::vector<int64_t> values()
     {
         return {3, 1, 2};
     }
-    static int64_t min()
+    constexpr static int64_t min()
     {
         return 1;
     }
-    static int64_t max()
+    constexpr static int64_t max()
     {
         return 3;
     }
-    static int64_t sum()
+    constexpr static int64_t sum()
     {
         return 6;
     }
-    static double average()
+    constexpr static double average()
     {
         return 2.0;
     }
 };
 
 struct Bool : Base<PropertyType::Bool, bool> {
+    constexpr static const char* name = "bool";
+    constexpr static bool can_sum = false;
+    constexpr static bool can_average = false;
+    constexpr static bool can_minmax = false;
     static std::vector<bool> values()
     {
         return {true, false};
     }
-    static bool can_sum()
-    {
-        return false;
-    }
-    static bool can_average()
-    {
-        return false;
-    }
-    static bool can_minmax()
-    {
-        return false;
-    }
 };
 
 struct Float : Base<PropertyType::Float, float> {
+    constexpr static const char* name = "float";
     static std::vector<float> values()
     {
         return {3.3f, 1.1f, 2.2f};
     }
-    static float min()
+    constexpr static float min()
     {
         return 1.1f;
     }
-    static float max()
+    constexpr static float max()
     {
         return 3.3f;
     }
@@ -214,15 +181,16 @@ struct Float : Base<PropertyType::Float, float> {
 };
 
 struct Double : Base<PropertyType::Double, double> {
+    constexpr static const char* name = "double";
     static std::vector<double> values()
     {
         return {3.3, 1.1, 2.2};
     }
-    static double min()
+    constexpr static double min()
     {
         return 1.1;
     }
-    static double max()
+    constexpr static double max()
     {
         return 3.3;
     }
@@ -237,6 +205,7 @@ struct Double : Base<PropertyType::Double, double> {
 };
 
 struct String : Base<PropertyType::String, StringData> {
+    constexpr static const char* name = "string";
     using Boxed = std::string;
     static std::vector<StringData> values()
     {
@@ -249,7 +218,9 @@ struct String : Base<PropertyType::String, StringData> {
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
+    constexpr static const char* name = "data";
     using Boxed = std::string;
+    constexpr static bool can_sort = false;
     static std::any to_any(BinaryData value)
     {
         return value ? std::string(value) : std::any();
@@ -258,20 +229,14 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     {
         return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
     }
-    static bool can_sort()
-    {
-        return false;
-    }
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
+    constexpr static const char* name = "date";
+    constexpr static bool can_minmax = true;
     static std::vector<Timestamp> values()
     {
         return {Timestamp(3, 3), Timestamp(1, 1), Timestamp(2, 2)};
-    }
-    static bool can_minmax()
-    {
-        return true;
     }
     static Timestamp min()
     {
@@ -284,17 +249,19 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 };
 
 struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
+    constexpr static const char* name = "mixed";
     using AvgType = Decimal128;
-    enum { is_optional = true };
+    constexpr static bool is_optional = true;
+    constexpr static bool can_sum = true;
+    constexpr static bool can_average = true;
+    constexpr static bool can_minmax = true;
+    constexpr static PropertyType property_type = PropertyType::Mixed | PropertyType::Nullable;
+
     static std::vector<realm::Mixed> values()
     {
         return {Mixed{realm::UUID()}, Mixed{int64_t(1)},      Mixed{},
                 Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{Decimal128("300")},
                 Mixed{double(2.2)},   Mixed{float(3.3)}};
-    }
-    static PropertyType property_type()
-    {
-        return PropertyType::Mixed | PropertyType::Nullable;
     }
     static Mixed min()
     {
@@ -316,21 +283,10 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
     {
         return Mixed{0};
     }
-    static bool can_sum()
-    {
-        return true;
-    }
-    static bool can_average()
-    {
-        return true;
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
 };
 
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
+    constexpr static const char* name = "object id";
     static std::vector<ObjectId> values()
     {
         return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
@@ -338,6 +294,7 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
 };
 
 struct UUID : Base<PropertyType::UUID, realm::UUID> {
+    constexpr static const char* name = "uuid";
     static std::vector<realm::UUID> values()
     {
         return {realm::UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
@@ -346,7 +303,12 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
 };
 
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
+    constexpr static const char* name = "decimal128";
     using AvgType = Decimal128;
+    constexpr static bool can_sum = true;
+    constexpr static bool can_average = true;
+    constexpr static bool can_minmax = true;
+
     static std::vector<Decimal128> values()
     {
         return {Decimal128("876.54e32"), Decimal128("123.45e6")};
@@ -367,29 +329,16 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
     {
         return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2));
     }
-    static bool can_sum()
-    {
-        return true;
-    }
-    static bool can_average()
-    {
-        return true;
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
 };
 
 template <typename BaseT>
 struct BoxedOptional : BaseT {
+    static const inline std::string name = std::string(BaseT::name) + "?";
     using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    constexpr static bool is_optional = true;
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
+
     static std::vector<Type> values()
     {
         std::vector<Type> ret;
@@ -416,11 +365,10 @@ struct BoxedOptional : BaseT {
 
 template <typename BaseT>
 struct UnboxedOptional : BaseT {
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    static const inline std::string name = std::string(BaseT::name) + "?";
+    constexpr static bool is_optional = true;
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
+
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();

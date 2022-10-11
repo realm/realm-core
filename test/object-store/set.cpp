@@ -81,7 +81,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",
-         {{"value_set", PropertyType::Set | Test::property_type()},
+         {{"value_set", PropertyType::Set | Test::property_type},
           {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
         {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
     });
@@ -122,8 +122,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
 
     SECTION("basic value operations") {
         REQUIRE(set().size() == 0);
-        REQUIRE(set().get_type() == Test::property_type());
-        REQUIRE(set_as_results().get_type() == Test::property_type());
+        REQUIRE(set().get_type() == Test::property_type);
+        REQUIRE(set_as_results().get_type() == Test::property_type);
         write([&]() {
             for (size_t i = 0; i < values.size(); ++i) {
                 auto result = set().insert(T(values[i]));
@@ -226,70 +226,74 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
             check_empty();
         }
         SECTION("min()") {
-            if (!Test::can_minmax()) {
+            if constexpr (!Test::can_minmax) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(Mixed(Test::min()) == set().min());
-            REQUIRE(Mixed(Test::min()) == set_as_results().min());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().min());
-            REQUIRE(!set_as_results().min());
+            else {
+                REQUIRE(Mixed(Test::min()) == set().min());
+                REQUIRE(Mixed(Test::min()) == set_as_results().min());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().min());
+                REQUIRE(!set_as_results().min());
+            }
         }
         SECTION("max()") {
-            if (!Test::can_minmax()) {
+            if constexpr (!Test::can_minmax) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(Mixed(Test::max()) == set().max());
-            REQUIRE(Mixed(Test::max()) == set_as_results().max());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().max());
-            REQUIRE(!set_as_results().max());
+            else {
+                REQUIRE(Mixed(Test::max()) == set().max());
+                REQUIRE(Mixed(Test::max()) == set_as_results().max());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().max());
+                REQUIRE(!set_as_results().max());
+            }
         }
         SECTION("sum()") {
-            if (!Test::can_sum()) {
+            if constexpr (!Test::can_sum) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(cf::get<W>(set().sum()) == Test::sum());
-            REQUIRE(cf::get<W>(*set_as_results().sum()) == Test::sum());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(set().sum() == 0);
-            REQUIRE(set_as_results().sum() == 0);
+            else {
+                REQUIRE(cf::get<W>(set().sum()) == Test::sum());
+                REQUIRE(cf::get<W>(*set_as_results().sum()) == Test::sum());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(set().sum() == 0);
+                REQUIRE(set_as_results().sum() == 0);
+            }
         }
         SECTION("average()") {
-            if (!Test::can_average()) {
+            if constexpr (!Test::can_average) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(cf::get<typename Test::AvgType>(*set().average()) == Test::average());
-            REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average()) == Test::average());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().average());
-            REQUIRE(!set_as_results().average());
+            else {
+                REQUIRE(cf::get<typename Test::AvgType>(*set().average()) == Test::average());
+                REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average()) == Test::average());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().average());
+                REQUIRE(!set_as_results().average());
+            }
         }
         SECTION("sort") {
             SECTION("ascending") {
                 auto sorted = set_as_results().sort({{"self", true}});
-                std::sort(begin(values), end(values), cf::less());
+                std::sort(begin(values), end(values), std::less<>());
                 REQUIRE(sorted == values);
             }
             SECTION("descending") {
                 auto sorted = set_as_results().sort({{"self", false}});
-                std::sort(begin(values), end(values), cf::greater());
+                std::sort(begin(values), end(values), std::greater<>());
                 REQUIRE(sorted == values);
             }
         }
@@ -312,7 +316,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({{"table", {{"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
-                      {"table2", {{"value", Test::property_type()}}}});
+                      {"table2", {{"value", Test::property_type}}}});
     auto table = r->read_group().get_table("class_table");
     ColKey col_set = table->get_column_key("link_set");
     auto target = r->read_group().get_table("class_table2");
@@ -425,79 +429,84 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
             REQUIRE(target->size() == 0);
         }
         SECTION("min()") {
-            if (!Test::can_minmax()) {
+            if constexpr (!Test::can_minmax) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(target_col), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(target_col), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(Mixed(Test::min()) == set().min(target_col));
-            REQUIRE(Mixed(Test::min()) == set_as_results().min(target_col));
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().min(target_col));
-            REQUIRE(!set_as_results().min(target_col));
+            else {
+                REQUIRE(Mixed(Test::min()) == set().min(target_col));
+                REQUIRE(Mixed(Test::min()) == set_as_results().min(target_col));
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().min(target_col));
+                REQUIRE(!set_as_results().min(target_col));
+            }
         }
         SECTION("max()") {
-            if (!Test::can_minmax()) {
+            if constexpr (!Test::can_minmax) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(target_col), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(target_col), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(Mixed(Test::max()) == set().max(target_col));
-            REQUIRE(Mixed(Test::max()) == set_as_results().max(target_col));
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().max(target_col));
-            REQUIRE(!set_as_results().max(target_col));
+            else {
+                REQUIRE(Mixed(Test::max()) == set().max(target_col));
+                REQUIRE(Mixed(Test::max()) == set_as_results().max(target_col));
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().max(target_col));
+                REQUIRE(!set_as_results().max(target_col));
+            }
         }
         SECTION("sum()") {
-            if (!Test::can_sum()) {
+            if constexpr (!Test::can_sum) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(target_col), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(target_col), ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(cf::get<W>(set().sum(target_col)) == Test::sum());
-            REQUIRE(cf::get<W>(*set_as_results().sum(target_col)) == Test::sum());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(set().sum(target_col) == 0);
-            REQUIRE(set_as_results().sum(target_col) == 0);
+            else {
+                REQUIRE(cf::get<W>(set().sum(target_col)) == Test::sum());
+                REQUIRE(cf::get<W>(*set_as_results().sum(target_col)) == Test::sum());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(set().sum(target_col) == 0);
+                REQUIRE(set_as_results().sum(target_col) == 0);
+            }
         }
         SECTION("average()") {
-            if (!Test::can_average()) {
+            if constexpr (!Test::can_average) {
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(target_col), ErrorCodes::IllegalOperation);
                 REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(target_col),
                                                     ErrorCodes::IllegalOperation);
-                return;
             }
-            REQUIRE(cf::get<typename Test::AvgType>(*set().average(target_col)) == Test::average());
-            REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average(target_col)) == Test::average());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().average(target_col));
-            REQUIRE(!set_as_results().average(target_col));
+            else {
+                REQUIRE(cf::get<typename Test::AvgType>(*set().average(target_col)) == Test::average());
+                REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average(target_col)) == Test::average());
+                write([&]() {
+                    set().remove_all();
+                });
+                REQUIRE(!set().average(target_col));
+                REQUIRE(!set_as_results().average(target_col));
+            }
         }
         SECTION("sort") {
-            if (!Test::can_sort()) {
+            if constexpr (!Test::can_sort) {
                 REQUIRE_THROWS_CONTAINING(set_as_results().sort({{"value", true}}), "is of unsupported type");
-                return;
             }
-            SECTION("ascending") {
-                auto sorted = set_as_results().sort({{"value", true}});
-                std::sort(begin(values), end(values), cf::less());
-                for (size_t i = 0; i < values.size(); ++i) {
-                    REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+            else {
+                SECTION("ascending") {
+                    auto sorted = set_as_results().sort({{"value", true}});
+                    std::sort(begin(values), end(values), std::less<>());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                    }
                 }
-            }
-            SECTION("descending") {
-                auto sorted = set_as_results().sort({{"value", false}});
-                std::sort(begin(values), end(values), cf::greater());
-                for (size_t i = 0; i < values.size(); ++i) {
-                    REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                SECTION("descending") {
+                    auto sorted = set_as_results().sort({{"value", false}});
+                    std::sort(begin(values), end(values), std::greater<>());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                    }
                 }
             }
         }
