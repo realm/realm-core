@@ -118,6 +118,7 @@ public:
         IllegalOperation = RLM_ERR_ILLEGAL_OPERATION,
         SerializationError = RLM_ERR_SERIALIZATION_ERROR,
         StaleAccessor = RLM_ERR_STALE_ACCESSOR,
+        TopLevelObject = RLM_ERR_TOP_LEVEL_OBJECT,
         InvalidatedObject = RLM_ERR_INVALIDATED_OBJECT,
         ReadOnlyDB = RLM_ERR_READ_ONLY_DB,
         DeleteOnOpenRealm = RLM_ERR_DELETE_OPENED_REALM,

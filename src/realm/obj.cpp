@@ -516,7 +516,7 @@ Obj Obj::get_parent_object() const
     update_if_needed();
 
     if (!m_table->is_embedded()) {
-        throw std::runtime_error("Object is not embedded");
+        throw LogicError(ErrorCodes::TopLevelObject, "Object is not embedded");
     }
     m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
         if (get_backlink_cnt(backlink_col_key) == 1) {

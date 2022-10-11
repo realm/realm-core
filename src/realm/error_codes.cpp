@@ -112,6 +112,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ReadOnlyProperty:
         case SyntaxError:
         case TableNameInUse:
+        case TopLevelObject:
         case TypeMismatch:
         case UnexpectedPrimaryKey:
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
@@ -328,6 +329,7 @@ static const MapElem string_to_error_code[] = {
     {"SyntaxError", ErrorCodes::SyntaxError},
     {"SystemError", ErrorCodes::SystemError},
     {"TableNameInUse", ErrorCodes::TableNameInUse},
+    {"TopLevelObject", ErrorCodes::TopLevelObject},
     {"TwilioError", ErrorCodes::TwilioError},
     {"TypeMismatch", ErrorCodes::TypeMismatch},
     {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
