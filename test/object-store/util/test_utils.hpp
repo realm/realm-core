@@ -87,6 +87,20 @@ private:
     std::string m_message;
 };
 
+class LogicErrorMatcher final : public Catch::Matchers::MatcherBase<LogicError> {
+public:
+    LogicErrorMatcher(ErrorCodes::Error code)
+        : m_code(code)
+    {
+    }
+
+    bool match(LogicError const& ex) const override;
+    std::string describe() const override;
+
+private:
+    ErrorCodes::Error m_code;
+};
+
 namespace _impl {
 template <typename T>
 ExceptionMatcher<T> make_exception_matcher(ErrorCodes::Error code, T&& matcher)
@@ -169,33 +183,12 @@ std::string get_parent_directory(const std::string& path);
 
 #define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::ContainsSubstring(msg))
 
-namespace {
-}
-
 #define REQUIRE_EXCEPTION(expr, c, msg)                                                                              \
     REQUIRE_THROWS_MATCHES(expr, realm::Exception, _impl::make_exception_matcher(realm::ErrorCodes::c, msg))
 #define REQUIRE_THROWS_OUT_OF_BOUNDS(expr, index, size, msg)                                                         \
     REQUIRE_THROWS_MATCHES(expr, OutOfBounds, OutOfBoundsMatcher(index, size, msg));
-
-#define REQUIRE_THROWS_WITH_CODE(expr, err)                                                                          \
-    do {                                                                                                             \
-        try {                                                                                                        \
-            expr;                                                                                                    \
-        }                                                                                                            \
-        catch (const Exception& e) {                                                                                 \
-            REQUIRE(e.code() == err);                                                                                \
-        }                                                                                                            \
-    } while (0)
-
 #define REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(expr, err)                                                               \
-    do {                                                                                                             \
-        try {                                                                                                        \
-            expr;                                                                                                    \
-        }                                                                                                            \
-        catch (const LogicError& e) {                                                                                \
-            REQUIRE(e.code() == err);                                                                                \
-        }                                                                                                            \
-    } while (0)
+    REQUIRE_THROWS_MATCHES(expr, LogicError, LogicErrorMatcher(err))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 

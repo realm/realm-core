@@ -60,6 +60,16 @@ std::string OutOfBoundsMatcher::describe() const
     return util::format("OutOfBounds(index=%1, size=%2, \"%3\")", m_index, m_size, m_message);
 }
 
+bool LogicErrorMatcher::match(LogicError const& ex) const
+{
+    return ex.code() == m_code;
+}
+
+std::string LogicErrorMatcher::describe() const
+{
+    return util::format("LogicError(%1)", ErrorCodes::error_string(m_code));
+}
+
 std::ostream& operator<<(std::ostream& os, const Exception& e)
 {
     os << util::get_type_name(e) << "(" << e.code_string() << ", \"" << e.what() << "\")";
