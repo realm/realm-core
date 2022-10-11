@@ -404,18 +404,32 @@ void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> asc
 void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
 {
     align_indices(indices);
+#ifdef REALM_DEBUG
     if (indices.size() > 1) {
+        // We rely in the design that the keys are already sorted
         switch (m_key_type) {
-            case type_String:
-                do_sort(indices, ascending, static_cast<BPlusTree<StringData>*>(m_keys.get())->get_all());
+            case type_String: {
+                SortedKeys help(static_cast<BPlusTree<StringData>*>(m_keys.get()));
+                auto is_sorted = std::is_sorted(help.begin(), help.end());
+                REALM_ASSERT(is_sorted);
                 break;
-            case type_Int:
-                do_sort(indices, ascending, static_cast<BPlusTree<Int>*>(m_keys.get())->get_all());
+            }
+            case type_Int: {
+                SortedKeys help(static_cast<BPlusTree<Int>*>(m_keys.get()));
+                auto is_sorted = std::is_sorted(help.begin(), help.end());
+                REALM_ASSERT(is_sorted);
                 break;
+            }
             default:
-                throw std::runtime_error("Not implemented");
                 break;
         }
+    }
+#endif
+    if (ascending) {
+        std::sort(indices.begin(), indices.end());
+    }
+    else {
+        std::sort(indices.begin(), indices.end(), std::greater<size_t>());
     }
 }
 
