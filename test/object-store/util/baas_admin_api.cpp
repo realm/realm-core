@@ -964,31 +964,21 @@ AppSession create_app(const AppCreateConfig& config)
             std::transform(config.flx_sync_config->default_roles.begin(), config.flx_sync_config->default_roles.end(),
                            std::back_inserter(default_roles), [](const AppCreateConfig::FLXSyncRole& role_def) {
                                nlohmann::json ret{{"name", role_def.name}, {"applyWhen", role_def.apply_when}};
-                               if (auto read_bool_ptr = mpark::get_if<bool>(&role_def.read)) {
-                                   ret["read"] = *read_bool_ptr;
-                               }
-                               else {
-                                   ret["read"] = mpark::get<nlohmann::json>(role_def.read);
-                               }
-                               if (auto write_bool_ptr = mpark::get_if<bool>(&role_def.write)) {
-                                   ret["write"] = *write_bool_ptr;
-                               }
-                               else {
-                                   ret["write"] = mpark::get<nlohmann::json>(role_def.write);
-                               }
+                               ret["read"] = role_def.read;
+                               ret["write"] = role_def.write;
                                return ret;
                            });
         }
-        mongo_service_def["config"]["flexible_sync"] = nlohmann::json{{"state", "enabled"},
-                                                                      {"database_name", config.mongo_dbname},
-                                                                      {"queryable_fields_names", queryable_fields},
-                                                                      {"asymmetric_tables", asymmetric_tables},
-                                                                      {"permissions",
-                                                                       {{"rules", nlohmann::json::object()},
-                                                                        {
-                                                                            "defaultRoles",
-                                                                            default_roles,
-                                                                        }}}};
+        mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
+                                                        {"database_name", config.mongo_dbname},
+                                                        {"queryable_fields_names", queryable_fields},
+                                                        {"asymmetric_tables", asymmetric_tables},
+                                                        {"permissions",
+                                                         {{"rules", nlohmann::json::object()},
+                                                          {
+                                                              "defaultRoles",
+                                                              default_roles,
+                                                          }}}};
     }
     else {
         sync_config = nlohmann::json{

@@ -290,6 +290,59 @@ private:
     }
 };
 
+class OwnedMixed : public Mixed {
+public:
+    explicit OwnedMixed(std::string&& str)
+        : m_owned_string(std::move(str))
+    {
+        m_type = int(type_String) + 1;
+        string_val = m_owned_string;
+    }
+
+    OwnedMixed(OwnedMixed&& m) noexcept
+        : Mixed(m)
+        , m_owned_string(std::move(m.m_owned_string))
+    {
+        if (is_type(type_String)) {
+            string_val = m_owned_string;
+        }
+    }
+
+    OwnedMixed(const OwnedMixed& m)
+        : Mixed(m)
+        , m_owned_string(m.m_owned_string)
+    {
+        if (is_type(type_String)) {
+            string_val = m_owned_string;
+        }
+    }
+
+    OwnedMixed& operator=(OwnedMixed&& m) noexcept
+    {
+        *static_cast<Mixed*>(this) = m;
+        if (is_type(type_String)) {
+            m_owned_string = std::move(m.m_owned_string);
+            string_val = m_owned_string;
+        }
+        return *this;
+    }
+
+    OwnedMixed& operator=(const OwnedMixed& m)
+    {
+        *static_cast<Mixed*>(this) = m;
+        if (is_type(type_String)) {
+            m_owned_string = m.m_owned_string;
+            string_val = m_owned_string;
+        }
+        return *this;
+    }
+
+    using Mixed::Mixed;
+
+private:
+    std::string m_owned_string;
+};
+
 // Implementation:
 
 inline Mixed::Mixed(int64_t v) noexcept
