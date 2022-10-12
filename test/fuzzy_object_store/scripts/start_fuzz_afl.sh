@@ -58,7 +58,7 @@ fi
 cmake -D REALM_AFL=ON \
       -D CMAKE_BUILD_TYPE=${build_mode} \
       -D CMAKE_C_COMPILER=afl-cc \
-      -D CMAKE_CXX_COMPILER=afl-cc \
+      -D CMAKE_CXX_COMPILER=afl-c++ \
       -D REALM_MAX_BPNODE_SIZE=100 \
       -D REALM_ENABLE_ENCRYPTION=ON \
       -G Ninja \
@@ -69,13 +69,7 @@ ninja -j 4 "${fuzz_test}"
 echo "Cleaning up the findings directory"
 
 FINDINGS_DIR="findings"
-echo ${fuzz_test}
-EXEC=$(find -name ${fuzz_test})
-
-if [[-z ${EXEC} ]]; then 
-    echo "Exec file not found"
-    exit -1;
-fi
+EXEC=$(find . -name ${fuzz_test})
 
 pkill afl-fuzz
 rm -rf "${FINDINGS_DIR}"
