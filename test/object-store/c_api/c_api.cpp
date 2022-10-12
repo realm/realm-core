@@ -3162,6 +3162,12 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(!realm_equals(strings.get(), strings3.get()));
                     });
                 }
+
+                SECTION("parse query for sets") {
+                    auto links = cptr_checked(realm_get_set(obj1.get(), foo_properties["link_set"]));
+                    CHECK(links);
+                    cptr_checked(realm_query_parse_for_set(links.get(), "TRUEPREDICATE", 0, nullptr));
+                }
             }
 
             SECTION("get/insert all property types") {
