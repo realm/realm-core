@@ -824,11 +824,34 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
+        Schema schema{{"TopLevel",
+                       {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                        {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                        {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
+                      {"TopLevel_embedded_obj",
+                       ObjectSchema::ObjectType::Embedded,
+                       {{"str_field", PropertyType::String | PropertyType::Nullable}}},
+                      {"Int PK",
+                       {
+                           {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                           {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                       }},
+                      {"String PK",
+                       {
+                           {"_id", PropertyType::String, Property::IsPrimary{true}},
+                           {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                       }},
+                      {"UUID PK",
+                       {
+                           {"_id", PropertyType::UUID, Property::IsPrimary{true}},
+                           {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                       }}};
+
         AppCreateConfig::FLXSyncRole role;
         role.name = "compensating_write_perms";
         role.read = true;
         role.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-        FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
+        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}, {role}};
         harness.emplace("flx_bad_query", server_schema);
     }
 
@@ -852,7 +875,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         return std::make_pair(std::move(error_future), std::move(fn));
     };
 
-    auto validate_sync_error = [&](const SyncError& sync_error, ObjectId invalid_obj,
+    auto validate_sync_error = [&](const SyncError& sync_error, Mixed expected_pk, const char* expected_object_name,
                                    const std::string& error_msg_fragment) {
         CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
         CHECK(sync_error.is_session_level_protocol_error());
@@ -860,9 +883,8 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK(sync_error.compensating_writes_info.size() == 1);
         CHECK(sync_error.server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
         auto write_info = sync_error.compensating_writes_info[0];
-        CHECK(write_info.primary_key.is_type(type_ObjectId));
-        CHECK(write_info.primary_key.get_object_id() == invalid_obj);
-        CHECK(write_info.object_name == "TopLevel");
+        CHECK(write_info.primary_key == expected_pk);
+        CHECK(write_info.object_name == expected_object_name);
         CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring(error_msg_fragment));
     };
 
@@ -872,11 +894,18 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_TopLevel");
 
-    SECTION("compensating write because of permission violation") {
+    auto create_subscription = [&](StringData table_name, auto make_query) {
+        auto table = realm->read_group().get_table(table_name);
         auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
+        new_query.insert_or_assign(make_query(Query(table), queryable_str_field));
         std::move(new_query).commit();
+    };
+
+    SECTION("compensating write because of permission violation") {
+        create_subscription("class_TopLevel", [](auto q, auto col) {
+            return q.equal(col, "bizz");
+        });
 
         CppContext c(realm);
         realm->begin_transaction();
@@ -889,7 +918,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         wait_for_download(*realm);
 
         validate_sync_error(
-            std::move(error_future).get(), invalid_obj,
+            std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
@@ -899,11 +928,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     }
 
     SECTION("compensating write because of permission violation with write on embedded object") {
-        auto queryable_str_field = table->get_column_key("queryable_str_field");
-        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(
-            Query(table).equal(queryable_str_field, "bizz").Or().equal(queryable_str_field, "foo"));
-        std::move(new_query).commit();
+        create_subscription("class_TopLevel", [](auto q, auto col) {
+            return q.equal(col, "bizz").Or().equal(col, "foo");
+        });
 
         CppContext c(realm);
         realm->begin_transaction();
@@ -924,7 +951,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         wait_for_upload(*realm);
         wait_for_download(*realm);
         validate_sync_error(
-            std::move(error_future).get(), invalid_obj,
+            std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
@@ -948,10 +975,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     }
 
     SECTION("compensating write for writing a top-level object that is out-of-view") {
-        auto queryable_str_field = table->get_column_key("queryable_str_field");
-        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-        std::move(new_query).commit();
+        create_subscription("class_TopLevel", [](auto q, auto col) {
+            return q.equal(col, "foo");
+        });
 
         CppContext c(realm);
         realm->begin_transaction();
@@ -972,7 +998,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        validate_sync_error(std::move(error_future).get(), invalid_obj,
+        validate_sync_error(std::move(error_future).get(), invalid_obj, "TopLevel",
                             "object is outside of the current query view");
 
         wait_for_advance(*realm);
@@ -992,6 +1018,70 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
         wait_for_upload(*realm);
         wait_for_download(*realm);
+    }
+
+    SECTION("compensating writes for each primary key type") {
+        SECTION("int") {
+            create_subscription("class_Int PK", [](auto q, auto col) {
+                return q.equal(col, "foo");
+            });
+            realm->begin_transaction();
+            realm->read_group().get_table("class_Int PK")->create_object_with_primary_key(123456);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            validate_sync_error(std::move(error_future).get(), 123456, "Int PK",
+                                "write to \"123456\" in table \"Int PK\" not allowed");
+        }
+
+        SECTION("short string") {
+            create_subscription("class_String PK", [](auto q, auto col) {
+                return q.equal(col, "foo");
+            });
+            realm->begin_transaction();
+            realm->read_group().get_table("class_String PK")->create_object_with_primary_key("short");
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            validate_sync_error(std::move(error_future).get(), "short", "String PK",
+                                "write to \"short\" in table \"String PK\" not allowed");
+        }
+
+        SECTION("long string") {
+            create_subscription("class_String PK", [](auto q, auto col) {
+                return q.equal(col, "foo");
+            });
+            realm->begin_transaction();
+            const char* pk = "long string which won't fit in the SSO buffer";
+            realm->read_group().get_table("class_String PK")->create_object_with_primary_key(pk);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            validate_sync_error(std::move(error_future).get(), pk, "String PK",
+                                util::format("write to \"%1\" in table \"String PK\" not allowed", pk));
+        }
+
+        SECTION("uuid") {
+            create_subscription("class_UUID PK", [](auto q, auto col) {
+                return q.equal(col, "foo");
+            });
+            realm->begin_transaction();
+            UUID pk("01234567-9abc-4def-9012-3456789abcde");
+            realm->read_group().get_table("class_UUID PK")->create_object_with_primary_key(pk);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            validate_sync_error(std::move(error_future).get(), pk, "UUID PK",
+                                util::format("write to \"UUID(%1)\" in table \"UUID PK\" not allowed", pk));
+        }
     }
 
     // Clear the Realm afterwards as we're reusing an app

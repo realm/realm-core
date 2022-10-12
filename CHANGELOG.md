@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
  
 ### Breaking changes
 * Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
