@@ -46,6 +46,8 @@
 #include <iostream>
 #include <stdexcept>
 
+using namespace std::string_literals;
+
 namespace realm::app {
 
 namespace {
@@ -164,14 +166,14 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         CppContext c(realm);
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", foo_obj_id},
-                                        {"queryable_str_field", std::string{"foo"}},
+                                        {"queryable_str_field", "foo"s},
                                         {"queryable_int_field", static_cast<int64_t>(5)},
-                                        {"non_queryable_field", std::string{"non queryable 1"}}}));
+                                        {"non_queryable_field", "non queryable 1"s}}));
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", bar_obj_id},
-                                        {"queryable_str_field", std::string{"bar"}},
+                                        {"queryable_str_field", "bar"s},
                                         {"queryable_int_field", static_cast<int64_t>(10)},
-                                        {"non_queryable_field", std::string{"non queryable 2"}}}));
+                                        {"non_queryable_field", "non queryable 2"s}}));
     });
 
 
@@ -336,7 +338,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                        std::any(AnyDict{{"_id", oid},
                                         {"queryable_str_field", str_field},
                                         {"queryable_int_field", int_field},
-                                        {"non_queryable_field", std::string{"non queryable 1"}},
+                                        {"non_queryable_field", "non queryable 1"s},
                                         {"list_of_ints_field", std::vector<std::any>{r1, r2, r3}},
                                         {"sum_of_list_field", sum}}));
         realm->commit_transaction();
@@ -782,19 +784,15 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
             error_promise->emplace_value(std::move(err));
         };
 
-        REQUIRE_THROWS_AS(
-            [&] {
-                auto realm = Realm::get_shared_realm(config);
-                CppContext c(realm);
-                realm->begin_transaction();
-                Object::create(
-                    c, realm, "TopLevel",
-                    std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_str_field", std::string{"foo"}}}));
-                realm->commit_transaction();
-            }(),
-            NoSubscriptionForWrite);
-
         auto realm = Realm::get_shared_realm(config);
+        CppContext c(realm);
+        realm->begin_transaction();
+        REQUIRE_THROWS_AS(
+            Object::create(c, realm, "TopLevel",
+                           std::any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_str_field", "foo"s}})),
+            NoSubscriptionForWrite);
+        realm->cancel_transaction();
+
         auto table = realm->read_group().get_table("class_TopLevel");
 
         REQUIRE(table->is_empty());
@@ -806,17 +804,16 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
-        CppContext c(realm);
         realm->begin_transaction();
         auto obj = Object::create(c, realm, "TopLevel",
                                   std::any(AnyDict{{"_id", ObjectId::gen()},
-                                                   {"queryable_str_field", std::string{"foo"}},
-                                                   {"embedded_obj", AnyDict{{"str_field", std::string{"bar"}}}}}));
+                                                   {"queryable_str_field", "foo"s},
+                                                   {"embedded_obj", AnyDict{{"str_field", "bar"s}}}}));
         realm->commit_transaction();
 
         realm->begin_transaction();
         auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
-        embedded_obj.set_property_value(c, "str_field", std::any{std::string{"baz"}});
+        embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
         realm->commit_transaction();
 
         wait_for_upload(*realm);
@@ -828,8 +825,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
     role.read = true;
-    role.write =
-        nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+    role.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
     FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
@@ -838,10 +834,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
         auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
             if (!error_promise) {
-                std::cerr << util::format(
-                                 "An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                 err.message)
-                          << std::endl;
+                util::format(std::cerr,
+                             "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
+                             err.message);
                 abort();
             }
             std::move(error_promise)->emplace_value(std::move(err));
@@ -881,7 +876,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->begin_transaction();
             auto invalid_obj = ObjectId::gen();
             Object::create(c, realm, "TopLevel",
-                           std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", std::string{"bizz"}}}));
+                           std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", "bizz"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -915,18 +910,17 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             CppContext c(realm);
             realm->begin_transaction();
             auto invalid_obj = ObjectId::gen();
-            auto obj =
-                Object::create(c, realm, "TopLevel",
-                               std::any(AnyDict{{"_id", invalid_obj},
-                                                {"queryable_str_field", std::string{"foo"}},
-                                                {"embedded_obj", AnyDict{{"str_field", std::string{"bar"}}}}}));
+            auto obj = Object::create(c, realm, "TopLevel",
+                                      std::any(AnyDict{{"_id", invalid_obj},
+                                                       {"queryable_str_field", "foo"s},
+                                                       {"embedded_obj", AnyDict{{"str_field", "bar"s}}}}));
             realm->commit_transaction();
             realm->begin_transaction();
-            obj.set_property_value(c, "queryable_str_field", std::any{std::string{"bizz"}});
+            obj.set_property_value(c, "queryable_str_field", std::any{"bizz"s});
             realm->commit_transaction();
             realm->begin_transaction();
             auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
-            embedded_obj.set_property_value(c, "str_field", std::any{std::string{"baz"}});
+            embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -945,7 +939,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                     "bar");
 
             realm->begin_transaction();
-            embedded_obj.set_property_value(c, "str_field", std::any{std::string{"baz"}});
+            embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -979,12 +973,12 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             Object::create(c, realm, "TopLevel",
                            std::any(AnyDict{
                                {"_id", valid_obj},
-                               {"queryable_str_field", std::string{"foo"}},
+                               {"queryable_str_field", "foo"s},
                            }));
             Object::create(c, realm, "TopLevel",
                            std::any(AnyDict{
                                {"_id", invalid_obj},
-                               {"queryable_str_field", std::string{"bar"}},
+                               {"queryable_str_field", "bar"s},
                            }));
             realm->commit_transaction();
 
@@ -1004,7 +998,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             Object::create(c, realm, "TopLevel",
                            std::any(AnyDict{
                                {"_id", ObjectId::gen()},
-                               {"queryable_str_field", std::string{"foo"}},
+                               {"queryable_str_field", "foo"s},
                            }));
             realm->commit_transaction();
 
@@ -1158,14 +1152,14 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
             realm->begin_transaction();
             Object::create(c, realm, "TopLevel",
                            std::any(AnyDict{{"_id", foo_obj_id},
-                                            {"queryable_str_field", std::string{"foo"}},
+                                            {"queryable_str_field", "foo"s},
                                             {"queryable_int_field", static_cast<int64_t>(5)},
-                                            {"non_queryable_field", std::string{"non queryable 1"}}}));
+                                            {"non_queryable_field", "non queryable 1"s}}));
             Object::create(c, realm, "TopLevel",
                            std::any(AnyDict{{"_id", bar_obj_id},
-                                            {"queryable_str_field", std::string{"bar"}},
+                                            {"queryable_str_field", "bar"s},
                                             {"queryable_int_field", static_cast<int64_t>(10)},
-                                            {"non_queryable_field", std::string{"non queryable 2"}}}));
+                                            {"non_queryable_field", "non queryable 2"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -1210,14 +1204,14 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         realm->begin_transaction();
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", foo_obj_id},
-                                        {"queryable_str_field", std::string{"foo"}},
+                                        {"queryable_str_field", "foo"s},
                                         {"queryable_int_field", static_cast<int64_t>(5)},
-                                        {"non_queryable_field", std::string{"non queryable 1"}}}));
+                                        {"non_queryable_field", "non queryable 1"s}}));
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", bar_obj_id},
-                                        {"queryable_str_field", std::string{"bar"}},
+                                        {"queryable_str_field", "bar"s},
                                         {"queryable_int_field", static_cast<int64_t>(10)},
-                                        {"non_queryable_field", std::string{"non queryable 2"}}}));
+                                        {"non_queryable_field", "non queryable 2"s}}));
         realm->commit_transaction();
 
         wait_for_upload(*realm);
@@ -1289,14 +1283,14 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         realm->begin_transaction();
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", foo_obj_id},
-                                        {"queryable_str_field", std::string{"foo"}},
+                                        {"queryable_str_field", "foo"s},
                                         {"queryable_int_field", static_cast<int64_t>(5)},
-                                        {"non_queryable_field", std::string{"non queryable 1"}}}));
+                                        {"non_queryable_field", "non queryable 1"s}}));
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{{"_id", bar_obj_id},
-                                        {"queryable_str_field", std::string{"bar"}},
+                                        {"queryable_str_field", "bar"s},
                                         {"queryable_int_field", static_cast<int64_t>(10)},
-                                        {"non_queryable_field", std::string{"non queryable 2"}}}));
+                                        {"non_queryable_field", "non queryable 2"s}}));
         realm->commit_transaction();
 
         wait_for_upload(*realm);
@@ -1816,10 +1810,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             realm->begin_transaction();
             CppContext c(realm);
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", std::string{"bar"}}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
         });
 
@@ -1839,11 +1831,9 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             realm->begin_transaction();
             CppContext c(realm);
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             CHECK_THROWS_WITH(
-                Object::create(c, realm, "Asymmetric",
-                               std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}})),
+                Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "bar"s}})),
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
                 "implemented'.");
             realm->commit_transaction();
@@ -1864,12 +1854,12 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             auto foo_obj_id = ObjectId::gen();
             realm->begin_transaction();
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             realm->commit_transaction();
             realm->begin_transaction();
             // Update `location` field.
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}}));
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -1955,8 +1945,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             realm->begin_transaction();
             CppContext c(realm);
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", ObjectId::gen()},
-                                            {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+                           std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
             realm->commit_transaction();
         });
 
@@ -1973,9 +1962,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CppContext c(realm);
             auto foo_obj_id = ObjectId::gen();
             realm->begin_transaction();
-            Object::create(
-                c, realm, "Asymmetric",
-                std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+            Object::create(c, realm, "Asymmetric",
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
             realm->commit_transaction();
             // Update embedded field to `null`.
             realm->begin_transaction();
@@ -1984,9 +1972,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             realm->commit_transaction();
             // Update embedded field again to a new value.
             realm->begin_transaction();
-            Object::create(
-                c, realm, "Asymmetric",
-                std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"bar"}}}}}));
+            Object::create(c, realm, "Asymmetric",
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", "bar"s}}}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -2053,9 +2040,9 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
             CppContext c(realm);
             realm->begin_transaction();
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", std::string{"bar"}}}));
+                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
