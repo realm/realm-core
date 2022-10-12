@@ -822,12 +822,18 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
 }
 
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
-    AppCreateConfig::FLXSyncRole role;
-    role.name = "compensating_write_perms";
-    role.read = true;
-    role.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-    FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
-    FLXSyncTestHarness harness("flx_bad_query", server_schema);
+    static std::optional<FLXSyncTestHarness> harness;
+    if (!harness) {
+        AppCreateConfig::FLXSyncRole role;
+        role.name = "compensating_write_perms";
+        role.read = true;
+        role.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+        FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
+        harness.emplace("flx_bad_query", server_schema);
+    }
+
+    create_user_and_log_in(harness->app());
+    auto user = harness->app()->current_user();
 
     auto make_error_handler = [] {
         auto [error_promise, error_future] = util::make_promise_future<SyncError>();
@@ -839,7 +845,8 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                              err.message);
                 abort();
             }
-            std::move(error_promise)->emplace_value(std::move(err));
+            error_promise->emplace_value(std::move(err));
+            error_promise.reset();
         };
 
         return std::make_pair(std::move(error_future), std::move(fn));
@@ -859,152 +866,145 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring(error_msg_fragment));
     };
 
+    SyncTestFile config(user, harness->schema(), SyncConfig::FLXSyncEnabled{});
+    auto&& [error_future, err_handler] = make_error_handler();
+    config.sync_config->error_handler = err_handler;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+
     SECTION("compensating write because of permission violation") {
-        harness.do_with_new_user([&](auto user) {
-            SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            auto&& [error_future, err_handler] = make_error_handler();
-            config.sync_config->error_handler = err_handler;
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
+        std::move(new_query).commit();
 
-            auto realm = Realm::get_shared_realm(config);
-            auto table = realm->read_group().get_table("class_TopLevel");
-            auto queryable_str_field = table->get_column_key("queryable_str_field");
-            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-            new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
-            std::move(new_query).commit();
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto invalid_obj = ObjectId::gen();
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", "bizz"s}}));
+        realm->commit_transaction();
 
-            CppContext c(realm);
-            realm->begin_transaction();
-            auto invalid_obj = ObjectId::gen();
-            Object::create(c, realm, "TopLevel",
-                           std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", "bizz"s}}));
-            realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
+        validate_sync_error(
+            std::move(error_future).get(), invalid_obj,
+            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            validate_sync_error(
-                std::move(error_future).get(), invalid_obj,
-                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+        wait_for_advance(*realm);
 
-            wait_for_advance(*realm);
-
-            auto top_level_table = realm->read_group().get_table("class_TopLevel");
-            REQUIRE(top_level_table->is_empty());
-        });
+        auto top_level_table = realm->read_group().get_table("class_TopLevel");
+        REQUIRE(top_level_table->is_empty());
     }
 
     SECTION("compensating write because of permission violation with write on embedded object") {
-        harness.do_with_new_user([&](auto user) {
-            SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            auto&& [error_future, err_handler] = make_error_handler();
-            config.sync_config->error_handler = err_handler;
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(
+            Query(table).equal(queryable_str_field, "bizz").Or().equal(queryable_str_field, "foo"));
+        std::move(new_query).commit();
 
-            auto realm = Realm::get_shared_realm(config);
-            auto table = realm->read_group().get_table("class_TopLevel");
-            auto queryable_str_field = table->get_column_key("queryable_str_field");
-            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-            new_query.insert_or_assign(
-                Query(table).equal(queryable_str_field, "bizz").Or().equal(queryable_str_field, "foo"));
-            std::move(new_query).commit();
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto invalid_obj = ObjectId::gen();
+        auto obj = Object::create(c, realm, "TopLevel",
+                                  std::any(AnyDict{{"_id", invalid_obj},
+                                                   {"queryable_str_field", "foo"s},
+                                                   {"embedded_obj", AnyDict{{"str_field", "bar"s}}}}));
+        realm->commit_transaction();
+        realm->begin_transaction();
+        obj.set_property_value(c, "queryable_str_field", std::any{"bizz"s});
+        realm->commit_transaction();
+        realm->begin_transaction();
+        auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
+        embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
+        realm->commit_transaction();
 
-            CppContext c(realm);
-            realm->begin_transaction();
-            auto invalid_obj = ObjectId::gen();
-            auto obj = Object::create(c, realm, "TopLevel",
-                                      std::any(AnyDict{{"_id", invalid_obj},
-                                                       {"queryable_str_field", "foo"s},
-                                                       {"embedded_obj", AnyDict{{"str_field", "bar"s}}}}));
-            realm->commit_transaction();
-            realm->begin_transaction();
-            obj.set_property_value(c, "queryable_str_field", std::any{"bizz"s});
-            realm->commit_transaction();
-            realm->begin_transaction();
-            auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
-            embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
-            realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+        validate_sync_error(
+            std::move(error_future).get(), invalid_obj,
+            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-            validate_sync_error(
-                std::move(error_future).get(), invalid_obj,
-                util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+        wait_for_advance(*realm);
 
-            wait_for_advance(*realm);
+        obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
+        embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
+        REQUIRE(util::any_cast<std::string&&>(obj.get_property_value<std::any>(c, "queryable_str_field")) == "foo");
+        REQUIRE(util::any_cast<std::string&&>(embedded_obj.get_property_value<std::any>(c, "str_field")) == "bar");
 
-            obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
-            embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
-            REQUIRE(util::any_cast<std::string&&>(obj.get_property_value<std::any>(c, "queryable_str_field")) ==
-                    "foo");
-            REQUIRE(util::any_cast<std::string&&>(embedded_obj.get_property_value<std::any>(c, "str_field")) ==
-                    "bar");
+        realm->begin_transaction();
+        embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
+        realm->commit_transaction();
 
-            realm->begin_transaction();
-            embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
-            realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
-            wait_for_advance(*realm);
-            obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
-            embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
-            REQUIRE(util::any_cast<std::string&&>(embedded_obj.get_property_value<std::any>(c, "str_field")) ==
-                    "baz");
-        });
+        wait_for_advance(*realm);
+        obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any(invalid_obj));
+        embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
+        REQUIRE(embedded_obj.get_column_value<StringData>("str_field") == "baz");
     }
 
     SECTION("compensating write for writing a top-level object that is out-of-view") {
-        harness.do_with_new_user([&](auto user) {
-            SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            auto&& [error_future, err_handler] = make_error_handler();
-            config.sync_config->error_handler = err_handler;
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+        std::move(new_query).commit();
 
-            auto realm = Realm::get_shared_realm(config);
-            auto table = realm->read_group().get_table("class_TopLevel");
-            auto queryable_str_field = table->get_column_key("queryable_str_field");
-            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-            new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-            std::move(new_query).commit();
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto valid_obj = ObjectId::gen();
+        auto invalid_obj = ObjectId::gen();
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{
+                           {"_id", valid_obj},
+                           {"queryable_str_field", "foo"s},
+                       }));
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{
+                           {"_id", invalid_obj},
+                           {"queryable_str_field", "bar"s},
+                       }));
+        realm->commit_transaction();
 
-            CppContext c(realm);
-            realm->begin_transaction();
-            auto valid_obj = ObjectId::gen();
-            auto invalid_obj = ObjectId::gen();
-            Object::create(c, realm, "TopLevel",
-                           std::any(AnyDict{
-                               {"_id", valid_obj},
-                               {"queryable_str_field", "foo"s},
-                           }));
-            Object::create(c, realm, "TopLevel",
-                           std::any(AnyDict{
-                               {"_id", invalid_obj},
-                               {"queryable_str_field", "bar"s},
-                           }));
-            realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
+        validate_sync_error(std::move(error_future).get(), invalid_obj,
+                            "object is outside of the current query view");
 
-            validate_sync_error(std::move(error_future).get(), invalid_obj,
-                                "object is outside of the current query view");
+        wait_for_advance(*realm);
 
-            wait_for_advance(*realm);
+        auto top_level_table = realm->read_group().get_table("class_TopLevel");
+        REQUIRE(top_level_table->size() == 1);
+        REQUIRE(top_level_table->get_object_with_primary_key(valid_obj));
 
-            auto top_level_table = realm->read_group().get_table("class_TopLevel");
-            REQUIRE(top_level_table->size() == 1);
-            REQUIRE(top_level_table->get_object_with_primary_key(valid_obj));
+        // Verify that a valid object afterwards does not produce an error
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{
+                           {"_id", ObjectId::gen()},
+                           {"queryable_str_field", "foo"s},
+                       }));
+        realm->commit_transaction();
 
-            realm->begin_transaction();
-            Object::create(c, realm, "TopLevel",
-                           std::any(AnyDict{
-                               {"_id", ObjectId::gen()},
-                               {"queryable_str_field", "foo"s},
-                           }));
-            realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+    }
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-        });
+    // Clear the Realm afterwards as we're reusing an app
+    realm->begin_transaction();
+    table->clear();
+    realm->commit_transaction();
+    wait_for_upload(*realm);
+    realm.reset();
+
+    // Add new sections before this
+    SECTION("teardown") {
+        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
+        harness.reset();
     }
 }
 
