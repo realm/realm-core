@@ -461,9 +461,12 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
-    alloc.update_reader_view(new_file_size, [&]() {
-        db->refresh_encrypted_mappings(VersionID{new_read_lock.m_version, new_read_lock.m_reader_idx}, alloc);
-    });
+    {
+        std::lock_guard<std::recursive_mutex> lock_guard(db->m_mutex);
+        alloc.update_reader_view(new_file_size, [&]() {
+            db->refresh_encrypted_mappings(VersionID{new_read_lock.m_version, new_read_lock.m_reader_idx}, alloc);
+        });
+    }
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;
     ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);

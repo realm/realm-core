@@ -548,6 +548,7 @@ private:
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept;
 
+    // Caller must hold DB::m_mutex
     void refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept;
 
     /// return true if write transaction can commence, false otherwise.
@@ -609,8 +610,7 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {
-};
+struct DB::BadVersion : std::exception {};
 
 inline bool DB::is_attached() const noexcept
 {

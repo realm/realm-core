@@ -111,7 +111,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-
+    std::lock_guard<std::recursive_mutex> lock(db->m_mutex);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version,
                   [_db, rli, alloc]() {
                       _db->refresh_encrypted_mappings(VersionID{rli.m_version, rli.m_reader_idx}, *alloc);

@@ -2203,10 +2203,7 @@ TEST(Shared_EncryptionKeyCheck)
                    std::string(e.what()).find("Realm file initial open failed: Invalid mnemonic") !=
                        std::string::npos);
 
-    CHECK_THROW_EX(DB::create(path, false, DBOptions(crypt_key(true))), std::runtime_error,
-                   std::string(e.what()).find(util::format(
-                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
-                       std::string::npos);
+    CHECK_NOTHROW(DB::create(path, false, DBOptions(crypt_key(true))));
 }
 
 // opposite - if opened unencrypted, attempt to share it encrypted
@@ -2233,17 +2230,6 @@ NONCONCURRENT_TEST(Shared_EncryptionKeyCheck_3)
     memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     DBRef sg = DB::create(path, false, DBOptions(first_key));
-
-    // No more than one DBRef instance is allowed per process
-    CHECK_THROW_EX(DB::create(path, false, DBOptions(second_key)), std::runtime_error,
-                   std::string(e.what()).find(util::format(
-                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
-                       std::string::npos);
-
-    CHECK_THROW_EX(DB::create(path, false, DBOptions(first_key)), std::runtime_error,
-                   std::string(e.what()).find(util::format(
-                       "%1: Opening more than one instance of a DB is not supported when using encryption", path)) !=
-                       std::string::npos);
 
     int pid = test_util::fork_and_update_mappings();
 

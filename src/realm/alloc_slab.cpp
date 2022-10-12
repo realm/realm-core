@@ -1266,6 +1266,10 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         Array top_array(*this), free_positions(*this), free_lengths(*this);
         top_array.init_from_ref(read_lock.top_ref);
+        if (top_array.size() <= Group::s_free_pos_ndx) {
+            // A file on streaming format has no freelist info.
+            continue;
+        }
         REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
                         read_lock.top_ref, read_lock.version);
         REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,

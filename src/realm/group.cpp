@@ -594,7 +594,7 @@ void Group::update_num_objects()
 #endif // REALM_METRICS
 }
 
-
+// Caller must hold any mutex needed for the 'refresh_encrypted_pages' parameter
 void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
                           util::UniqueFunction<void()> refresh_encrypted_pages)
 {

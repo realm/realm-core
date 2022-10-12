@@ -1186,14 +1186,15 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
 #else
                 uint64_t pid = getpid();
 #endif
-
-                if (m_key && info->session_initiator_pid == pid) {
-                    // Not supported because we use process shared encrypted mappings.
-                    // Caching per process should be handled by the RealmCoordinator.
-                    throw std::runtime_error(util::format(
-                        "%1: Opening more than one instance of a DB is not supported when using encryption (pid: %2)",
-                        path, pid));
-                }
+                /*
+                                if (m_key && info->session_initiator_pid == pid) {
+                                    // Not supported because we use process shared encrypted mappings.
+                                    // Caching per process should be handled by the RealmCoordinator.
+                                    throw std::runtime_error(util::format(
+                                        "%1: Opening more than one instance of a DB is not supported when using
+                   encryption (pid: %2)", path, pid));
+                                }
+                */
                 // We need per session agreement among all participants on the
                 // target Realm file format. From a technical perspective, the
                 // best way to ensure that, would be to require a bumping of the
@@ -1516,12 +1517,13 @@ void DB::release_all_read_locks() noexcept
     REALM_ASSERT(m_transaction_count == 0);
 }
 
+// caller must hold DB::m_mutex
 void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 {
     if (m_key) {
         version_type from;
         {
-            std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_last_seen_version
+            // No longer: std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_last_seen_version
             if (!m_last_encryption_page_reader) {
                 alloc.refresh_all_encrypted_pages();
                 m_last_encryption_page_reader = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
@@ -1537,7 +1539,8 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 
         alloc.refresh_pages_for_versions(read_locks);
 
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_last_encryption_page_reader
+        // No longer: std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on
+        // m_last_encryption_page_reader
         auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full);
         m_version_manager->release_read_lock(*m_last_encryption_page_reader);
         m_last_encryption_page_reader = tmp_rl;

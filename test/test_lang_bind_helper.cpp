@@ -2344,8 +2344,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -3158,7 +3157,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
     auto b_col = tb->get_column_keys()[0];
     TableView tv = ta->where().greater(col, 100).find_all();
     const auto wait_start = std::chrono::steady_clock::now();
-    std::chrono::seconds max_wait_seconds = std::chrono::seconds(25);
+    std::chrono::seconds max_wait_seconds = std::chrono::seconds(250);
     while (tc->size() == 0) {
         auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();

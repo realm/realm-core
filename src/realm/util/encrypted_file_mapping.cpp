@@ -249,6 +249,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 
         if (bytes_read == 0)
             return false;
+        REALM_ASSERT(bytes_read == block_size);
 
         iv_table& iv = get_iv_table(fd, pos);
         if (iv.iv1 == 0) {
@@ -276,18 +277,22 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 // old hmacs that don't go with this data. ftruncate() is
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
-                for (ssize_t i = 0; i < bytes_read; ++i) {
+                ssize_t i;
+                for (i = 0; i < bytes_read; ++i) {
                     if (m_rw_buffer[i] != 0) {
-                        if (--retries_left == 0) {
-                            throw DecryptionFailed();
-                        }
-                        else {
-                            millisleep(47); // a small prime
-                            continue;
-                        }
+                        break;
                     }
                 }
-                return false;
+                if (i != bytes_read) {
+                    // at least one byte wasn't zero
+                    if (--retries_left == 0) {
+                        throw DecryptionFailed();
+                    }
+                    else {
+                        millisleep(47); // a small prime
+                        continue;       // re-read the data and retry all checks
+                    }
+                }
             }
         }
 
