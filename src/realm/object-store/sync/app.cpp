@@ -588,7 +588,8 @@ void App::log_in_with_credentials(
                [completion = std::move(completion), credentials, linking_user,
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code, error->message);
+                       self->log("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                 error->message);
                        return completion(nullptr, std::move(error));
                    }
 
@@ -1051,20 +1052,24 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
         query_stg += "]";
         log("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name2, query_stg);
     }
-    auto handler = [self = shared_from_this(), name = name, service_name = service_name2, completion = std::move(completion)](const Response& response) {
+    auto handler = [self = shared_from_this(), name = name, service_name = service_name2,
+                    completion = std::move(completion)](const Response& response) {
         if (auto error = AppUtils::check_for_errors(response)) {
-            self->log("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name, response.http_status_code, error->message);
+            self->log("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
+                      response.http_status_code, error->message);
             return completion(util::none, error);
         }
         util::Optional<Bson> body_as_bson;
         try {
             body_as_bson = bson::parse(response.body);
             if (self->would_log()) {
-                self->log("App: call_function: %1 service_name: %2 - results: %3", name, service_name, body_as_bson ? body_as_bson->to_string() : "<none>");
+                self->log("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
+                          body_as_bson ? body_as_bson->to_string() : "<none>");
             }
         }
         catch (const std::exception& e) {
-            self->log("App: call_function: %1 service_name: %2 - error parsing result: %3", name, service_name, e.what());
+            self->log("App: call_function: %1 service_name: %2 - error parsing result: %3", name, service_name,
+                      e.what());
             return completion(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         };
         completion(std::move(body_as_bson), util::none);
