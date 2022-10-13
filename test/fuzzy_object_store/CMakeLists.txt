@@ -1,11 +1,15 @@
 set(TEST_AFL_SOURCES
-    object_store_afl.cpp
-    fuzz_object_store.cpp
+    afl_runner.cpp
+    fuzz_engine.cpp
+    fuzz_object.cpp
+    fuzz_configurator.cpp
 ) # TEST_AFL_SOURCES_OBJECT_STORE
 
 set(TEST_LIBFUZZER_SOURCES
-    libfuzzer_object_store_entry.cpp
-    fuzz_object_store.cpp
+    libfuzzer_runner.cpp
+    fuzz_engine.cpp
+    fuzz_object.cpp
+    fuzz_configurator.cpp
 ) # TEST_LIBFUZZER_SOURCES_OBJECT_STORE
 
 file(GLOB AFL_RUN_SCRIPTS
@@ -22,10 +26,10 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testcases)
 file(COPY ${AFL_SEEDS}
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/testcases)
 
-add_executable(fuzz-object-store ${TEST_AFL_SOURCES})
-target_link_libraries(fuzz-object-store TestUtil Storage ObjectStore)
+add_executable(afl-realm-fuzz ${TEST_AFL_SOURCES})
+target_link_libraries(afl-realm-fuzz TestUtil Storage ObjectStore)
 
 if(REALM_LIBFUZZER)
-    add_executable(realm-libfuzzer-object-store ${TEST_LIBFUZZER_SOURCES})
-    target_link_libraries(rrealm-libfuzzer-object-store TestUtil Storage ObjectStore)
+    add_executable(libfuzz-realm ${TEST_LIBFUZZER_SOURCES})
+    target_link_libraries(libfuzz-realm TestUtil Storage ObjectStore)
 endif()

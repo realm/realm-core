@@ -15,16 +15,9 @@
  * limitations under the License.
  *
  **************************************************************************/
+#include "fuzz_engine.hpp"
 
-#ifndef REALM_FUZZ_GROUP_HPP
-#define REALM_FUZZ_GROUP_HPP
-
-#include <string>
-#include <realm/group.hpp>
-#include <realm/util/optional.hpp>
-
-int run_fuzzy_object_store(int argc, const char* argv[]);
-void parse_and_apply_instructions_object_store(std::string& in, const std::string& path, std::ostream* log);
-
-
-#endif
+int main(int argc, const char* argv[])
+{
+    return run_fuzz_engine(argc, argv);
+}

@@ -6,7 +6,7 @@ BUILD_DIR="build.object.store.fuzzer"
 
 build_mode="Release"
 num_fuzzers="1"
-fuzz_test="fuzz-object-store"
+fuzz_test="afl-realm-fuzz"
 
 
 if [ "$#" -ne 2 ]; then
@@ -79,7 +79,7 @@ mkdir -p "${FINDINGS_DIR}"
 time_out="1000" # ms
 memory="1000" # MB
 
-echo "Goint to fuzz: ${PWD}/${EXEC}"
+echo "Going to fuzz: ${PWD}/${EXEC}"
 
 # if we have only one fuzzer
 if [ "${num_fuzzers}" -eq 1 ]; then

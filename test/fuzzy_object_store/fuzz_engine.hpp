@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * Copyright 2016 Realm Inc.
+ * Copyright 2022 Realm Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,16 @@
  *
  **************************************************************************/
 
-#include <realm/db.hpp>
-#include "../fuzz_group.hpp"
+#ifndef REALM_FUZZ_GROUP_HPP
+#define REALM_FUZZ_GROUP_HPP
+
+#include <string>
 #include <fstream>
 
-//__AFL_FUZZ_INIT();
+class FuzzEngine {
+public:
+    int run_fuzz_engine(int argc, const char* argv[]);
+    void do_fuzz(std::string& in, const std::string& path, std::ostream* log);
+};
 
-int main(int argc, const char* argv[])
-{
-    return run_fuzzy(argc, argv);
-}
+#endif
