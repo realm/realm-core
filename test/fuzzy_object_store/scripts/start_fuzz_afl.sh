@@ -54,12 +54,12 @@ cd "${BUILD_DIR}" || exit
 if [ -z ${REALM_MAX_BPNODE_SIZE} ]; then
     REALM_MAX_BPNODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
 fi
-#-D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
+
 cmake -D REALM_AFL=ON \
       -D CMAKE_BUILD_TYPE=${build_mode} \
       -D CMAKE_C_COMPILER=afl-cc \
       -D CMAKE_CXX_COMPILER=afl-c++ \
-      -D REALM_MAX_BPNODE_SIZE=100 \
+      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
       -D REALM_ENABLE_ENCRYPTION=ON \
       -G Ninja \
       ..
@@ -92,17 +92,17 @@ if [ "${num_fuzzers}" -eq 1 ]; then
 fi
 
 # start the fuzzers in parallel
-#echo "Starting $num_fuzzers fuzzers in parallel"
-#for i in $(seq 1 ${num_fuzzers}); do
-#    [[ $i -eq 1 ]] && flag="-M" || flag="-S"
-#    afl-fuzz -t "$time_out" \
-#        -m "$memory" \
-#        -i "${ROOT_DIR}/test/fuzzy_object_store/testcases" \
-#        -o "${FINDINGS_DIR}" \
-#        "${flag}" "fuzzer$i" \
-#        ${EXEC} @@ --name "fuzzer$i" >/dev/null 2>&1 &
-#done
+echo "Starting $num_fuzzers fuzzers in parallel"
+for i in $(seq 1 ${num_fuzzers}); do
+    [[ $i -eq 1 ]] && flag="-M" || flag="-S"
+   afl-fuzz -t "$time_out" \
+       -m "$memory" \
+       -i "${ROOT_DIR}/test/fuzzy_object_store/testcases" \
+       -o "${FINDINGS_DIR}" \
+       "${flag}" "fuzzer$i" \
+       ${EXEC} @@ --name "fuzzer$i" >/dev/null 2>&1 &
+done
 
-#echo
-#echo "Use 'afl-whatsup ${ROOT_DIR}/${BUILD_DIR}/${FINDINGS_DIR}' to check progress"
-#echo
+echo
+echo "Use 'afl-whatsup ${ROOT_DIR}/${BUILD_DIR}/${FINDINGS_DIR}' to check progress"
+echo
