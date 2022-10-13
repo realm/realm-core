@@ -180,7 +180,7 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
                 count = c;
             });
             if (count < expected_count) {
-                millisleep(500); // don't spam the server too much
+                millisleep(500); // slow down the number of retries
                 return false;
             }
             return true;
@@ -1724,7 +1724,7 @@ TEST_CASE("audit integration tests") {
                                               deleted = *count;
                                           });
                     if (deleted == 0) {
-                        millisleep(100); // don't spam the server too much
+                        millisleep(100); // slow down the number of retries
                     }
                 }
             };
@@ -1752,7 +1752,7 @@ TEST_CASE("audit integration tests") {
                             count = result.modified_count;
                         });
                     if (count == 0) {
-                        millisleep(100); // don't spam the server too much
+                        millisleep(100); // slow down the number of retries
                     }
                 }
             };
