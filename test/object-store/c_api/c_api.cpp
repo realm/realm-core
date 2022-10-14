@@ -4761,25 +4761,6 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     }
 }
 
-static const char* httpmethod_to_string(realm::app::HttpMethod method)
-{
-    using namespace realm::app;
-    switch (method) {
-        case HttpMethod::get:
-            return "GET";
-        case HttpMethod::post:
-            return "POST";
-        case HttpMethod::patch:
-            return "PATCH";
-        case HttpMethod::put:
-            return "PUT";
-        case HttpMethod::del:
-            return "DEL";
-        default:
-            return "UNKNOWN";
-    }
-}
-
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
 static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
