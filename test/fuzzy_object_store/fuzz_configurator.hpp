@@ -30,8 +30,11 @@ public:
     const realm::Realm::Config& get_config() const;
     FuzzObject& get_fuzzer();
     const std::string& get_realm_path() const;
+    bool is_stdin_filename_enabled() const;
     std::ostream* get_logger();
     State& get_state();
+    void set_state(const std::string& input);
+    const std::string& get_prefix() const;
 
 private:
     static void usage(const char* argv[]);
@@ -41,10 +44,11 @@ private:
 
     realm::Realm::Config m_config;
     std::string m_path;
-    std::string m_contents;
+    std::string m_prefix;
     std::ofstream m_log;
     bool m_logging{false};
     bool m_use_encryption{false};
+    bool m_file_names_from_stdin{false};
     FuzzObject& m_fuzzer;
     State m_state;
 };

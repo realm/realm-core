@@ -34,7 +34,13 @@ int FuzzEngine::run(int argc, const char* argv[])
     try {
         FuzzObject fuzzer;
         FuzzConfigurator cnf(fuzzer, argc, argv);
-        do_fuzz(cnf);
+
+        if (cnf.is_stdin_filename_enabled()) {
+            run_loop(cnf);
+        }
+        else {
+            do_fuzz(cnf);
+        }
     }
     catch (const EndOfFile&) {
     }
@@ -146,31 +152,21 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
     }
 }
 
-//    if (file_names_from_stdin) {
-//        std::string file_name;
-//
-//        std::cin >> file_name;
-//        while (std::cin) {
-//            std::ifstream in(prefix + file_name, std::ios::in | std::ios::binary);
-//            if (!in.is_open()) {
-//                std::cerr << "Could not open file for reading: " << (prefix + file_name) << std::endl;
-//            }
-//            else {
-//                std::cout << file_name << std::endl;
-//                realm::test_util::RealmPathInfo test_context{name};
-//                SHARED_GROUP_TEST_PATH(path);
-//
-//                std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-//                parse_and_apply_instructions(contents, path, log);
-//            }
-//
-//            std::cin >> file_name;
-//        }
-//    }
-//    else {
-
-//    auto path = "./fuzz_test.realm.lock";
-//        std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-//    log = &fs;
-
-//    }
+void FuzzEngine::run_loop(FuzzConfigurator& cnf)
+{
+    std::string file_name;
+    std::cin >> file_name;
+    while (std::cin) {
+        std::ifstream in(cnf.get_prefix() + file_name, std::ios::in | std::ios::binary);
+        if (!in.is_open()) {
+            std::cerr << "Could not open file for reading: " << (cnf.get_prefix() + file_name) << std::endl;
+        }
+        else {
+            std::cout << file_name << std::endl;
+            std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+            cnf.set_state(contents);
+            do_fuzz(cnf);
+            std::cin >> file_name;
+        }
+    }
+}

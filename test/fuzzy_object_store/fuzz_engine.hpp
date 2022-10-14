@@ -27,6 +27,9 @@ class FuzzEngine {
 public:
     int run(int argc, const char* argv[]);
     void do_fuzz(FuzzConfigurator&);
+
+private:
+    void run_loop(FuzzConfigurator&);
 };
 
 #endif

@@ -23,6 +23,7 @@
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[])
     : m_fuzzer(fuzzer)
 {
+    realm::disable_sync_to_disk();
     init(argc, argv);
     setup_realm_config();
     print_cnf();
@@ -30,7 +31,6 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* arg
 
 void FuzzConfigurator::setup_realm_config()
 {
-    realm::disable_sync_to_disk();
     m_config.path = m_path;
     m_config.schema_version = 0;
     if (m_use_encryption) {
@@ -56,6 +56,11 @@ FuzzObject& FuzzConfigurator::get_fuzzer()
 const std::string& FuzzConfigurator::get_realm_path() const
 {
     return m_path;
+}
+
+bool FuzzConfigurator::is_stdin_filename_enabled() const
+{
+    return m_file_names_from_stdin;
 }
 
 std::ostream* FuzzConfigurator::get_logger()
@@ -87,8 +92,7 @@ void FuzzConfigurator::init(int argc, const char* argv[])
 {
     std::string name = "fuzz-test";
     realm::test_util::RealmPathInfo test_context{name};
-    std::string prefix = "./";
-    bool file_names_from_stdin = false;
+    m_prefix = "./";
     SHARED_GROUP_TEST_PATH(path);
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
@@ -100,10 +104,10 @@ void FuzzConfigurator::init(int argc, const char* argv[])
             m_logging = true;
         }
         else if (arg == "--") {
-            file_names_from_stdin = true;
+            m_file_names_from_stdin = true;
         }
         else if (arg == "--prefix") {
-            prefix = argv[++i];
+            m_prefix = argv[++i];
         }
         else if (arg == "--name") {
             name = argv[++i];
@@ -112,21 +116,31 @@ void FuzzConfigurator::init(int argc, const char* argv[])
             file_arg = i;
         }
     }
-    if (!file_names_from_stdin && file_arg == size_t(-1)) {
+    if (!m_file_names_from_stdin && file_arg == size_t(-1)) {
         usage(argv);
     }
 
-    realm::disable_sync_to_disk();
-    std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
-    if (!in.is_open()) {
-        std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
-        throw;
-    }
-    std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
     m_path = path.c_str();
-    m_contents.swap(contents);
-    m_state = State{contents, 0};
+    if (!m_file_names_from_stdin) {
+        std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
+        if (!in.is_open()) {
+            std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
+            throw;
+        }
+        std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+        set_state(contents);
+    }
+}
+
+void FuzzConfigurator::set_state(const std::string& input)
+{
+    m_state = State{input, 0};
     m_use_encryption = m_fuzzer.get_next_token(m_state) % 2 == 0;
+}
+
+const std::string& FuzzConfigurator::get_prefix() const
+{
+    return m_prefix;
 }
 
 void FuzzConfigurator::print_cnf()
