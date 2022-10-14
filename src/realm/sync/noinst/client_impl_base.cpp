@@ -204,8 +204,10 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 void Connection::activate()
 {
     m_activated = true;
-    if (m_num_active_sessions == 0)
+    if (m_num_active_sessions == 0) {
+        REALM_ASSERT(m_on_idle != nullptr);
         m_on_idle->trigger();
+    }
     // We cannot in general connect immediately, because a prior failure to
     // connect may require a delay before reconnecting (see `m_reconnect_info`).
     initiate_reconnect_wait(); // Throws
@@ -233,8 +235,10 @@ void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == ConnectionState::disconnected)
+        if (m_activated && m_state == ConnectionState::disconnected) {
+            REALM_ASSERT(m_on_idle != nullptr);
             m_on_idle->trigger();
+        }
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {

@@ -528,9 +528,10 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // Note that a similar argument applies when two threads call
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
-    if (retrigger)
+    if (retrigger) {
         REALM_ASSERT(m_actualize_and_finalize != nullptr);
-    m_actualize_and_finalize->trigger();
+        m_actualize_and_finalize->trigger();
+    }
 }
 
 
@@ -556,9 +557,10 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // The conditional triggering needs to happen before releasing the
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
-    if (retrigger)
+    if (retrigger) {
         REALM_ASSERT(m_actualize_and_finalize != nullptr);
-    m_actualize_and_finalize->trigger();
+        m_actualize_and_finalize->trigger();
+    }
 }
 
 
