@@ -100,31 +100,34 @@ public:
         stop();
     }
 
-    void post(util::UniqueFunction<void()>&& handler) REQUIRES(!m_mutex) override
+    void post(util::UniqueFunction<void()>&& handler) override REQUIRES(!m_mutex)
     {
-        REALM_ASSERT(ensure_service_is_running());
-        m_service.post(std::move(handler));
+        if (!is_stopped()) {
+            m_service.post(std::move(handler));
+        }
     }
 
-    std::unique_ptr<EventLoopClient::Trigger> create_trigger(util::UniqueFunction<void()>&& handler)
-        REQUIRES(!m_mutex) override
+    std::unique_ptr<EventLoopClient::Trigger> create_trigger(util::UniqueFunction<void()>&& handler) override
+        REQUIRES(!m_mutex)
     {
-        REALM_ASSERT(ensure_service_is_running());
-        return std::make_unique<DefaultEventLoopClient::Trigger>(m_service, std::move(handler));
+        if (!is_stopped()) {
+            return std::make_unique<DefaultEventLoopClient::Trigger>(m_service, std::move(handler));
+        }
+        return nullptr;
     }
 
-    bool is_running() REQUIRES(!m_mutex) override
+    bool is_stopped() override REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
-        return m_state;
+        return m_state == State::Stopped;
     }
 
-    void start() REQUIRES(!m_mutex) override
+    void start() override REQUIRES(!m_mutex)
     {
-        ensure_service_is_running();
+        REALM_ASSERT(ensure_service_is_running());
     }
 
-    void stop() REQUIRES(!m_mutex) override;
+    void stop() override REQUIRES(!m_mutex);
 
     util::network::Service& get_service()
     {
@@ -132,21 +135,24 @@ public:
     }
 
 private:
-    std::unique_ptr<EventLoopClient::Timer> do_create_timer(std::chrono::milliseconds delay,
-                                                            util::UniqueFunction<void(std::error_code)>&& handler)
-        REQUIRES(!m_mutex) override
+    std::unique_ptr<EventLoopClient::Timer>
+    do_create_timer(std::chrono::milliseconds delay, util::UniqueFunction<void(std::error_code)>&& handler) override
+        REQUIRES(!m_mutex)
     {
-        REALM_ASSERT(ensure_service_is_running());
-        return Timer::async_wait(m_service, delay, std::move(handler));
+        if (!is_stopped()) {
+            return Timer::async_wait(m_service, delay, std::move(handler));
+        }
+        return nullptr;
     }
 
-    // If the service thread is not running, make sure it has been started
+    // If the service thread is not running, make sure it has been started. There
+    // must be something pending on the event loop at all times, otherwise, the
+    // service.run() thread will exit prematurely.
     bool ensure_service_is_running() REQUIRES(!m_mutex);
 
     //@{
     // Thread Helper Functions
     void thread_update_state(State new_state) REQUIRES(!m_mutex);
-    void thread_start_service() REQUIRES(!m_mutex);
     //@}
 
     util::CheckedMutex m_mutex;
@@ -177,11 +183,13 @@ public:
 
     std::shared_ptr<EventLoopClient> create_event_loop() override
     {
+        m_logger_ptr->trace("DefaultWebSocketFactory: creating event loop instance");
         m_event_loop = std::make_shared<DefaultEventLoopClient>(m_logger_ptr);
         return m_event_loop;
     }
 
-    DefaultWebSocketFactory(DefaultWebSocketFactory&&) = delete;
+    /// No default copy constructor
+    DefaultWebSocketFactory(DefaultWebSocketFactory&) = delete;
 
     std::unique_ptr<WebSocket> connect(WebSocketObserver* observer, Endpoint&& endpoint) override;
 

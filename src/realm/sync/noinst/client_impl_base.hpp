@@ -1124,6 +1124,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
 
 inline util::websocket::EventLoopClient& ClientImpl::get_event_loop() noexcept
 {
+    REALM_ASSERT(m_event_loop != nullptr);
     return *m_event_loop;
 }
 

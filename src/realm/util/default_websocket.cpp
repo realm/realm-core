@@ -380,42 +380,40 @@ void DefaultEventLoopClient::thread_update_state(State new_state)
     m_state = new_state;
 }
 
-void DefaultEventLoopClient::thread_start_service()
-{
-    thread_update_state(State::Running);
-    m_service.run(); // Throws
-    thread_update_state(State::Stopped);
-}
-
 // If the service thread is not running, make sure it has been started
 bool DefaultEventLoopClient::ensure_service_is_running()
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (m_state == State::NotStarted)
+    if (m_state == State::NotStarted) {
         if (m_thread == nullptr) {
-            m_logger.trace("DefaultEventLoopClient: Event loop thread started");
+            m_logger.trace("DefaultEventLoopClient: Starting event loop thread");
             m_thread = std::make_unique<std::thread>([this]() {
-                /*                if (g_binding_callback_thread_observer) {
-                                    g_binding_callback_thread_observer->did_create_thread();
-                                    auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                                        g_binding_callback_thread_observer->will_destroy_thread();
-                                    });
-                                    try {
-                                        thread_start_service();
-                                    }
-                                    catch (std::exception const& e) {
-                                        thread_update_state(State::Stopped);
-                                        g_binding_callback_thread_observer->handle_error(e);
-                                    }
-                                }
-                                else { */
-                thread_start_service();
-                //                }
+                /*if (g_binding_callback_thread_observer) {
+                    g_binding_callback_thread_observer->did_create_thread();
+                    auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+                        g_binding_callback_thread_observer->will_destroy_thread();
+                    });
+                    try {
+                        thread_update_state(State::Running);
+                        m_service.run(); // Throws
+                        thread_update_state(State::Stopped);
+                    }
+                    catch (std::exception const& e) {
+                        thread_update_state(State::Stopped);
+                        g_binding_callback_thread_observer->handle_error(e);
+                    }
+                }
+                else {*/
+                thread_update_state(State::Running);
+                m_service.run(); // Throws
+                thread_update_state(State::Stopped);
+                //}
             });
-            // Return true to indicate the thread is in the process of being started
-            // The state will be updated once the thread is up and running
-            return true;
         }
+        // Return true to indicate the thread is in the process of being started
+        // The state will be updated once the thread is up and running
+        return true;
+    }
     // Return true if the event loop is running
     return m_state == State::Running;
 }

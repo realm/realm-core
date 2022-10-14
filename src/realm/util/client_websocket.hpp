@@ -61,8 +61,8 @@ public:
     /// post events will do nothing.
     virtual void stop() = 0;
 
-    /// Return true if the event loop is currently running
-    virtual bool is_running() = 0;
+    /// Return true if the event loop has been stopped.
+    virtual bool is_stopped() = 0;
 
     /// \brief Submit a handler to be executed by the event loop thread.
     ///
@@ -214,8 +214,14 @@ public:
 
     virtual ~WebSocketFactory() = default;
 
+    /// Create a new event loop object for posting events onto the event loop. This will only be called
+    /// once per client instantiation, so a fresh event loop should be create with each call to this
+    /// function.
     virtual std::shared_ptr<EventLoopClient> create_event_loop() = 0;
 
+    /// Create a new websocket pointed to the server designated by endpoint. Any events that occur during
+    /// the execution of the websocket will call directly to the handlers provided by the observer. These
+    /// events are not posted to the event loop; it is up to the observer to post events on the event loop.
     virtual std::unique_ptr<WebSocket> connect(WebSocketObserver* observer, Endpoint&& endpoint) = 0;
 
 protected:

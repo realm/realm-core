@@ -389,8 +389,8 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = get_event_loop().is_running();
-    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
+    bool client_destroyed_with_event_loop_stopped = get_event_loop().is_stopped();
+    REALM_ASSERT_RELEASE(client_destroyed_with_event_loop_stopped);
 
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
@@ -478,12 +478,14 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
-    util::LockGuard lock{m_mutex};
-    if (!m_stopped)
-        return;
-    m_stopped = true;
-    m_wait_or_client_stopped_cond.notify_all();
+    {
+        util::LockGuard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+    }
     get_event_loop().stop();
+    m_wait_or_client_stopped_cond.notify_all();
     if (m_stop_promise) {
         m_stop_promise->emplace_value();
     }
@@ -495,7 +497,7 @@ void ClientImpl::start(std::optional<util::Promise<void>>&& promise)
     if (promise) {
         m_stop_promise.emplace(std::move(*promise));
     }
-    get_event_loop().start(); // Throws
+    get_event_loop().start();
 }
 
 
