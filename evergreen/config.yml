@@ -102,6 +102,10 @@ functions:
               set_cmake_var realm_vars REALM_TEST_DURATION STRING "${long_running_test_duration}"
           fi
 
+          if [ -n "${enable_llvm_coverage|}" ]; then
+              set_cmake_var relam_vars REALM_LLVM_COVERAGE BOOL On
+          fi
+
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
 
@@ -178,6 +182,10 @@ functions:
           set -o verbose
           CTEST=$(pwd)/${cmake_bindir}/ctest
 
+          if [ -n "${xcode_developer_dir}" ]; then
+              export DEVELOPER_DIR="${xcode_developer_dir}"
+          fi
+
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
@@ -193,6 +201,12 @@ functions:
           if [[ -n "${llvm_symbolizer}" ]]; then
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
           fi
+          if [[ -n "${enable_llvm_coverage}" ]]; then
+              LLVM_RUNNER="${llvm_runner|}"
+              LLVM_PROFDATA="${llvm_profdata|llvm-profdata}"
+              LLVM_COV="${llvm_cov|llvm-cov}"
+              export LLVM_PROFILE_FILE="${task_name}-%p.profraw"
+          fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_PROGRESS=1
@@ -206,6 +220,20 @@ functions:
 
           cd build
           $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
+
+          if [[ "${enable_llvm_coverage}" && -n "${test_executable_name|}" ]]; then
+              find . -name ${task_name}-\*.profraw -exec "$LLVM_RUNNER" "$LLVM_PROFDATA" merge -sparse -o ${task_name}.profdata {} +
+              if [[ ! -f ${task_name}.profdata ]]; then
+                echo "No coverage data found"
+                exit 0
+              fi
+              TEST_EXECUTABLE_NAME="$(find . -name "${test_executable_name}" -type f)"
+              "$LLVM_RUNNER" "$LLVM_COV" show \
+                  --instr-profile=${task_name}.profdata \
+                  --format=html \
+                  --object="$TEST_EXECUTABLE_NAME" \
+                  --output-dir=coverage_report_${task_name}
+          fi
 
   "upload test results":
   - command: attach.results
@@ -233,6 +261,42 @@ functions:
       content_type: text/text
       display_name: install baas output
       optional: true
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: '${realm_artifacts_aws_access_key}'
+        AWS_SECRET_ACCESS_KEY: '${realm_artifacts_aws_secret_key}'
+        AWS_DEFAULT_REGION: us-east-1
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ ! -d ./build/coverage_report_${task_name} ]]; then
+          echo "No coverage data found!"
+          echo "[]" > coverage_artifacts.json
+          exit 0
+        fi
+
+        cd build/coverage_report_${task_name}
+        aws s3 sync . \
+          "s3://realm-evergreen-artifacts/${project}/${branch_name}/${task_id}/${execution}/coverage_report/"
+
+        cat > ../../coverage_artifacts.json <<EOF
+        [
+          {
+            "name": "Coverage report",
+            "link": "https://s3.amazonaws.com/realm-evergreen-artifacts/${project}/${branch_name}/${task_id}/${execution}/coverage_report/index.html",
+            "visibility": "public"
+          }
+        ]
+        EOF
+
+  - command: attach.artifacts
+    params:
+      files:
+        - realm-core/coverage_artifacts.json
 
   "run hang analyzer":
   - command: shell.exec
@@ -529,9 +593,12 @@ tasks:
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
+    vars:
+      target_to_build: "CoreTests"
   - func: "run tests"
     vars:
       test_filter: CoreTests
+      test_executable_name: "realm-tests"
 
 - name: benchmark-common-tasks
   exec_timeout_secs: 1800
@@ -562,9 +629,12 @@ tasks:
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
+    vars:
+      target_to_build: "SyncTests"
   - func: "run tests"
     vars:
       test_filter: SyncTests
+      test_executable_name: "realm-sync-tests"
 
 - name: object-store-tests
   tags: [ "test_suite", "for_pull_requests" ]
@@ -573,6 +643,7 @@ tasks:
   - func: "compile"
     vars:
       target_to_build: "ObjectStoreTests"
+      test_executable_name: "realm-object-store-tests"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec
@@ -1006,6 +1077,24 @@ buildvariants:
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
+
+- name: macos-coverage
+  display_name: "MacOS 11 arm64 (Code Coverage)"
+  run_on: macos-1100-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: Release
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    llvm_runner: "xcrun"
+    enable_llvm_coverage: On
+  tasks:
+  - name: compile_test
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
