@@ -15,23 +15,37 @@
  * limitations under the License.
  *
  **************************************************************************/
+#ifndef FUZZ_CONFIG_HPP
+#define FUZZ_CONFIG_HPP
+
+#include "util.hpp"
+#include <realm/object-store/shared_realm.hpp>
 #include <string>
 #include <fstream>
 
+class FuzzObject;
 class FuzzConfigurator {
 public:
+    FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[]);
+    const realm::Realm::Config& get_config() const;
+    FuzzObject& get_fuzzer();
+    const std::string& get_realm_path() const;
+    std::ostream* get_logger();
+    State& get_state();
+
+private:
+    static void usage(const char* argv[]);
+    void init(int argc, const char* argv[]);
+    void print_cnf();
+    void setup_realm_config();
+
+    realm::Realm::Config m_config;
     std::string m_path;
     std::string m_contents;
     std::ofstream m_log;
-    bool logging{false};
-
-    static FuzzConfigurator& init(int argc, const char* argv[])
-    {
-        static FuzzConfigurator cnf{argc, argv};
-        return cnf;
-    }
-
-private:
-    FuzzConfigurator(int argc, const char* argv[]);
-    static void usage(const char* argv[]);
+    bool m_logging{false};
+    bool m_use_encryption{false};
+    FuzzObject& m_fuzzer;
+    State m_state;
 };
+#endif

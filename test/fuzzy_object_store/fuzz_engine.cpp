@@ -19,10 +19,7 @@
 #include "fuzz_engine.hpp"
 #include "fuzz_configurator.hpp"
 #include "fuzz_object.hpp"
-
-#include <realm.hpp>
-#include <realm/index_string.hpp>
-#include <realm/object-store/shared_realm.hpp>
+#include "util.hpp"
 
 #include <ctime>
 #include <cstdio>
@@ -30,144 +27,27 @@
 #include <iostream>
 
 using namespace realm;
-using namespace realm::util;
-
-#define TEST_FUZZ
-// #ifdef TEST_FUZZ
-//  Determines whether or not to run the shared group verify function
-//  after each transaction. This will find errors earlier but is expensive.
-#define REALM_VERIFY true
-
-#if REALM_VERIFY
-#define REALM_DO_IF_VERIFY(log, op)                                                                                  \
-    do {                                                                                                             \
-        if (log)                                                                                                     \
-            *log << #op << ";\n";                                                                                    \
-        op;                                                                                                          \
-    } while (false)
-#else
-#define REALM_DO_IF_VERIFY(log, owner)                                                                               \
-    do {                                                                                                             \
-    } while (false)
-#endif
-
-namespace {
-
-struct EndOfFile {};
-
-unsigned char get_next(State& s)
-{
-    if (s.pos == s.str.size()) {
-        throw EndOfFile{};
-    }
-    char byte = s.str[s.pos];
-    s.pos++;
-    return byte;
-}
-
-enum INS {
-    ADD_TABLE,
-    REMOVE_TABLE,
-    CREATE_OBJECT,
-    RENAME_COLUMN,
-    ADD_COLUMN,
-    REMOVE_COLUMN,
-    SET,
-    REMOVE_OBJECT,
-    REMOVE_RECURSIVE,
-    ADD_COLUMN_LINK,
-    ADD_COLUMN_LINK_LIST,
-    CLEAR_TABLE,
-    ADD_SEARCH_INDEX,
-    REMOVE_SEARCH_INDEX,
-    COMMIT,
-    ROLLBACK,
-    ADVANCE,
-    MOVE_LAST_OVER,
-    CLOSE_AND_REOPEN,
-    GET_ALL_COLUMN_NAMES,
-    CREATE_TABLE_VIEW,
-    COMPACT,
-    IS_NULL,
-    ENUMERATE_COLUMN,
-
-    ASYNC_WRITE,
-    ASYNC_CANCEL,
-    ASYNC_RUN,
-
-    COUNT
-};
-
-// You can use this variable to make a conditional breakpoint if you know that
-// a problem occurs after a certain amount of iterations.
-int iteration = 0;
-
-const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
 const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
-// Max number of rows in a table. Overridden only by create_object() and only in the case where
-// max_rows is not exceeded *prior* to executing add_empty_row.
-const size_t max_rows = 100000;
-
-} // anonymous namespace
-
-int FuzzEngine::run_fuzzy_engine(int argc, const char* argv[])
+int FuzzEngine::run(int argc, const char* argv[])
 {
-    auto& instance = FuzzConfigurator::init(argc, argv);
-    if (instance.logging) {
-        instance.m_log << "Going to fuzz shared_realm ... \n";
+    try {
+        FuzzObject fuzzer;
+        FuzzConfigurator cnf(fuzzer, argc, argv);
+        do_fuzz(cnf);
     }
-    auto logger = instance.logging ? &instance.m_log : nullptr;
-    do_fuzz(instance.m_contents, instance.m_path, logger);
+    catch (const EndOfFile&) {
+    }
     return 0;
 }
 
-void FuzzEngine::do_fuzz(std::string& in, const std::string& path, std::ostream* log)
+void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
 {
-    column_index = table_index = 0;
-
-    State s;
-    s.str = in;
-    s.pos = 0;
-
-    // const bool use_encryption = false;
-    const bool use_encryption = get_next(s) % 2 == 0;
-
-    struct TestConfig : public Realm::Config {
-        TestConfig(std::string local_path, bool use_encryption)
-        {
-            disable_sync_to_disk();
-            path = local_path;
-            schema_version = 0;
-            if (use_encryption) {
-                const char* key = get_encryption_key();
-                const char* i = key;
-                while (*i != '\0') {
-                    encryption_key.push_back(*i);
-                    i++;
-                }
-            }
-        }
-    };
-    TestConfig config{path, use_encryption};
-
-
-    if (log) {
-        *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
-        *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
-        *log << "// ----------------------------------------------------------------------\n";
-        std::string printable_key;
-        if (!use_encryption) {
-            printable_key = "nullptr";
-        }
-        else {
-            printable_key = std::string("\"") + config.encryption_key.data() + "\"";
-        }
-        *log << "const char* key = " << printable_key << ";\n";
-        *log << "\n";
-    }
-    auto shared_realm = Realm::get_shared_realm(config);
-    FuzzObject fuzz_object;
+    const auto path = cnf.get_realm_path();
+    auto log = cnf.get_logger();
+    auto& state = cnf.get_state();
+    auto& fuzzer = cnf.get_fuzzer();
+    auto shared_realm = Realm::get_shared_realm(cnf.get_config());
     std::vector<TableView> table_views;
 
     auto fetch_group = [shared_realm]() -> Group& {
@@ -177,95 +57,92 @@ void FuzzEngine::do_fuzz(std::string& in, const std::string& path, std::ostream*
         return shared_realm->read_group();
     };
 
-    try {
-        for (;;) {
-            char instr = get_next(s) % COUNT;
-            iteration++;
+    int iteration = 0;
 
-            // This can help when debugging
-            if (log) {
-                *log << iteration << " ";
-            }
+    for (;;) {
+        char instr = fuzzer.get_next_token(state) % COUNT;
+        iteration++;
 
-            Group& group = fetch_group();
-
-            if (instr == ADD_TABLE && group.size() < max_tables)
-                fuzz_object.create_table(group, log);
-
-            else if (instr == REMOVE_TABLE && group.size() > 0) {
-                fuzz_object.remove_table(group, log);
-            }
-            else if (instr == CLEAR_TABLE && group.size() > 0) {
-                fuzz_object.clear_table(group, log, s);
-            }
-            else if (instr == CREATE_OBJECT && group.size() > 0) {
-                fuzz_object.create_object(group, log, s);
-            }
-            else if (instr == ADD_COLUMN && group.size() > 0) {
-                fuzz_object.add_column(group, log, s);
-            }
-            else if (instr == REMOVE_COLUMN && group.size() > 0) {
-                fuzz_object.remove_column(group, log, s);
-            }
-            else if (instr == GET_ALL_COLUMN_NAMES && group.size() > 0) {
-                fuzz_object.get_all_column_names(group);
-            }
-            else if (instr == RENAME_COLUMN && group.size() > 0) {
-                fuzz_object.rename_column(group, log, s);
-            }
-            else if (instr == ADD_SEARCH_INDEX && group.size() > 0) {
-                fuzz_object.add_search_index(group, log, s);
-            }
-            else if (instr == REMOVE_SEARCH_INDEX && group.size() > 0) {
-                fuzz_object.remove_search_index(group, log, s);
-            }
-            else if (instr == ADD_COLUMN_LINK && group.size() >= 1) {
-                fuzz_object.add_column_link(group, log, s);
-            }
-            else if (instr == ADD_COLUMN_LINK_LIST && group.size() >= 2) {
-                fuzz_object.add_column_link_list(group, log, s);
-            }
-            else if (instr == SET && group.size() > 0) {
-                fuzz_object.set_obj(group, log, s);
-            }
-            else if (instr == REMOVE_OBJECT && group.size() > 0) {
-                fuzz_object.remove_obj(group, log, s);
-            }
-            else if (instr == REMOVE_RECURSIVE && group.size() > 0) {
-                fuzz_object.remove_recursive(group, log, s);
-            }
-            else if (instr == ENUMERATE_COLUMN && group.size() > 0) {
-                fuzz_object.enumerate_column(group, log, s);
-            }
-            else if (instr == COMMIT) {
-                fuzz_object.commit(shared_realm, log);
-            }
-            else if (instr == ROLLBACK) {
-                fuzz_object.rollback(shared_realm, group, log);
-            }
-            else if (instr == ADVANCE) {
-                fuzz_object.advance(group, log);
-            }
-            else if (instr == CLOSE_AND_REOPEN) {
-                fuzz_object.close_and_reopen(shared_realm, log, config);
-            }
-            else if (instr == CREATE_TABLE_VIEW && group.size() > 0) {
-                fuzz_object.create_table_view(group, log, s, table_views);
-            }
-            else if (instr == COMPACT) {
-            }
-            else if (instr == IS_NULL && group.size() > 0) {
-                fuzz_object.check_null(group, log, s);
-            }
-            else if (instr == ASYNC_WRITE && group.size() > 0) {
-                fuzz_object.async_write(shared_realm, log);
-            }
-            else if (instr == ASYNC_CANCEL) {
-                fuzz_object.async_cancel(shared_realm, group, log, s);
-            }
+        if (log) {
+            *log << iteration << " ";
         }
-    }
-    catch (const EndOfFile&) {
+
+        Group& group = fetch_group();
+
+        if (instr == ADD_TABLE && group.size() < max_tables)
+            fuzzer.create_table(group, log);
+
+        else if (instr == REMOVE_TABLE && group.size() > 0) {
+            fuzzer.remove_table(group, log, state);
+        }
+        else if (instr == CLEAR_TABLE && group.size() > 0) {
+            fuzzer.clear_table(group, log, state);
+        }
+        else if (instr == CREATE_OBJECT && group.size() > 0) {
+            fuzzer.create_object(group, log, state);
+        }
+        else if (instr == ADD_COLUMN && group.size() > 0) {
+            fuzzer.add_column(group, log, state);
+        }
+        else if (instr == REMOVE_COLUMN && group.size() > 0) {
+            fuzzer.remove_column(group, log, state);
+        }
+        else if (instr == GET_ALL_COLUMN_NAMES && group.size() > 0) {
+            fuzzer.get_all_column_names(group);
+        }
+        else if (instr == RENAME_COLUMN && group.size() > 0) {
+            fuzzer.rename_column(group, log, state);
+        }
+        else if (instr == ADD_SEARCH_INDEX && group.size() > 0) {
+            fuzzer.add_search_index(group, log, state);
+        }
+        else if (instr == REMOVE_SEARCH_INDEX && group.size() > 0) {
+            fuzzer.remove_search_index(group, log, state);
+        }
+        else if (instr == ADD_COLUMN_LINK && group.size() >= 1) {
+            fuzzer.add_column_link(group, log, state);
+        }
+        else if (instr == ADD_COLUMN_LINK_LIST && group.size() >= 2) {
+            fuzzer.add_column_link_list(group, log, state);
+        }
+        else if (instr == SET && group.size() > 0) {
+            fuzzer.set_obj(group, log, state);
+        }
+        else if (instr == REMOVE_OBJECT && group.size() > 0) {
+            fuzzer.remove_obj(group, log, state);
+        }
+        else if (instr == REMOVE_RECURSIVE && group.size() > 0) {
+            fuzzer.remove_recursive(group, log, state);
+        }
+        else if (instr == ENUMERATE_COLUMN && group.size() > 0) {
+            fuzzer.enumerate_column(group, log, state);
+        }
+        else if (instr == COMMIT) {
+            fuzzer.commit(shared_realm, log);
+        }
+        else if (instr == ROLLBACK) {
+            fuzzer.rollback(shared_realm, group, log);
+        }
+        else if (instr == ADVANCE) {
+            fuzzer.advance(group, log);
+        }
+        else if (instr == CLOSE_AND_REOPEN) {
+            fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
+        }
+        else if (instr == CREATE_TABLE_VIEW && group.size() > 0) {
+            fuzzer.create_table_view(group, log, state, table_views);
+        }
+        else if (instr == COMPACT) {
+        }
+        else if (instr == IS_NULL && group.size() > 0) {
+            fuzzer.check_null(group, log, state);
+        }
+        else if (instr == ASYNC_WRITE && group.size() > 0) {
+            fuzzer.async_write(shared_realm, log);
+        }
+        else if (instr == ASYNC_CANCEL) {
+            fuzzer.async_cancel(shared_realm, group, log, state);
+        }
     }
 }
 

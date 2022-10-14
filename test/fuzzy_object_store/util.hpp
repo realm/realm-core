@@ -16,9 +16,10 @@
  *
  **************************************************************************/
 
-#include <string>
+#ifndef FUZZ_UTIL_HPP
+#define FUZZ_UTIL_HPP
 
-namespace {
+#include <string>
 
 struct State {
     std::string str;
@@ -26,16 +27,6 @@ struct State {
 };
 
 struct EndOfFile {};
-
-unsigned char get_next(State& s)
-{
-    if (s.pos == s.str.size()) {
-        throw EndOfFile{};
-    }
-    char byte = s.str[s.pos];
-    s.pos++;
-    return byte;
-}
 
 enum INS {
     ADD_TABLE,
@@ -71,4 +62,23 @@ enum INS {
 };
 
 
-} // namespace
+#define TEST_FUZZ
+// #ifdef TEST_FUZZ
+//  Determines whether or not to run the shared group verify function
+//  after each transaction. This will find errors earlier but is expensive.
+#define REALM_VERIFY true
+
+#if REALM_VERIFY
+#define REALM_DO_IF_VERIFY(log, op)                                                                                  \
+    do {                                                                                                             \
+        if (log)                                                                                                     \
+            *log << #op << ";\n";                                                                                    \
+        op;                                                                                                          \
+    } while (false)
+#else
+#define REALM_DO_IF_VERIFY(log, owner)                                                                               \
+    do {                                                                                                             \
+    } while (false)
+#endif
+
+#endif

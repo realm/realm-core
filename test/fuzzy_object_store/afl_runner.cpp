@@ -19,5 +19,6 @@
 
 int main(int argc, const char* argv[])
 {
-    return run_fuzz_engine(argc, argv);
+    FuzzEngine fuzz_engine;
+    return fuzz_engine.run(argc, argv);
 }

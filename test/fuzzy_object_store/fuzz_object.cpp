@@ -17,139 +17,24 @@
  **************************************************************************/
 
 #include "fuzz_object.hpp"
+#include "util.hpp"
+
 #include <realm/group.hpp>
 #include <realm/data_type.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm.hpp>
+#include <realm/index_string.hpp>
 
-DataType FuzzObject::get_type(unsigned char c)
-{
-    DataType types[] = {type_Int, type_Bool, type_Float, type_Double, type_String, type_Binary, type_Timestamp};
+#include <utility>
 
-    unsigned char mod = c % (sizeof(types) / sizeof(DataType));
-    return types[mod];
-}
+using namespace realm;
+using namespace realm::util;
 
-const char* get_encryption_key()
-{
-#if REALM_ENABLE_ENCRYPTION
-    return "1234567890123456789012345678901123456789012345678901234567890123";
-#else
-    return nullptr;
-#endif
-}
-
-int64_t get_int64(State& s)
-{
-    int64_t v = 0;
-    for (size_t t = 0; t < 8; t++) {
-        unsigned char c = get_next(s);
-        *(reinterpret_cast<signed char*>(&v) + t) = c;
-    }
-    return v;
-}
-
-int32_t get_int32(State& s)
-{
-    int32_t v = 0;
-    for (size_t t = 0; t < 4; t++) {
-        unsigned char c = get_next(s);
-        *(reinterpret_cast<signed char*>(&v) + t) = c;
-    }
-    return v;
-}
-
-std::string create_string(size_t length)
-{
-    REALM_ASSERT_3(length, <, 256);
-    char buf[256] = {0};
-    for (size_t i = 0; i < length; i++)
-        buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, length};
-}
-
-std::pair<int64_t, int32_t> get_timestamp_values(State& s)
-{
-    int64_t seconds = get_int64(s);
-    int32_t nanoseconds = get_int32(s) % 1000000000;
-    // Make sure the values form a sensible Timestamp
-    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
-    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
-    const bool correct_timestamp = both_non_negative || both_non_positive;
-    if (!correct_timestamp) {
-        nanoseconds = -nanoseconds;
-    }
-    return {seconds, nanoseconds};
-}
-
-int table_index = 0;
-int column_index = 0;
-
-std::string create_column_name(DataType t)
-{
-    std::string str;
-    switch (t) {
-        case type_Int:
-            str = "int_";
-            break;
-        case type_Bool:
-            str = "bool_";
-            break;
-        case type_Float:
-            str = "float_";
-            break;
-        case type_Double:
-            str = "double_";
-            break;
-        case type_String:
-            str = "string_";
-            break;
-        case type_Binary:
-            str = "binary_";
-            break;
-        case type_Timestamp:
-            str = "date_";
-            break;
-        case type_Decimal:
-            str = "decimal_";
-            break;
-        case type_ObjectId:
-            str = "id_";
-            break;
-        case type_Link:
-            str = "link_";
-            break;
-        case type_TypedLink:
-            str = "typed_link_";
-            break;
-        case type_LinkList:
-            str = "link_list_";
-            break;
-        case type_UUID:
-            str = "uuid_";
-            break;
-        case type_Mixed:
-            str = "any_";
-            break;
-    }
-    return str + util::to_string(column_index++);
-}
-
-std::string create_table_name()
-{
-    std::string str = "Table_";
-    return str + util::to_string(table_index++);
-}
-
-std::string get_current_time_stamp()
-{
-    std::time_t t = std::time(nullptr);
-    const int str_size = 100;
-    char str_buffer[str_size] = {0};
-    std::strftime(str_buffer, str_size, "%c", std::localtime(&t));
-    return str_buffer;
-}
-
+// Max number of rows in a table. Overridden only by create_object() and only in the case where
+// max_rows is not exceeded *prior* to executing add_empty_row.
+const size_t max_rows = 100000;
+const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
 
 void FuzzObject::create_table(Group& group, std::ostream* log)
 {
@@ -160,10 +45,20 @@ void FuzzObject::create_table(Group& group, std::ostream* log)
     group.add_table(name);
 }
 
-void FuzzObject::remove_table(Group& group, std::ostream* log)
+unsigned char FuzzObject::get_next_token(State& s) const
+{
+    if (s.pos == s.str.size()) {
+        throw EndOfFile{};
+    }
+    char byte = s.str[s.pos];
+    s.pos++;
+    return byte;
+}
+
+void FuzzObject::remove_table(Group& group, std::ostream* log, State& s)
 {
     try {
-        TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+        TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
         if (log) {
             *log << "try { wt->remove_table(" << table_key
                  << "); }"
@@ -180,7 +75,7 @@ void FuzzObject::remove_table(Group& group, std::ostream* log)
 
 void FuzzObject::clear_table(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     if (log) {
         *log << "wt->get_table(" << table_key << ")->clear();\n";
     }
@@ -189,8 +84,8 @@ void FuzzObject::clear_table(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::create_object(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
-    size_t num_rows = get_next(s);
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
+    size_t num_rows = get_next_token(s);
     if (group.get_table(table_key)->size() + num_rows < max_rows) {
         if (log) {
             *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
@@ -203,11 +98,11 @@ void FuzzObject::create_object(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::add_column(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
-    DataType type = get_type(get_next(s));
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
+    DataType type = get_type(get_next_token(s));
     std::string name = create_column_name(type);
     // Mixed cannot be nullable. For other types, chose nullability randomly
-    bool nullable = (get_next(s) % 2 == 0);
+    bool nullable = (get_next_token(s) % 2 == 0);
     if (log) {
         *log << "wt->get_table(" << table_key << ")->add_column(DataType(" << int(type) << "), \"" << name << "\", "
              << (nullable ? "true" : "false") << ");";
@@ -220,11 +115,11 @@ void FuzzObject::add_column(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::remove_column(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto column_keys = t->get_column_keys();
     if (!column_keys.empty()) {
-        ColKey col = column_keys[get_next(s) % column_keys.size()];
+        ColKey col = column_keys[get_next_token(s) % column_keys.size()];
         if (log) {
             *log << "wt->get_table(" << table_key << ")->remove_column(" << col << ");\n";
         }
@@ -234,11 +129,11 @@ void FuzzObject::remove_column(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::rename_column(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto column_keys = t->get_column_keys();
     if (!column_keys.empty()) {
-        ColKey col = column_keys[get_next(s) % column_keys.size()];
+        ColKey col = column_keys[get_next_token(s) % column_keys.size()];
         std::string name = create_column_name(t->get_column_type(col));
         if (log) {
             *log << "wt->get_table(" << table_key << ")->rename_column(" << col << ", \"" << name << "\");\n";
@@ -249,11 +144,11 @@ void FuzzObject::rename_column(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::add_search_index(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto column_keys = t->get_column_keys();
     if (!column_keys.empty()) {
-        ColKey col = column_keys[get_next(s) % column_keys.size()];
+        ColKey col = column_keys[get_next_token(s) % column_keys.size()];
         bool supports_search_index = StringIndex::type_supported(t->get_column_type(col));
 
         if (supports_search_index) {
@@ -267,11 +162,11 @@ void FuzzObject::add_search_index(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::remove_search_index(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto column_keys = t->get_column_keys();
     if (!column_keys.empty()) {
-        ColKey col = column_keys[get_next(s) % column_keys.size()];
+        ColKey col = column_keys[get_next_token(s) % column_keys.size()];
         // We don't need to check if the column is of a type that is indexable or if it has index on or off
         // because Realm will just do a no-op at worst (no exception or assert).
         if (log) {
@@ -283,8 +178,8 @@ void FuzzObject::remove_search_index(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::add_column_link(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key_1 = group.get_table_keys()[get_next(s) % group.size()];
-    TableKey table_key_2 = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
+    TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t1 = group.get_table(table_key_1);
     TableRef t2 = group.get_table(table_key_2);
     std::string name = create_column_name(type_Link);
@@ -300,8 +195,8 @@ void FuzzObject::add_column_link(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::add_column_link_list(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key_1 = group.get_table_keys()[get_next(s) % group.size()];
-    TableKey table_key_2 = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
+    TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t1 = group.get_table(table_key_1);
     TableRef t2 = group.get_table(table_key_2);
     std::string name = create_column_name(type_LinkList);
@@ -317,12 +212,12 @@ void FuzzObject::add_column_link_list(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto all_col_keys = t->get_column_keys();
     if (!all_col_keys.empty() && t->size() > 0) {
-        ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
-        size_t row = get_next(s) % t->size();
+        ColKey col = all_col_keys[get_next_token(s) % all_col_keys.size()];
+        size_t row = get_next_token(s) % t->size();
         DataType type = t->get_column_type(col);
         Obj obj = t->get_object(row);
         if (log) {
@@ -330,7 +225,7 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
         }
 
         // With equal probability, either set to null or to a value
-        if (get_next(s) % 2 == 0 && t->is_nullable(col)) {
+        if (get_next_token(s) % 2 == 0 && t->is_nullable(col)) {
             if (type == type_Link) {
                 if (log) {
                     *log << "obj.set(" << col << ", null_key);\n";
@@ -346,21 +241,21 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
         }
         else {
             if (type == type_String) {
-                std::string str = create_string(get_next(s));
+                std::string str = create_string(get_next_token(s));
                 if (log) {
                     *log << "obj.set(" << col << ", \"" << str << "\");\n";
                 }
                 obj.set(col, StringData(str));
             }
             else if (type == type_Binary) {
-                std::string str = create_string(get_next(s));
+                std::string str = create_string(get_next_token(s));
                 if (log) {
                     *log << "obj.set<Binary>(" << col << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
                 }
                 obj.set<Binary>(col, BinaryData(str));
             }
             else if (type == type_Int) {
-                bool add_int = get_next(s) % 2 == 0;
+                bool add_int = get_next_token(s) % 2 == 0;
                 int64_t value = get_int64(s);
                 if (add_int) {
                     if (log) {
@@ -385,21 +280,21 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
                 }
             }
             else if (type == type_Bool) {
-                bool value = get_next(s) % 2 == 0;
+                bool value = get_next_token(s) % 2 == 0;
                 if (log) {
                     *log << "obj.set<Bool>(" << col << ", " << (value ? "true" : "false") << ");\n";
                 }
                 obj.set<Bool>(col, value);
             }
             else if (type == type_Float) {
-                float value = get_next(s);
+                float value = get_next_token(s);
                 if (log) {
                     *log << "obj.set<Float>(" << col << ", " << value << ");\n";
                 }
                 obj.set<Float>(col, value);
             }
             else if (type == type_Double) {
-                double value = get_next(s);
+                double value = get_next_token(s);
                 if (log) {
                     *log << "obj.set<double>(" << col << ", " << value << ");\n";
                 }
@@ -408,7 +303,7 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
             else if (type == type_Link) {
                 TableRef target = t->get_link_target(col);
                 if (target->size() > 0) {
-                    ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
+                    ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
                     if (log) {
                         *log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
                     }
@@ -419,10 +314,10 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
                 TableRef target = t->get_link_target(col);
                 if (target->size() > 0) {
                     LnkLst links = obj.get_linklist(col);
-                    ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
+                    ObjKey target_key = target->get_object(get_next_token(s) % target->size()).get_key();
                     // either add or set, 50/50 probability
-                    if (links.size() > 0 && get_next(s) > 128) {
-                        size_t linklist_row = get_next(s) % links.size();
+                    if (links.size() > 0 && get_next_token(s) > 128) {
+                        size_t linklist_row = get_next_token(s) % links.size();
                         if (log) {
                             *log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", " << target_key
                                  << ");\n";
@@ -454,10 +349,10 @@ void FuzzObject::set_obj(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::remove_obj(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     if (t->size() > 0) {
-        ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
+        ObjKey key = t->get_object(get_next_token(s) % t->size()).get_key();
         if (log) {
             *log << "wt->get_table(" << table_key << ")->remove_object(" << key << ");\n";
         }
@@ -467,10 +362,10 @@ void FuzzObject::remove_obj(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::remove_recursive(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     if (t->size() > 0) {
-        ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
+        ObjKey key = t->get_object(get_next_token(s) % t->size()).get_key();
         if (log) {
             *log << "wt->get_table(" << table_key << ")->remove_object_recursive(" << key << ");\n";
         }
@@ -480,11 +375,11 @@ void FuzzObject::remove_recursive(Group& group, std::ostream* log, State& s)
 
 void FuzzObject::enumerate_column(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto all_col_keys = t->get_column_keys();
     if (!all_col_keys.empty()) {
-        size_t ndx = get_next(s) % all_col_keys.size();
+        size_t ndx = get_next_token(s) % all_col_keys.size();
         ColKey col = all_col_keys[ndx];
         if (log) {
             *log << "wt->get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
@@ -541,7 +436,7 @@ void FuzzObject::advance(Group& group, std::ostream* log)
     REALM_DO_IF_VERIFY(log, tr->verify());
 }
 
-void FuzzObject::close_and_reopen(SharedRealm shared_realm, std::ostream* log, Realm::Config& config)
+void FuzzObject::close_and_reopen(SharedRealm shared_realm, std::ostream* log, const Realm::Config& config)
 {
     if (log) {
         *log << "wt = nullptr;\n";
@@ -563,7 +458,7 @@ void FuzzObject::close_and_reopen(SharedRealm shared_realm, std::ostream* log, R
 
 void FuzzObject::create_table_view(Group& group, std::ostream* log, State& s, std::vector<TableView>& table_views)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     if (log) {
         *log << "table_views.push_back(wt->get_table(" << table_key << ")->where().find_all());\n";
@@ -574,11 +469,11 @@ void FuzzObject::create_table_view(Group& group, std::ostream* log, State& s, st
 
 void FuzzObject::check_null(Group& group, std::ostream* log, State& s)
 {
-    TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     if (t->get_column_count() > 0 && t->size() > 0) {
         auto all_col_keys = t->get_column_keys();
-        size_t ndx = get_next(s) % all_col_keys.size();
+        size_t ndx = get_next_token(s) % all_col_keys.size();
         ColKey col = all_col_keys[ndx];
         ObjKey key = t->get_object(get_int32(s) % t->size()).get_key();
         if (log) {
@@ -607,8 +502,8 @@ void FuzzObject::async_cancel(SharedRealm shared_realm, Group& group, std::ostre
         *log << "Async cancel \n";
     }
     auto token = shared_realm->async_begin_transaction([&]() {
-        TableKey table_key = group.get_table_keys()[get_next(s) % group.size()];
-        size_t num_rows = get_next(s);
+        TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
+        size_t num_rows = get_next_token(s);
         if (group.get_table(table_key)->size() + num_rows < max_rows) {
             if (log) {
                 *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
@@ -619,4 +514,129 @@ void FuzzObject::async_cancel(SharedRealm shared_realm, Group& group, std::ostre
         }
     });
     shared_realm->async_cancel_transaction(token);
+}
+
+DataType FuzzObject::get_type(unsigned char c) const
+{
+    DataType types[] = {type_Int, type_Bool, type_Float, type_Double, type_String, type_Binary, type_Timestamp};
+
+    unsigned char mod = c % (sizeof(types) / sizeof(DataType));
+    return types[mod];
+}
+
+const char* FuzzObject::get_encryption_key() const
+{
+#if REALM_ENABLE_ENCRYPTION
+    return "1234567890123456789012345678901123456789012345678901234567890123";
+#else
+    return nullptr;
+#endif
+}
+
+int64_t FuzzObject::get_int64(State& s) const
+{
+    int64_t v = 0;
+    for (size_t t = 0; t < 8; t++) {
+        unsigned char c = get_next_token(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
+int32_t FuzzObject::get_int32(State& s) const
+{
+    int32_t v = 0;
+    for (size_t t = 0; t < 4; t++) {
+        unsigned char c = get_next_token(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
+std::string FuzzObject::create_string(size_t length) const
+{
+    REALM_ASSERT_3(length, <, 256);
+    char buf[256] = {0};
+    for (size_t i = 0; i < length; i++)
+        buf[i] = 'a' + (rand() % 20);
+    return std::string{buf, length};
+}
+
+std::pair<int64_t, int32_t> FuzzObject::get_timestamp_values(State& s) const
+{
+    int64_t seconds = get_int64(s);
+    int32_t nanoseconds = get_int32(s) % 1000000000;
+    // Make sure the values form a sensible Timestamp
+    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+    const bool correct_timestamp = both_non_negative || both_non_positive;
+    if (!correct_timestamp) {
+        nanoseconds = -nanoseconds;
+    }
+    return {seconds, nanoseconds};
+}
+
+std::string FuzzObject::create_column_name(DataType t)
+{
+    std::string str;
+    switch (t) {
+        case type_Int:
+            str = "int_";
+            break;
+        case type_Bool:
+            str = "bool_";
+            break;
+        case type_Float:
+            str = "float_";
+            break;
+        case type_Double:
+            str = "double_";
+            break;
+        case type_String:
+            str = "string_";
+            break;
+        case type_Binary:
+            str = "binary_";
+            break;
+        case type_Timestamp:
+            str = "date_";
+            break;
+        case type_Decimal:
+            str = "decimal_";
+            break;
+        case type_ObjectId:
+            str = "id_";
+            break;
+        case type_Link:
+            str = "link_";
+            break;
+        case type_TypedLink:
+            str = "typed_link_";
+            break;
+        case type_LinkList:
+            str = "link_list_";
+            break;
+        case type_UUID:
+            str = "uuid_";
+            break;
+        case type_Mixed:
+            str = "any_";
+            break;
+    }
+    return str + util::to_string(m_column_index++);
+}
+
+std::string FuzzObject::create_table_name()
+{
+    std::string str = "Table_";
+    return str + util::to_string(m_table_index++);
+}
+
+std::string FuzzObject::get_current_time_stamp() const
+{
+    std::time_t t = std::time(nullptr);
+    const int str_size = 100;
+    char str_buffer[str_size] = {0};
+    std::strftime(str_buffer, str_size, "%c", std::localtime(&t));
+    return str_buffer;
 }

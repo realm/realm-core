@@ -16,16 +16,17 @@
  *
  **************************************************************************/
 
-#ifndef REALM_FUZZ_GROUP_HPP
-#define REALM_FUZZ_GROUP_HPP
+#ifndef FUZZ_ENGINE_HPP
+#define FUZZ_ENGINE_HPP
 
 #include <string>
 #include <fstream>
 
+class FuzzConfigurator;
 class FuzzEngine {
 public:
-    int run_fuzz_engine(int argc, const char* argv[]);
-    void do_fuzz(std::string& in, const std::string& path, std::ostream* log);
+    int run(int argc, const char* argv[]);
+    void do_fuzz(FuzzConfigurator&);
 };
 
 #endif
