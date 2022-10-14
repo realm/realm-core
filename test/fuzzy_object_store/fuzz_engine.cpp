@@ -71,13 +71,14 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
 
         if (log) {
             *log << iteration << " ";
+            *log << "Do fuzz with command " << (int)instr << std::endl;
         }
 
         Group& group = fetch_group();
 
-        if (instr == ADD_TABLE && group.size() < max_tables)
+        if (instr == ADD_TABLE && group.size() < max_tables) {
             fuzzer.create_table(group, log);
-
+        }
         else if (instr == REMOVE_TABLE && group.size() > 0) {
             fuzzer.remove_table(group, log, state);
         }
@@ -129,12 +130,12 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
         else if (instr == ROLLBACK) {
             fuzzer.rollback(shared_realm, group, log);
         }
-        else if (instr == ADVANCE) {
-            fuzzer.advance(group, log);
-        }
-        else if (instr == CLOSE_AND_REOPEN) {
-            fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
-        }
+        // else if (instr == ADVANCE) {
+        //     fuzzer.advance(shared_realm, group, log);
+        // }
+        // else if (instr == CLOSE_AND_REOPEN) {
+        //      fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
+        //  }
         else if (instr == CREATE_TABLE_VIEW && group.size() > 0) {
             fuzzer.create_table_view(group, log, state, table_views);
         }

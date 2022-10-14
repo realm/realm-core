@@ -46,7 +46,7 @@ public:
     void get_all_column_names(realm::Group& group);
     void commit(realm::SharedRealm shared_realm, std::ostream* log);
     void rollback(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log);
-    void advance(realm::Group& group, std::ostream* log);
+    void advance(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log);
     void close_and_reopen(realm::SharedRealm shared_realm, std::ostream* log, const realm::Realm::Config& config);
     void create_table_view(realm::Group& group, std::ostream* log, State& s,
                            std::vector<realm::TableView>& table_views);
