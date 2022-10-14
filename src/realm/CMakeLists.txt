@@ -268,10 +268,10 @@ set(REALM_NOINST_HEADERS
     util/cf_str.hpp
     util/circular_buffer.hpp
     util/cli_args.hpp
-    util/demangle.hpp
-    util/enum.hpp
     util/client_websocket.hpp
     util/default_websocket.hpp
+    util/demangle.hpp
+    util/enum.hpp
     util/from_chars.hpp
     util/get_file_size.hpp
     util/json_parser.hpp
