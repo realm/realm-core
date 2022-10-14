@@ -795,12 +795,12 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             {
                 File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
                 Header& writable_header = *writable_map.get_addr();
-                realm::util::encryption_read_barrier(writable_map, 0);
+                realm::util::encryption_read_barrier(writable_map, 0, 1, true);
                 writable_header.m_top_ref[1] = footer->m_top_ref;
                 writable_header.m_file_format[1] = writable_header.m_file_format[0];
                 realm::util::encryption_write_barrier(writable_map, 0);
                 writable_map.sync();
-                realm::util::encryption_read_barrier(writable_map, 0);
+                realm::util::encryption_read_barrier(writable_map, 0, 1, true);
                 writable_header.m_flags |= flags_SelectBit;
                 realm::util::encryption_write_barrier(writable_map, 0);
                 writable_map.sync();

@@ -105,15 +105,15 @@ void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t 
                               size_t new_size);
 void remove_encrypted_mapping(void* addr, size_t size);
 void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                EncryptedFileMapping* mapping);
+                                EncryptedFileMapping* mapping, bool to_modify);
 
 void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
 void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping,
-                                    HeaderToSize header_to_size = nullptr)
+                                    HeaderToSize header_to_size = nullptr, bool to_modify = false)
 {
     if (REALM_UNLIKELY(mapping))
-        do_encryption_read_barrier(addr, size, header_to_size, mapping);
+        do_encryption_read_barrier(addr, size, header_to_size, mapping, to_modify);
 }
 
 void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -132,10 +132,10 @@ void inline encryption_flush(EncryptedFileMapping* mapping)
 }
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                       EncryptedFileMapping* mapping)
+                                       EncryptedFileMapping* mapping, bool to_modify)
 {
     UniqueLock lock(mapping_mutex);
-    mapping->read_barrier(addr, size, header_to_size);
+    mapping->read_barrier(addr, size, header_to_size, to_modify);
 }
 
 inline void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -163,10 +163,10 @@ void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
 
 // helpers for encrypted Maps
 template <typename T>
-void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1)
+void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1, bool to_modify = false)
 {
     T* addr = map.get_addr();
-    encryption_read_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping());
+    encryption_read_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping(), nullptr, to_modify);
 }
 
 template <typename T>

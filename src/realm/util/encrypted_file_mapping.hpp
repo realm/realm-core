@@ -53,11 +53,13 @@ public:
     void sync() noexcept;
 
     // Make sure that memory in the specified range is synchronized with any
-    // changes made globally visible through call to write_barrier or mark_for_refresh
-    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
+    // changes made globally visible through call to write_barrier or mark_for_refresh.
+    // Optionally mark the pages for later modification
+    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
+    // Pages selected must have been marked for modification at an earlier read barrier
     void write_barrier(const void* addr, size_t size) noexcept;
 
     // Marks pages in the given range as having been changed on disk (by another process)
@@ -112,7 +114,8 @@ private:
         Touched = 1,         // a ref->ptr translation has taken place
         UpToDate = 2,        // the page is fully up to date
         RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8            // the page has been modified with respect to what's on file.
+        Dirty = 8,           // the page has been modified with respect to what's on file.
+        Writable = 16        // the page is open for writing
     };
     std::vector<PageState> m_page_state;
     // little helpers:

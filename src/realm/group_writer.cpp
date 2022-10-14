@@ -153,7 +153,7 @@ char* GroupWriter::MapWindow::translate(ref_type ref)
 
 void GroupWriter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
-    realm::util::encryption_read_barrier(start_addr, size, m_map.get_encrypted_mapping());
+    realm::util::encryption_read_barrier(start_addr, size, m_map.get_encrypted_mapping(), nullptr, true);
 }
 
 void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
@@ -1137,8 +1137,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
-        window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
-                                         sizeof(file_header.m_file_format[slot_selector]));
+        // window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
+        //                                 sizeof(file_header.m_file_format[slot_selector]));
     }
 
     // When running the test suite, device synchronization is disabled
@@ -1151,12 +1151,14 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
-                                     sizeof(file_header.m_top_ref[slot_selector]));
+    // window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
+    //                                 sizeof(file_header.m_top_ref[slot_selector]));
+    window->encryption_write_barrier(&file_header, sizeof file_header);
     flush_all_mappings();
     if (!disable_sync)
         m_alloc.get_file().barrier();
     // Flip the slot selector bit.
+    window->encryption_read_barrier(&file_header, sizeof file_header);
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 

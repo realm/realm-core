@@ -494,6 +494,9 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
+    for (auto& e : m_page_state) {
+        REALM_ASSERT(is_not(e, Writable));
+    }
     if (m_access == File::access_ReadWrite) {
         flush();
         sync();
@@ -513,6 +516,7 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
         return;
     REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
     REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Writable));
 
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -544,7 +548,8 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
-
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Writable));
     char* addr = page_addr(local_page_ndx);
 
     if (!copy_up_to_date_page(local_page_ndx)) {
@@ -568,9 +573,12 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
             if (m->contains_page(page_ndx)) {
                 size_t local_page_ndx = page_ndx - m->m_first_page;
                 if (is(m->m_page_state[local_page_ndx], UpToDate)) {
-                    REALM_ASSERT_EX(is_not(m->m_page_state[local_page_ndx], Dirty), local_page_ndx);
-                    clear(m->m_page_state[local_page_ndx], UpToDate);
-                    set(m->m_page_state[local_page_ndx], RefetchRequired);
+                    // if we hit a concurrent write it takes priority and we cannot
+                    // trigger a refetch.
+                    if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
+                        clear(m->m_page_state[local_page_ndx], UpToDate);
+                        set(m->m_page_state[local_page_ndx], RefetchRequired);
+                    }
                 }
             }
         }
@@ -580,6 +588,7 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
 void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset,
                                                 size_t end_offset) noexcept
 {
+    REALM_ASSERT(is(m_page_state[local_page_ndx], Writable));
     REALM_ASSERT(is(m_page_state[local_page_ndx], UpToDate));
     // Go through all other mappings of this file and copy changes into those mappings
     size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -597,6 +606,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
+    clear(m_page_state[local_page_ndx], Writable);
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
         m_chunk_dont_scan[chunk_ndx] = 0;
@@ -691,17 +701,17 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
     };
 
     auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
-        PageState ps = m_page_state[page_ndx];
-        if (is(m_page_state[page_ndx], UpToDate | RefetchRequired)) {
-            if (is_not(ps, Touched) && is_not(ps, Dirty)) {
-                clear(m_page_state[page_ndx], UpToDate | RefetchRequired);
+        PageState& ps = m_page_state[page_ndx];
+        if (is(ps, UpToDate | RefetchRequired)) {
+            if (is_not(ps, Touched) && is_not(ps, Dirty) && is_not(ps, Writable)) {
+                clear(ps, UpToDate | RefetchRequired);
                 reclaim_page(page_ndx);
                 m_num_decrypted--;
                 done_some_work();
             }
             contiguous_scan = false;
         }
-        clear(m_page_state[page_ndx], Touched);
+        clear(ps, Touched);
     };
 
     auto skip_chunk_if_possible = [&](size_t& page_ndx) // update vars corresponding to skipping a chunk if possible
@@ -831,7 +841,7 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     }
 }
 
-void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify)
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
 
@@ -842,6 +852,8 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
             set(ps, Touched);
         if (is_not(ps, UpToDate))
             refresh_page(first_accessed_local_page);
+        if (to_modify)
+            set(ps, Writable);
     }
 
     // force the page reclaimer to look into pages in this chunk:
@@ -873,6 +885,8 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
             set(ps, Touched);
         if (is_not(ps, UpToDate))
             refresh_page(idx);
+        if (to_modify)
+            set(ps, Writable);
     }
 }
 

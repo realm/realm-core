@@ -654,7 +654,7 @@ void File::write(const char* data, size_t size)
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(write_map, pos, size);
+        realm::util::encryption_read_barrier(write_map, pos, size, true);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
         uint64_t cur = get_file_pos(m_fd);
