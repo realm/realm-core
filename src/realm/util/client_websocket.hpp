@@ -63,9 +63,7 @@ public:
     /// Register an observer that will be notified when the event loop starts to run, is about
     /// to exit, or if an exception occurs. This is primarily intended to be used with the
     /// default websocket factory implementation for testing.
-    virtual void register_event_loop_observer(EventLoopObserver&&)
-    {
-    }
+    virtual void register_event_loop_observer(EventLoopObserver&&) {}
 
     /// Start the event loop - if any of the post, trigger or timer events are registered
     /// prior to calling start(), the event loop could be started early, depending on the

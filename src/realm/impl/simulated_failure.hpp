@@ -281,8 +281,7 @@ inline SimulatedFailure::RandomPrimeGuard::~RandomPrimeGuard() noexcept
     unprime(m_type);
 }
 
-inline SimulatedFailure::RandomPrime::RandomPrime(FailureType failure_type, int n, int m,
-                                                  uint_fast64_t seed)
+inline SimulatedFailure::RandomPrime::RandomPrime(FailureType failure_type, int n, int m, uint_fast64_t seed)
     : m_type(failure_type)
     , m_n(n)
     , m_m(m)
@@ -299,8 +298,6 @@ inline void SimulatedFailure::RandomPrime::remove_prime()
 {
     unprime(m_type);
 }
-
-
 
 
 } // namespace _impl

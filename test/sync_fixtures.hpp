@@ -845,7 +845,7 @@ private:
                     // Prime the random failure on the event loop thread
                     // state will be lost when the thread terminates
                     sf::RandomPrime pg(sf::sync_client__read_head, sim.first, sim.second,
-                                   random_int<uint_fast64_t>()); // Seed from global generator
+                                       random_int<uint_fast64_t>()); // Seed from global generator
                     pg.prime();
                 });
                 m_clients[i]->sync_start();
