@@ -1,4 +1,5 @@
 set(SYNC_SOURCES
+    binding_callback_thread_observer.cpp
     config.cpp
     noinst/changeset_index.cpp
     noinst/client_history_impl.cpp
@@ -34,6 +35,7 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    binding_callback_thread_observer.hpp
     config.hpp
     changeset_encoder.hpp
     changeset_parser.hpp

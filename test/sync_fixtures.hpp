@@ -832,7 +832,7 @@ private:
         if (CHECK_NOTHROW(do_run_server()))
             return;
         stop();
-        m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i + 1);
+        m_server_loggers[i]->error("Exception was thrown from server[%1]'s event loop", i + 1);
     }
 
     void run_client(int i)
@@ -841,8 +841,13 @@ private:
             auto sim = m_simulated_client_error_rates[i];
             if (sim.first != 0) {
                 using sf = _impl::SimulatedFailure;
-                sf::RandomPrimeGuard pg(sf::sync_client__read_head, sim.first, sim.second,
-                                        random_int<uint_fast64_t>()); // Seed from global generator
+                m_clients[i]->add_test_setup([&]() {
+                    // Prime the random failure on the event loop thread
+                    // state will be lost when the thread terminates
+                    sf::RandomPrime pg(sf::sync_client__read_head, sim.first, sim.second,
+                                   random_int<uint_fast64_t>()); // Seed from global generator
+                    pg.prime();
+                });
                 m_clients[i]->sync_start();
             }
             else {
@@ -854,7 +859,7 @@ private:
         if (CHECK_NOTHROW(do_run_client()))
             return;
         stop();
-        m_server_loggers[i]->error("Exception was throw from client[%1]'s event loop", i + 1);
+        m_server_loggers[i]->error("Exception was thrown from client[%1]'s event loop", i + 1);
     }
 };
 

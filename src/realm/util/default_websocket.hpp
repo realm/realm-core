@@ -9,13 +9,11 @@
 #include <thread>
 #include <utility>
 
-#include <realm/object-store/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/config.hpp>
 #include <realm/util/checked_mutex.hpp>
+#include <realm/util/client_websocket.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/network.hpp>
-#include <realm/util/client_websocket.hpp>
 
 namespace realm::util::network {
 class Service;
@@ -25,7 +23,7 @@ namespace realm::util::websocket {
 
 class DefaultEventLoopClient : public EventLoopClient {
 public:
-    enum State { NotStarted = 0, Running = 1, Stopped = 2 };
+    enum State { NotStarted = 0, Running = 1, Stopping = 3, Stopped = 2 };
 
     class Timer : public EventLoopClient::Timer {
     public:
@@ -98,6 +96,10 @@ public:
     virtual ~DefaultEventLoopClient() REQUIRES(!m_mutex)
     {
         stop();
+        // Join the thread before destruction so stop() can be called within the event loop thread
+        if (m_thread != nullptr && m_thread->joinable()) {
+            m_thread->join();
+        }
     }
 
     void post(util::UniqueFunction<void()>&& handler) override REQUIRES(!m_mutex)
@@ -119,7 +121,12 @@ public:
     bool is_stopped() override REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
-        return m_state == State::Stopped;
+        return m_state == State::Stopped || m_state == State::Stopping;
+    }
+
+    void register_event_loop_observer(EventLoopObserver&& observer) override
+    {
+        m_observer.emplace(std::move(observer));
     }
 
     void start() override REQUIRES(!m_mutex)
@@ -150,9 +157,15 @@ private:
     // service.run() thread will exit prematurely.
     bool ensure_service_is_running() REQUIRES(!m_mutex);
 
+    void update_state(State new_state) REQUIRES(m_mutex);
+
     //@{
     // Thread Helper Functions
-    void thread_update_state(State new_state) REQUIRES(!m_mutex);
+    void thread_update_state(State new_state) REQUIRES(!m_mutex)
+    {
+        util::CheckedLockGuard lock(m_mutex);
+        update_state(new_state);
+    }
     //@}
 
     util::CheckedMutex m_mutex;
@@ -161,9 +174,11 @@ private:
     // The original util::network::Service object that used to live in client_impl
     util::network::Service m_service;
     // The event loop thread that calls Service->run()
-    std::unique_ptr<std::thread> m_thread GUARDED_BY(m_mutex);
+    std::unique_ptr<std::thread> m_thread;
     // The event loop can only be started once, it cannot be restarted later
     State m_state GUARDED_BY(m_mutex);
+    // Optional observer for passing along event loop thread state
+    std::optional<EventLoopObserver> m_observer;
 };
 
 class DefaultWebSocketFactory : public WebSocketFactory {

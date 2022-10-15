@@ -15,6 +15,7 @@
 #include <realm/util/platform_info.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -151,6 +152,31 @@ ClientImpl::ClientImpl(ClientConfig config)
     logger.debug("User agent string: '%1'", get_user_agent_string());
 
     m_event_loop = m_socket_factory->create_event_loop();
+    REALM_ASSERT(m_event_loop != nullptr);
+    m_event_loop->register_event_loop_observer(util::websocket::EventLoopClient::EventLoopObserver{
+        [this]() {  // starting_event_loop
+            m_logger.trace("EventLoop: started");
+            if (g_binding_callback_thread_observer) {
+                g_binding_callback_thread_observer->did_create_thread();
+            }
+        },
+        [this]() { // stopping_event_loop
+            m_logger.trace("EventLoop: stopped");
+            if (m_stop_promise) {
+                // If sync_start() is waiting, free it now...
+                m_stop_promise->emplace_value();
+            }
+            if (g_binding_callback_thread_observer) {
+                g_binding_callback_thread_observer->will_destroy_thread();
+            }
+        },
+        [this](std::exception const& e) { // event_loop_error
+            m_logger.error("EventLoop: exception occurred: %1", e.what());
+            if (g_binding_callback_thread_observer) {
+                g_binding_callback_thread_observer->handle_error(e);
+            }
+        }
+    });
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "

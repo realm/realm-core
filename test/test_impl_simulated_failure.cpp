@@ -93,4 +93,22 @@ TEST_IF(Impl_SimulatedFailure_Random, _impl::SimulatedFailure::is_enabled())
     }
 }
 
+TEST_IF(Impl_SimulatedFailure_RandomPrime, _impl::SimulatedFailure::is_enabled())
+{
+    using sf = _impl::SimulatedFailure;
+    sf::RandomPrime pg(sf::generic, 1, 1,                       // 100% chance of failure
+                       test_util::random_int<uint_fast64_t>()); // Seed from global generator
+
+    // Verify it is not set when created
+    CHECK(!sf::check_trigger(sf::generic));
+
+    // Verify it can be enabled (fails 100% so loop is not needed)
+    pg.prime();
+    CHECK(sf::check_trigger(sf::generic));
+
+    // Verify it can be disabled (fails 100%, but should not trigger since not enabled)
+    pg.remove_prime();
+    CHECK(!sf::check_trigger(sf::generic));
+}
+
 } // unnamed namespace

@@ -47,9 +47,25 @@ public:
         virtual ~Trigger() noexcept = default;
     };
 
+    struct EventLoopObserver {
+        // If set, this is called as soon as the event loop thread is started
+        std::optional<util::UniqueFunction<void()>> starting_event_loop;
+        // If set, this is called as the the event loop thread is existing
+        std::optional<util::UniqueFunction<void()>> stopping_event_loop;
+        // If set, this is called if an exception is thrown by the service in the event loop thread
+        std::optional<util::UniqueFunction<void(std::exception const&)>> event_loop_error;
+    };
+
     /// The event loop implementation must ensure the event loop is stopped and flushed when
     /// the object is destroyed.
     virtual ~EventLoopClient() = default;
+
+    /// Register an observer that will be notified when the event loop starts to run, is about
+    /// to exit, or if an exception occurs. This is primarily intended to be used with the
+    /// default websocket factory implementation for testing.
+    virtual void register_event_loop_observer(EventLoopObserver&&)
+    {
+    }
 
     /// Start the event loop - if any of the post, trigger or timer events are registered
     /// prior to calling start(), the event loop could be started early, depending on the
@@ -57,11 +73,11 @@ public:
     /// number of calls to start().
     virtual void start() = 0;
 
-    /// Stop the event loop - any pending events will be cancelled and future calls to
-    /// post events will do nothing.
+    /// Stop the event loop - any future calls to post events or create timers or triggers
+    /// will do nothing. Can be called from within the event loop thread.
     virtual void stop() = 0;
 
-    /// Return true if the event loop has been stopped.
+    /// Return true if the event loop has been stopped or is stopping.
     virtual bool is_stopped() = 0;
 
     /// \brief Submit a handler to be executed by the event loop thread.

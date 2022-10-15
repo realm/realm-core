@@ -122,6 +122,10 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
+    /// Add a test setup function that will be posted to the event loop and will run
+    /// when the event loop thread is started. For testing only.
+    void add_test_setup(util::UniqueFunction<void()>&&);
+
     // @{
     /// These call stop() and start() on the event loop respectively. If a promise is provided
     /// to start, it will be triggered when stop() is called.

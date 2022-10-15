@@ -37,6 +37,10 @@ public:
     Client(Client&&) noexcept;
     ~Client() noexcept;
 
+    /// Add a test setup function that will be posted to the event loop and will run
+    /// when the event loop thread is started. For testing only.
+    void add_test_setup(util::UniqueFunction<void()>&&);
+
     /// Start the internal event-loop of the client. At most one event loop may
     /// execute at any given time. This is a non-blocking call.
     void start();

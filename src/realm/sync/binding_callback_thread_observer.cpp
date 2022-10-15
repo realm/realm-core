@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/binding_callback_thread_observer.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 
 namespace realm {
 BindingCallbackThreadObserver* g_binding_callback_thread_observer = nullptr;

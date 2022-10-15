@@ -476,6 +476,13 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 }
 
 
+void ClientImpl::add_test_setup(util::UniqueFunction<void()>&& setup_func)
+{
+    // Post the setup function to be run on the event loop when it starts
+    get_event_loop().post(std::move(setup_func));
+}
+
+
 void ClientImpl::stop() noexcept
 {
     {
@@ -486,18 +493,23 @@ void ClientImpl::stop() noexcept
     }
     get_event_loop().stop();
     m_wait_or_client_stopped_cond.notify_all();
-    if (m_stop_promise) {
-        m_stop_promise->emplace_value();
-    }
 }
 
 
 void ClientImpl::start(std::optional<util::Promise<void>>&& promise)
 {
-    if (promise) {
-        m_stop_promise.emplace(std::move(*promise));
+    // Was stop() called before start?
+    if (!m_stopped) {
+        if (promise) {
+            m_stop_promise.emplace(std::move(*promise));
+        }
+        get_event_loop().start();
     }
-    get_event_loop().start();
+    // Already shut down, don't start the event loop and just free the future
+    else if (promise) {
+        get_event_loop().stop();  // invalidate event loop
+        promise->emplace_value(); // Free the future event though the loop wasn't started
+    }
 }
 
 
@@ -1706,6 +1718,11 @@ Client::Client(Client&& client) noexcept
 
 Client::~Client() noexcept {}
 
+
+void Client::add_test_setup(util::UniqueFunction<void()>&& setup_func)
+{
+    m_impl->add_test_setup(std::move(setup_func));
+}
 
 void Client::start()
 {

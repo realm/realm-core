@@ -46,6 +46,7 @@ public:
 
     class OneShotPrimeGuard;
     class RandomPrimeGuard;
+    class RandomPrime;
 
     /// Prime the specified failure type on the calling thread for triggering
     /// once.
@@ -123,6 +124,21 @@ public:
 
 private:
     const FailureType m_type;
+};
+
+class SimulatedFailure::RandomPrime {
+public:
+    RandomPrime(FailureType failure_type, int n, int m, uint_fast64_t seed = 0);
+    // Destructor does not automatically unprime the random failure type
+    ~RandomPrime() noexcept = default;
+    void prime();
+    void remove_prime();
+
+private:
+    const FailureType m_type;
+    const int m_n;
+    const int m_m;
+    const uint_fast64_t m_seed;
 };
 
 std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
@@ -264,6 +280,28 @@ inline SimulatedFailure::RandomPrimeGuard::~RandomPrimeGuard() noexcept
 {
     unprime(m_type);
 }
+
+inline SimulatedFailure::RandomPrime::RandomPrime(FailureType failure_type, int n, int m,
+                                                  uint_fast64_t seed)
+    : m_type(failure_type)
+    , m_n(n)
+    , m_m(m)
+    , m_seed(seed)
+{
+}
+
+inline void SimulatedFailure::RandomPrime::prime()
+{
+    prime_random(m_type, m_n, m_m, m_seed);
+}
+
+inline void SimulatedFailure::RandomPrime::remove_prime()
+{
+    unprime(m_type);
+}
+
+
+
 
 } // namespace _impl
 } // namespace realm

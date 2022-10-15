@@ -362,22 +362,34 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 
 void DefaultEventLoopClient::stop()
 {
+    // Need to release the lock for the join
     util::CheckedUniqueLock lock(m_mutex);
-    // Need to release the lock
-    if (auto thread_ptr = std::move(m_thread); thread_ptr != nullptr) {
+    if (m_state == State::NotStarted || m_state == State::Running) {
+        update_state(State::Stopping);
         m_service.stop();
-        m_logger.trace("DefaultEventLoopClient: Event loop thread stopped");
-        if (thread_ptr->joinable()) {
-            lock.unlock(); // Thread grabs the mutex before updating the state to stopped
-            thread_ptr->join();
-        }
+        // In case stop() was called from the event loop thread, wait to join the thread
+        // until the event loop is destructed
     }
 }
 
-void DefaultEventLoopClient::thread_update_state(State new_state)
+void DefaultEventLoopClient::update_state(State new_state)
 {
-    util::CheckedLockGuard lock(m_mutex);
-    m_state = new_state;
+    switch (m_state) {
+        case State::NotStarted: // NotStarted -> any state other than NotStarted
+            if (new_state != State::NotStarted)
+                m_state = new_state;
+            break;
+        case State::Running: // Running -> Stopping or Stopped
+            if (new_state == State::Stopping || new_state == State::Stopped)
+                m_state = new_state;
+            break;
+        case State::Stopping: // Stopping -> Stopped
+            if (new_state == State::Stopped)
+                m_state = new_state;
+            break;
+        case State::Stopped: // Stopped -> not allowed
+            break;
+    }
 }
 
 // If the service thread is not running, make sure it has been started
@@ -386,26 +398,27 @@ bool DefaultEventLoopClient::ensure_service_is_running()
     util::CheckedLockGuard lock(m_mutex);
     if (m_state == State::NotStarted) {
         if (m_thread == nullptr) {
-            m_logger.trace("DefaultEventLoopClient: Starting event loop thread");
-            m_thread = std::make_unique<std::thread>([this]() {
-                /*if (g_binding_callback_thread_observer) {
-                    g_binding_callback_thread_observer->did_create_thread();
-                    auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                        g_binding_callback_thread_observer->will_destroy_thread();
-                    });
-                    try {
-                        thread_update_state(State::Running);
-                        m_service.run(); // Throws
-                        thread_update_state(State::Stopped);
+            m_thread = std::make_unique<std::thread>([this]() mutable {
+                if (m_observer && m_observer->starting_event_loop) {
+                    (*m_observer->starting_event_loop)();
+                }
+                auto will_destroy_thread = util::make_scope_exit([this]() noexcept {
+                    if (m_observer && m_observer->stopping_event_loop) {
+                        (*m_observer->stopping_event_loop)();
                     }
-                    catch (std::exception const& e) {
-                        thread_update_state(State::Stopped);
-                        g_binding_callback_thread_observer->handle_error(e);
+                });
+                // If we're already stopped, exit thread
+                if (!is_stopped()) {
+                    thread_update_state(State::Running);
+                    try {
+                        m_service.run(); // Throws
+                    }
+                    catch (const std::exception& e) {
+                        if (m_observer && m_observer->event_loop_error) {
+                            (*m_observer->event_loop_error)(e);
+                        }
                     }
                 }
-                else {*/
-                thread_update_state(State::Running);
-                m_service.run(); // Throws
                 thread_update_state(State::Stopped);
                 //}
             });
