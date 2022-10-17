@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables (PR [#5897](https://github.com/realm/realm-core/pull/5897)).
+* Adding `realm_query_parse_for_set` in the C API ([#5935](https://github.com/realm/realm-core/pull/5935)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
