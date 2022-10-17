@@ -157,8 +157,8 @@ struct AppCreateConfig {
     struct FLXSyncRole {
         std::string name;
         nlohmann::json apply_when = nlohmann::json::object();
-        mpark::variant<bool, nlohmann::json> read;
-        mpark::variant<bool, nlohmann::json> write;
+        nlohmann::json read;
+        nlohmann::json write;
     };
 
     struct FLXSyncConfig {
