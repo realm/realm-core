@@ -43,10 +43,10 @@ public:
     void remove_obj(realm::Group& group, std::ostream* log, State& s);
     void remove_recursive(realm::Group& group, std::ostream* log, State& s);
     void enumerate_column(realm::Group& group, std::ostream* log, State& s);
-    void get_all_column_names(realm::Group& group);
+    void get_all_column_names(realm::Group& group, std::ostream* log);
     void commit(realm::SharedRealm shared_realm, std::ostream* log);
     void rollback(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log);
-    void advance(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log);
+    void advance(realm::SharedRealm shared_realm, std::ostream* log);
     void close_and_reopen(realm::SharedRealm shared_realm, std::ostream* log, const realm::Realm::Config& config);
     void create_table_view(realm::Group& group, std::ostream* log, State& s,
                            std::vector<realm::TableView>& table_views);

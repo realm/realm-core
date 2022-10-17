@@ -95,7 +95,7 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
             fuzzer.remove_column(group, log, state);
         }
         else if (instr == GET_ALL_COLUMN_NAMES && group.size() > 0) {
-            fuzzer.get_all_column_names(group);
+            fuzzer.get_all_column_names(group, log);
         }
         else if (instr == RENAME_COLUMN && group.size() > 0) {
             fuzzer.rename_column(group, log, state);
@@ -130,12 +130,12 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
         else if (instr == ROLLBACK) {
             fuzzer.rollback(shared_realm, group, log);
         }
-        // else if (instr == ADVANCE) {
-        //     fuzzer.advance(shared_realm, group, log);
-        // }
-        // else if (instr == CLOSE_AND_REOPEN) {
-        //      fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
-        //  }
+        else if (instr == ADVANCE) {
+            fuzzer.advance(shared_realm, log);
+        }
+        else if (instr == CLOSE_AND_REOPEN) {
+            fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
+        }
         else if (instr == CREATE_TABLE_VIEW && group.size() > 0) {
             fuzzer.create_table_view(group, log, state, table_views);
         }
