@@ -2833,8 +2833,10 @@ typedef struct realm_user_identity {
     realm_auth_provider_e provider_type;
 } realm_user_identity_t;
 
-typedef void (*realm_return_apikey_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*);
-typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count, realm_app_error_t*);
+typedef void (*realm_return_apikey_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t*,
+                                           const realm_app_error_t*);
+typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count,
+                                                realm_app_error_t*);
 
 /**
  * Generic completion callback for asynchronous Realm App operations.
@@ -3134,28 +3136,30 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
  * Creates a user API key that can be used to authenticate as the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
-    const realm_app_t*, const realm_user_t*, const char* name,
-    realm_return_apikey_func_t callback,
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t*, const realm_user_t*,
+                                                                 const char* name,
+                                                                 realm_return_apikey_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Fetches a user API key associated with the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
-    const realm_app_t*, const realm_user_t*, realm_object_id_t id,
-    realm_return_apikey_func_t callback,
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t*, const realm_user_t*,
+                                                                realm_object_id_t id,
+                                                                realm_return_apikey_func_t callback,
+                                                                realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 
 /**
  * Fetches the user API keys associated with the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
-    const realm_app_t*, const realm_user_t*,
-    realm_return_apikey_list_func_t callback,
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t*, const realm_user_t*,
+                                                                 realm_return_apikey_list_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Deletes a user API key associated with the current user.
