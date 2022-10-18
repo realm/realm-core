@@ -225,7 +225,6 @@ static std::error_code wait_for_session(Realm& realm,
                                         void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
                                         std::chrono::seconds timeout)
 {
-
     auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
     (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](std::error_code error) {
@@ -233,7 +232,7 @@ static std::error_code wait_for_session(Realm& realm,
         if (!shared_state) {
             return;
         }
-        std::unique_lock<std::mutex> lock(shared_state->mutex);
+        std::lock_guard<std::mutex> lock(shared_state->mutex);
         shared_state->complete = true;
         shared_state->ec = error;
         shared_state->cv.notify_one();
