@@ -3175,6 +3175,12 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(!realm_equals(strings.get(), strings3.get()));
                     });
                 }
+
+                SECTION("parse query for sets") {
+                    auto links = cptr_checked(realm_get_set(obj1.get(), foo_properties["link_set"]));
+                    CHECK(links);
+                    cptr_checked(realm_query_parse_for_set(links.get(), "TRUEPREDICATE", 0, nullptr));
+                }
             }
 
             SECTION("get/insert all property types") {
@@ -4785,25 +4791,6 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             REQUIRE(before_client_reset_counter.load() == 1);
             REQUIRE(after_client_reset_counter.load() == 0);
         }
-    }
-}
-
-static const char* httpmethod_to_string(realm::app::HttpMethod method)
-{
-    using namespace realm::app;
-    switch (method) {
-        case HttpMethod::get:
-            return "GET";
-        case HttpMethod::post:
-            return "POST";
-        case HttpMethod::patch:
-            return "PATCH";
-        case HttpMethod::put:
-            return "PUT";
-        case HttpMethod::del:
-            return "DEL";
-        default:
-            return "UNKNOWN";
     }
 }
 

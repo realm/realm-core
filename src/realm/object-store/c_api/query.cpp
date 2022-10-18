@@ -222,6 +222,22 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
     });
 }
 
+RLM_API realm_query_t* realm_query_parse_for_set(const realm_set_t* set, const char* query_string, size_t num_args,
+                                                 const realm_query_arg_t* args)
+{
+    return wrap_err([&]() {
+        auto existing_query = set->get_query();
+        auto realm = set->get_realm();
+        auto table = set->get_table();
+        auto query = parse_and_apply_query(realm, table, query_string, num_args, args);
+        auto combined = existing_query.and_query(query);
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
+        if (auto ordering = query.get_ordering())
+            ordering_copy->append(*ordering);
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
+    });
+}
+
 RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* results, const char* query_string,
                                                      size_t num_args, const realm_query_arg_t* args)
 {

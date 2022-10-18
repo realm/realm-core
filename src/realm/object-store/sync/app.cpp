@@ -256,9 +256,23 @@ void App::configure(const SyncClientConfig& sync_client_config)
 {
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
+    m_logger = m_sync_manager->make_logger();
     if (auto metadata = m_sync_manager->app_metadata()) {
         update_hostname(metadata);
     }
+}
+
+template <class... Params>
+void App::log(const char* message, Params&&... params)
+{
+    if (would_log()) {
+        m_logger->debug(message, std::forward<Params>(params)...);
+    }
+}
+
+bool App::would_log()
+{
+    return m_logger && m_logger->would_log(util::Logger::Level::debug);
 }
 
 std::string App::make_sync_route(const std::string& http_app_route)
@@ -282,6 +296,7 @@ void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
 void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname)
 {
     // Update url components based on new hostname value
+    log("App: update_hostname: %1 | %2", hostname, ws_hostname);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
     std::string this_app_path = app_path + "/" + m_config.app_id;
@@ -314,6 +329,7 @@ App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient
 void App::UsernamePasswordProviderClient::register_email(const std::string& email, const std::string& password,
                                                          UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: register_email: %1", email);
     m_parent->post(util::format("%1/providers/%2/register", m_parent->m_auth_route, username_password_provider_key),
                    std::move(completion), {{"email", email}, {"password", password}});
 }
@@ -321,6 +337,7 @@ void App::UsernamePasswordProviderClient::register_email(const std::string& emai
 void App::UsernamePasswordProviderClient::confirm_user(const std::string& token, const std::string& token_id,
                                                        UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: confirm_user");
     m_parent->post(util::format("%1/providers/%2/confirm", m_parent->m_auth_route, username_password_provider_key),
                    std::move(completion), {{"token", token}, {"tokenId", token_id}});
 }
@@ -328,6 +345,7 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
 void App::UsernamePasswordProviderClient::resend_confirmation_email(
     const std::string& email, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: resend_confirmation_email: %1", email);
     m_parent->post(
         util::format("%1/providers/%2/confirm/send", m_parent->m_auth_route, username_password_provider_key),
         std::move(completion), {{"email", email}});
@@ -336,6 +354,7 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(
 void App::UsernamePasswordProviderClient::retry_custom_confirmation(
     const std::string& email, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: retry_custom_confirmation: %1", email);
     m_parent->post(
         util::format("%1/providers/%2/confirm/call", m_parent->m_auth_route, username_password_provider_key),
         std::move(completion), {{"email", email}});
@@ -344,6 +363,7 @@ void App::UsernamePasswordProviderClient::retry_custom_confirmation(
 void App::UsernamePasswordProviderClient::send_reset_password_email(
     const std::string& email, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: send_reset_password_email: %1", email);
     m_parent->post(util::format("%1/providers/%2/reset/send", m_parent->m_auth_route, username_password_provider_key),
                    std::move(completion), {{"email", email}});
 }
@@ -352,6 +372,7 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
                                                          const std::string& token_id,
                                                          UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: reset_password");
     m_parent->post(util::format("%1/providers/%2/reset", m_parent->m_auth_route, username_password_provider_key),
                    std::move(completion), {{"password", password}, {"token", token}, {"tokenId", token_id}});
 }
@@ -360,6 +381,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(
     const std::string& email, const std::string& password, const BsonArray& args,
     UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    m_parent->log("App: call_reset_password_function: %1", email);
     m_parent->post(util::format("%1/providers/%2/reset/call", m_parent->m_auth_route, username_password_provider_key),
                    std::move(completion), {{"email", email}, {"password", password}, {"arguments", args}});
 }
@@ -540,6 +562,7 @@ void App::log_in_with_credentials(
     const AppCredentials& credentials, const std::shared_ptr<SyncUser>& linking_user,
     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
+    log("App: log_in_with_credentials");
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {
@@ -563,6 +586,8 @@ void App::log_in_with_credentials(
                [completion = std::move(completion), credentials, linking_user,
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
+                       self->log("App: log_in_with_credentials failed: %1 message: %2",
+                                 response.http_status_code, error->what());
                        return completion(nullptr, std::move(error));
                    }
 
@@ -629,6 +654,7 @@ void App::log_out(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Opt
 
 void App::log_out(UniqueFunction<void(Optional<AppError>)>&& completion)
 {
+    log("App: log_out()");
     log_out(current_user(), std::move(completion));
 }
 
@@ -908,6 +934,7 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
     request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
                                                                                 : RequestTokenType::AccessToken);
 
+    log("App: do_authenticated_request: %1 %2", httpmethod_to_string(request.method), request.url);
     auto completion_2 = [completion = std::move(completion), request, sync_user,
                          self = shared_from_this()](const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {
@@ -975,6 +1002,8 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
         route = util::format("%1/auth/session", m_base_route);
     }
 
+    log("App: refresh_access_token: email: %1", sync_user->user_profile().email());
+
     do_request(Request{HttpMethod::post, std::move(route), m_request_timeout_ms,
                        get_request_headers(sync_user, RequestTokenType::RefreshToken)},
                [completion = std::move(completion), sync_user](const Response& response) {
@@ -1004,15 +1033,33 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                         const Optional<std::string>& service_name,
                         UniqueFunction<void(Optional<Bson>&&, Optional<AppError>)>&& completion)
 {
-    auto handler = [completion = std::move(completion)](const Response& response) {
+    auto service_name2 = service_name ? *service_name : "<none>";
+    if (would_log()) {
+        std::string query_stg = "[ ";
+        for (auto&& item : args_bson) {
+            query_stg += item.to_string() + ", ";
+        }
+        query_stg += "]";
+        log("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name2, query_stg);
+    }
+    auto handler = [self = shared_from_this(), name = name, service_name = service_name2,
+                    completion = std::move(completion)](const Response& response) {
         if (auto error = AppUtils::check_for_errors(response)) {
+            self->log("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
+                      response.http_status_code, error->what());
             return completion(util::none, error);
         }
         util::Optional<Bson> body_as_bson;
         try {
             body_as_bson = bson::parse(response.body);
+            if (self->would_log()) {
+                self->log("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
+                          body_as_bson ? body_as_bson->to_string() : "<none>");
+            }
         }
         catch (const std::exception& e) {
+            self->log("App: call_function: %1 service_name: %2 - error parsing result: %3", name, service_name,
+                      e.what());
             return completion(util::none, AppError(ErrorCodes::BadBsonParse, e.what()));
         };
         completion(std::move(body_as_bson), util::none);

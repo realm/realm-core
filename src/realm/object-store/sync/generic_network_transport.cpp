@@ -17,33 +17,54 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/sync/generic_network_transport.hpp>
-#include <iostream>
+
+#include <ostream>
+
 namespace realm::app {
 
-static std::string http_message(int code)
+namespace {
+std::string http_message(const std::string& prefix, int code)
 {
     if (code >= 100 && code < 200) {
-        return util::format(". Informational: %1", code);
+        return util::format("%1. Informational: %2", prefix, code);
     }
     else if (code >= 200 && code < 300) {
-        return util::format(". Success: %1", code);
+        return util::format("%1. Success: %2", prefix, code);
     }
     else if (code >= 300 && code < 400) {
-        return util::format(". Redirection: %1", code);
+        return util::format("%1. Redirection: %2", prefix, code);
     }
     else if (code >= 400 && code < 500) {
-        return util::format(". Client Error: %1", code);
+        return util::format("%1. Client Error: %2", prefix, code);
     }
     else if (code >= 500 && code < 600) {
-        return util::format(". Server Error: %1", code);
+        return util::format("%1. Server Error: %2", prefix, code);
     }
-    return util::format(". Unknown HTTP Error: %1", code);
+    return util::format("%1. Unknown HTTP Error: %2", prefix, code);
+}
+} // anonymous namespace
+
+const char* httpmethod_to_string(HttpMethod method)
+{
+    switch (method) {
+        case HttpMethod::get:
+            return "GET";
+        case HttpMethod::post:
+            return "POST";
+        case HttpMethod::patch:
+            return "PATCH";
+        case HttpMethod::put:
+            return "PUT";
+        case HttpMethod::del:
+            return "DEL";
+    }
+    return "UNKNOWN";
 }
 
 AppError::AppError(ErrorCodes::Error error_code, std::string message, std::string link,
                    util::Optional<int> additional_error_code)
     : Exception(error_code,
-                message + (error_code == ErrorCodes::HTTPError ? http_message(*additional_error_code) : ""))
+               error_code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
 {

@@ -2264,6 +2264,22 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
                                                   size_t num_args, const realm_query_arg_t* args);
 
 /**
+ * Parse a query string and bind it to a set.
+ *
+ * If the query failed to parse, the parser error is available from
+ * `realm_get_last_error()`.
+ *
+ * @param target_set The set on which to run this query.
+ * @param query_string A string in the Realm Query Language, optionally
+ *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param num_args The number of arguments for this query.
+ * @param args A pointer to a list of argument values.
+ * @return A non-null pointer if the query was successfully parsed and no
+ *         exception occurred.
+ */
+RLM_API realm_query_t* realm_query_parse_for_set(const realm_set_t* target_set, const char* query_string,
+                                                 size_t num_args, const realm_query_arg_t* args);
+/**
  * Parse a query string and bind it to another query result.
  *
  * If the query failed to parse, the parser error is available from
