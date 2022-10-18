@@ -576,7 +576,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results["a"].size() == 3);
         REQUIRE(sectioned_results["b"].size() == 1);
         REQUIRE(sectioned_results["o"].size() == 1);
-        REQUIRE_THROWS(sectioned_results["x"]);
+        REQUIRE_EXCEPTION(sectioned_results["x"], InvalidArgument, "Section key \"x\" not found.");
         REQUIRE(algo_run_count == 5);
     }
 
@@ -593,7 +593,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results["ap"].size() == 3);
         REQUIRE(sectioned_results["ba"].size() == 1);
         REQUIRE(sectioned_results["or"].size() == 1);
-        REQUIRE_THROWS(sectioned_results["a"]);
+        REQUIRE_EXCEPTION(sectioned_results["a"], InvalidArgument, "Section key \"a\" not found.");
         REQUIRE(algo_run_count == 5);
     }
 
@@ -620,7 +620,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {
             return value.get_link();
         });
-        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
+                          "Links are not supported as section keys."); // Trigger calculation
         // Even after sectioning has failed, the sectioned results
         // object should left in a sensible state.
         REQUIRE(sr.is_valid());
@@ -637,7 +638,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
             auto obj = Object(realm, value.get_link());
             return Mixed(obj.obj().get<ObjLink>(col_typed_link));
         });
-        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
+                          "Links are not supported as section keys."); // Trigger calculation
         REQUIRE(sr.is_valid());
     }
 

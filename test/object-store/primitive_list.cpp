@@ -205,22 +205,30 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         SECTION("invalidate") {
             r->invalidate();
-            REQUIRE_THROWS(list.verify_attached());
+            REQUIRE_EXCEPTION(list.verify_attached(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("close") {
             r->close();
-            REQUIRE_THROWS(list.verify_attached());
+            REQUIRE_EXCEPTION(list.verify_attached(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("delete row") {
             obj.remove();
-            REQUIRE_THROWS(list.verify_attached());
+            REQUIRE_EXCEPTION(list.verify_attached(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("rollback transaction creating list") {
             r->cancel_transaction();
-            REQUIRE_THROWS(list.verify_attached());
+            REQUIRE_EXCEPTION(list.verify_attached(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
     }
 
@@ -229,22 +237,29 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         SECTION("invalidate") {
             r->invalidate();
-            REQUIRE_THROWS(list.verify_in_transaction());
+            REQUIRE_EXCEPTION(list.verify_in_transaction(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("close") {
             r->close();
-            REQUIRE_THROWS(list.verify_in_transaction());
+            REQUIRE_EXCEPTION(list.verify_in_transaction(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("delete row") {
             obj.remove();
-            REQUIRE_THROWS(list.verify_in_transaction());
+            REQUIRE_EXCEPTION(list.verify_in_transaction(), InvalidatedObject,
+                              "List is no longer valid. Either the parent object was deleted or the containing Realm "
+                              "has been invalidated or closed.");
         }
 
         SECTION("end write") {
             r->commit_transaction();
-            REQUIRE_THROWS(list.verify_in_transaction());
+            REQUIRE_EXCEPTION(list.verify_in_transaction(), WrongTransactionState,
+                              "Cannot modify managed List outside of a write transaction.");
         }
     }
 
@@ -335,10 +350,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             REQUIRE(util::any_cast<Boxed>(list.get(ctx, i)) == Boxed(values[i]));
             REQUIRE(util::any_cast<Boxed>(results.get(ctx, i)) == Boxed(values[i]));
         }
-        REQUIRE_THROWS(list.get<T>(values.size()));
-        REQUIRE_THROWS(results.get<T>(values.size()));
-        REQUIRE_THROWS(list.get(ctx, values.size()));
-        REQUIRE_THROWS(results.get(ctx, values.size()));
+        size_t n = values.size();
+        auto list_msg =
+            util::format("Requested index %1 calling get() on list 'object.value' when max is %2", n, n - 1);
+        auto results_msg = util::format("Requested index %1 calling get() on Results when max is %2", n, n - 1);
+        REQUIRE_THROWS_OUT_OF_BOUNDS(list.get<T>(values.size()), n, n, list_msg);
+        REQUIRE_THROWS_OUT_OF_BOUNDS(results.get<T>(values.size()), n, n, results_msg);
+        REQUIRE_THROWS_OUT_OF_BOUNDS(list.get(ctx, values.size()), n, n, list_msg);
+        REQUIRE_THROWS_OUT_OF_BOUNDS(results.get(ctx, values.size()), n, n, results_msg);
     }
 
     SECTION("first()") {
@@ -377,7 +396,9 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             REQUIRE(results.get_any(i) == val);
         }
 
-        REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
+        size_t n = values.size();
+        auto msg = util::format("Requested index %1 calling set() on list 'object.value' when max is %2", n, n - 1);
+        REQUIRE_THROWS_OUT_OF_BOUNDS(list.set(list.size(), static_cast<T>(values[0])), n, n, msg);
     }
 
     SECTION("find()") {
@@ -421,7 +442,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
 #if 0
     SECTION("filtered index_of()") {
-        REQUIRE_THROWS(results.index_of(table->get(0)));
+        REQUIRE_EXCEPTION(results.index_of(table->get(0)), InvalidSession, "message?");
         auto q = TestType::unwrap(values[0], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
         auto filtered = list.filter(std::move(q));
         for (size_t i = 1; i < values.size(); ++i) {
@@ -495,8 +516,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("min()") {
         if constexpr (!TestType::can_minmax) {
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.min(), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(
+                list.min(), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 list 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                results.min(), IllegalOperation,
+                util::format("Operation 'min' not supported for %1 list 'object.value'", TestType::name));
         }
         else {
             REQUIRE(cf::get<W>(*list.min()) == TestType::min());
@@ -509,9 +534,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("max()") {
         if constexpr (!TestType::can_minmax) {
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.max(), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(), ErrorCodes::IllegalOperation);
-            return;
+            REQUIRE_EXCEPTION(
+                list.max(), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 list 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                results.max(), IllegalOperation,
+                util::format("Operation 'max' not supported for %1 list 'object.value'", TestType::name));
         }
         else {
             REQUIRE(cf::get<W>(list.max().value()) == TestType::max());
@@ -524,7 +552,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("sum()") {
         if constexpr (!TestType::can_sum) {
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.sum(), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(
+                list.sum(), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 list 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                results.sum(), IllegalOperation,
+                util::format("Operation 'sum' not supported for %1 list 'object.value'", TestType::name));
         }
         else {
             REQUIRE(cf::get<W>(list.sum()) == TestType::sum());
@@ -537,7 +570,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("average()") {
         if constexpr (!TestType::can_average) {
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.average(), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(
+                list.average(), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 list 'object.value'", TestType::name));
+            REQUIRE_EXCEPTION(
+                results.average(), IllegalOperation,
+                util::format("Operation 'average' not supported for %1 list 'object.value'", TestType::name));
         }
         else {
             REQUIRE(cf::get<typename TestType::AvgType>(*list.average()) == TestType::average());

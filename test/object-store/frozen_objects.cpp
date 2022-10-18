@@ -87,12 +87,14 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
 
     SECTION("auto_refresh") {
         REQUIRE(!frozen_realm->auto_refresh());
-        REQUIRE_THROWS(frozen_realm->set_auto_refresh(true));
+        REQUIRE_EXCEPTION(frozen_realm->set_auto_refresh(true), WrongTransactionState,
+                          "Auto-refresh cannot be enabled for frozen Realms.");
         REQUIRE(!frozen_realm->auto_refresh());
     }
 
     SECTION("begin_transaction() throws") {
-        REQUIRE_THROWS(frozen_realm->begin_transaction());
+        REQUIRE_EXCEPTION(frozen_realm->begin_transaction(), WrongTransactionState,
+                          "Can't perform transactions on a frozen Realm");
     }
 
     SECTION("can call methods on another thread") {
@@ -164,7 +166,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_results.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("Result constructor - Empty") {
@@ -174,7 +178,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            REQUIRE_THROWS(frozen_res.get_any(0));
+            REQUIRE_EXCEPTION(frozen_res.get_any(0), OutOfBounds,
+                              "Requested index 0 calling get_any() on Results when empty");
         });
     }
 
@@ -336,8 +341,12 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}));
-        REQUIRE_THROWS(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
+        REQUIRE_EXCEPTION(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {
@@ -401,7 +410,8 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}), WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {
@@ -476,8 +486,12 @@ TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}));
-        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
+        REQUIRE_EXCEPTION(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {

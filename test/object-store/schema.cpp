@@ -82,6 +82,8 @@ struct StringMaker<SchemaChange> {
 };
 } // namespace Catch
 
+using namespace Catch::Matchers;
+
 TEST_CASE("ObjectSchema") {
     SECTION("Aliases are still present in schema returned from the Realm") {
         TestFile config;
@@ -359,8 +361,9 @@ TEST_CASE("Schema") {
             Schema schema = {
                 {"object", {{"link", PropertyType::Object | PropertyType::Nullable}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.link' of type 'object' has unknown object type ''");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.link' of type 'object' has unknown object type ''"));
         }
 
         SECTION("allow asymmetric tables") {
@@ -373,7 +376,9 @@ TEST_CASE("Schema") {
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::SyncFLX));
-            REQUIRE_THROWS(schema.validate(SchemaValidationMode::SyncPBS));
+            REQUIRE_EXCEPTION(schema.validate(SchemaValidationMode::SyncPBS), SchemaValidationFailed,
+                              Catch::Matchers::ContainsSubstring(
+                                  "Asymmetric table 'location' not allowed in partition based sync"));
         }
 
         SECTION("asymmetric tables not allowed in local realm") {
@@ -382,7 +387,8 @@ TEST_CASE("Schema") {
                  ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Asymmetric table 'location' not allowed in a local Realm");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Asymmetric table 'location' not allowed in a local Realm"));
         }
 
         SECTION("rejects link properties with asymmetric target object") {
@@ -392,9 +398,10 @@ TEST_CASE("Schema") {
                  ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
             };
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::SyncFLX),
-                "Property 'object.link' of type 'object' cannot be a link to an asymmetric object.");
+            REQUIRE_EXCEPTION(
+                schema.validate(SchemaValidationMode::SyncFLX), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Property 'object.link' of type 'object' cannot be a link to an asymmetric object."));
         }
 
         SECTION("rejects link properties with asymmetric origin object") {
@@ -404,9 +411,9 @@ TEST_CASE("Schema") {
                  {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", {{"value", PropertyType::Int}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(SchemaValidationMode::SyncFLX),
-                                      "Asymmetric table with property 'object.link' of type 'object' cannot have a "
-                                      "non-embedded object type.");
+            REQUIRE_EXCEPTION(schema.validate(SchemaValidationMode::SyncFLX), SchemaValidationFailed,
+                              ContainsSubstring("Asymmetric table with property 'object.link' of type 'object' "
+                                                "cannot have a non-embedded object type."));
         }
 
         SECTION("allow embedded objects with asymmetric sync") {
@@ -417,29 +424,32 @@ TEST_CASE("Schema") {
                   {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
                 {"link target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
             };
-            schema.validate(SchemaValidationMode::SyncFLX);
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::SyncFLX));
         }
 
         SECTION("rejects array properties with no target object") {
             Schema schema = {
                 {"object", {{"array", PropertyType::Array | PropertyType::Object}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.array' of type 'array' has unknown object type ''");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.array' of type 'array' has unknown object type ''"));
         }
 
         SECTION("rejects link properties with a target not in the schema") {
             Schema schema = {{"object", {{"link", PropertyType::Object | PropertyType::Nullable, "invalid target"}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Property 'object.link' of type 'object' has unknown object type 'invalid target'");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Property 'object.link' of type 'object' has unknown object type 'invalid target'"));
         }
 
         SECTION("rejects array properties with a target not in the schema") {
             Schema schema = {{"object", {{"array", PropertyType::Array | PropertyType::Object, "invalid target"}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Property 'object.array' of type 'array' has unknown object type 'invalid target'"));
         }
 
         SECTION("allows embedded objects in lists and dictionaries") {
@@ -460,9 +470,9 @@ TEST_CASE("Schema") {
                 {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
                 {"object", {{"set", PropertyType::Object | PropertyType::Set, "target"}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Set property 'object.set' cannot contain embedded object type 'target'. Set "
-                                      "semantics are not applicable to embedded objects.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Set property 'object.set' cannot contain embedded object type "
+                                                "'target'. Set semantics are not applicable to embedded objects."));
         }
 
         SECTION("rejects explicitly included embedded object orphans") {
@@ -471,9 +481,10 @@ TEST_CASE("Schema") {
                               ObjectSchema::ObjectType::Embedded,
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::RejectEmbeddedOrphans),
-                "Embedded object 'origin' is unreachable by any link path from top level objects.");
+            REQUIRE_EXCEPTION(
+                schema.validate(SchemaValidationMode::RejectEmbeddedOrphans), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Embedded object 'origin' is unreachable by any link path from top level objects."));
         }
 
         SECTION("allows embedded object chains starting from a top level object") {
@@ -547,9 +558,10 @@ TEST_CASE("Schema") {
                 {"EmbeddedObject",
                  ObjectSchema::ObjectType::Embedded,
                  {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'"));
         }
 
         SECTION("rejects embedded objects loop to itself from a list") {
@@ -559,9 +571,10 @@ TEST_CASE("Schema") {
                 {"EmbeddedObject",
                  ObjectSchema::ObjectType::Embedded,
                  {{"link_to_self", PropertyType::Object | PropertyType::Array, "EmbeddedObject"}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'"));
         }
 
         SECTION("rejects embedded objects loop via different embedded object") {
@@ -574,8 +587,9 @@ TEST_CASE("Schema") {
                 {"EmbeddedObjectB",
                  ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently "
-                                                         "supported: 'EmbeddedObjectA.link_to_b.link_to_a'");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Cycles containing embedded objects are not currently supported: "
+                                                "'EmbeddedObjectA.link_to_b.link_to_a'"));
         }
 
         SECTION("rejects with descriptions of all embedded object loops") {
@@ -592,22 +606,13 @@ TEST_CASE("Schema") {
                 {"EmbeddedObjectC",
                  ObjectSchema::ObjectType::Embedded,
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
-            std::string message;
-            try {
-                schema.validate();
-            }
-            catch (const std::exception& e) {
-                message = e.what();
-            }
-            bool found_loop_on_a = message.find("EmbeddedObjectA.link_to_c.link_to_a") != std::string::npos ||
-                                   message.find("EmbeddedObjectA.link_to_b.link_to_a") != std::string::npos;
-            bool found_loop_on_b = message.find("EmbeddedObjectB.link_to_a.link_to_b") != std::string::npos ||
-                                   message.find("EmbeddedObjectB.link_to_a.link_to_c.link_to_a") != std::string::npos;
-            bool found_loop_on_c = message.find("EmbeddedObjectC.link_to_a.link_to_c") != std::string::npos ||
-                                   message.find("EmbeddedObjectC.link_to_a.link_to_b.link_to_a") != std::string::npos;
-            REQUIRE(found_loop_on_a);
-            REQUIRE(found_loop_on_b);
-            REQUIRE(found_loop_on_c);
+            REQUIRE_THROWS_WITH(schema.validate(),
+                                (ContainsSubstring("EmbeddedObjectA.link_to_c.link_to_a") ||
+                                 ContainsSubstring("EmbeddedObjectA.link_to_b.link_to_a")) &&
+                                    (ContainsSubstring("EmbeddedObjectB.link_to_a.link_to_b") ||
+                                     ContainsSubstring("EmbeddedObjectB.link_to_a.link_to_c.link_to_a")) &&
+                                    (ContainsSubstring("EmbeddedObjectC.link_to_a.link_to_c") ||
+                                     ContainsSubstring("EmbeddedObjectC.link_to_a.link_to_b.link_to_a")));
         }
 
         SECTION("allows top level loops") {
@@ -665,8 +670,9 @@ TEST_CASE("Schema") {
                                   {"value", PropertyType::Int},
                               },
                               {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "", ""}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(), "Property 'object.incoming' of type 'linking objects' has unknown object type ''");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.incoming' of type 'linking objects' has unknown object type ''"));
         }
 
         SECTION("rejects linking objects without a source property") {
@@ -675,9 +681,10 @@ TEST_CASE("Schema") {
                                   {"value", PropertyType::Int},
                               },
                               {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "object", ""}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Property 'object.incoming' of type 'linking objects' must have an origin property name.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring(
+                    "Property 'object.incoming' of type 'linking objects' must have an origin property name."));
         }
 
         SECTION("rejects linking objects with invalid source object") {
@@ -687,9 +694,9 @@ TEST_CASE("Schema") {
                      {"value", PropertyType::Int},
                  },
                  {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "not an object type", ""}}}};
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
-                "Property 'object.incoming' of type 'linking objects' has unknown object type 'not an object type'");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.incoming' of type 'linking objects' has unknown "
+                                                "object type 'not an object type'"));
         }
 
         SECTION("rejects linking objects with invalid source property") {
@@ -698,8 +705,9 @@ TEST_CASE("Schema") {
                                   {"value", PropertyType::Int},
                               },
                               {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "object", "value"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.value' declared as origin of linking "
-                                                         "objects property 'object.incoming' is not a link");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.value' declared as origin of linking objects "
+                                                "property 'object.incoming' is not a link"));
 
             schema = {{"object",
                        {
@@ -711,9 +719,9 @@ TEST_CASE("Schema") {
                        {
                            {"value", PropertyType::Int},
                        }}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.link' declared as origin of linking objects property "
-                                      "'object.incoming' links to type 'object 2'");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.link' declared as origin of linking objects "
+                                                "property 'object.incoming' links to type 'object 2'"));
         }
 
         SECTION("rejects non-array linking objects") {
@@ -722,8 +730,8 @@ TEST_CASE("Schema") {
                                   {"link", PropertyType::Object | PropertyType::Nullable, "object"},
                               },
                               {{"incoming", PropertyType::LinkingObjects, "object", "link"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Linking Objects property 'object.incoming' must be an array.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Linking Objects property 'object.incoming' must be an array."));
         }
 
         SECTION("rejects target object types for non-link properties") {
@@ -742,7 +750,8 @@ TEST_CASE("Schema") {
             for (auto& prop : schema.begin()->persisted_properties) {
                 REQUIRE_NOTHROW(schema.validate());
                 prop.object_type = "object";
-                REQUIRE_THROWS_CONTAINING(schema.validate(), "cannot have an object type.");
+                REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                                  ContainsSubstring("cannot have an object type."));
                 prop.object_type = "";
             }
         }
@@ -776,14 +785,15 @@ TEST_CASE("Schema") {
         SECTION("rejects non-nullable link properties") {
             Schema schema = {{"object", {{"link", PropertyType::Object, "target"}}},
                              {"target", {{"value", PropertyType::Int}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.link' of type 'object' must be nullable.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.link' of type 'object' must be nullable."));
         }
 
         SECTION("rejects non-nullable dictionary properties") {
             Schema schema = {{"object", {{"dictionary", PropertyType::Dictionary | PropertyType::Object, "target"}}},
                              {"target", {{"value", PropertyType::Int}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.dictionary' of type 'object' must be nullable.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.dictionary' of type 'object' must be nullable."));
         }
 
         SECTION("rejects non-nullable Mixed dictionary properties") {
@@ -807,15 +817,16 @@ TEST_CASE("Schema") {
                 {"object",
                  {{"array", PropertyType::Array | PropertyType::Object | PropertyType::Nullable, "target"}}},
                 {"target", {{"value", PropertyType::Int}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.array' of type 'array' cannot be nullable.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.array' of type 'array' cannot be nullable."));
         }
 
         SECTION("rejects nullable set properties") {
             Schema schema = {
                 {"object", {{"set", PropertyType::Set | PropertyType::Object | PropertyType::Nullable, "target"}}},
                 {"target", {{"value", PropertyType::Int}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.set' of type 'set' cannot be nullable.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Property 'object.set' of type 'set' cannot be nullable."));
         }
 
         SECTION("rejects nullable linking objects") {
@@ -826,8 +837,9 @@ TEST_CASE("Schema") {
                  },
                  {{"incoming", PropertyType::LinkingObjects | PropertyType::Array | PropertyType::Nullable, "object",
                    "link"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.incoming' of type 'linking objects' cannot be nullable.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.incoming' of type 'linking objects' cannot be nullable."));
         }
 
         SECTION("rejects duplicate primary keys") {
@@ -836,8 +848,9 @@ TEST_CASE("Schema") {
                                   {"pk1", PropertyType::Int, Property::IsPrimary{true}},
                                   {"pk2", PropertyType::Int, Property::IsPrimary{true}},
                               }}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Properties 'pk2' and 'pk1' are both marked as the primary key of 'object'.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Properties 'pk2' and 'pk1' are both marked as the primary key of 'object'."));
         }
 
         SECTION("rejects primary key on embedded table") {
@@ -847,7 +860,8 @@ TEST_CASE("Schema") {
                                   {"pk1", PropertyType::Int, Property::IsPrimary{true}},
                                   {"int", PropertyType::Int},
                               }}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded object type 'object' cannot have a primary key.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Embedded object type 'object' cannot have a primary key."));
         }
 
         SECTION("rejects invalid primary key types") {
@@ -857,40 +871,49 @@ TEST_CASE("Schema") {
                               }}};
 
             schema.begin()->primary_key_property()->type = PropertyType::Mixed;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'mixed' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'mixed' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Bool;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'bool' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'bool' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Float;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'float' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'float' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Double;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'double' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'double' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Object;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'object' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'object' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::LinkingObjects;
-            REQUIRE_THROWS_CONTAINING(
-                schema.validate(), "Property 'object.pk' of type 'linking objects' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'linking objects' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Data;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'data' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'data' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Date;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'date' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'date' cannot be made the primary key."));
 
             schema.begin()->primary_key_property()->type = PropertyType::Decimal;
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'decimal' cannot be made the primary key.");
+            REQUIRE_EXCEPTION(
+                schema.validate(), SchemaValidationFailed,
+                ContainsSubstring("Property 'object.pk' of type 'decimal' cannot be made the primary key."));
         }
 
         SECTION("allows valid primary key types") {
@@ -923,8 +946,8 @@ TEST_CASE("Schema") {
                                   {"value", PropertyType::Int},
                               }}};
             schema.begin()->primary_key = "nonexistent";
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Specified primary key 'object.nonexistent' does not exist.");
+            REQUIRE_EXCEPTION(schema.validate(), SchemaValidationFailed,
+                              ContainsSubstring("Specified primary key 'object.nonexistent' does not exist."));
         }
 
         SECTION("rejects indexes for types that cannot be indexed") {
