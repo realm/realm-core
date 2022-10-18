@@ -168,7 +168,7 @@ void SyncSession::become_waiting_for_access_token()
 }
 
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
-                                  const std::string& context_message)
+                                  std::string_view context_message)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {

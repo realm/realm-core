@@ -562,7 +562,6 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
-
 namespace {
 struct CollectionAggregateAdaptor {
     const CollectionBase& list;
@@ -853,10 +852,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0].first != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                              keypaths[0].first, string_for_property_type(type & ~PropertyType::Flags)));
         return sort({{{}}, {keypaths[0].second}});
@@ -928,10 +927,10 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0] != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'", keypaths[0],
                              string_for_property_type(type & ~PropertyType::Flags)));
         return distinct(DistinctDescriptor({{ColKey()}}));
@@ -1000,7 +999,8 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
         return;
     if (m_update_policy == UpdatePolicy::Never) {
         if (force)
-            throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
+            throw LogicError(ErrorCodes::IllegalOperation,
+                             "Cannot create asynchronous query for snapshotted Results.");
         return;
     }
 

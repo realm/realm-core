@@ -433,7 +433,7 @@ void RealmCoordinator::open_db()
         // don't want two copies of the path in the error, so strip it out if it
         // appears, and then include it in our prefix.
         std::string underlying = ex.what();
-        auto& path = ex.get_path();
+        auto path = ex.get_path();
         auto pos = underlying.find(", path:");
         if (pos != std::string::npos && pos > 0) {
             underlying.erase(pos);

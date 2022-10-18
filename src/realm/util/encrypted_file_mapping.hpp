@@ -20,7 +20,6 @@
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <realm/util/file.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/features.h>
 
 #if REALM_ENABLE_ENCRYPTION

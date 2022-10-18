@@ -56,7 +56,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
         case AuthProvider::SERVER_API_KEY:
             return IdentityProviderServerAPIKey;
     }
-    throw std::runtime_error("unknown provider type in provider_type_from_enum");
+    throw InvalidArgument("unknown provider type in provider_type_from_enum");
 }
 
 AuthProvider enum_from_provider_type(const IdentityProvider& provider)

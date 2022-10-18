@@ -392,7 +392,7 @@ public:
         else if (left.m_from_list && right.m_from_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             // Eg: `{1, 2, 3} * {4, 5} > age`
-            throw std::logic_error("Operations involving two lists are not supported");
+            throw LogicError(ErrorCodes::InvalidQuery, "Operations involving two lists are not supported");
         }
         else if (!left.m_from_list && right.m_from_list) {
             // Right values come from link. Left must come from single row.

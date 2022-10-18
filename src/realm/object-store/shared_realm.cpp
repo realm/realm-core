@@ -1084,7 +1084,7 @@ void Realm::convert(const Config& config, bool merge_into_existing)
 
 #if REALM_ENABLE_SYNC
     if (config.sync_config && config.sync_config->flx_sync_requested) {
-        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
+        throw IllegalOperation("Cannot convert Realms to flexible sync Realms");
     }
 #endif
 
@@ -1205,7 +1205,7 @@ bool Realm::do_refresh()
     }
 
     if (m_config.immutable()) {
-        throw std::logic_error("Can't refresh a read-only Realm.");
+        throw WrongTransactionState("Can't refresh an immutable Realm.");
     }
 
     // can't be any new changes if we're in a write transaction
@@ -1248,7 +1248,7 @@ bool Realm::do_refresh()
 void Realm::set_auto_refresh(bool auto_refresh)
 {
     if (is_frozen() && auto_refresh) {
-        throw std::logic_error("Auto-refresh cannot be enabled for frozen Realms.");
+        throw WrongTransactionState("Auto-refresh cannot be enabled for frozen Realms.");
     }
     m_auto_refresh = auto_refresh;
 }
@@ -1331,9 +1331,10 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
         return;
     }
     if (!lock_successful) {
-        throw LogicError(
+        throw FileAccessError(
             ErrorCodes::DeleteOnOpenRealm,
-            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
+            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path),
+            realm_file_path);
     }
 }
 

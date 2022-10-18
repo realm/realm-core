@@ -19,7 +19,7 @@
 #ifndef REALM_SECTIONED_RESULTS_HPP
 #define REALM_SECTIONED_RESULTS_HPP
 
-#include <realm/util/functional.hpp>
+#include <realm/object-store/results.hpp>
 
 #include <list>
 

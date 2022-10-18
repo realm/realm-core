@@ -26,7 +26,7 @@ namespace realm {
 
 const char* Exception::what() const noexcept
 {
-    return reason().c_str();
+    return reason().data();
 }
 
 const Status& Exception::to_status() const
@@ -34,7 +34,7 @@ const Status& Exception::to_status() const
     return m_status;
 }
 
-const std::string& Exception::reason() const noexcept
+std::string_view Exception::reason() const noexcept
 {
     return m_status.reason();
 }
@@ -85,7 +85,7 @@ UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
 UnsupportedFileFormatVersion::~UnsupportedFileFormatVersion() noexcept = default;
 
 
-LogicError::LogicError(ErrorCodes::Error code, const std::string& msg)
+LogicError::LogicError(ErrorCodes::Error code, std::string_view msg)
     : Exception(code, msg)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::logic_error));
@@ -93,15 +93,19 @@ LogicError::LogicError(ErrorCodes::Error code, const std::string& msg)
 LogicError::~LogicError() noexcept = default;
 
 
-RuntimeError::RuntimeError(ErrorCodes::Error code, const std::string& msg)
+RuntimeError::RuntimeError(ErrorCodes::Error code, std::string_view msg)
     : Exception(code, msg)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::runtime_error));
 }
 RuntimeError::~RuntimeError() noexcept = default;
 
+InvalidArgument::InvalidArgument(std::string_view msg)
+    : InvalidArgument(ErrorCodes::InvalidArgument, msg)
+{
+}
 
-InvalidArgument::InvalidArgument(ErrorCodes::Error code, const std::string& msg)
+InvalidArgument::InvalidArgument(ErrorCodes::Error code, std::string_view msg)
     : LogicError(code, msg)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::invalid_argument));
@@ -109,7 +113,7 @@ InvalidArgument::InvalidArgument(ErrorCodes::Error code, const std::string& msg)
 InvalidArgument::~InvalidArgument() noexcept = default;
 
 
-OutOfBounds::OutOfBounds(const std::string& msg, size_t idx, size_t sz)
+OutOfBounds::OutOfBounds(std::string_view msg, size_t idx, size_t sz)
     : InvalidArgument(ErrorCodes::OutOfBounds,
                       sz == 0 ? util::format("Requested index %1 calling %2 when empty", idx, msg)
                               : util::format("Requested index %1 calling %2 when max is %3", idx, msg, sz - 1))
@@ -120,7 +124,7 @@ OutOfBounds::OutOfBounds(const std::string& msg, size_t idx, size_t sz)
 OutOfBounds::~OutOfBounds() noexcept = default;
 
 
-FileAccessError::FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path, int err)
+FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path, int err)
     : RuntimeError(code, path.empty() ? msg : util::format("%1, path: '%2'", msg, path))
     , m_path(path)
     , m_errno(err)
@@ -128,7 +132,7 @@ FileAccessError::FileAccessError(ErrorCodes::Error code, const std::string& msg,
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
 }
 
-FileAccessError::FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path)
+FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path)
     : RuntimeError(code, msg)
     , m_path(path)
 {
