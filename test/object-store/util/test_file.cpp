@@ -117,10 +117,14 @@ static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token"
 static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
 static const std::string fake_device_id = "123400000000000000000000";
 
+static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
+{
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
+                                        fake_device_id);
+}
+
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
-    : SyncTestFile(app->sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app->base_url(),
-                                                 fake_device_id),
-                   bson::Bson(name))
+    : SyncTestFile(get_fake_user(*app, user_name), bson::Bson(name))
 {
 }
 
@@ -327,7 +331,7 @@ TestAppSession::~TestAppSession()
     }
 }
 
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
 
@@ -368,6 +372,11 @@ TestSyncManager::~TestSyncManager()
             app::App::clear_cached_apps();
         }
     }
+}
+
+std::shared_ptr<realm::SyncUser> TestSyncManager::fake_user(const std::string& name)
+{
+    return get_fake_user(*m_app, name);
 }
 
 #endif // REALM_ENABLE_SYNC
