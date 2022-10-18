@@ -39,6 +39,7 @@
 * Changed the behaviour of creating a collection of non-nullable Mixed type to throw a descriptive error message rather than asserting in debug mode. ([#5894](https://github.com/realm/realm-core/issues/5894), since the introduction of the Mixed type).
 * Fix a use-after-free when a sync session is closed and the app is destroyed at the same time ([#5752](https://github.com/realm/realm-core/issues/5752), since v11.5.2).
 * Fix Http transport doesn't correctly preserve the request body ([#5890](https://github.com/realm/realm-core/issues/5890), since 12.8.0).
+* IN Query fails if left operator is a TypedLink ([5946](https://github.com/realm/realm-core/issues/5946), since v10.5.2)
 
 ### Breaking changes
 * Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()` ([PR #5898](https://github.com/realm/realm-core/pull/5898)).
