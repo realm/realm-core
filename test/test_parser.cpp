@@ -4656,6 +4656,7 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "link == $4", args, num_args, 1);
     verify_query_sub(test_context, origin, "link.@links.Origin.link == $2", args, num_args, 1); // poor man's SELF
     verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
+    verify_query_sub(test_context, origin, "$1 IN links", args, num_args, 1);
     verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
     verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
@@ -5524,6 +5525,11 @@ TEST(Parser_PrimaryKey)
 
     std::string query_string = "int == obj(\"class_Int\",1)";
     Query q = origin->query(query_string);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.get_description(), query_string);
+
+    query_string = "obj(\"class_Int\",1) == int";
+    q = origin->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
 
