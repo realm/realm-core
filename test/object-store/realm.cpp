@@ -397,7 +397,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
 
         SECTION("refreshing an immutable Realm throws") {
-            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh a read-only Realm.");
+            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh an immutable Realm.");
         }
     }
 
@@ -2435,8 +2435,8 @@ TEST_CASE("SharedRealm: close()") {
         REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->read_group(), ErrorCodes::ClosedRealm);
         REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->begin_transaction(), ErrorCodes::ClosedRealm);
         REQUIRE(!realm->is_in_transaction());
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->commit_transaction(), ErrorCodes::WrongTransactionState);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->cancel_transaction(), ErrorCodes::WrongTransactionState);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->commit_transaction(), ErrorCodes::ClosedRealm);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->cancel_transaction(), ErrorCodes::ClosedRealm);
 
         REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->refresh(), ErrorCodes::ClosedRealm);
         REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->invalidate(), ErrorCodes::ClosedRealm);
