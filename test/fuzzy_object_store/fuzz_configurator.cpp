@@ -63,9 +63,9 @@ bool FuzzConfigurator::is_stdin_filename_enabled() const
     return m_file_names_from_stdin;
 }
 
-std::ostream* FuzzConfigurator::get_logger()
+FuzzLog& FuzzConfigurator::get_logger()
 {
-    return m_logging ? &(m_log) : nullptr;
+    return m_log;
 }
 
 State& FuzzConfigurator::get_state()
@@ -98,10 +98,7 @@ void FuzzConfigurator::init(int argc, const char* argv[])
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
-            m_log.open("fuzz_log.txt");
-            m_log << path.c_str() << std::endl;
-            m_log << "Init realm " << std::endl;
-            m_logging = true;
+            m_log = FuzzLog{"fuzz_log.txt"};
         }
         else if (arg == "--") {
             m_file_names_from_stdin = true;

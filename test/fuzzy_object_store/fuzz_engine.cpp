@@ -50,7 +50,7 @@ int FuzzEngine::run(int argc, const char* argv[])
 void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
 {
     const auto path = cnf.get_realm_path();
-    auto log = cnf.get_logger();
+    auto& log = cnf.get_logger();
     auto& state = cnf.get_state();
     auto& fuzzer = cnf.get_fuzzer();
     auto shared_realm = Realm::get_shared_realm(cnf.get_config());
@@ -69,10 +69,8 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
         char instr = fuzzer.get_next_token(state) % COUNT;
         iteration++;
 
-        if (log) {
-            *log << iteration << " ";
-            *log << "Do fuzz with command " << (int)instr << std::endl;
-        }
+        log << iteration << "\n";
+        log << "Do fuzz with command " << instr << "\n";
 
         Group& group = fetch_group();
 

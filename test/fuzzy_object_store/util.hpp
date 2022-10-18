@@ -71,8 +71,7 @@ enum INS {
 #if REALM_VERIFY
 #define REALM_DO_IF_VERIFY(log, op)                                                                                  \
     do {                                                                                                             \
-        if (log)                                                                                                     \
-            *log << #op << ";\n";                                                                                    \
+        log << #op << ";\n";                                                                                         \
         op;                                                                                                          \
     } while (false)
 #else

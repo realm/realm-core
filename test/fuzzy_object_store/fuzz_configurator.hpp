@@ -19,9 +19,9 @@
 #define FUZZ_CONFIG_HPP
 
 #include "util.hpp"
+#include "fuzz_logger.hpp"
 #include <realm/object-store/shared_realm.hpp>
 #include <string>
-#include <fstream>
 
 class FuzzObject;
 class FuzzConfigurator {
@@ -31,7 +31,7 @@ public:
     FuzzObject& get_fuzzer();
     const std::string& get_realm_path() const;
     bool is_stdin_filename_enabled() const;
-    std::ostream* get_logger();
+    FuzzLog& get_logger();
     State& get_state();
     void set_state(const std::string& input);
     const std::string& get_prefix() const;
@@ -45,7 +45,7 @@ private:
     realm::Realm::Config m_config;
     std::string m_path;
     std::string m_prefix;
-    std::ofstream m_log;
+    FuzzLog m_log;
     bool m_logging{false};
     bool m_use_encryption{false};
     bool m_file_names_from_stdin{false};

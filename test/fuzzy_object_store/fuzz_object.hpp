@@ -25,34 +25,34 @@
 #include <fstream>
 
 struct State;
+class FuzzLog;
 class FuzzObject {
     // list of realm operations we support in our fuzzer
 public:
-    void create_table(realm::Group& group, std::ostream* log);
-    void remove_table(realm::Group& group, std::ostream* lo, State& sg);
-    void clear_table(realm::Group& group, std::ostream* log, State& s);
-    void create_object(realm::Group& group, std::ostream* log, State& s);
-    void add_column(realm::Group& group, std::ostream* log, State& s);
-    void remove_column(realm::Group& group, std::ostream* log, State& s);
-    void rename_column(realm::Group& group, std::ostream* log, State& s);
-    void add_search_index(realm::Group& group, std::ostream* log, State& s);
-    void remove_search_index(realm::Group& group, std::ostream* log, State& s);
-    void add_column_link(realm::Group& group, std::ostream* log, State& s);
-    void add_column_link_list(realm::Group& group, std::ostream* log, State& s);
-    void set_obj(realm::Group& group, std::ostream* log, State& s);
-    void remove_obj(realm::Group& group, std::ostream* log, State& s);
-    void remove_recursive(realm::Group& group, std::ostream* log, State& s);
-    void enumerate_column(realm::Group& group, std::ostream* log, State& s);
-    void get_all_column_names(realm::Group& group, std::ostream* log);
-    void commit(realm::SharedRealm shared_realm, std::ostream* log);
-    void rollback(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log);
-    void advance(realm::SharedRealm shared_realm, std::ostream* log);
-    void close_and_reopen(realm::SharedRealm shared_realm, std::ostream* log, const realm::Realm::Config& config);
-    void create_table_view(realm::Group& group, std::ostream* log, State& s,
-                           std::vector<realm::TableView>& table_views);
-    void check_null(realm::Group& group, std::ostream* log, State& s);
-    void async_write(realm::SharedRealm shared_realm, std::ostream* log);
-    void async_cancel(realm::SharedRealm shared_realm, realm::Group& group, std::ostream* log, State& s);
+    void create_table(realm::Group& group, FuzzLog& log);
+    void remove_table(realm::Group& group, FuzzLog& lo, State& sg);
+    void clear_table(realm::Group& group, FuzzLog& log, State& s);
+    void create_object(realm::Group& group, FuzzLog& log, State& s);
+    void add_column(realm::Group& group, FuzzLog& log, State& s);
+    void remove_column(realm::Group& group, FuzzLog& log, State& s);
+    void rename_column(realm::Group& group, FuzzLog& log, State& s);
+    void add_search_index(realm::Group& group, FuzzLog& log, State& s);
+    void remove_search_index(realm::Group& group, FuzzLog& log, State& s);
+    void add_column_link(realm::Group& group, FuzzLog& log, State& s);
+    void add_column_link_list(realm::Group& group, FuzzLog& log, State& s);
+    void set_obj(realm::Group& group, FuzzLog& log, State& s);
+    void remove_obj(realm::Group& group, FuzzLog& log, State& s);
+    void remove_recursive(realm::Group& group, FuzzLog& log, State& s);
+    void enumerate_column(realm::Group& group, FuzzLog& log, State& s);
+    void get_all_column_names(realm::Group& group, FuzzLog& log);
+    void commit(realm::SharedRealm shared_realm, FuzzLog& log);
+    void rollback(realm::SharedRealm shared_realm, realm::Group& group, FuzzLog& log);
+    void advance(realm::SharedRealm shared_realm, FuzzLog& log);
+    void close_and_reopen(realm::SharedRealm shared_realm, FuzzLog& log, const realm::Realm::Config& config);
+    void create_table_view(realm::Group& group, FuzzLog& log, State& s, std::vector<realm::TableView>& table_views);
+    void check_null(realm::Group& group, FuzzLog& log, State& s);
+    void async_write(realm::SharedRealm shared_realm, FuzzLog& log);
+    void async_cancel(realm::SharedRealm shared_realm, realm::Group& group, FuzzLog& log, State& s);
 
     const char* get_encryption_key() const;
     std::string get_current_time_stamp() const;
