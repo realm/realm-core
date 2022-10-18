@@ -34,6 +34,7 @@
 #include <cstdlib>
 #endif
 
+#include <realm/util/errno.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
@@ -685,7 +686,7 @@ std::string SlabAlloc::get_file_path_for_assertions() const
     return m_file.get_path();
 }
 
-ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
+ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 {
     m_cfg = cfg;
     // ExceptionSafety: If this function throws, it must leave the allocator in
@@ -706,23 +707,26 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     REALM_ASSERT_EX(cfg.session_initiator || !cfg.clear_file, cfg.session_initiator, cfg.clear_file,
                     get_file_path_for_assertions());
 
-    // Create a deep copy of the file_path string, otherwise it can appear that
-    // users are leaking paths because string assignment operator implementations might
-    // actually be reference counting with copy-on-write. If our all_files map
-    // holds onto these references (since it is still reachable memory) it can appear
-    // as a leak in the user application, but it is actually us (and that's ok).
-    const std::string path = file_path.c_str();
-
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
     set_read_only(cfg.read_only);
-    m_file.open(path.c_str(), access, create, 0); // Throws
+    try {
+        m_file.open(path.c_str(), access, create, 0); // Throws
+    }
+    catch (const FileAccessError& ex) {
+        auto msg = util::format_errno("Failed to open Realm file at path '%2': %1", ex.get_errno(), path);
+        if (ex.code() == ErrorCodes::PermissionDenied) {
+            msg += util::format(". Please use a path where your app has %1 permissions.",
+                                cfg.read_only ? "read" : "read-write");
+        }
+        throw FileAccessError(ex.code(), msg, path, ex.get_errno());
+    }
+    File::CloseGuard fcg(m_file);
     auto physical_file_size = m_file.get_size();
     // Note that get_size() may (will) return a different size before and after
     // the call below to set_encryption_key.
     m_file.set_encryption_key(cfg.encryption_key);
-    File::CloseGuard fcg(m_file);
 
     size_t size = 0;
     // The size of a database file must not exceed what can be encoded in
@@ -752,9 +756,13 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         size = initial_size;
     }
     ref_type top_ref;
+    note_reader_start(this);
+    util::ScopeExit reader_end_guard([this]() noexcept {
+        note_reader_end(this);
+    });
+
     size_t expected_size = size_t(-1);
     try {
-        note_reader_start(this);
         // we'll read header and (potentially) footer
         File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
         realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
@@ -772,7 +780,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         }
 
-        top_ref = validate_header(header, footer, size, path); // Throws
+        top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 
@@ -829,29 +837,19 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             expected_size = round_up_to_page_size(logical_size);
         }
     }
-    catch (const DecryptionFailed&) {
-        note_reader_end(this);
-        throw InvalidDatabase("Realm file decryption failed", path);
-    }
     catch (const InvalidDatabase&) {
-        note_reader_end(this);
         throw;
     }
+    catch (const DecryptionFailed&) {
+        throw InvalidDatabase("decryption failed", path);
+    }
     catch (const std::exception& e) {
-        // Catch all for other exceptions
-        note_reader_end(this);
-        // we end up here if any of the file or mapping operations fail.
-        throw InvalidDatabase(util::format("Realm file initial open failed: %1", e.what()), path);
+        throw InvalidDatabase(e.what(), path);
     }
     catch (...) {
-        note_reader_end(this);
-        throw InvalidDatabase("Realm file initial open failed: unknown error", path);
+        throw InvalidDatabase("unknown error", path);
     }
     m_baseline = 0;
-    auto handler = [this]() noexcept {
-        note_reader_end(this);
-    };
-    auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
     // lists correctly
     m_free_space_state = free_space_Invalid;
@@ -978,7 +976,7 @@ void SlabAlloc::throw_header_exception(std::string msg, const Header& header, co
 {
     char buf[256];
     snprintf(buf, sizeof(buf),
-             ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+             " top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
              "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
              header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
              header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
@@ -997,18 +995,30 @@ ref_type SlabAlloc::validate_header(const char* data, size_t size, const std::st
 }
 
 ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter* footer, size_t size,
-                                    const std::string& path)
+                                    const std::string& path, bool is_encrypted)
 {
     // Verify that size is sane and 8-byte aligned
-    if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0)) {
-        std::string msg = "Realm file has bad size (" + util::to_string(size) + ")";
-        throw InvalidDatabase(msg, path);
-    }
+    if (REALM_UNLIKELY(size < sizeof(Header)))
+        throw InvalidDatabase(util::format("file is non-empty but too small (%1 bytes) to be a valid Realm.", size),
+                              path);
+    if (REALM_UNLIKELY(size % 8 != 0))
+        throw InvalidDatabase(util::format("file has an invalid size (%1).", size), path);
 
     // First four bytes of info block is file format id
     if (REALM_UNLIKELY(!(char(header->m_mnemonic[0]) == 'T' && char(header->m_mnemonic[1]) == '-' &&
-                         char(header->m_mnemonic[2]) == 'D' && char(header->m_mnemonic[3]) == 'B')))
-        throw_header_exception("Invalid mnemonic", *header, path);
+                         char(header->m_mnemonic[2]) == 'D' && char(header->m_mnemonic[3]) == 'B'))) {
+        if (is_encrypted) {
+            // Encrypted files check the hmac on read, so there's a lot less
+            // which could go wrong and have us still reach this point
+            throw_header_exception("header has invalid mnemonic. The file does not appear to be Realm file.", *header,
+                                   path);
+        }
+        else {
+            throw_header_exception("header has invalid mnemonic. The file is either not a Realm file, is an "
+                                   "encrypted Realm file but no encryption key was supplied, or is corrupted.",
+                                   *header, path);
+        }
+    }
 
     // Last bit in info block indicates which top_ref block is valid
     int slot_selector = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
@@ -1017,23 +1027,28 @@ ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter*
     auto top_ref = header->m_top_ref[slot_selector];
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof(Header) + sizeof(StreamingFooter))) {
-            std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
-            throw InvalidDatabase(msg, path);
+            throw InvalidDatabase(
+                util::format("file is in streaming format but too small (%1 bytes) to be a valid Realm.", size),
+                path);
         }
         REALM_ASSERT(footer);
         top_ref = footer->m_top_ref;
         if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie)) {
-            std::string msg = "Invalid streaming format cookie (" + util::to_string(footer->m_magic_cookie) + ")";
-            throw InvalidDatabase(msg, path);
+            throw InvalidDatabase(util::format("file is in streaming format but has an invalid footer cookie (%1). "
+                                               "The file is probably truncated.",
+                                               footer->m_magic_cookie),
+                                  path);
         }
     }
     if (REALM_UNLIKELY(top_ref % 8 != 0)) {
-        std::string msg = "Top ref not aligned (" + util::to_string(top_ref) + ")";
-        throw_header_exception(msg, *header, path);
+        throw_header_exception("top ref is not aligned", *header, path);
     }
     if (REALM_UNLIKELY(top_ref >= size)) {
-        std::string msg = "Top ref outside file (size = " + util::to_string(size) + ")";
-        throw_header_exception(msg, *header, path);
+        throw_header_exception(
+            util::format(
+                "top ref is outside of the file (size: %1, top_ref: %2). The file has probably been truncated.", size,
+                top_ref),
+            *header, path);
     }
     return ref_type(top_ref);
 }

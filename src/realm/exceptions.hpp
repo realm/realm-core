@@ -333,8 +333,7 @@ struct CrossTableLinkTarget : LogicError {
 /// types that are used for various specific types of errors.
 class FileAccessError : public RuntimeError {
 public:
-    FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path, int err);
-    FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path);
+    FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path, int err = 0);
     ~FileAccessError() noexcept override;
 
     /// Return the associated file system path, or the empty string if there is

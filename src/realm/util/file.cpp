@@ -184,16 +184,19 @@ struct WindowsFileHandleHolder {
 
 
 namespace realm::util {
+namespace {
 
 /// Thrown if create_Always was specified and the file did already
 /// exist.
-class File::Exists : public FileAccessError {
+class Exists : public FileAccessError {
 public:
-    Exists(const std::string& msg, const std::string& path, int err)
-        : FileAccessError(ErrorCodes::FileAlreadyExists, std::string("File already exists. ") + msg, path, err)
+    Exists(const std::string& msg, const std::string& path)
+        : FileAccessError(ErrorCodes::FileAlreadyExists, msg, path)
     {
     }
 };
+
+} // anonymous namespace
 
 
 bool try_make_dir(const std::string& path)
@@ -207,10 +210,11 @@ bool try_make_dir(const std::string& path)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("make_dir() failed: ", err);
+    if (err == EEXIST)
+        return false;
+
+    auto msg = format_errno("Failed to create directory at '%2': %1", err, path);
     switch (err) {
-        case EEXIST:
-            return false;
         case EACCES:
         case EROFS:
             throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
@@ -224,8 +228,7 @@ void make_dir(const std::string& path)
 {
     if (try_make_dir(path)) // Throws
         return;
-    std::string msg = get_errno_msg("make_dir() failed: ", EEXIST);
-    throw File::Exists(msg, path, EEXIST);
+    throw Exists(format_errno("Failed to create directory at '%2': %1", EEXIST, path), path);
 }
 
 
@@ -257,7 +260,7 @@ void remove_dir(const std::string& path)
     if (try_remove_dir(path)) // Throws
         return;
     int err = ENOENT;
-    std::string msg = get_errno_msg("remove() failed: ", err);
+    std::string msg = format_errno("Failed to remove directory '%2': %1", err, path);
     throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
 }
 
@@ -273,7 +276,10 @@ bool try_remove_dir(const std::string& path)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("remove_dir() failed: ", err);
+    if (err == ENOENT)
+        return false;
+
+    std::string msg = format_errno("Failed to remove directory '%2': %1", err, path);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -282,22 +288,9 @@ bool try_remove_dir(const std::string& path)
         case EEXIST:
         case ENOTEMPTY:
             throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
-        case ENOENT:
-            return false;
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err); // LCOV_EXCL_LINE
     }
-}
-
-
-void remove_dir_recursive(const std::string& path)
-{
-    if (try_remove_dir_recursive(path)) // Throws
-        return;
-
-    int err = ENOENT;
-    std::string msg = get_errno_msg("remove_dir_recursive() failed: ", err);
-    throw FileAccessError(ErrorCodes::FileNotFound, msg, path, ENOENT);
 }
 
 
@@ -348,26 +341,21 @@ std::string make_temp_dir()
 #else // POSIX.1-2008 version
 
 #if REALM_ANDROID
-    char buffer[] = "/data/local/tmp/realm_XXXXXX";
-    if (mkdtemp(buffer) == 0) {
-        throw SystemError(errno, "mkdtemp() failed"); // LCOV_EXCL_LINE
-    }
-    return std::string(buffer);
+    std::string buffer = "/data/local/tmp/realm_XXXXXX";
 #else
     char* tmp_dir_env = getenv("TMPDIR");
-    std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
-    if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
-        base_dir = base_dir + "/";
+    std::string buffer = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
+    if (!buffer.empty() && buffer.back() != '/') {
+        buffer += "/";
     }
-    std::string tmp = base_dir + std::string("realm_XXXXXX") + std::string("\0", 1);
-    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
-    memcpy(buffer.get(), tmp.c_str(), tmp.size());
-    if (mkdtemp(buffer.get()) == 0) {
-        throw SystemError(errno, "mkdtemp() failed"); // LCOV_EXCL_LINE
-    }
-    return std::string(buffer.get());
+    buffer += "realm_XXXXXX";
 #endif
 
+    if (mkdtemp(buffer.data()) == 0) {
+        int err = errno;
+        throw SystemError(err, util::format("Failed to create temporary directory: %1", err)); // LCOV_EXCL_LINE
+    }
+    return buffer;
 #endif
 }
 
@@ -442,7 +430,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_PATH_NOT_FOUND:
             throw FileAccessError(ErrorCodes::FileNotFound, msg, path, int(err));
         case ERROR_FILE_EXISTS:
-            throw Exists(msg, path, int(err));
+            throw Exists(error_prefix, path);
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, int(err));
     }
@@ -489,17 +477,22 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string error_prefix = "open() failed: ";
-    std::string msg = get_errno_msg(error_prefix.c_str(), err);
+    std::string msg = format_errno("Failed to open file at path '%2': %1", err, path);
     switch (err) {
         case EACCES:
+        case EPERM:
         case EROFS:
         case ETXTBSY:
             throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
         case ENOENT:
+            if (c != create_Never)
+                msg = util::format("Failed to open file at path '%1': parent directory does not exist", path);
             throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
         case EEXIST:
-            throw Exists(msg, path, err);
+            throw Exists(msg, path);
+        case ENOTDIR:
+            msg = format("Failed to open file at path '%1': parent path is not a directory", path);
+            [[fallthrough]];
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err); // LCOV_EXCL_LINE
     }
@@ -640,11 +633,11 @@ error:
 error:
     // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
+    auto msg = format_errno("write() failed: %1", err);
     if (err == ENOSPC || err == EDQUOT) {
-        std::string msg = get_errno_msg("write() failed: ", err);
         throw OutOfDiskSpace(msg);
     }
-    throw SystemError(err, "write() failed");
+    throw SystemError(err, msg);
     // LCOV_EXCL_STOP
 
 #endif
@@ -781,11 +774,11 @@ void File::resize(SizeType size)
     // required by File::resize().
     if (::ftruncate(m_fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
+        auto msg = format_errno("ftruncate() failed: %1", err);
         if (err == ENOSPC || err == EDQUOT) {
-            std::string msg = get_errno_msg("ftruncate() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw SystemError(err, "ftruncate() failed");
+        throw SystemError(err, msg);
     }
 
 #endif
@@ -944,14 +937,15 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
         return true;
     }
 
-    if (status == ENOSPC || status == EDQUOT) {
-        std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
-        throw OutOfDiskSpace(msg);
-    }
     if (status == EINVAL || status == EPERM) {
         return false; // Retry with non-atomic version
     }
-    throw SystemError(status, "posix_fallocate() failed");
+
+    auto msg = format_errno("posix_fallocate() failed: %1", status);
+    if (status == ENOSPC || status == EDQUOT) {
+        throw OutOfDiskSpace(msg);
+    }
+    throw SystemError(status, msg);
 
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -1418,7 +1412,7 @@ void File::remove(const std::string& path)
     if (try_remove(path))
         return;
     int err = ENOENT;
-    std::string msg = get_errno_msg("remove() failed: ", err);
+    std::string msg = format_errno("Failed to delete file at '%2': %1", err, path);
     throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
 }
 
@@ -1434,7 +1428,10 @@ bool File::try_remove(const std::string& path)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("unlink() failed: ", err);
+    if (err == ENOENT)
+        return false;
+
+    std::string msg = format_errno("Failed to delete file at '%2': %1", err, path);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -1460,7 +1457,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
     if (r == 0)
         return;
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("rename() failed: ", err);
+    std::string msg = format_errno("Failed to rename file from '%2' to '%3': %1", err, old_path, new_path);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -1535,7 +1532,8 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
         if (::fstat(f2, &statbuf) == 0)
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
     }
-    throw SystemError(errno, "fstat() failed");
+    int err = errno;
+    throw SystemError(err, format_errno("fstat() failed: %1", err));
 
 #endif
 }
@@ -1557,7 +1555,8 @@ File::UniqueID File::get_unique_id() const
     if (::fstat(m_fd, &statbuf) == 0) {
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
-    throw SystemError(errno, "fstat() failed");
+    int err = errno;
+    throw SystemError(err, format_errno("fstat() failed: %1", err));
 #endif
 }
 
@@ -1581,7 +1580,7 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
     // File doesn't exist
     if (err == ENOENT)
         return false;
-    throw SystemError(err, "fstat() failed");
+    throw SystemError(err, format_errno("fstat() failed: %1", err));
 #endif
 }
 
@@ -1603,7 +1602,8 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
-    throw SystemError(errno, "fstat() failed");
+    int err = errno;
+    throw SystemError(err, format_errno("fstat() failed: %1", err));
 
 #endif
 }
@@ -1866,13 +1866,14 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
     m_dirp = opendir(path.c_str());
     if (!m_dirp) {
         int err = errno; // Eliminate any risk of clobbering
-        std::string msg = get_errno_msg("opendir() failed: ", err);
+        if (allow_missing && err == ENOENT)
+            return;
+
+        std::string msg = format_errno("opendir() failed: %1", err);
         switch (err) {
             case EACCES:
                 throw FileAccessError(ErrorCodes::PermissionDenied, msg, path, err);
             case ENOENT:
-                if (allow_missing)
-                    return;
                 throw FileAccessError(ErrorCodes::FileNotFound, msg, path, err);
             default:
                 throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err);

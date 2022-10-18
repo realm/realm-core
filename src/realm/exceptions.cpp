@@ -125,16 +125,9 @@ OutOfBounds::~OutOfBounds() noexcept = default;
 
 
 FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path, int err)
-    : RuntimeError(code, path.empty() ? msg : util::format("%1, path: '%2'", msg, path))
-    , m_path(path)
-    , m_errno(err)
-{
-    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
-}
-
-FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path)
     : RuntimeError(code, msg)
     , m_path(path)
+    , m_errno(err)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
 }

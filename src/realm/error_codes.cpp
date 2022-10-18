@@ -37,8 +37,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
-        case IncompatibleLockFile:
-        case IncompatibleSession:
         case MaximumFileSizeExceeded:
         case MultipleSyncAgents:
         case NoSubscriptionForWrite:
@@ -60,6 +58,8 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case FileNotFound:
         case FileOperationFailed:
         case IncompatibleHistories:
+        case IncompatibleLockFile:
+        case IncompatibleSession:
         case InvalidDatabase:
         case PermissionDenied:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);

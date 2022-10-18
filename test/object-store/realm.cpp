@@ -233,7 +233,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
                                           std::hash<std::string>()(config.path)); // Mirror internal implementation
         REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
-        realm::util::remove_dir_recursive(fallback_dir);
+        REQUIRE(realm::util::try_remove_dir_recursive(fallback_dir));
     }
 
     SECTION("automatically append dir separator to end of fallback path") {
@@ -252,7 +252,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
                                           std::hash<std::string>()(config.path)); // Mirror internal implementation
         REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
-        realm::util::remove_dir_recursive(fallback_dir);
+        REQUIRE(realm::util::try_remove_dir_recursive(fallback_dir));
     }
 #endif
 

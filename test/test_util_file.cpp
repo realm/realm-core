@@ -210,32 +210,6 @@ TEST(Utils_File_remove_open)
 }
 #endif
 
-TEST(Utils_File_RemoveDirRecursive)
-{
-    TEST_DIR(dir_0);
-    auto touch = [](const std::string& path) {
-        File(path, File::mode_Write);
-    };
-    std::string dir_1  = File::resolve("dir_1",  dir_0);
-    make_dir(dir_1);
-    std::string dir_2  = File::resolve("dir_2",  dir_1);
-    make_dir(dir_2);
-    std::string dir_3  = File::resolve("dir_3",  dir_2);
-    make_dir(dir_3);
-    std::string file_1 = File::resolve("file_1", dir_2);
-    touch(file_1);
-    std::string dir_4  = File::resolve("dir_4",  dir_2);
-    make_dir(dir_4);
-    std::string file_2 = File::resolve("file_2", dir_2);
-    touch(file_2);
-    std::string file_3 = File::resolve("file_3", dir_3);
-    touch(file_3);
-    std::string file_4 = File::resolve("file_4", dir_4);
-    touch(file_4);
-    remove_dir_recursive(dir_1);
-    remove_dir(dir_0);
-}
-
 TEST(Utils_File_TryRemoveDirRecursive)
 {
     TEST_DIR(dir_0);

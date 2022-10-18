@@ -652,6 +652,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
+    using util::format;
 
     REALM_ASSERT(!is_attached());
 
@@ -813,19 +814,16 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Architecture mismatch: SharedInfo size is %1 but should be %2.",
+                                                    info_size, sizeof(SharedInfo)));
         }
         if (info->shared_info_version != g_shared_info_version) {
             if (retries_left) {
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Shared info version doesn't match, " << info->shared_info_version << " " << g_shared_info_version
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Version mismatch: SharedInfo version is %1 but should be %2.",
+                                                    info->shared_info_version, g_shared_info_version));
         }
         // Validate compatible sizes of mutex and condvar types. Sizes of all
         // other fields are architecture independent, so if condvar and mutex
@@ -837,10 +835,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Mutex size doesn't match: " << info->size_of_mutex << " " << sizeof(info->shared_controlmutex)
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Architecture mismatch: Mutex size is %1 but should be %2.",
+                                                    info->size_of_mutex, sizeof(info->shared_controlmutex)));
         }
 
         if (info->size_of_condvar != sizeof info->room_to_write) {
@@ -848,10 +844,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Condition var size doesn't match: " << info->size_of_condvar << " " << sizeof(info->room_to_write)
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(
+                path, format("Architecture mismatch: Condition variable size is %1 but should be %2.",
+                             info->size_of_condvar, sizeof(info->room_to_write)));
         }
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
         m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
@@ -859,7 +854,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
         if (!m_controlmutex.is_valid()) {
-            throw IncompatibleLockFile("Control mutex is invalid.");
+            throw IncompatibleLockFile(
+                path, "Control mutex is invalid. This suggests that incompatible pthread libraries are in use.");
         }
 
         // OK! lock file appears valid. We can now continue operations under the protection
@@ -995,8 +991,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                         good_history_type = (stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format("Expected a Realm without history, but found history type %1",
-                                             stored_hist_type),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened "
+                                             "with replication disabled.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_OutOfRealm:
@@ -1007,27 +1004,28 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                                              stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format(
-                                    "Expected a Realm with no or in-realm history, but found history type %1",
-                                    stored_hist_type),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "local history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_SyncClient:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncClient) || (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format(
-                                    "Expected an empty or synced Realm, but found history type %1, top ref %2",
-                                    stored_hist_type, top_ref),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "synchronized history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_SyncServer:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) || (top_ref == 0));
                         if (!good_history_type)
-                            throw IncompatibleHistories(util::format("Expected a Realm containing a server-side "
-                                                                     "history, but found history type %1, top ref %2",
-                                                                     stored_hist_type, top_ref),
-                                                        path);
+                            throw IncompatibleHistories(
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "server history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
+                                path);
                         break;
                 }
 
@@ -1120,10 +1118,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // throw the same kind of exception, as would have been thrown
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
-                    std::stringstream ss;
-                    ss << "File format version doesn't match: " << info->file_format_version << " "
-                       << target_file_format_version << ".";
-                    throw IncompatibleLockFile(ss.str());
+                    throw IncompatibleLockFile(path,
+                                               format("Version mismatch: File format version is %1 but should be %2.",
+                                                      info->file_format_version, target_file_format_version));
                 }
 
                 // Even though this session participant is not the session initiator,
