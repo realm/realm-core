@@ -288,6 +288,7 @@ Dictionary::Iterator Dictionary::end() const
     return dict().end();
 }
 
+namespace {
 class NotificationHandler {
 public:
     NotificationHandler(realm::Dictionary& dict, Dictionary::CBFunc cb)
@@ -334,6 +335,7 @@ private:
     std::unique_ptr<realm::Dictionary> m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
+} // namespace
 
 NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array) &
 {

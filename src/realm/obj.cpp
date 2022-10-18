@@ -1072,12 +1072,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
             if (output_mode == output_mode_xjson_plus) {
                 open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-                if (ck.is_list())
-                    open_str += "List";
-                else if (ck.is_set())
-                    open_str += "Set";
-                else if (ck.is_dictionary())
-                    open_str += "Dictionary";
+                open_str += collection_type_name(ck, true);
                 open_str += "\": ";
                 close_str += " }";
             }

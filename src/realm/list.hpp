@@ -277,6 +277,9 @@ protected:
             }
         }
     }
+
+private:
+    T do_get(size_t ndx, const char* msg) const;
 };
 
 // Specialization of Lst<ObjKey>:
@@ -663,10 +666,14 @@ inline CollectionBasePtr Lst<T>::clone_collection() const
 template <class T>
 inline T Lst<T>::get(size_t ndx) const
 {
+    return do_get(ndx, "get()");
+}
+
+template <class T>
+inline T Lst<T>::do_get(size_t ndx, const char* msg) const
+{
     const auto current_size = size();
-    if (ndx >= current_size) {
-        throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
-    }
+    CollectionBase::validate_index(msg, ndx, current_size);
 
     auto value = m_tree->get(ndx);
     if constexpr (std::is_same_v<T, Mixed>) {
@@ -823,10 +830,8 @@ template <class T>
 void Lst<T>::move(size_t from, size_t to)
 {
     auto sz = size();
-    if (from >= sz || to >= sz) {
-        throw OutOfBounds(util::format("move() on %1", CollectionBase::get_property_name()), from >= sz ? from : to,
-                          sz);
-    }
+    CollectionBase::validate_index("move()", from, sz);
+    CollectionBase::validate_index("move()", to, sz);
 
     if (from != to) {
         if (Replication* repl = this->m_obj.get_replication()) {
@@ -854,10 +859,8 @@ template <class T>
 void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
     auto sz = size();
-    if (ndx1 >= sz || ndx2 >= sz) {
-        throw OutOfBounds(util::format("swap() on %1", CollectionBase::get_property_name()), ndx1 >= sz ? ndx1 : ndx2,
-                          sz);
-    }
+    CollectionBase::validate_index("swap()", ndx1, sz);
+    CollectionBase::validate_index("swap()", ndx2, sz);
 
     if (ndx1 != ndx2) {
         if (Replication* repl = this->m_obj.get_replication()) {
@@ -876,7 +879,7 @@ T Lst<T>::set(size_t ndx, T value)
                               util::format("List: %1", CollectionBase::get_property_name()));
 
     // get will check for ndx out of bounds
-    T old = get(ndx);
+    T old = do_get(ndx, "set()");
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_set(*this, ndx, value);
     }
@@ -895,8 +898,7 @@ void Lst<T>::insert(size_t ndx, T value)
                               util::format("List: %1", CollectionBase::get_property_name()));
 
     auto sz = size();
-    if (ndx > sz)
-        throw OutOfBounds(util::format("insert() on %1", CollectionBase::get_property_name()), ndx, sz + 1);
+    CollectionBase::validate_index("insert()", ndx, sz + 1);
 
     ensure_created();
 
@@ -911,7 +913,7 @@ template <class T>
 T Lst<T>::remove(size_t ndx)
 {
     // get will check for ndx out of bounds
-    T old = get(ndx);
+    T old = do_get(ndx, "remove()");
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_erase(*this, ndx);
     }
@@ -1083,9 +1085,7 @@ inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 inline ObjKey LnkLst::get(size_t ndx) const
 {
     const auto current_size = size();
-    if (ndx >= current_size) {
-        throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
-    }
+    CollectionBase::validate_index("get()", ndx, current_size);
     return m_list.m_tree->get(virtual2real(ndx));
 }
 
@@ -1107,8 +1107,8 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw IllegalOperation(
-            util::format("Cannot insert an already managed object into a list of embedded objects: %1",
-                         CollectionBase::get_property_name()));
+            util::format("Cannot insert an already managed object into list of embedded objects '%1.%2'",
+                         get_table()->get_class_name(), CollectionBase::get_property_name()));
 
     update_if_needed();
     m_list.insert(virtual2real(ndx), value);
@@ -1120,7 +1120,8 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw IllegalOperation(
-            util::format("Cannot replace embedded object: %1", CollectionBase::get_property_name()));
+            util::format("Cannot insert an already managed object into list of embedded objects '%1.%2'",
+                         get_table()->get_class_name(), CollectionBase::get_property_name()));
 
     update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);

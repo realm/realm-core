@@ -327,6 +327,7 @@ void SectionedResults::calculate_sections_if_required()
         return;
     if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evalutation)
         return;
+
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
         m_results.ensure_up_to_date();

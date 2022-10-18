@@ -105,7 +105,7 @@ private:
 class SectionedResults {
 public:
     SectionedResults() = default;
-    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
+    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)>;
 
     /**
      * Returns a `ResultsSection` which will be bound to a section key present at the given index in

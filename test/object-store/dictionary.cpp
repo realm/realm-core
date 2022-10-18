@@ -165,7 +165,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("verify_attached()") {
         object_store::Dictionary unattached;
         REQUIRE_NOTHROW(dict.verify_attached());
-        REQUIRE_THROWS_WITH(unattached.verify_attached(), "Access to invalidated Dictionary object");
+        REQUIRE_THROWS_WITH(unattached.verify_attached(), "Dictionary was never initialized and is invalid.");
     }
 
     SECTION("verify_in_transaction()") {

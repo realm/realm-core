@@ -3239,8 +3239,7 @@ TEST_CASE("results: error messages") {
     }
 
     SECTION("unsupported aggregate operation") {
-        REQUIRE_THROWS_WITH(results.sum("value"),
-                            "Cannot sum property 'value': operation not supported for 'string' properties");
+        REQUIRE_THROWS_WITH(results.sum("value"), "Operation 'sum' not supported for string property 'object.value'");
     }
 }
 
