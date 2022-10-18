@@ -256,6 +256,8 @@ struct GenericNetworkTransport {
     }
 };
 
+const char* httpmethod_to_string(HttpMethod method);
+
 } // namespace realm::app
 
 #endif /* REALM_GENERIC_NETWORK_TRANSPORT_HPP */
