@@ -20,6 +20,7 @@
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/list.hpp>
@@ -36,11 +37,7 @@ namespace realm::sectioned_results_fixtures {
 template <PropertyType prop_type, typename T>
 struct Base {
     using Type = T;
-
-    static PropertyType property_type()
-    {
-        return prop_type;
-    }
+    constexpr static PropertyType property_type = prop_type;
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
@@ -68,10 +65,7 @@ struct Int : Base<PropertyType::Int, int64_t> {
         return value.get_int() % 2;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Bool : Base<PropertyType::Bool, bool> {
@@ -99,10 +93,7 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return value.get_bool();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Float : Base<PropertyType::Float, float> {
@@ -130,10 +121,7 @@ struct Float : Base<PropertyType::Float, float> {
         return (int(value.get_float()) % 2) ? 1.0 : 0.0;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Double : Base<PropertyType::Double, double> {
@@ -161,10 +149,7 @@ struct Double : Base<PropertyType::Double, double> {
         return (int(value.get_double()) % 2) ? 1.0 : 0.0;
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct String : Base<PropertyType::String, StringData> {
@@ -196,10 +181,7 @@ struct String : Base<PropertyType::String, StringData> {
         return str.size() > 0 ? str.prefix(1) : str;
     }
 
-    static size_t expected_size()
-    {
-        return 5;
-    }
+    constexpr static size_t expected_size = 5;
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
@@ -230,10 +212,7 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
         return value.get_binary();
     }
 
-    static size_t expected_size()
-    {
-        return 6;
-    }
+    constexpr static size_t expected_size = 6;
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
@@ -263,10 +242,7 @@ struct Date : Base<PropertyType::Date, Timestamp> {
         return value.get_timestamp().get_seconds() < 10 ? Timestamp(1, 1) : Timestamp(2, 1);
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
@@ -301,15 +277,8 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
         return Mixed::is_numeric(value.get_type()) ? "Numerics" : "Alphanumeric";
     }
 
-    static PropertyType property_type()
-    {
-        return PropertyType::Mixed | PropertyType::Nullable;
-    }
-
-    static size_t expected_size()
-    {
-        return 3;
-    }
+    constexpr static PropertyType property_type = PropertyType::Mixed | PropertyType::Nullable;
+    constexpr static size_t expected_size = 3;
 };
 
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
@@ -345,10 +314,7 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
         return value.get_object_id();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct UUID : Base<PropertyType::UUID, realm::UUID> {
@@ -388,10 +354,7 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
         return value.get_uuid();
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
@@ -425,20 +388,14 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
         return value.get_decimal() < Decimal128("876.54e32") ? Decimal128("1") : Decimal128("0");
     }
 
-    static size_t expected_size()
-    {
-        return 2;
-    }
+    constexpr static size_t expected_size = 2;
 };
 
 template <typename BaseT>
 struct BoxedOptional : BaseT {
     using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
     static std::vector<Type> values()
     {
         std::vector<Type> ret;
@@ -448,10 +405,7 @@ struct BoxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size()
-    {
-        return BaseT::expected_size() + 1;
-    }
+    constexpr static size_t expected_size = BaseT::expected_size + 1;
 
     static std::vector<Type> expected_sorted()
     {
@@ -472,11 +426,10 @@ struct BoxedOptional : BaseT {
 
 template <typename BaseT>
 struct UnboxedOptional : BaseT {
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
+    constexpr static bool is_optional = true;
+    constexpr static PropertyType property_type = BaseT::property_type | PropertyType::Nullable;
+    constexpr static size_t expected_size = BaseT::expected_size + 1;
+
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();
@@ -490,10 +443,6 @@ struct UnboxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size()
-    {
-        return BaseT::expected_size() + 1;
-    }
 
     static auto expected_sorted() -> decltype(BaseT::values())
     {
@@ -1659,7 +1608,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"object",
-         {{"value_col", TestType::property_type()}, {"array_col", PropertyType::Array | TestType::property_type()}}},
+         {{"value_col", TestType::property_type}, {"array_col", PropertyType::Array | TestType::property_type}}},
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -1687,7 +1636,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
             algo_run_count++;
             return TestType::comparison_value(value);
         });
-        REQUIRE(sectioned_results.size() == TestType::expected_size());
+        REQUIRE(sectioned_results.size() == TestType::expected_size);
         auto size = sectioned_results.size();
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
@@ -1715,7 +1664,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         });
         std::reverse(exp_values_sorted.begin(), exp_values_sorted.end());
         std::reverse(exp_keys.begin(), exp_keys.end());
-        REQUIRE(sectioned_results.size() == TestType::expected_size());
+        REQUIRE(sectioned_results.size() == TestType::expected_size);
         auto size = sectioned_results.size();
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
@@ -1824,7 +1773,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         auto frozen_realm = r->freeze();
         auto frozen_sr = sectioned_results.freeze(frozen_realm);
         auto size = frozen_sr.size();
-        REQUIRE(size == TestType::expected_size());
+        REQUIRE(size == TestType::expected_size);
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
             auto section = frozen_sr[section_idx];
@@ -1848,7 +1797,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
             return TestType::comparison_value(value);
         });
         auto size = sectioned_results.size();
-        REQUIRE(size == TestType::expected_size());
+        REQUIRE(size == TestType::expected_size);
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
             auto section = sectioned_results[section_idx];

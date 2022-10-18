@@ -3023,7 +3023,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
     const std::string partition_key_col_name = "partition_key_prop";
     const std::string table_name = "class_partition_test_type";
     REQUIRE(!base_url.empty());
-    auto partition_property = Property(partition_key_col_name, TestType::property_type());
+    auto partition_property = Property(partition_key_col_name, TestType::property_type);
     Schema schema = {{Group::table_name_to_class_name(table_name),
                       {
                           {valid_pk_name, PropertyType::Int, true},

@@ -128,7 +128,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
-        {"object", {{"value", PropertyType::Array | TestType::property_type()}}},
+        {"object", {{"value", PropertyType::Array | TestType::property_type}}},
     };
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
@@ -163,8 +163,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     }
 
     SECTION("get_type()") {
-        REQUIRE(list.get_type() == TestType::property_type());
-        REQUIRE(results.get_type() == TestType::property_type());
+        REQUIRE(list.get_type() == TestType::property_type);
+        REQUIRE(results.get_type() == TestType::property_type);
     }
 
     SECTION("get_object_type()") {
@@ -405,14 +405,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     }
     SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), cf::less());
+        std::sort(begin(values), end(values), std::less<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), cf::greater());
+        std::sort(begin(values), end(values), std::greater<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
@@ -436,23 +436,23 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         auto sorted = list.sort(SortDescriptor({{col}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), cf::less());
+        std::sort(begin(values), end(values), std::less<>());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         sorted = list.sort(SortDescriptor({{col}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), cf::greater());
+        std::sort(begin(values), end(values), std::greater<>());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         auto execption_string =
             util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
-                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags));
+                         string_for_property_type(TestType::property_type & ~PropertyType::Flags));
         REQUIRE_THROWS_WITH(list.sort({{"not self", true}}), execption_string);
         REQUIRE_THROWS_WITH(list.sort({{"self", true}, {"self", false}}),
                             util::format("Cannot sort array of '%1' on more than one key path",
-                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+                                         string_for_property_type(TestType::property_type & ~PropertyType::Flags)));
     }
 
     SECTION("distinct()") {
@@ -472,10 +472,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         REQUIRE_THROWS_WITH(
             results.distinct({{"not self"}}),
             util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
-                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+                         string_for_property_type(TestType::property_type & ~PropertyType::Flags)));
         REQUIRE_THROWS_WITH(results.distinct({{"self"}, {"self"}}),
                             util::format("Cannot sort array of '%1' on more than one key path",
-                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+                                         string_for_property_type(TestType::property_type & ~PropertyType::Flags)));
     }
 #if 0
     SECTION("filter()") {
@@ -494,57 +494,58 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 #endif
 
     SECTION("min()") {
-        if (!TestType::can_minmax()) {
+        if constexpr (!TestType::can_minmax) {
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.min(), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(), ErrorCodes::IllegalOperation);
-            return;
         }
-
-        REQUIRE(cf::get<W>(*list.min()) == TestType::min());
-        REQUIRE(cf::get<W>(*results.min()) == TestType::min());
-        list.remove_all();
-        REQUIRE(list.min() == util::none);
-        REQUIRE(results.min() == util::none);
+        else {
+            REQUIRE(cf::get<W>(*list.min()) == TestType::min());
+            REQUIRE(cf::get<W>(*results.min()) == TestType::min());
+            list.remove_all();
+            REQUIRE(list.min() == util::none);
+            REQUIRE(results.min() == util::none);
+        }
     }
 
     SECTION("max()") {
-        if (!TestType::can_minmax()) {
+        if constexpr (!TestType::can_minmax) {
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.max(), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(), ErrorCodes::IllegalOperation);
             return;
         }
-
-        REQUIRE(cf::get<W>(list.max().value()) == TestType::max());
-        REQUIRE(cf::get<W>(results.max().value()) == TestType::max());
-        list.remove_all();
-        REQUIRE(list.max() == util::none);
-        REQUIRE(results.max() == util::none);
+        else {
+            REQUIRE(cf::get<W>(list.max().value()) == TestType::max());
+            REQUIRE(cf::get<W>(results.max().value()) == TestType::max());
+            list.remove_all();
+            REQUIRE(list.max() == util::none);
+            REQUIRE(results.max() == util::none);
+        }
     }
 
     SECTION("sum()") {
-        if (!TestType::can_sum()) {
+        if constexpr (!TestType::can_sum) {
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.sum(), ErrorCodes::IllegalOperation);
-            return;
         }
-
-        REQUIRE(cf::get<W>(list.sum()) == TestType::sum());
-        REQUIRE(cf::get<W>(*results.sum()) == TestType::sum());
-        list.remove_all();
-        REQUIRE(cf::get<W>(list.sum()) == TestType::empty_sum_value());
-        REQUIRE(cf::get<W>(*results.sum()) == TestType::empty_sum_value());
+        else {
+            REQUIRE(cf::get<W>(list.sum()) == TestType::sum());
+            REQUIRE(cf::get<W>(*results.sum()) == TestType::sum());
+            list.remove_all();
+            REQUIRE(cf::get<W>(list.sum()) == TestType::empty_sum_value());
+            REQUIRE(cf::get<W>(*results.sum()) == TestType::empty_sum_value());
+        }
     }
 
     SECTION("average()") {
-        if (!TestType::can_average()) {
+        if constexpr (!TestType::can_average) {
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.average(), ErrorCodes::IllegalOperation);
-            return;
         }
-
-        REQUIRE(cf::get<typename TestType::AvgType>(*list.average()) == TestType::average());
-        REQUIRE(cf::get<typename TestType::AvgType>(*results.average()) == TestType::average());
-        list.remove_all();
-        REQUIRE(list.average() == util::none);
-        REQUIRE(results.average() == util::none);
+        else {
+            REQUIRE(cf::get<typename TestType::AvgType>(*list.average()) == TestType::average());
+            REQUIRE(cf::get<typename TestType::AvgType>(*results.average()) == TestType::average());
+            list.remove_all();
+            REQUIRE(list.average() == util::none);
+            REQUIRE(results.average() == util::none);
+        }
     }
 
     SECTION("operator==()") {
