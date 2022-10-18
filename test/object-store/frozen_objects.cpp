@@ -43,21 +43,6 @@
 
 #include <realm/util/scope_exit.hpp>
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-
-    static void begin_read(SharedRealm const& shared_realm, VersionID version)
-    {
-        Realm::Internal::begin_read(*shared_realm, version);
-    }
-};
-} // namespace realm
-
 using namespace realm;
 using util::any_cast;
 

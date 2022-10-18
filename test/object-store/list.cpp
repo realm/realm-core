@@ -1741,15 +1741,6 @@ TEST_CASE("list of embedded objects") {
 }
 
 #if REALM_ENABLE_SYNC
-namespace realm {
-class TestHelper {
-public:
-    static std::shared_ptr<Transaction> transaction(Realm& shared_realm)
-    {
-        return Realm::Internal::get_transaction_ref(shared_realm);
-    }
-};
-} // namespace realm
 
 TEST_CASE("list with unresolved links") {
     TestSyncManager init_sync_manager({}, {false});
