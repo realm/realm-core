@@ -88,6 +88,7 @@ public:
         IncompatibleSession = RLM_ERR_INCOMPATIBLE_SESSION,
         IncompatibleLockFile = RLM_ERR_INCOMPATIBLE_LOCK_FILE,
         InvalidQuery = RLM_ERR_INVALID_QUERY,
+        BadVersion = RLM_ERR_BAD_VERSION,
         UnsupportedFileFormatVersion = RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
         MultipleSyncAgents = RLM_ERR_MULTIPLE_SYNC_AGENTS,
         ObjectAlreadyExists = RLM_ERR_OBJECT_ALREADY_EXISTS,
@@ -104,7 +105,6 @@ public:
         FileFormatUpgradeRequired = RLM_ERR_FILE_FORMAT_UPGRADE_REQUIRED,
         SchemaVersionMismatch = RLM_ERR_SCHEMA_VERSION_MISMATCH,
         NoSubscriptionForWrite = RLM_ERR_NO_SUBSCRIPTION_FOR_WRITE,
-        BadVersion = RLM_ERR_BAD_VERSION,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
