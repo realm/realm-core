@@ -180,12 +180,12 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
                 count = c;
             });
             if (count < expected_count) {
-                millisleep(500); // don't spam the server too much
+                millisleep(500); // slow down the number of retries
                 return false;
             }
             return true;
         },
-        std::chrono::minutes(60));
+        std::chrono::minutes(5));
 
     collection.find({}, {},
                     [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
@@ -1723,6 +1723,9 @@ TEST_CASE("audit integration tests") {
                                               REQUIRE_FALSE(error);
                                               deleted = *count;
                                           });
+                    if (deleted == 0) {
+                        millisleep(100); // slow down the number of retries
+                    }
                 }
             };
 
@@ -1748,6 +1751,9 @@ TEST_CASE("audit integration tests") {
                             REQUIRE_FALSE(error);
                             count = result.modified_count;
                         });
+                    if (count == 0) {
+                        millisleep(100); // slow down the number of retries
+                    }
                 }
             };
 

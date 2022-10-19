@@ -2,14 +2,17 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables (PR [#5897](https://github.com/realm/realm-core/pull/5897)).
+* Adding `realm_query_parse_for_set` in the C API ([#5935](https://github.com/realm/realm-core/pull/5935)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
+* Fix a use-after-free if the last external reference to an encrypted Realm was closed between when a client reset error was received and when the download of the new Realm began. ([PR #5949](https://github.com/realm/realm-core/pull/5949), since 12.4.0).
+
 ### Breaking changes
-* None.
+* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
+* Introduced new callback type realm_return_apikey_list_func_t and realm_return_apikey_func_t in the C-API ([PR #5945](https://github.com/realm/realm-core/pull/5945)).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -18,6 +21,9 @@
 
 ### Internals
 * Remove the unused utility function `copy_dir_recursive()`.
+* StringData and Timestamp are now constexpr-constructible.
+* Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
+* Updated `install_baas.sh` to use files stored on s3 ([#5932](https://github.com/realm/realm-core/issues/5932))
 
 ----------------------------------------------
 
@@ -34,6 +40,7 @@
 * Changed the behaviour of creating a collection of non-nullable Mixed type to throw a descriptive error message rather than asserting in debug mode. ([#5894](https://github.com/realm/realm-core/issues/5894), since the introduction of the Mixed type).
 * Fix a use-after-free when a sync session is closed and the app is destroyed at the same time ([#5752](https://github.com/realm/realm-core/issues/5752), since v11.5.2).
 * Fix Http transport doesn't correctly preserve the request body ([#5890](https://github.com/realm/realm-core/issues/5890), since 12.8.0).
+* IN Query fails if left operator is a TypedLink ([5946](https://github.com/realm/realm-core/issues/5946), since v10.5.2)
 
 ### Breaking changes
 * Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()` ([PR #5898](https://github.com/realm/realm-core/pull/5898)).

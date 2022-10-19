@@ -226,5 +226,5 @@ RLM_API bool realm_config_get_cached(realm_config_t* realm_config) noexcept
 RLM_API void realm_config_set_automatic_backlink_handling(realm_config_t* realm_config,
                                                           bool enable_automatic_handling) noexcept
 {
-    realm_config->automatic_handle_backlicks_in_migrations = enable_automatic_handling;
+    realm_config->automatically_handle_backlinks_in_migrations = enable_automatic_handling;
 }

@@ -335,10 +335,18 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                 server_requests_action);
         }
     }
+
+    std::vector<char> encryption_key;
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        encryption_key = m_config.encryption_key;
+    }
+
     DBOptions options;
-    options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
     options.enable_async_writes = false;
+    if (!encryption_key.empty())
+        options.encryption_key = encryption_key.data();
 
     std::shared_ptr<DB> db;
     auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());

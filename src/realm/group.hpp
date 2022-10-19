@@ -283,17 +283,19 @@ public:
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
-        REALM_ASSERT(table_name.begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len)));
-        return table_name.substr(g_class_name_prefix_len);
+        if (table_name.begins_with(g_class_name_prefix)) {
+            return table_name.substr(g_class_name_prefix.size());
+        }
+        return table_name;
     }
 
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
-        char* p = std::copy_n(g_class_name_prefix, g_class_name_prefix_len, buffer.data());
-        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix_len);
+        char* p = std::copy_n(g_class_name_prefix.data(), g_class_name_prefix.size(), buffer.data());
+        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix.size());
         std::copy_n(class_name.data(), len, p);
-        return StringData(buffer.data(), g_class_name_prefix_len + len);
+        return StringData(buffer.data(), g_class_name_prefix.size() + len);
     }
 
     TableRef get_table(TableKey key);
@@ -532,8 +534,7 @@ protected:
     }
 
 private:
-    static constexpr char g_class_name_prefix[] = "class_";
-    static constexpr size_t g_class_name_prefix_len = 6;
+    static constexpr StringData g_class_name_prefix = "class_";
 
     struct ToDeleteRef {
         ToDeleteRef(TableKey tk, ObjKey k)
@@ -926,7 +927,7 @@ inline StringData Group::get_table_name(TableKey key) const
 
 inline bool Group::table_is_public(TableKey key) const
 {
-    return get_table_name(key).begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len));
+    return get_table_name(key).begins_with(g_class_name_prefix);
 }
 
 inline bool Group::has_table(StringData name) const noexcept
