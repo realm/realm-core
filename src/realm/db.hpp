@@ -108,6 +108,8 @@ class DB;
 using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
+    class ReadLockInfo;
+
 public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
     // the association determined on creation of the DB Object. The association can be broken by
@@ -216,7 +218,7 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-
+    bool wait_for_page_refresh_needed();
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
 
@@ -413,6 +415,7 @@ protected:
 
 private:
     class AsyncCommitHelper;
+    class PageRefresher;
     class VersionManager;
     struct SharedInfo;
     struct ReadCount;
@@ -470,6 +473,7 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+    std::unique_ptr<PageRefresher> m_page_refresher;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.

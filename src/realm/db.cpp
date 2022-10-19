@@ -1275,7 +1275,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
-
+    if (m_key) {
+        m_page_refresher = std::make_unique<PageRefresher>(this);
+    }
     m_alloc.set_read_only(true);
 }
 
@@ -1552,8 +1554,9 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
-    // make helper thread terminate
+    // make helper thread(s) terminate
     m_commit_helper.reset();
+    m_page_refresher.reset();
 
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())
@@ -1632,6 +1635,55 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
 }
 
+class DB::PageRefresher {
+public:
+    PageRefresher(DB* db)
+        : m_db(db)
+    {
+        start();
+    }
+    ~PageRefresher()
+    {
+        m_db->wait_for_change_release();
+        stop();
+    }
+    void main()
+    {
+        auto& alloc = m_db->m_alloc;
+        while (m_should_run) {
+            // wait for change
+            bool changed = m_db->wait_for_page_refresh_needed();
+            // if wait_for_change is disabled we give up.
+            if (!changed)
+                break;
+            auto readlock = m_db->grab_read_lock(ReadLockInfo::Full, VersionID());
+            ReadLockGuard rlg(*m_db, readlock);
+            std::lock_guard<std::recursive_mutex> lock_guard(m_db->m_mutex);
+            alloc.update_reader_view(readlock.m_file_size, [&]() {
+                m_db->refresh_encrypted_mappings(VersionID{readlock.m_version, readlock.m_reader_idx}, alloc);
+            });
+        }
+    }
+    void start()
+    {
+        m_should_run = true;
+        m_thread = std::thread([this]() {
+            main();
+        });
+    }
+    void stop()
+    {
+        if (!m_should_run)
+            return;
+        m_should_run = false;
+        m_thread.join();
+    }
+
+private:
+    DB* m_db = nullptr;
+    std::thread m_thread;
+    bool m_should_run = false;
+};
 class DB::AsyncCommitHelper {
 public:
     AsyncCommitHelper(DB* db)
@@ -1883,6 +1935,22 @@ void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
 {
     REALM_ASSERT(m_commit_helper);
     m_commit_helper->sync_to_disk(std::move(fn));
+}
+
+bool DB::wait_for_page_refresh_needed()
+{
+    if (m_fake_read_lock_if_immutable) {
+        return false;
+    }
+    if (!m_last_encryption_page_reader) {
+        return true;
+    }
+    SharedInfo* info = m_file_map.get_addr();
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+    while (m_last_encryption_page_reader->m_version == info->latest_version_number && m_wait_for_change_enabled) {
+        m_new_commit_available.wait(m_controlmutex, 0);
+    }
+    return (m_last_encryption_page_reader->m_version != info->latest_version_number);
 }
 
 bool DB::has_changed(TransactionRef& tr)
