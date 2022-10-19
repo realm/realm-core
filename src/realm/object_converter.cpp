@@ -183,32 +183,29 @@ void InterRealmValueConverter::copy_dictionary(const Obj& src_obj, Obj& dst_obj,
     Dictionary src = src_obj.get_dictionary(m_src_col);
     Dictionary dst = dst_obj.get_dictionary(m_dst_col);
 
-    std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
-    constexpr bool ascending = true;
-    src.sort_keys(sorted_src, ascending);
-    dst.sort_keys(sorted_dst, ascending);
+    std::vector<size_t> to_insert, to_delete;
 
     size_t dst_ndx = 0;
     size_t src_ndx = 0;
-    while (src_ndx < sorted_src.size()) {
-        if (dst_ndx == sorted_dst.size()) {
+    while (src_ndx < src.size()) {
+        if (dst_ndx == dst.size()) {
             // if we have reached the end of the dst items, all remaining
             // src items should be added
-            while (src_ndx < sorted_src.size()) {
-                to_insert.push_back(sorted_src[src_ndx++]);
+            while (src_ndx < src.size()) {
+                to_insert.push_back(src_ndx++);
             }
             break;
         }
 
-        auto src_val = src.get_pair(sorted_src[src_ndx]);
-        while (dst_ndx < sorted_dst.size()) {
-            auto dst_val = dst.get_pair(sorted_dst[dst_ndx]);
+        auto src_val = src.get_pair(src_ndx);
+        while (dst_ndx < dst.size()) {
+            auto dst_val = dst.get_pair(dst_ndx);
             int cmp = src_val.first.compare(dst_val.first);
             if (cmp == 0) {
                 // Check if the values differ
                 if (cmp_src_to_dst(src_val.second, dst_val.second, nullptr, update_out)) {
                     // values are different - modify destination, advance both
-                    to_insert.push_back(sorted_src[src_ndx]);
+                    to_insert.push_back(src_ndx);
                 }
                 // keys and values equal: advance both src and dst
                 ++dst_ndx;
@@ -217,23 +214,22 @@ void InterRealmValueConverter::copy_dictionary(const Obj& src_obj, Obj& dst_obj,
             }
             else if (cmp < 0) {
                 // src < dst: insert src, advance src only
-                to_insert.push_back(sorted_src[src_ndx++]);
+                to_insert.push_back(src_ndx++);
                 break;
             }
             else {
                 // src > dst: delete dst, advance only dst
-                to_delete.push_back(sorted_dst[dst_ndx++]);
+                to_delete.push_back(dst_ndx++);
                 continue;
             }
         }
     }
     // at this point, we've gone through all src items but still have dst items
     // oustanding; these should all be deleted because they are not in src
-    while (dst_ndx < sorted_dst.size()) {
-        to_delete.push_back(sorted_dst[dst_ndx++]);
+    while (dst_ndx < dst.size()) {
+        to_delete.push_back(dst_ndx++);
     }
 
-    std::sort(to_delete.begin(), to_delete.end());
     for (auto it = to_delete.rbegin(); it != to_delete.rend(); ++it) {
         dst.erase(dst.begin() + *it);
     }
