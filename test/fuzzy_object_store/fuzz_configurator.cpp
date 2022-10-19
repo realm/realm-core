@@ -25,7 +25,7 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* arg
 {
     realm::disable_sync_to_disk();
     std::string file_path;
-    if(auto i = parse_cmdline(argc, argv))
+    if (auto i = parse_cmdline(argc, argv))
         file_path = argv[i];
     init(file_path);
     setup_realm_config();
@@ -36,7 +36,7 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::st
     : m_fuzzer(fuzzer)
 {
     realm::disable_sync_to_disk();
-    for(const auto& in : input) {
+    for (const auto& in : input) {
         init(in);
         setup_realm_config();
         print_cnf();
