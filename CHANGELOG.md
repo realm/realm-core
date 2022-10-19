@@ -9,6 +9,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
 * Fix a use-after-free if the last external reference to an encrypted Realm was closed between when a client reset error was received and when the download of the new Realm began. ([PR #5949](https://github.com/realm/realm-core/pull/5949), since 12.4.0).
+* Fixed an assertion failure during client reset with recovery when recovering a list operation on an embedded object that has a link column in the path prefix to the list from the top level object. ([PR #5957](https://github.com/realm/realm-core/issues/5957), since introduction of automatic recovery in v11.16.0).
 
 ### Breaking changes
 * Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
