@@ -3822,7 +3822,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state(state.class_prefix, state.group);
+        util::serializer::SerialisationState empty_state(state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4237,8 +4237,11 @@ public:
                                                  m_left->description(state));
         }
         else {
+            state.target_table = m_right->get_target_table();
+            std::string ret = m_left->description(state) + " " + TCond::description() + " ";
             state.target_table = m_left->get_target_table();
-            return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
+            ret += m_right->description(state);
+            return ret;
         }
     }
 

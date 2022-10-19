@@ -232,6 +232,10 @@ public:
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
     Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
+    Obj& set_any(StringData col_name, Mixed value, bool is_default = false)
+    {
+        return set_any(get_column_key(col_name), value, is_default);
+    }
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
@@ -310,6 +314,7 @@ public:
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
     LnkSet get_linkset(ColKey col_key) const;
+    LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;

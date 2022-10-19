@@ -335,10 +335,18 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                 server_requests_action);
         }
     }
+
+    std::vector<char> encryption_key;
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        encryption_key = m_config.encryption_key;
+    }
+
     DBOptions options;
-    options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
     options.enable_async_writes = false;
+    if (!encryption_key.empty())
+        options.encryption_key = encryption_key.data();
 
     std::shared_ptr<DB> db;
     auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());
@@ -739,29 +747,11 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = sync_config.ssl_verify_callback;
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
-    if (sync_config.on_download_message_received_hook) {
-        session_config.on_download_message_received_hook =
-            [hook = sync_config.on_download_message_received_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
-                hook(anchor, progress, query_version, batch_state, num_changesets);
-            };
-    }
-    if (sync_config.on_bootstrap_message_processed_hook) {
-        session_config.on_bootstrap_message_processed_hook =
-            [hook = sync_config.on_bootstrap_message_processed_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state) -> bool {
-            return hook(anchor, progress, query_version, batch_state);
+    if (sync_config.on_sync_client_event_hook) {
+        session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
+                                                    anchor = weak_from_this()](const SyncClientHookData& data) {
+            return hook(anchor, data);
         };
-    }
-    if (sync_config.on_download_message_integrated_hook) {
-        session_config.on_download_message_integrated_hook =
-            [hook = sync_config.on_download_message_integrated_hook,
-             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
-                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
-                hook(anchor, progress, query_version, batch_state, num_changesets);
-            };
     }
 
     {

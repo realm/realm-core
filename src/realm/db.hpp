@@ -172,7 +172,7 @@ public:
 
     const char* get_encryption_key() const noexcept
     {
-        return m_key;
+        return m_alloc.m_file.get_encryption_key();
     }
 
 #ifdef REALM_DEBUG
@@ -461,7 +461,6 @@ private:
     std::string m_lockfile_prefix;
     std::string m_db_path;
     std::string m_coordination_dir;
-    const char* m_key;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;

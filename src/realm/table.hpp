@@ -110,6 +110,9 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    // Get table name with class prefix removed
+    StringData get_class_name() const noexcept;
+
     const char* get_state() const noexcept;
 
     /// If this table is a group-level table, the parent group is returned,
@@ -174,8 +177,7 @@ public:
             throw LogicError(LogicError::column_does_not_exist);
     }
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
-    // Called only when updating the schema.
-    void set_table_type(Type table_tpe);
+    void set_table_type(Type new_type, bool handle_backlinks = false);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -512,7 +514,7 @@ private:
     Obj create_linked_object(GlobalKey = {});
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
-    void set_embedded(bool embedded);
+    void set_embedded(bool embedded, bool handle_backlinks);
     /// Changes type unconditionally. Called only from Group::do_get_or_add_table()
     void do_set_table_type(Type table_type);
 
@@ -869,18 +871,7 @@ private:
     friend class AggregateHelper;
 };
 
-inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
-{
-    switch (table_type) {
-        case Table::Type::TopLevel:
-            return o << "TopLevel";
-        case Table::Type::Embedded:
-            return o << "Embedded";
-        case Table::Type::TopLevelAsymmetric:
-            return o << "TopLevelAsymmetric";
-    }
-    return o << "Invalid table type: " << uint8_t(table_type);
-}
+std::ostream& operator<<(std::ostream& o, Table::Type table_type);
 
 class ColKeyIterator {
 public:
@@ -992,7 +983,8 @@ public:
     {
         auto ck = m_current_table->get_column_key(col_name);
         if (!ck) {
-            throw std::runtime_error(util::format("%1 has no property %2", m_current_table->get_name(), col_name));
+            throw std::runtime_error(
+                util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
         }
         add(ck);
         return *this;
