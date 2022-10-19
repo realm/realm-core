@@ -415,19 +415,19 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type == type_Link && right_type == type_TypedLink && right->has_single_value()) {
-        if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
-            if (right->get_mixed().is_null()) {
-                right_type = ColumnTypeTraits<realm::null>::id;
-                right = std::make_unique<Value<realm::null>>();
+    auto handle_typed_link = [drv](std::unique_ptr<Subexpr>& list, std::unique_ptr<Subexpr>& value, DataType& type) {
+        if (auto link_column = dynamic_cast<const Columns<Link>*>(list.get())) {
+            if (value->get_mixed().is_null()) {
+                type = ColumnTypeTraits<realm::null>::id;
+                value = std::make_unique<Value<realm::null>>();
             }
             else {
                 auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
-                auto right_table_key = right->get_mixed().get_link().get_table_key();
-                auto right_obj_key = right->get_mixed().get_link().get_obj_key();
+                auto right_table_key = value->get_mixed().get_link().get_table_key();
+                auto right_obj_key = value->get_mixed().get_link().get_obj_key();
                 if (left_dest_table_key == right_table_key) {
-                    right = std::make_unique<Value<ObjKey>>(right_obj_key);
-                    right_type = type_Link;
+                    value = std::make_unique<Value<ObjKey>>(right_obj_key);
+                    type = type_Link;
                 }
                 else {
                     const Group* g = drv->m_base_table->get_parent_group();
@@ -435,10 +435,17 @@ Query EqualityNode::visit(ParserDriver* drv)
                         "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
                         link_column->link_map().description(drv->m_serializer_state),
                         link_column->link_map().get_target_table()->get_class_name(),
-                        print_pretty_objlink(right->get_mixed().get_link(), g)));
+                        print_pretty_objlink(value->get_mixed().get_link(), g)));
                 }
             }
         }
+    };
+
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_single_value()) {
+        handle_typed_link(left, right, right_type);
+    }
+    if (right_type == type_Link && left_type == type_TypedLink && left->has_single_value()) {
+        handle_typed_link(right, left, left_type);
     }
 
     if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
