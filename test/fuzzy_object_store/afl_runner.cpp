@@ -16,7 +16,9 @@
  *
  **************************************************************************/
 #include "fuzz_engine.hpp"
-
+#include <vector>
+#include <string>
+#include <iostream>
 int main(int argc, const char* argv[])
 {
     FuzzEngine fuzz_engine;

@@ -65,7 +65,7 @@ void FuzzObject::remove_table(Group& group, FuzzLog& log, State& s)
         group.remove_table(table_key);
     }
     catch (const CrossTableLinkTarget&) {
-        // log << "// Exception\n";
+        log << "// Exception\n";
     }
 }
 

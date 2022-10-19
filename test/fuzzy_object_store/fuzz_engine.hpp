@@ -21,11 +21,13 @@
 
 #include <string>
 #include <fstream>
+#include <vector>
 
 class FuzzConfigurator;
 class FuzzEngine {
 public:
-    int run(int argc, const char* argv[]);
+    int run(int, const char*[]);
+    int run(const std::vector<std::string>& input);
     void do_fuzz(FuzzConfigurator&);
 
 private:

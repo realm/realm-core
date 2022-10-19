@@ -18,20 +18,23 @@
 #ifndef FUZZ_LOGGER_HPP
 #define FUZZ_LOGGER_HPP
 #include <fstream>
+#include <iostream>
 
 class FuzzLog {
 public:
     FuzzLog() = default;
     FuzzLog(const std::string& path)
-        : m_out(path, std::ios::out | std::ios::app)
+        : m_out(path, std::ios::out)
         , m_active(true)
     {
     }
     template <typename T>
     FuzzLog& operator<<(const T& v)
     {
-        if (m_active)
+        if (m_active) {
             m_out << v;
+            // std::cout << v;
+        }
         return *this;
     }
 

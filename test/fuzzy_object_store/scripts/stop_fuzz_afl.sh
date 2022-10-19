@@ -7,11 +7,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="build.object.store.fuzzer"
 FINDINGS_DIR=${ROOT_DIR}/${BUILD_DIR}/findings
 
-#if [ "$#" -ne 2 ]; then
-#    echo "Usage: sh ${SCRIPT} executable_path (e.g. group) output_directory"
-#    exit 1
-#fi
-fuzz_test="fuzz-object-store"
+fuzz_test="afl-realm-fuzz"
 unit_tests_path="${ROOT_DIR}/test/fuzzy_object_store/testcases"
 
 echo "Killing all running fuzzers"

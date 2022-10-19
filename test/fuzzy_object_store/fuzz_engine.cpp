@@ -47,6 +47,24 @@ int FuzzEngine::run(int argc, const char* argv[])
     return 0;
 }
 
+int FuzzEngine::run(const std::vector<std::string>& input)
+{
+    try {
+        FuzzObject fuzzer;
+        FuzzConfigurator cnf(fuzzer, input);
+
+        if (cnf.is_stdin_filename_enabled()) {
+            run_loop(cnf);
+        }
+        else {
+            do_fuzz(cnf);
+        }
+    }
+    catch (const EndOfFile&) {
+    }
+    return 0;
+}
+
 void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
 {
     const auto path = cnf.get_realm_path();
@@ -68,9 +86,7 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
     for (;;) {
         char instr = fuzzer.get_next_token(state) % COUNT;
         iteration++;
-
-        log << iteration << "\n";
-        log << "Do fuzz with command " << instr << "\n";
+        log << "Iteration: " << iteration << ". fuzz with command: " << std::to_string(instr) << "\n";
 
         Group& group = fetch_group();
 

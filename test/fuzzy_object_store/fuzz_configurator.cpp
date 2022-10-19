@@ -22,6 +22,7 @@
 
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[])
     : m_fuzzer(fuzzer)
+    , m_fuzz_name("afl++")
 {
     realm::disable_sync_to_disk();
     std::string file_path;
@@ -34,6 +35,7 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* arg
 
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::string>& input)
     : m_fuzzer(fuzzer)
+    , m_fuzz_name("libfuzz")
 {
     realm::disable_sync_to_disk();
     for (const auto& in : input) {

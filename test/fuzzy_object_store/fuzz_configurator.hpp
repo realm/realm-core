@@ -27,7 +27,7 @@
 class FuzzObject;
 class FuzzConfigurator {
 public:
-    FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[]);
+    FuzzConfigurator(FuzzObject& fuzzer, int argc, const char*[]);
     FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::string>&);
     const realm::Realm::Config& get_config() const;
     FuzzObject& get_fuzzer();
@@ -39,7 +39,7 @@ public:
     const std::string& get_prefix() const;
 
 private:
-    static void usage(const char* argv[]);
+    static void usage(const char*[]);
     std::size_t parse_cmdline(int argc, const char* argv[]);
     void init(const std::string&);
     void print_cnf();
@@ -54,5 +54,6 @@ private:
     bool m_file_names_from_stdin{false};
     FuzzObject& m_fuzzer;
     State m_state;
+    std::string m_fuzz_name;
 };
 #endif
