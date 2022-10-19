@@ -22,11 +22,13 @@
 #include "fuzz_logger.hpp"
 #include <realm/object-store/shared_realm.hpp>
 #include <string>
+#include <vector>
 
 class FuzzObject;
 class FuzzConfigurator {
 public:
     FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[]);
+    FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::string>&);
     const realm::Realm::Config& get_config() const;
     FuzzObject& get_fuzzer();
     const std::string& get_realm_path() const;
@@ -38,7 +40,8 @@ public:
 
 private:
     static void usage(const char* argv[]);
-    void init(int argc, const char* argv[]);
+    std::size_t parse_cmdline(int argc, const char* argv[]);
+    void init(const std::string&);
     void print_cnf();
     void setup_realm_config();
 

@@ -24,9 +24,23 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* arg
     : m_fuzzer(fuzzer)
 {
     realm::disable_sync_to_disk();
-    init(argc, argv);
+    std::string file_path;
+    if(auto i = parse_cmdline(argc, argv))
+        file_path = argv[i];
+    init(file_path);
     setup_realm_config();
     print_cnf();
+}
+
+FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::string>& input)
+    : m_fuzzer(fuzzer)
+{
+    realm::disable_sync_to_disk();
+    for(const auto& in : input) {
+        init(in);
+        setup_realm_config();
+        print_cnf();
+    }
 }
 
 void FuzzConfigurator::setup_realm_config()
@@ -88,13 +102,9 @@ void FuzzConfigurator::usage(const char* argv[])
     throw;
 }
 
-void FuzzConfigurator::init(int argc, const char* argv[])
+std::size_t FuzzConfigurator::parse_cmdline(int argc, const char* argv[])
 {
-    std::string name = "fuzz-test";
-    realm::test_util::RealmPathInfo test_context{name};
-    m_prefix = "./";
-    SHARED_GROUP_TEST_PATH(path);
-    size_t file_arg = size_t(-1);
+    size_t file_arg = -1;
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
@@ -106,22 +116,32 @@ void FuzzConfigurator::init(int argc, const char* argv[])
         else if (arg == "--prefix") {
             m_prefix = argv[++i];
         }
-        else if (arg == "--name") {
-            name = argv[++i];
-        }
+        // else if (arg == "--name") {
+        //     name = argv[++i];
+        // }
         else {
             file_arg = i;
         }
     }
+
     if (!m_file_names_from_stdin && file_arg == size_t(-1)) {
         usage(argv);
     }
 
+    return file_arg;
+}
+
+void FuzzConfigurator::init(const std::string& file_path)
+{
+    std::string name = "fuzz-test";
+    realm::test_util::RealmPathInfo test_context{name};
+    m_prefix = "./";
+    SHARED_GROUP_TEST_PATH(path);
     m_path = path.c_str();
     if (!m_file_names_from_stdin) {
-        std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
+        std::ifstream in(file_path, std::ios::in | std::ios::binary);
         if (!in.is_open()) {
-            std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
+            std::cerr << "Could not open file for reading: " << file_path << "\n";
             throw;
         }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
