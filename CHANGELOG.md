@@ -48,6 +48,7 @@
 * StringData and Timestamp are now constexpr-constructible.
 * Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
 * Updated `install_baas.sh` to use files stored on s3 ([#5932](https://github.com/realm/realm-core/issues/5932))
+* Added realm core version to the app login request ([#5959](https://github.com/realm/realm-core/issues/5959))
 
 ----------------------------------------------
 
