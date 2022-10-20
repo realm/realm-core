@@ -421,7 +421,12 @@ bool Connection::websocket_close_message_received(std::error_code error_code, St
         SessionErrorInfo error_info{error_code, message, try_again};
 
         // If the server sends a websocket close message with code 1009, then it's because we've sent an
-        // UPLOAD message that is too large for the server to process. Simply disconnecting/reconnecting
+        // UPLOAD message that is too large for the server to process. Simply disconnecting/reconnecting will not
+        // be sufficient because when we re-connect we'll just try to send the same bad upload message.
+        //
+        // Since the handling of this error happens at a layer below the standard `ERROR` message handling
+        // we need to synthesize an `ERROR` message-like error info here to client reset when this error
+        // is received.
         if (error_code.value() == 1009) {
             error_info.error_code = make_error_code(ProtocolError::limits_exceeded);
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
