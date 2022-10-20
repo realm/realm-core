@@ -27,11 +27,8 @@ class FuzzConfigurator;
 class FuzzEngine {
 public:
     int run(int, const char*[]);
-    int run(const std::vector<std::string>& input);
+    int run(const std::string& input);
     void do_fuzz(FuzzConfigurator&);
-
-private:
-    void run_loop(FuzzConfigurator&);
 };
 
 #endif

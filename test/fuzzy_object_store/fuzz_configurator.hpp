@@ -28,19 +28,16 @@ class FuzzObject;
 class FuzzConfigurator {
 public:
     FuzzConfigurator(FuzzObject& fuzzer, int argc, const char*[]);
-    FuzzConfigurator(FuzzObject& fuzzer, const std::vector<std::string>&);
+    FuzzConfigurator(FuzzObject& fuzzer, const std::string&);
     const realm::Realm::Config& get_config() const;
     FuzzObject& get_fuzzer();
     const std::string& get_realm_path() const;
-    bool is_stdin_filename_enabled() const;
     FuzzLog& get_logger();
     State& get_state();
     void set_state(const std::string& input);
     const std::string& get_prefix() const;
 
 private:
-    static void usage(const char*[]);
-    std::size_t parse_cmdline(int argc, const char* argv[]);
     void init(const std::string&);
     void print_cnf();
     void setup_realm_config();
@@ -51,7 +48,7 @@ private:
     FuzzLog m_log;
     bool m_logging{false};
     bool m_use_encryption{false};
-    bool m_file_names_from_stdin{false};
+    bool m_file_path_passed{false};
     FuzzObject& m_fuzzer;
     State m_state;
     std::string m_fuzz_name;

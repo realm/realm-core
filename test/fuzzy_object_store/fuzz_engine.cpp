@@ -34,31 +34,19 @@ int FuzzEngine::run(int argc, const char* argv[])
     try {
         FuzzObject fuzzer;
         FuzzConfigurator cnf(fuzzer, argc, argv);
-
-        if (cnf.is_stdin_filename_enabled()) {
-            run_loop(cnf);
-        }
-        else {
-            do_fuzz(cnf);
-        }
+        do_fuzz(cnf);
     }
     catch (const EndOfFile&) {
     }
     return 0;
 }
 
-int FuzzEngine::run(const std::vector<std::string>& input)
+int FuzzEngine::run(const std::string& input)
 {
     try {
         FuzzObject fuzzer;
         FuzzConfigurator cnf(fuzzer, input);
-
-        if (cnf.is_stdin_filename_enabled()) {
-            run_loop(cnf);
-        }
-        else {
-            do_fuzz(cnf);
-        }
+        do_fuzz(cnf);
     }
     catch (const EndOfFile&) {
     }
@@ -73,6 +61,8 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
     auto& fuzzer = cnf.get_fuzzer();
     auto shared_realm = Realm::get_shared_realm(cnf.get_config());
     std::vector<TableView> table_views;
+
+    log << "Start fuzzing with state = " << state.str << "\n";
 
     auto fetch_group = [shared_realm]() -> Group& {
         if (!shared_realm->is_in_transaction()) {
@@ -163,25 +153,6 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
         }
         else if (instr == ASYNC_CANCEL) {
             fuzzer.async_cancel(shared_realm, group, log, state);
-        }
-    }
-}
-
-void FuzzEngine::run_loop(FuzzConfigurator& cnf)
-{
-    std::string file_name;
-    std::cin >> file_name;
-    while (std::cin) {
-        std::ifstream in(cnf.get_prefix() + file_name, std::ios::in | std::ios::binary);
-        if (!in.is_open()) {
-            std::cerr << "Could not open file for reading: " << (cnf.get_prefix() + file_name) << std::endl;
-        }
-        else {
-            std::cout << file_name << std::endl;
-            std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-            cnf.set_state(contents);
-            do_fuzz(cnf);
-            std::cin >> file_name;
         }
     }
 }

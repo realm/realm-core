@@ -39,7 +39,7 @@ const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE +
 
 unsigned char FuzzObject::get_next_token(State& s) const
 {
-    if (s.pos == s.str.size()) {
+    if (s.pos == s.str.size() || s.str.empty()) {
         throw EndOfFile{};
     }
     char byte = s.str[s.pos];

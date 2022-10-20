@@ -25,7 +25,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size)
 {
     if (Size == 0)
         return 0;
-    std::vector<std::string> input{{Data, Data + Size}};
+    std::string input{(const char*)Data, Size};
     FuzzEngine fuzz_engine;
     return fuzz_engine.run(input);
 }

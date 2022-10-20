@@ -2,11 +2,11 @@
 
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR="build.object.store.fuzzer"
+BUILD_DIR="build.object.store.afl.fuzzer"
 
 build_mode="Release"
 num_fuzzers="1"
-fuzz_test="afl-realm-fuzz"
+fuzz_test="realm-afl++"
 
 
 if [ "$#" -ne 2 ]; then
@@ -55,8 +55,7 @@ if [ -z ${REALM_MAX_BPNODE_SIZE} ]; then
     REALM_MAX_BPNODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
 fi
 
-cmake -D REALM_AFL=ON \
-      -D CMAKE_BUILD_TYPE=${build_mode} \
+cmake -D CMAKE_BUILD_TYPE=${build_mode} \
       -D CMAKE_C_COMPILER=afl-cc \
       -D CMAKE_CXX_COMPILER=afl-c++ \
       -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
@@ -64,7 +63,7 @@ cmake -D REALM_AFL=ON \
       -G Ninja \
       ..
 
-ninja -j 4 "${fuzz_test}"
+ninja "${fuzz_test}"
 
 echo "Cleaning up the findings directory"
 
@@ -79,7 +78,7 @@ mkdir -p "${FINDINGS_DIR}"
 time_out="1000" # ms
 memory="1000" # MB
 
-echo "Going to fuzz: ${PWD}/${EXEC}"
+echo "Going to fuzz with AFL++: ${PWD}/${EXEC}"
 
 # if we have only one fuzzer
 if [ "${num_fuzzers}" -eq 1 ]; then
