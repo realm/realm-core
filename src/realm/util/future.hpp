@@ -38,7 +38,7 @@ template <typename T>
 class Promise;
 
 template <typename T>
-class SharedPromise;
+class CopyablePromiseHolder;
 
 template <typename T>
 class Future;
@@ -441,7 +441,7 @@ struct SharedStateImpl final : public SharedStateBase {
 // public API.
 using future_details::Future;
 using future_details::Promise;
-using future_details::SharedPromise;
+using future_details::CopyablePromiseHolder;
 
 /**
  * This class represents the producer side of a Future.
@@ -528,7 +528,7 @@ private:
     Future<T> get_future() noexcept;
 
     friend class Future<void>;
-    friend class SharedPromise<T>;
+    friend class CopyablePromiseHolder<T>;
 
     Promise(util::bind_ptr<SharedState<T>> shared_state)
         : m_shared_state(std::move(shared_state))
@@ -555,21 +555,23 @@ private:
 };
 
 /**
- * SharedPromise<T> is a lightweight copyable holder for Promises so they can be captured inside
+ * CopyablePromiseHolder<T> is a lightweight copyable holder for Promises so they can be captured inside
  * of std::function's and other types that require all members to be copyable.
  *
- * The only thing you can do with a SharedPromise is extract a regular promise from it exactly once,
+ * The only thing you can do with a CopyablePromiseHolder is extract a regular promise from it exactly once,
  * and copy/move it as you would a util::bind_ptr.
+ *
+ * Do not use this type to try to fill a Promise from multiple places or threads.
  */
 template <typename T>
-class future_details::SharedPromise {
+class future_details::CopyablePromiseHolder {
 public:
-    SharedPromise(Promise<T>&& input)
+    CopyablePromiseHolder(Promise<T>&& input)
         : m_shared_state(std::move(input).release())
     {
     }
 
-    SharedPromise(const Promise<T>&) = delete;
+    CopyablePromiseHolder(const Promise<T>&) = delete;
 
     Promise<T> get_promise()
     {

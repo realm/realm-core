@@ -2710,7 +2710,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         auto pf = util::make_promise_future<SyncError>();
         config.sync_config->error_handler =
-            [sp = util::SharedPromise(std::move(pf.promise))](auto, SyncError error) mutable {
+            [sp = util::CopyablePromiseHolder(std::move(pf.promise))](auto, SyncError error) mutable {
                 sp.get_promise().emplace_value(std::move(error));
             };
         auto r = Realm::get_shared_realm(config);
