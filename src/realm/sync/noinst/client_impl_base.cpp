@@ -392,7 +392,7 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
 void Connection::websocket_protocol_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
+    bool is_fatal = true;                                       // A WebSocket protocol violation is a fatal error
     close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
@@ -1029,7 +1029,7 @@ void Connection::close_due_to_missing_protocol_feature()
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
     std::error_code ec = ClientError::missing_protocol_feature;
-    bool is_fatal = true;                         // A missing protocol feature is a fatal error
+    bool is_fatal = true;                                       // A missing protocol feature is a fatal error
     close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
@@ -1312,6 +1312,23 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
 }
 
 
+void Connection::receive_test_command_response(session_ident_type session_ident, request_ident_type request_ident,
+                                               std::string_view body)
+{
+    Session* sess = get_session(session_ident);
+    if (REALM_UNLIKELY(!sess)) {
+        logger.error("Bad session identifier in TEST_COMMAND response message, session_ident = %1",
+                     session_ident);                                 // Throws
+        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
+        return;
+    }
+
+    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
+        close_due_to_protocol_error(ec);
+    }
+}
+
+
 void Connection::handle_protocol_error(ClientProtocol::Error error)
 {
     switch (error) {
@@ -1387,7 +1404,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
-        if (download_batch_state != DownloadBatchState::LastInBatch) {
+        if (download_batch_state == DownloadBatchState::MoreToCome) {
             throw IntegrationException(ClientError::bad_progress,
                                        "received empty download message that was not the last in batch");
         }
@@ -1614,6 +1631,14 @@ void Session::send_message()
         if (have_client_file_ident())
             send_ident_message(); // Throws
         return;
+    }
+
+    const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                                                      [](const PendingTestCommand& command) {
+                                                          return command.pending;
+                                                      });
+    if (has_pending_test_command) {
+        return send_test_command_message();
     }
 
     if (m_error_to_send)
@@ -1954,6 +1979,30 @@ void Session::send_json_error_message()
 }
 
 
+void Session::send_test_command_message()
+{
+    REALM_ASSERT(m_state == Active);
+
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [](const PendingTestCommand& command) {
+                               return command.pending;
+                           });
+    REALM_ASSERT(it != m_pending_test_commands.end());
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    auto session_ident = get_ident();
+
+    logger.info("Sending: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", it->body, session_ident, it->id);
+    protocol.make_test_command_message(out, session_ident, it->id, it->body);
+
+    m_conn.initiate_write_message(out, this); // Throws;
+    it->pending = false;
+
+    enlist_to_send();
+}
+
+
 void Session::close_connection()
 {
     REALM_ASSERT(m_state == Active);
@@ -2081,6 +2130,10 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    if (is_steady_state_download_message(batch_state, query_version)) {
+        batch_state = DownloadBatchState::SteadyState;
+    }
+
     logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
                  "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
@@ -2088,7 +2141,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state == DownloadBatchState::LastInBatch, query_version, received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2148,7 +2201,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook(progress, query_version, batch_state);
+    receive_download_message_hook(progress, query_version, batch_state, received_changesets.size());
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();
@@ -2156,6 +2209,8 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
+
+    download_message_integrated_hook(progress, query_version, batch_state, received_changesets.size());
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
@@ -2300,6 +2355,24 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         ensure_enlisted_to_send(); // Throws
 
     return std::error_code{}; // Success;
+}
+
+std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)
+{
+    logger.info("Received: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", body, m_ident, ident);
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [&](const PendingTestCommand& command) {
+                               return command.id == ident;
+                           });
+    if (it == m_pending_test_commands.end()) {
+        logger.error("No matching pending test command for id %1", ident);
+        return ClientError::bad_request_ident;
+    }
+
+    it->promise.emplace_value(std::string{body});
+    m_pending_test_commands.erase(it);
+
+    return {};
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)

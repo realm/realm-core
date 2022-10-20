@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <random>
+#include <list>
 
 #include <realm/binary_data.hpp>
 #include <realm/util/optional.hpp>
@@ -466,6 +467,7 @@ private:
                                   int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
+    void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
     void handle_protocol_error(ClientProtocol::Error);
 
     // These are only called from Session class.
@@ -751,9 +753,17 @@ public:
     Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
+    util::Future<std::string> send_test_command(std::string body);
+
 private:
     using SyncTransactReporter = ClientHistory::SyncTransactReporter;
 
+    struct PendingTestCommand {
+        request_ident_type id;
+        std::string body;
+        util::Promise<std::string> promise;
+        bool pending = true;
+    };
 
     /// Fetch a reference to the remote virtual path of the Realm associated
     /// with this session.
@@ -1025,6 +1035,9 @@ private:
 
     SessionWrapper& m_wrapper;
 
+    request_ident_type m_last_pending_test_command_ident = 0;
+    std::list<PendingTestCommand> m_pending_test_commands;
+
     static std::string make_logger_prefix(session_ident_type);
 
     Session(SessionWrapper& wrapper, Connection&, session_ident_type);
@@ -1062,6 +1075,7 @@ private:
     void send_unbind_message();
     void send_query_change_message();
     void send_json_error_message();
+    void send_test_command_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
@@ -1069,6 +1083,7 @@ private:
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(const ProtocolErrorInfo& info);
     std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    std::error_code receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;
@@ -1078,7 +1093,10 @@ private:
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
-    void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
+    void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState, size_t);
+    void download_message_integrated_hook(const SyncProgress&, int64_t, DownloadBatchState, size_t);
+
+    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
     friend class Connection;
 };

@@ -102,7 +102,7 @@ public:
         virtual void report_sync_transact(VersionID old_version, VersionID new_version) = 0;
 
     protected:
-        ~SyncTransactReporter() {}
+        ~SyncTransactReporter() = default;
     };
 
 
@@ -249,11 +249,12 @@ public:
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
-    void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                     util::Span<const RemoteChangeset> changesets, VersionInfo& new_version,
-                                     DownloadBatchState download_type, util::Logger&,
-                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr = nullptr,
-                                     SyncTransactReporter* transact_reporter = nullptr);
+    void
+    integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+                                util::Span<const RemoteChangeset> changesets, VersionInfo& new_version,
+                                DownloadBatchState download_type, util::Logger&,
+                                util::UniqueFunction<void(const TransactionRef&, size_t)> run_in_write_tr = nullptr,
+                                SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
@@ -414,6 +415,9 @@ private:
     // entries that produced a version that succeeds `begin_version` and precedes `end_version`.
     std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version,
                                                   version_type end_version) const noexcept;
+
+    size_t transform_and_apply_server_changesets(util::Span<Changeset> changesets_to_integrate, TransactionRef,
+                                                 util::Logger&, std::uint64_t& downloaded_bytes);
 
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);

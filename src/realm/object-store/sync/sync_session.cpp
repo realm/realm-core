@@ -143,9 +143,10 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     std::swap(waits, m_completion_callbacks);
 
     m_session = nullptr;
-    auto& sync_manager = *m_sync_manager;
+    if (m_sync_manager) {
+        m_sync_manager->unregister_session(m_db->get_path());
+    }
     m_state_mutex.unlock(lock);
-    sync_manager.unregister_session(m_db->get_path());
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
     if (old_state != new_state) {
@@ -740,9 +741,10 @@ void SyncSession::create_sync_session()
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     if (sync_config.on_download_message_received_hook) {
         session_config.on_download_message_received_hook =
-            [hook = sync_config.on_download_message_received_hook, anchor = weak_from_this()](
-                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
-                hook(anchor, progress, query_version, batch_state);
+            [hook = sync_config.on_download_message_received_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
             };
     }
     if (sync_config.on_bootstrap_message_processed_hook) {
@@ -752,6 +754,14 @@ void SyncSession::create_sync_session()
                                         sync::DownloadBatchState batch_state) -> bool {
             return hook(anchor, progress, query_version, batch_state);
         };
+    }
+    if (sync_config.on_download_message_integrated_hook) {
+        session_config.on_download_message_integrated_hook =
+            [hook = sync_config.on_download_message_integrated_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state, size_t num_changesets) {
+                hook(anchor, progress, query_version, batch_state, num_changesets);
+            };
     }
 
     {
@@ -954,9 +964,10 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Inactive: {
-            auto& sync_manager = *m_sync_manager;
+            if (m_sync_manager) {
+                m_sync_manager->unregister_session(m_db->get_path());
+            }
             m_state_mutex.unlock(lock);
-            sync_manager.unregister_session(m_db->get_path());
             break;
         }
         case State::WaitingForAccessToken:
@@ -1304,4 +1315,14 @@ void SyncSession::ConnectionChangeNotifier::invoke_callbacks(ConnectionState old
         lock.lock();
     }
     m_callback_index = npos;
+}
+
+util::Future<std::string> SyncSession::send_test_command(std::string body)
+{
+    util::CheckedLockGuard lk(m_state_mutex);
+    if (!m_session) {
+        return Status{ErrorCodes::RuntimeError, "Session doesn't exist to send test command on"};
+    }
+
+    return m_session->send_test_command(std::move(body));
 }

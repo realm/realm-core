@@ -9,6 +9,7 @@
 #include "sync/flx_sync_harness.hpp"
 #include "util/test_file.hpp"
 #include "util/event_loop.hpp"
+#include "realm/util/logger.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
@@ -1649,6 +1650,14 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(checked(realm_get_num_objects(realm, class_bar.key, &bar_count)));
         REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
+
+        SECTION("realm_get_value_by_property_index") {
+            realm_value value;
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 0, &value)));
+            CHECK(value.integer == int_val1.integer);
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 16, &value)));
+            CHECK(value.string.data == std::string{"Hello, World!"});
+        }
 
         SECTION("realm_clone()") {
             auto obj1a = clone_cptr(obj1);
@@ -3342,6 +3351,16 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_set_size(bars.get(), &size)));
                     CHECK(size == 1);
+
+                    auto results =
+                        cptr_checked(realm_get_backlinks(obj2.get(), class_foo.key, foo_properties["link_set"]));
+                    CHECK(results->size() == 1);
+                    auto mixed_link = results->get_any(0);
+                    CHECK(!mixed_link.is_unresolved_link());
+                    CHECK(mixed_link.is_type(type_TypedLink));
+                    auto link = mixed_link.get_link();
+                    CHECK(link.get_obj_key() == obj1->obj().get_key());
+                    CHECK(link.get_table_key() == obj1->obj().get_table()->get_key());
                 });
 
                 SECTION("get") {
@@ -4742,6 +4761,24 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     }
 }
 
+static const char* httpmethod_to_string(realm::app::HttpMethod method)
+{
+    using namespace realm::app;
+    switch (method) {
+        case HttpMethod::get:
+            return "GET";
+        case HttpMethod::post:
+            return "POST";
+        case HttpMethod::patch:
+            return "PATCH";
+        case HttpMethod::put:
+            return "PUT";
+        case HttpMethod::del:
+            return "DEL";
+        default:
+            return "UNKNOWN";
+    }
+}
 
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
@@ -4763,8 +4800,79 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
     }
 }
 
-TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
-    TestAppSession session;
+TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
+    struct TestTransportUserData {
+        TestTransportUserData()
+            : logger(std::make_unique<util::StderrLogger>())
+            , transport(std::make_unique<SynchronousTestTransport>())
+        {
+            logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+        }
+        std::unique_ptr<util::StderrLogger> logger;
+        std::unique_ptr<realm::app::GenericNetworkTransport> transport;
+    };
+
+    auto send_request_to_server = [](realm_userdata_t userdata, const realm_http_request_t request,
+                                     void* request_context) {
+        using namespace realm::app;
+
+        constexpr uint64_t default_timeout_ms = 60000;
+        REQUIRE(userdata != nullptr);
+        TestTransportUserData* user_data(static_cast<TestTransportUserData*>(userdata));
+        REQUIRE(user_data != nullptr);
+        REQUIRE(user_data->transport != nullptr);
+        REQUIRE(user_data->logger != nullptr);
+        REQUIRE(strlen(request.url) > 0);
+        HttpHeaders headers;
+        for (size_t i = 0; i < request.num_headers; i++) {
+            REQUIRE(request.headers[i].name != nullptr);
+            REQUIRE(request.headers[i].value != nullptr);
+            std::string name(request.headers[i].name);
+            std::string value(request.headers[i].value);
+            REQUIRE(!name.empty());
+            REQUIRE(!value.empty());
+            headers.emplace(name, value);
+        }
+        REQUIRE(request_context != nullptr);
+        auto new_request = Request{HttpMethod(request.method), request.url, default_timeout_ms, std::move(headers),
+                                   std::string(request.body, request.body_size)};
+        user_data->logger->trace("CAPI: Request URL (%1): %2", httpmethod_to_string(new_request.method),
+                                 new_request.url);
+        user_data->logger->trace("CAPI: Request body: %1", new_request.body);
+        user_data->transport->send_request_to_server(new_request, [&](const Response& response) mutable {
+            std::vector<realm_http_header_t> c_headers;
+            c_headers.reserve(response.headers.size());
+            for (auto&& header : response.headers) {
+                c_headers.push_back({header.first.c_str(), header.second.c_str()});
+            }
+
+            auto c_response = std::make_unique<realm_http_response_t>();
+            c_response->status_code = response.http_status_code;
+            c_response->custom_status_code = response.custom_status_code;
+            c_response->headers = c_headers.data();
+            c_response->num_headers = c_headers.size();
+            c_response->body = response.body.data();
+            c_response->body_size = response.body.size();
+            user_data->logger->trace("CAPI: Response (%1): %2", c_response->status_code,
+                                     std::string(c_response->body, c_response->body_size));
+            realm_http_transport_complete_request(request_context, c_response.get());
+        });
+    };
+
+    auto user_data_free = [](void* userdata) {
+        REQUIRE(userdata != nullptr);
+        std::unique_ptr<TestTransportUserData> user_data(static_cast<TestTransportUserData*>(userdata));
+        REQUIRE(user_data != nullptr);
+        REQUIRE(user_data->transport != nullptr);
+        REQUIRE(user_data->logger != nullptr);
+        user_data->logger->trace("CAPI: user_data free called");
+    };
+
+    // user_data will be deleted when user_data_free() is called
+    auto user_data = new TestTransportUserData();
+    auto http_transport = realm_http_transport_new(send_request_to_server, user_data, user_data_free);
+    auto app_session = get_runtime_app_session(get_base_url());
+    TestAppSession session(app_session, *http_transport, DeleteApp{false});
     realm_app app(session.app());
 
     SECTION("remove_user integration") {
@@ -4917,6 +5025,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
             realm_release(current_user);
         }
     }
+    realm_release(http_transport);
 }
 
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {

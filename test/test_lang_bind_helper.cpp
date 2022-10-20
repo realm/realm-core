@@ -3343,7 +3343,6 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
 
     // Wait for all reader threads to complete
     for (int i = 0; i < read_process_count; ++i) {
-        int status;
         test_util::waitpid_checked(readpids[i], 0, util::format("reader[%1]", i));
     }
 }

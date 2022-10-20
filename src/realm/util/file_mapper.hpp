@@ -74,6 +74,9 @@ inline void set_page_reclaim_governor_to_default()
 
 // There are several globals that rely on being process specific.
 // The unit tests which use fork() need to start with empty mappings.
+// This also resets the page reclaimer thread because if fork happens while
+// running with the global mutex `mapping_mutex` locked, the child process
+// will hang due to that mutex never being unlocked.
 // We do not support fork() in production.
 void prepare_for_fork_in_parent();
 void post_fork_in_child();

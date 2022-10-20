@@ -297,26 +297,6 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     ensure_reclaimer_thread_runs();
 }
 
-void prepare_for_fork_in_parent()
-{
-#if !REALM_PLATFORM_APPLE
-    if (reclaimer_thread) {
-        reclaimer_shutdown = true;
-        reclaimer_thread->join();
-        reclaimer_thread = nullptr;
-        reclaimer_shutdown = false;
-    }
-#endif
-}
-
-void post_fork_in_child()
-{
-    UniqueLock lock(mapping_mutex);
-    mappings_by_addr.clear();
-    mappings_by_file.clear();
-    num_decrypted_pages = 0;
-}
-
 size_t get_num_decrypted_pages()
 {
     return num_decrypted_pages.load();
@@ -730,7 +710,31 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 }
 
 
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
+
+void prepare_for_fork_in_parent()
+{
+#if REALM_ENABLE_ENCRYPTION
+#if !REALM_PLATFORM_APPLE
+    if (reclaimer_thread) {
+        reclaimer_shutdown = true;
+        reclaimer_thread->join();
+        reclaimer_thread = nullptr;
+        reclaimer_shutdown = false;
+    }
+#endif // !REALM_PLATFORM_APPLE
+#endif // REALM_ENABLE_ENCRYPTION
+}
+
+void post_fork_in_child()
+{
+#if REALM_ENABLE_ENCRYPTION
+    UniqueLock lock(mapping_mutex);
+    mappings_by_addr.clear();
+    mappings_by_file.clear();
+    num_decrypted_pages = 0;
+#endif // REALM_ENABLE_ENCRYPTION
+}
 
 void* mmap_anon(size_t size)
 {

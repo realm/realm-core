@@ -1180,8 +1180,6 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
     if (num_changesets > 0) {
         recip_hist.ensure_instantiated(); // Throws
 
-        version_type lowest_last_integrated_local_version = changesets[0].last_integrated_local_version;
-
         // Parse the changesets
         std::vector<Changeset> parsed_transformed_changesets;
         parsed_transformed_changesets.resize(num_changesets);
@@ -1190,19 +1188,23 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
 
         // Transform the changesets
         version_type current_server_version = get_server_version();
-        bool may_have_causally_unrelated_changes = (current_server_version > lowest_last_integrated_local_version);
-        if (may_have_causally_unrelated_changes) {
-            // Merge with causally unrelated changesets, and resolve the
-            // conflicts if there are any.
-            TransformHistoryImpl transform_hist{remote_file_ident, *this, recip_hist};
-            Transformer& transformer = m_context.get_transformer(); // Throws
-            transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
-                                                    parsed_transformed_changesets, &logger); // Throws
-        }
-
-        // Apply the transformed changesets to the Realm state
         Group& group = *m_group;
         Transaction& transaction = dynamic_cast<Transaction&>(group);
+        auto apply = [&](const Changeset* c) -> bool {
+            TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
+            InstructionApplier applier{transaction};
+            applier.apply(*c, &logger);
+            reset(); // Reset the instruction encoder
+            return true;
+        };
+        // Merge with causally unrelated changesets, and resolve the
+        // conflicts if there are any.
+        TransformHistoryImpl transform_hist{remote_file_ident, *this, recip_hist};
+        Transformer& transformer = m_context.get_transformer(); // Throws
+        transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
+                                                parsed_transformed_changesets, std::move(apply),
+                                                &logger); // Throws
+
         for (std::size_t i = 0; i < num_changesets; ++i) {
             REALM_ASSERT(get_instruction_encoder().buffer().size() == 0);
             const Changeset& changeset = parsed_transformed_changesets[i];
@@ -1214,14 +1216,10 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
 
             ChangesetEncoder::Buffer changeset_buffer;
 
-            TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
-            InstructionApplier applier{transaction};
-            applier.apply(parsed_transformed_changesets[i], &logger);             // Throws
             encode_changeset(parsed_transformed_changesets[i], changeset_buffer); // Throws
             entry.changeset = BinaryData{changeset_buffer.data(), changeset_buffer.size()};
 
             add_sync_history_entry(entry); // Throws
-            reset();                       // Reset the instruction encoder
         }
     }
 
