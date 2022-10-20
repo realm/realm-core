@@ -114,6 +114,27 @@ int64_t state_to_storage(SubscriptionSet::State state)
     }
 }
 
+size_t state_to_order(SubscriptionSet::State needle)
+{
+    using State = SubscriptionSet::State;
+    switch (needle) {
+        case State::Uncommitted:
+            return 0;
+        case State::Pending:
+            return 1;
+        case State::Bootstrapping:
+            return 2;
+        case State::AwaitingMark:
+            return 3;
+        case State::Complete:
+            return 4;
+        case State::Error:
+            return 5;
+        case State::Superseded:
+            return 6;
+    }
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
@@ -461,7 +482,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     if (cur_state == State::Error) {
         return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, err_str});
     }
-    else if (cur_state >= notify_when) {
+    else if (state_to_order(cur_state) >= state_to_order(notify_when)) {
         return util::Future<State>::make_ready(cur_state);
     }
 
@@ -486,8 +507,10 @@ void MutableSubscriptionSet::process_notifications()
         return mgr->m_outstanding_requests == 0;
     });
 
+
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
+        if ((it->version == my_version &&
+             (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
             (new_state == State::Complete && it->version < my_version)) {
             to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
         }

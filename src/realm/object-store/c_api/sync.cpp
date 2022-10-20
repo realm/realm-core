@@ -215,7 +215,7 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNo
 
 SubscriptionSet::State sub_state_from_c_enum(realm_flx_sync_subscription_set_state_e value)
 {
-    switch (static_cast<realm_flx_sync_subscription_set_state>(value)) {
+    switch (value) {
         case RLM_SYNC_SUBSCRIPTION_PENDING:
             return SubscriptionSet::State::Pending;
         case RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING:
