@@ -439,9 +439,9 @@ struct SharedStateImpl final : public SharedStateBase {
 
 // These are in the future_details namespace to get access to its contents, but they are part of the
 // public API.
+using future_details::CopyablePromiseHolder;
 using future_details::Future;
 using future_details::Promise;
-using future_details::CopyablePromiseHolder;
 
 /**
  * This class represents the producer side of a Future.
