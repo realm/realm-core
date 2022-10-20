@@ -90,13 +90,13 @@ public:
     /*
      * State diagram:
      *
-     *                    ┌───────────┬─────────►Error─────────────┐
-     *                    │           │                            │
-     *                    │           │                            ▼
+     *                    ┌───────────┬─────────►Error──────────────────────────┐
+     *                    │           │                                         │
+     *                    │           │                                         ▼
      *   Uncommitted──►Pending──►Bootstrapping──►AwaitingMark──►Complete───►Superseded
-     *                    │                                        ▲
-     *                    │                                        │
-     *                    └────────────────────────────────────────┘
+     *                    │                            ▲
+     *                    │                            │
+     *                    └────────────────────────────┘
      *
      */
     enum class State {
@@ -107,9 +107,6 @@ public:
         Pending,
         // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
-        // The last bootstrap message containing the initial state for this subscription set has been received. The
-        // client is awaiting a mark message to mark this subscription as fully caught up to history.
-        AwaitingMark,
         // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
         // An error occurred while processing this subscription set on the server. Check error_str() for details.
@@ -117,6 +114,9 @@ public:
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
         Superseded,
+        // The last bootstrap message containing the initial state for this subscription set has been received. The
+        // client is awaiting a mark message to mark this subscription as fully caught up to history.
+        AwaitingMark,
     };
 
     static constexpr int64_t EmptyVersion = int64_t(-1);
@@ -327,7 +327,7 @@ public:
     };
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
-    VersionInfo get_active_and_latest_versions() const;
+    VersionInfo get_version_info() const;
 
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.

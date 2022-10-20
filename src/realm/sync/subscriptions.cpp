@@ -390,8 +390,7 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             m_error_str = std::string{*error_str};
             break;
         case State::Bootstrapping:
-            m_state = new_state;
-            break;
+            [[fallthrough]];
         case State::AwaitingMark:
             m_state = new_state;
             break;
@@ -711,7 +710,7 @@ SubscriptionSet SubscriptionStore::get_active() const
     return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
-SubscriptionStore::VersionInfo SubscriptionStore::get_active_and_latest_versions() const
+SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);

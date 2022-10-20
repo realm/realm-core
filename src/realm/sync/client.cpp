@@ -815,6 +815,9 @@ void SessionImpl::process_pending_flx_bootstrap()
         progress = *pending_batch.progress;
         changesets_processed += pending_batch.changesets.size();
 
+        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
+
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
@@ -953,7 +956,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
     if (m_flx_subscription_store) {
-        auto versions_info = m_flx_subscription_store->get_active_and_latest_versions();
+        auto versions_info = m_flx_subscription_store->get_version_info();
         m_flx_active_version = versions_info.active;
         m_flx_latest_version = versions_info.latest;
         m_flx_pending_mark_version = versions_info.pending_mark;

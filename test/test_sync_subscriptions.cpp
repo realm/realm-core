@@ -432,7 +432,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     util::File::copy(path.string(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
     auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
-    auto [active_version, latest_version, pending_mark_version] = store->get_active_and_latest_versions();
+    auto [active_version, latest_version, pending_mark_version] = store->get_version_info();
     CHECK_EQUAL(active_version, latest_version);
     auto active = store->get_active();
     CHECK_EQUAL(active.version(), 1);
