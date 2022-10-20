@@ -1262,7 +1262,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     }
 #endif // REALM_METRICS
     if (m_key) {
-        m_page_refresher = std::make_unique<PageRefresher>(this);
+        m_page_refresher = std::make_unique<PageRefresher>(shared_from_this());
     }
     m_alloc.set_read_only(true);
 }
@@ -1623,7 +1623,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
 
 class DB::PageRefresher {
 public:
-    PageRefresher(DB* db)
+    PageRefresher(DBRef db)
         : m_db(db)
     {
         start();
@@ -1670,7 +1670,7 @@ public:
     }
 
 private:
-    DB* m_db = nullptr;
+    DBRef m_db = nullptr;
     std::thread m_thread;
     bool m_should_run = false;
 };
