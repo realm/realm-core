@@ -3206,7 +3206,8 @@ private:
                                 {"appVersion", "A Local App Version"},
                                 {"platform", "Object Store Test Platform"},
                                 {"platformVersion", "Object Store Test Platform Version"},
-                                {"sdkVersion", "SDK Version"}}}}));
+                                {"sdkVersion", "SDK Version"},
+                                {"coreVersion", REALM_VERSION_STRING}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
