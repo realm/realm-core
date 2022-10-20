@@ -218,7 +218,7 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-    bool wait_for_page_refresh_needed();
+    bool is_page_refresh_needed();
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
 

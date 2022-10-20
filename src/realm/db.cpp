@@ -1644,7 +1644,6 @@ public:
     }
     ~PageRefresher()
     {
-        m_db->wait_for_change_release();
         stop();
     }
     void main()
@@ -1652,9 +1651,14 @@ public:
         auto& alloc = m_db->m_alloc;
         while (m_should_run) {
             // wait for change
-            bool changed = m_db->wait_for_page_refresh_needed();
-            // if wait_for_change is disabled we give up.
-            if (!changed)
+            bool changed = m_db->is_page_refresh_needed();
+            while (!changed && m_should_run) {
+                millisleep(1); // this is not the right solution!
+                // but waiting for change interacts badly with other waiters
+                // when we need to abort waiting
+                changed = m_db->is_page_refresh_needed();
+            }
+            if (!m_should_run)
                 break;
             auto readlock = m_db->grab_read_lock(ReadLockInfo::Full, VersionID());
             ReadLockGuard rlg(*m_db, readlock);
@@ -1937,7 +1941,7 @@ void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
     m_commit_helper->sync_to_disk(std::move(fn));
 }
 
-bool DB::wait_for_page_refresh_needed()
+bool DB::is_page_refresh_needed()
 {
     if (m_fake_read_lock_if_immutable) {
         return false;
@@ -1945,12 +1949,7 @@ bool DB::wait_for_page_refresh_needed()
     if (!m_last_encryption_page_reader) {
         return true;
     }
-    SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (m_last_encryption_page_reader->m_version == info->latest_version_number && m_wait_for_change_enabled) {
-        m_new_commit_available.wait(m_controlmutex, 0);
-    }
-    return (m_last_encryption_page_reader->m_version != info->latest_version_number);
+    return m_last_encryption_page_reader->m_version != get_version_of_latest_snapshot();
 }
 
 bool DB::has_changed(TransactionRef& tr)

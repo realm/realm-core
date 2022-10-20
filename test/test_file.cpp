@@ -185,7 +185,7 @@ TEST(File_ReaderAndWriter)
     TEST_PATH(path);
 
     File writer(path, File::mode_Write);
-    writer.set_encryption_key(crypt_key(true));
+    writer.set_encryption_key(crypt_key());
     writer.resize(count * sizeof(size_t));
 
     File reader(path, File::mode_Read);
