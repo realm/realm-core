@@ -1181,20 +1181,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 if (info->history_schema_version != openers_hist_schema_version)
                     throw LogicError(LogicError::mixed_history_schema_version);
 
-#ifdef _WIN32
-                uint64_t pid = GetCurrentProcessId();
-#else
-                uint64_t pid = getpid();
-#endif
-                /*
-                                if (m_key && info->session_initiator_pid == pid) {
-                                    // Not supported because we use process shared encrypted mappings.
-                                    // Caching per process should be handled by the RealmCoordinator.
-                                    throw std::runtime_error(util::format(
-                                        "%1: Opening more than one instance of a DB is not supported when using
-                   encryption (pid: %2)", path, pid));
-                                }
-                */
                 // We need per session agreement among all participants on the
                 // target Realm file format. From a technical perspective, the
                 // best way to ensure that, would be to require a bumping of the

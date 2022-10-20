@@ -1292,24 +1292,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         Array cur_freelist_posistions(*this), cur_freelist_lengths(*this);
         cur_freelist_posistions.init_from_ref(free_positions_ref);
         cur_freelist_lengths.init_from_ref(free_sizes_ref);
-        // auto print_freelist = [&]() {
-        //     std::cout << util::format("freelist for version: %1 has %2 entries.\n", version,
-        //                               cur_freelist_posistions.size());
-        //     for (size_t i = 0; i < cur_freelist_posistions.size(); ++i) {
-        //         std::cout << util::format("{%1, %2}, ", cur_freelist_posistions.get(i),
-        //                                   cur_freelist_lengths.get(i));
-        //     }
-        //     std::cout << std::endl;
-        // };
         if (!processed_first_version) {
             processed_first_version = true;
             prev_freelist_positions.init_from_ref(free_positions_ref);
             prev_freelist_lengths.init_from_ref(free_sizes_ref);
-            // print_freelist();
             continue;
         }
 
-        // print_freelist();
         RefRanges allocations;
 
         // Assumes freelists are in sorted order and are minimal contiguous ranges.

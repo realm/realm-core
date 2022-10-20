@@ -2219,10 +2219,8 @@ TEST(Shared_EncryptionKeyCheck_2)
     CHECK(sg3);
 }
 
-#ifndef _WIN32 // FIXME: we need a fork() on windows
-
 // if opened by one key, it cannot be opened by a different key
-NONCONCURRENT_TEST(Shared_EncryptionKeyCheck_3)
+NONCONCURRENT_TEST_IF(Shared_EncryptionKeyCheck_3, testing_supports_fork)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
@@ -2246,9 +2244,7 @@ NONCONCURRENT_TEST(Shared_EncryptionKeyCheck_3)
     }
 }
 
-#endif // not(win32)
-
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
 
 TEST(Shared_VersionCount)
 {
