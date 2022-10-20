@@ -60,7 +60,7 @@ typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
-typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
+typedef realm_userdata_t(*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -1429,7 +1429,7 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class
  * Get the parent object for the object passed as argument. Only works for embedded objects.
  * @return true, if no errors occurred.
  */
-RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t** parent, realm_class_key_t* class_key);
 
 /**
  * Find an object with a particular primary key value.
