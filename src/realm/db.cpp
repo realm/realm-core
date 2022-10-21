@@ -1261,7 +1261,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
-    if (m_key) {
+    if (m_key && !m_fake_read_lock_if_immutable) {
         m_page_refresher = std::make_unique<PageRefresher>(*this);
     }
     m_alloc.set_read_only(true);
@@ -1626,7 +1626,7 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
-        // start();
+        start();
     }
     ~PageRefresher()
     {
@@ -1637,15 +1637,10 @@ public:
         auto& alloc = m_db.m_alloc;
         while (m_should_run) {
             // wait for change
-            bool changed = m_db.is_page_refresh_needed();
-            while (!changed && m_should_run) {
-                millisleep(1); // this is not the right solution!
-                // but waiting for change interacts badly with other waiters
-                // when we need to abort waiting
-                changed = m_db.is_page_refresh_needed();
-            }
+            bool changed = m_db.wait_for_change_internal(m_should_run);
             if (!m_should_run)
                 break;
+            REALM_ASSERT(changed);
             auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
             ReadLockGuard rlg(m_db, readlock);
             std::lock_guard<std::recursive_mutex> lock_guard(m_db.m_mutex);
@@ -1666,13 +1661,14 @@ public:
         if (!m_should_run)
             return;
         m_should_run = false;
+        m_db.wake_wait_for_change();
         m_thread.join();
     }
 
 private:
     DB& m_db;
     std::thread m_thread;
-    bool m_should_run = false;
+    std::atomic<bool> m_should_run = false;
 };
 
 bool DB::other_writers_waiting_for_lock() const
@@ -1939,15 +1935,24 @@ void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
     m_commit_helper->sync_to_disk(std::move(fn));
 }
 
-bool DB::is_page_refresh_needed()
+void DB::wake_wait_for_change()
 {
-    if (m_fake_read_lock_if_immutable) {
-        return false;
-    }
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+    m_new_commit_available.notify_all();
+}
+
+bool DB::wait_for_change_internal(std::atomic<bool>& wait_enabled)
+{
     if (!m_last_encryption_page_reader) {
         return true;
     }
-    return m_last_encryption_page_reader->m_version != get_version_of_latest_snapshot();
+    SharedInfo* info = m_file_map.get_addr();
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+    while (m_last_encryption_page_reader->m_version == info->latest_version_number &&
+           wait_enabled.load(std::memory_order_relaxed)) {
+        m_new_commit_available.wait(m_controlmutex, 0);
+    }
+    return m_last_encryption_page_reader->m_version != info->latest_version_number;
 }
 
 bool DB::has_changed(TransactionRef& tr)

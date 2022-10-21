@@ -218,9 +218,12 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-    bool is_page_refresh_needed();
+    bool wait_for_change_internal(std::atomic<bool>& wait_enabled);
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
+    /// wake any thread waiting in wait_for_change, but without disabling
+    /// the functionality.
+    void wake_wait_for_change();
 
     /// re-enable waiting for change
     void enable_wait_for_change();
@@ -618,8 +621,7 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {
-};
+struct DB::BadVersion : std::exception {};
 
 inline bool DB::is_attached() const noexcept
 {
