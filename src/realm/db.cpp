@@ -1262,7 +1262,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     }
 #endif // REALM_METRICS
     if (m_key) {
-        m_page_refresher = std::make_unique<PageRefresher>(shared_from_this());
+        m_page_refresher = std::make_unique<PageRefresher>(*this);
     }
     m_alloc.set_read_only(true);
 }
@@ -1623,10 +1623,10 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
 
 class DB::PageRefresher {
 public:
-    PageRefresher(DBRef db)
+    PageRefresher(DB& db)
         : m_db(db)
     {
-        start();
+        // start();
     }
     ~PageRefresher()
     {
@@ -1634,23 +1634,23 @@ public:
     }
     void main()
     {
-        auto& alloc = m_db->m_alloc;
+        auto& alloc = m_db.m_alloc;
         while (m_should_run) {
             // wait for change
-            bool changed = m_db->is_page_refresh_needed();
+            bool changed = m_db.is_page_refresh_needed();
             while (!changed && m_should_run) {
                 millisleep(1); // this is not the right solution!
                 // but waiting for change interacts badly with other waiters
                 // when we need to abort waiting
-                changed = m_db->is_page_refresh_needed();
+                changed = m_db.is_page_refresh_needed();
             }
             if (!m_should_run)
                 break;
-            auto readlock = m_db->grab_read_lock(ReadLockInfo::Full, VersionID());
-            ReadLockGuard rlg(*m_db, readlock);
-            std::lock_guard<std::recursive_mutex> lock_guard(m_db->m_mutex);
+            auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
+            ReadLockGuard rlg(m_db, readlock);
+            std::lock_guard<std::recursive_mutex> lock_guard(m_db.m_mutex);
             alloc.update_reader_view(readlock.m_file_size, [&]() {
-                m_db->refresh_encrypted_mappings(VersionID{readlock.m_version, readlock.m_reader_idx}, alloc);
+                m_db.refresh_encrypted_mappings(VersionID{readlock.m_version, readlock.m_reader_idx}, alloc);
             });
         }
     }
@@ -1670,7 +1670,7 @@ public:
     }
 
 private:
-    DBRef m_db = nullptr;
+    DB& m_db;
     std::thread m_thread;
     bool m_should_run = false;
 };
