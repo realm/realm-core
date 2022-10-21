@@ -29,6 +29,7 @@ public:
     {
         if (m_active) {
             m_out << v;
+            m_out.flush();
         }
         return *this;
     }

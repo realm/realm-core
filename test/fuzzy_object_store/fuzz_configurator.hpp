@@ -34,10 +34,10 @@ public:
     FuzzLog& get_logger();
     State& get_state();
     void set_state(const std::string& input);
+    void print_cnf();
 
 private:
     void init(const std::string&);
-    void print_cnf();
     void setup_realm_config();
 
     realm::Realm::Config m_config;

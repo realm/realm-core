@@ -35,8 +35,10 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
     try {
         FuzzObject fuzzer;
         FuzzConfigurator cnf(fuzzer, input, false, name);
-        if (enable_logging)
+        if (enable_logging) {
             cnf.get_logger().enable_logging(path);
+            cnf.print_cnf();
+        }
         do_fuzz(cnf);
     }
     catch (const EndOfFile&) {
@@ -55,10 +57,19 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
 
     log << "Start fuzzing with state = " << state.str << "\n";
 
-    auto fetch_group = [shared_realm]() -> Group& {
-        if (!shared_realm->is_in_transaction()) {
-            shared_realm->begin_transaction();
+    auto begin_write = [&log](SharedRealm shared_realm) -> Group& {
+        log << "begin_write() - check : shared_realm->is_in_transaction()\n";
+        if (!shared_realm->is_in_transaction() && !shared_realm->is_in_async_transaction()) {
+            log << "begin_write() - open transaction : shared_realm->begin_transaction()\n";
+            try {
+                shared_realm->begin_transaction();
+            }
+            catch (std::exception& e) {
+                log << e.what() << "\n";
+                throw;
+            }
         }
+        log << "begin_write() - return shared_realm->read_group();\n";
         return shared_realm->read_group();
     };
 
@@ -69,8 +80,7 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
         iteration++;
         log << "Iteration: " << iteration << ". fuzz with command: " << std::to_string(instr) << "\n";
 
-        Group& group = fetch_group();
-
+        Group& group = begin_write(shared_realm);
         if (instr == ADD_TABLE && group.size() < max_tables) {
             fuzzer.create_table(group, log);
         }

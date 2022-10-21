@@ -29,7 +29,6 @@ FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input,
     realm::disable_sync_to_disk();
     init(input);
     setup_realm_config();
-    print_cnf();
 }
 
 void FuzzConfigurator::setup_realm_config()
@@ -73,8 +72,8 @@ State& FuzzConfigurator::get_state()
 
 void FuzzConfigurator::init(const std::string& input)
 {
-    std::string name = "fuzz-test";
-    realm::test_util::RealmPathInfo test_context{name};
+    std::string db_name = "fuzz-test";
+    realm::test_util::RealmPathInfo test_context{db_name};
     SHARED_GROUP_TEST_PATH(path);
     m_path = path.c_str();
     if (m_used_input_file) {
@@ -99,12 +98,12 @@ void FuzzConfigurator::set_state(const std::string& input)
 
 void FuzzConfigurator::print_cnf()
 {
-    m_log << "Fuzzer: " << m_fuzz_name << "\n";
+    m_log << "// Fuzzer: " << m_fuzz_name << "\n";
     m_log << "// Test case generated in " REALM_VER_CHUNK " on " << m_fuzzer.get_current_time_stamp() << ".\n";
     m_log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
     m_log << "// ----------------------------------------------------------------------\n";
     const auto& printable_key =
         !m_use_encryption ? "nullptr" : std::string("\"") + m_config.encryption_key.data() + "\"";
-    m_log << "const char* key = " << printable_key << ";\n";
+    m_log << "// const char* key = " << printable_key << ";\n";
     m_log << "\n";
 }

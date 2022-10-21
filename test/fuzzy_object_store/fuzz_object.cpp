@@ -42,9 +42,7 @@ unsigned char FuzzObject::get_next_token(State& s) const
     if (s.pos == s.str.size() || s.str.empty()) {
         throw EndOfFile{};
     }
-    char byte = s.str[s.pos];
-    s.pos++;
-    return byte;
+    return s.str[s.pos++];
 }
 
 void FuzzObject::create_table(Group& group, FuzzLog& log)
@@ -352,8 +350,10 @@ void FuzzObject::get_all_column_names(Group& group, FuzzLog& log)
 
 void FuzzObject::commit(SharedRealm shared_realm, FuzzLog& log)
 {
+    log << "FuzzObject::commit();\n";
+    log << "FuzzObject::commit() - shared_realm->is_in_transaction();\n";
     if (shared_realm->is_in_transaction()) {
-        log << "FuzzObject::commit();\n";
+        log << "FuzzObject::commit() - shared_realm->commit_transaction();\n";
         shared_realm->commit_transaction();
         REALM_DO_IF_VERIFY(log, shared_realm->read_group().verify());
     }
@@ -377,33 +377,21 @@ void FuzzObject::advance(realm::SharedRealm shared_realm, FuzzLog& log)
     shared_realm->notify();
 }
 
-void FuzzObject::close_and_reopen(SharedRealm, FuzzLog&, const Realm::Config&)
+void FuzzObject::close_and_reopen(SharedRealm& shared_realm, FuzzLog& log, const Realm::Config& config)
 {
-    // TODO: figure out a way to close and reopen at object store without crashing..
-    //     // if (log) {
-    //     //     *log << "wt = nullptr;\n";
-    //     //     *log << "rt = nullptr;\n";
-    //     //     *log << "db->close();\n";
-    //     // }
-    //     // if (!shared_realm->is_closed()) {
-    //     //     shared_realm->close();
-    //     //     if (log) {
-    //     //         *log << "db = DB::create(*hist, path, DBOptions(key));\n";
-    //     //     }
-    //     //     shared_realm = Realm::get_shared_realm(config);
-    //     //     if (log) {
-    //     //         *log << "wt = db_w->start_write();\n";
-    //     //         *log << "rt = db->start_read();\n";
-    //     //     }
-    //     // }
-
-
-    //     // if (!shared_realm->is_in_transaction()) {
-    //     //     shared_realm->begin_transaction();
-    //     // }
-
-    //     // auto& group = shared_realm->read_group();
-    //     // REALM_DO_IF_VERIFY(log, group.verify());
+    log << "Open/close realm\n";
+    if (!shared_realm->is_closed()) {
+        log << "Close realm file \n";
+        shared_realm->close();
+        shared_realm.reset();
+        shared_realm = Realm::get_shared_realm(config);
+        log << "Reopened realm file \n";
+    }
+    log << "Verify group after realm got reopened\n";
+    auto& group = shared_realm->read_group();
+    log << "Get group\n";
+    REALM_DO_IF_VERIFY(log, group.verify());
+    log << "Group verified\n";
 }
 
 void FuzzObject::create_table_view(Group& group, FuzzLog& log, State& s, std::vector<TableView>& table_views)
