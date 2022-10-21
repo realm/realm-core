@@ -4,12 +4,12 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="build.object.store.lib.fuzzer"
 
-build_mode="Release"
+build_mode="Debug"
 corpus=""
 fuzz_test="realm-libfuzz"
 
 if [ "$#" -ne 2 ]; then
-    echo "Usage: ${SCRIPT} <build_mode>"
+    echo "Usage: ${SCRIPT} <build_mode> <corpus>"
     echo "build mode  : either Debug or Release. Default ${build_mode}."
     echo "corpus (initial path seed for fuzzing)  : e.g ./test/test.txt. Default no seed used."
 fi

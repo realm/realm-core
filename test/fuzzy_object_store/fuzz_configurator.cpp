@@ -20,23 +20,11 @@
 #include "../util/test_path.hpp"
 #include <iostream>
 
-FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, int argc, const char* argv[])
-    : m_file_path_passed(true)
+FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_input_file,
+                                   const std::string& name)
+    : m_used_input_file(use_input_file)
     , m_fuzzer(fuzzer)
-    , m_fuzz_name("afl++")
-{
-    if (argc < 2)
-        throw;
-    realm::disable_sync_to_disk();
-    init(argv[1]);
-    setup_realm_config();
-    print_cnf();
-}
-
-FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input)
-    : m_file_path_passed(false)
-    , m_fuzzer(fuzzer)
-    , m_fuzz_name("libfuzz")
+    , m_fuzz_name(name)
 {
     realm::disable_sync_to_disk();
     init(input);
@@ -87,10 +75,9 @@ void FuzzConfigurator::init(const std::string& input)
 {
     std::string name = "fuzz-test";
     realm::test_util::RealmPathInfo test_context{name};
-    m_prefix = "./";
     SHARED_GROUP_TEST_PATH(path);
     m_path = path.c_str();
-    if (m_file_path_passed) {
+    if (m_used_input_file) {
         std::ifstream in(input, std::ios::in | std::ios::binary);
         if (!in.is_open()) {
             std::cerr << "Could not open file for reading: " << input << "\n";
@@ -110,20 +97,14 @@ void FuzzConfigurator::set_state(const std::string& input)
     m_use_encryption = m_fuzzer.get_next_token(m_state) % 2 == 0;
 }
 
-const std::string& FuzzConfigurator::get_prefix() const
-{
-    return m_prefix;
-}
-
 void FuzzConfigurator::print_cnf()
 {
-    if (m_logging) {
-        m_log << "// Test case generated in " REALM_VER_CHUNK " on " << m_fuzzer.get_current_time_stamp() << ".\n";
-        m_log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
-        m_log << "// ----------------------------------------------------------------------\n";
-        const auto& printable_key =
-            !m_use_encryption ? "nullptr" : std::string("\"") + m_config.encryption_key.data() + "\"";
-        m_log << "const char* key = " << printable_key << ";\n";
-        m_log << "\n";
-    }
+    m_log << "Fuzzer: " << m_fuzz_name << "\n";
+    m_log << "// Test case generated in " REALM_VER_CHUNK " on " << m_fuzzer.get_current_time_stamp() << ".\n";
+    m_log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
+    m_log << "// ----------------------------------------------------------------------\n";
+    const auto& printable_key =
+        !m_use_encryption ? "nullptr" : std::string("\"") + m_config.encryption_key.data() + "\"";
+    m_log << "const char* key = " << printable_key << ";\n";
+    m_log << "\n";
 }

@@ -23,21 +23,21 @@
 class FuzzLog {
 public:
     FuzzLog() = default;
-    FuzzLog(const std::string& path)
-        : m_out(path, std::ios::out)
-        , m_active(true)
-    {
-    }
+
     template <typename T>
     FuzzLog& operator<<(const T& v)
     {
         if (m_active) {
             m_out << v;
-            // std::cout << v;
         }
         return *this;
     }
 
+    void enable_logging(const std::string& path)
+    {
+        m_out.open(path, std::ios::out);
+        m_active = true;
+    }
 private:
     std::fstream m_out;
     bool m_active{false};

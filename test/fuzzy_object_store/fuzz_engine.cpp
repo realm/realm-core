@@ -29,23 +29,14 @@
 using namespace realm;
 const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
-int FuzzEngine::run(int argc, const char* argv[])
+int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bool enable_logging,
+                           const std::string& path)
 {
     try {
         FuzzObject fuzzer;
-        FuzzConfigurator cnf(fuzzer, argc, argv);
-        do_fuzz(cnf);
-    }
-    catch (const EndOfFile&) {
-    }
-    return 0;
-}
-
-int FuzzEngine::run(const std::string& input)
-{
-    try {
-        FuzzObject fuzzer;
-        FuzzConfigurator cnf(fuzzer, input);
+        FuzzConfigurator cnf(fuzzer, input, false, name);
+        if (enable_logging)
+            cnf.get_logger().enable_logging(path);
         do_fuzz(cnf);
     }
     catch (const EndOfFile&) {

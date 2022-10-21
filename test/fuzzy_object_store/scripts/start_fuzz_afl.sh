@@ -4,7 +4,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="build.object.store.afl.fuzzer"
 
-build_mode="Release"
+build_mode="Debug"
 num_fuzzers="1"
 fuzz_test="realm-afl++"
 

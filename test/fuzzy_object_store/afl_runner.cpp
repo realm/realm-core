@@ -22,5 +22,16 @@
 int main(int argc, const char* argv[])
 {
     FuzzEngine fuzz_engine;
-    return fuzz_engine.run(argc, argv);
+    bool enable_logging = false;
+    std::string path = "real-afl.txt";
+    size_t input_index = 0;
+    for (size_t i = 0; i < (size_t)argc; ++i) {
+        if (argv[i] == "--log") {
+            enable_logging = true;
+        }
+        else {
+            input_index = i;
+        }
+    }
+    return fuzz_engine.run_fuzzer(argv[input_index], "realm_afl", enable_logging, path);
 }
