@@ -1377,6 +1377,11 @@ void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
                 encryption_mark_for_refresh(m, r.begin, r.end);
             }
         }
+        if (auto m = e.xover_mapping.get_encrypted_mapping()) {
+            for (auto& r : ranges) {
+                encryption_mark_for_refresh(m, r.begin, r.end);
+            }
+        }
     }
     verify();
 }
@@ -1386,6 +1391,9 @@ void SlabAlloc::refresh_all_encrypted_pages()
     // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
+            encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());
+        }
+        if (auto m = e.xover_mapping.get_encrypted_mapping()) {
             encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());
         }
     }
