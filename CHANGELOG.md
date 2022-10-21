@@ -1,12 +1,10 @@
-# NEXT RELEASE
+# 12.10.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables (PR [#5897](https://github.com/realm/realm-core/pull/5897)).
 * Adding `realm_query_parse_for_set` in the C API ([#5935](https://github.com/realm/realm-core/pull/5935)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed an assertion failure when observing change notifications on a sectioned result, if the first modification was to a linked property that did not cause the state of the sections to change. ([#5912](https://github.com/realm/realm-core/issues/5912), since the introduction of sectioned results in v12.3.0)
 * CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
 * Fix a use-after-free if the last external reference to an encrypted Realm was closed between when a client reset error was received and when the download of the new Realm began. ([PR #5949](https://github.com/realm/realm-core/pull/5949), since 12.4.0).
