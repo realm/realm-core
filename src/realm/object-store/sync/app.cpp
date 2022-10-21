@@ -552,10 +552,13 @@ void App::attach_auth_options(BsonDocument& body)
         options["appVersion"] = *m_config.local_app_version;
     }
 
+    log("App: version info: platform: %1  version: %1 - sdk version: %3 - core version: %4", m_config.platform,
+        m_config.platform_version, m_config.sdk_version, REALM_VERSION_STRING);
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
     options["sdkVersion"] = m_config.sdk_version;
+    options["coreVersion"] = REALM_VERSION_STRING;
 
     body["options"] = BsonDocument({{"device", options}});
 }
@@ -564,7 +567,13 @@ void App::log_in_with_credentials(
     const AppCredentials& credentials, const std::shared_ptr<SyncUser>& linking_user,
     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
-    log("App: log_in_with_credentials");
+    if (would_log()) {
+        auto app_info = util::format("app_id: %1", m_config.app_id);
+        if (m_config.local_app_version) {
+            app_info += util::format(" - app_version: %1", *m_config.local_app_version);
+        }
+        log("App: log_in_with_credentials: %1", app_info);
+    }
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {

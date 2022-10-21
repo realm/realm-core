@@ -7,7 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
- 
+
 ### Breaking changes
 * Websocket errors caused by the client sending a websocket message that is too large (i.e. greater than 16MB) now get reported as a `ProtocolError::limits_exceeded` error with a `ClientReset` requested by the server ([#5209](https://github.com/realm/realm-core/issues/5209)).
 
@@ -18,6 +18,7 @@
 
 ### Internals
 * Added integration test for opening synchronized realms as in-memory realms ([#5955](https://github.com/realm/realm-core/pull/5955)).
+* Added realm core version to the app login request ([#5959](https://github.com/realm/realm-core/issues/5959))
 
 ----------------------------------------------
 
