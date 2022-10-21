@@ -2063,6 +2063,31 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
+    SECTION("MemOnly durability") {
+        {
+            SyncTestFile config(app, partition, schema);
+            config.in_memory = true;
+
+            REQUIRE(config.options().durability == DBOptions::Durability::MemOnly);
+            auto r = Realm::get_shared_realm(config);
+
+            REQUIRE(get_dogs(r).size() == 0);
+            create_one_dog(r);
+            REQUIRE(get_dogs(r).size() == 1);
+        }
+
+        {
+            create_user_and_log_in(app);
+            SyncTestFile config(app, partition, schema);
+            config.in_memory = true;
+            auto r = Realm::get_shared_realm(config);
+            Results dogs = get_dogs(r);
+            REQUIRE(dogs.size() == 1);
+            REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+            REQUIRE(dogs.get(0).get<String>("name") == "fido");
+        }
+    }
+
     // MARK: Expired Session Refresh -
     SECTION("Invalid Access Token is Refreshed") {
         {
