@@ -38,6 +38,7 @@ public:
         m_out.open(path, std::ios::out);
         m_active = true;
     }
+
 private:
     std::fstream m_out;
     bool m_active{false};
