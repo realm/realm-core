@@ -2733,16 +2733,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("too large sync message error handling") {
         SyncTestFile config(app, partition, schema);
 
-        std::mutex sync_error_mutex;
-        bool done = false;
-        config.sync_config->error_handler = [&](auto, SyncError error) {
-            if (error.error_code.category() != util::websocket::websocket_close_status_category())
-                return;
-            std::lock_guard<std::mutex> lk(sync_error_mutex);
-            done = true;
-            REQUIRE(error.error_code.value() == 1009);
-            REQUIRE(error.message == "read limited at 16777217 bytes");
-        };
+        auto pf = util::make_promise_future<SyncError>();
+        config.sync_config->error_handler =
+            [sp = util::CopyablePromiseHolder(std::move(pf.promise))](auto, SyncError error) mutable {
+                sp.get_promise().emplace_value(std::move(error));
+            };
         auto r = Realm::get_shared_realm(config);
 
         // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
@@ -2758,14 +2753,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
         r->commit_transaction();
 
-        // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
-        // and we should fail the test.
-        timed_wait_for(
-            [&] {
-                std::lock_guard<std::mutex> lk(sync_error_mutex);
-                return done;
-            },
-            std::chrono::minutes(5));
+        auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
+        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::limits_exceeded));
+        REQUIRE(error.message == "Sync websocket closed because the server received a message that was too large: "
+                                 "read limited at 16777217 bytes");
+        REQUIRE(error.is_client_reset_requested());
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
 
     SECTION("validation") {

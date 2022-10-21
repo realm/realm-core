@@ -521,8 +521,7 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
                 REALM_UNREACHABLE();
             }
         }
-        else {
-            REALM_ASSERT(col.is_dictionary());
+        else if (col.is_dictionary()) {
             ++it;
             REALM_ASSERT(it != path.end());
             REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
@@ -537,6 +536,15 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
             else {
                 return false;
             }
+        }
+        else { // single link to embedded object
+            // Neither embedded object sets nor Mixed(TypedLink) to embedded objects are supported.
+            REALM_ASSERT_EX(!col.is_collection(), col);
+            REALM_ASSERT_EX(col.get_type() == col_type_Link, col);
+            StringData col_name = remote_obj.get_table()->get_column_name(col);
+            remote_obj = remote_obj.get_linked_object(col);
+            local_obj = local_obj.get_linked_object(col_name);
+            ++it;
         }
     }
     return false;
