@@ -632,7 +632,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     }
 
     SECTION("reset section callback") {
-        algo_run_count = 0;
         sectioned_results.reset_section_callback([&](Mixed value, SharedRealm realm) {
             algo_run_count++;
             auto obj = Object(realm, value.get_link());
@@ -646,6 +645,24 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results["ba"].size() == 1);
         REQUIRE(sectioned_results["or"].size() == 1);
         REQUIRE_THROWS(sectioned_results["a"]);
+        REQUIRE(algo_run_count == 5);
+    }
+
+    SECTION("reset section callback after initializing with previous callback") {
+        REQUIRE(sectioned_results.size() == 3);
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
+
+        sectioned_results.reset_section_callback([&](Mixed value, SharedRealm realm) {
+            algo_run_count++;
+            auto obj = Object(realm, value.get_link());
+            return obj.get_column_value<StringData>("name_col").contains("o");
+        });
+        REQUIRE(algo_run_count == 0);
+        REQUIRE(sectioned_results.size() == 2);
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(sectioned_results[true].size() == 2);
+        REQUIRE(sectioned_results[false].size() == 3);
         REQUIRE(algo_run_count == 5);
     }
 
