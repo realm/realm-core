@@ -1429,7 +1429,8 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class
  * Get the parent object for the object passed as argument. Only works for embedded objects.
  * @return true, if no errors occurred.
  */
-RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t** parent,
+                                     realm_class_key_t* class_key);
 
 /**
  * Find an object with a particular primary key value.

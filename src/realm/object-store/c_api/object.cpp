@@ -28,11 +28,17 @@ RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_class_key_t
     });
 }
 
-RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent)
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t** parent,
+                                     realm_class_key_t* class_key)
 {
     return wrap_err([&]() {
+        auto obj = object->obj().get_parent_object();
+        if (class_key)
+            *class_key = obj.get_table()->get_key().value;
+
         if (parent)
-            *parent = realm_object_t{realm::Object{object->get_realm(), object->obj().get_parent_object()}};
+            *parent = new realm_object_t{Object{object->realm(), std::move(obj)}};
+
         return true;
     });
 }
