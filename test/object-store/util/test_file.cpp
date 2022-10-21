@@ -214,29 +214,37 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
+struct WaitForSessionState {
+    std::condition_variable cv;
+    std::mutex mutex;
+    bool complete = false;
+    std::error_code ec;
+};
+
 static std::error_code wait_for_session(Realm& realm,
                                         void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
                                         std::chrono::seconds timeout)
 {
-    std::condition_variable cv;
-    std::mutex wait_mutex;
-    bool wait_flag(false);
-    std::error_code ec;
+    auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([&](std::error_code error) {
-        std::unique_lock<std::mutex> lock(wait_mutex);
-        wait_flag = true;
-        ec = error;
-        cv.notify_one();
+    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](std::error_code error) {
+        auto shared_state = weak_state.lock();
+        if (!shared_state) {
+            return;
+        }
+        std::lock_guard<std::mutex> lock(shared_state->mutex);
+        shared_state->complete = true;
+        shared_state->ec = error;
+        shared_state->cv.notify_one();
     });
-    std::unique_lock<std::mutex> lock(wait_mutex);
-    bool completed = cv.wait_for(lock, timeout, [&]() {
-        return wait_flag == true;
+    std::unique_lock<std::mutex> lock(shared_state->mutex);
+    bool completed = shared_state->cv.wait_for(lock, timeout, [&]() {
+        return shared_state->complete == true;
     });
     if (!completed) {
         throw std::runtime_error("wait_For_session() timed out");
     }
-    return ec;
+    return shared_state->ec;
 }
 
 std::error_code wait_for_upload(Realm& realm, std::chrono::seconds timeout)

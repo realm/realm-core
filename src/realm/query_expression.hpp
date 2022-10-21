@@ -4237,8 +4237,11 @@ public:
                                                  m_left->description(state));
         }
         else {
+            state.target_table = m_right->get_target_table();
+            std::string ret = m_left->description(state) + " " + TCond::description() + " ";
             state.target_table = m_left->get_target_table();
-            return m_left->description(state) + " " + TCond::description() + " " + m_right->description(state);
+            ret += m_right->description(state);
+            return ret;
         }
     }
 
