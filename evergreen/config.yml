@@ -698,7 +698,7 @@ task_groups:
   - compile
   - .test_suite
 
-- name: core_tests-group
+- name: core_tests_group
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
