@@ -191,7 +191,7 @@ void FuzzObject::add_column_link_list(Group& group, FuzzLog& log, State& s)
 
 void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
 {
-    log << "FuzzObject::remove_obj();\n";
+    log << "FuzzObject::set_obj();\n";
     TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
     TableRef t = group.get_table(table_key);
     auto all_col_keys = t->get_column_keys();
