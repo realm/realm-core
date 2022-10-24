@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Calling `SectionedResults::reset_section_callback()` on a `SectionedResults` which had been evaluated would result in an assertion failure the next time the sections are evaluated ([PR #5965](https://github.com/realm/realm-core/pull/5965), since v12.10.0).
+* Opening an unencrypted file with an encryption key would sometimes report a misleading error message that indicated that the problem was something other than a decryption failure ([PR #5915](https://github.com/realm/realm-core/pull/5915), since 0.86.1).
 * Fix a rare deadlock which could occur when closing a synchronized Realm immediately after committing a write transaction when the sync worker thread has also just finished processing a changeset from the server ([PR #5948](https://github.com/realm/realm-core/pull/5948)).
 
 ### Breaking changes
