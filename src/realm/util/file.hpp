@@ -843,6 +843,11 @@ public:
     /// a call to File::unmap().
     T* release() noexcept;
 
+    bool is_writeable() const noexcept
+    {
+        return m_access_mode == access_ReadWrite;
+    }
+
 #if REALM_ENABLE_ENCRYPTION
     /// Get the encrypted file mapping corresponding to this mapping
     inline EncryptedFileMapping* get_encrypted_mapping() const

@@ -5753,14 +5753,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
     {
         const char* key = crypt_key(true);
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history());
-        bool is_okay = false;
-        try {
-            DBRef sg_encrypt = DB::create(*hist_encrypt, path, DBOptions(key));
-        }
-        catch (std::runtime_error&) {
-            is_okay = true;
-        }
-        CHECK(is_okay);
+        CHECK_THROW(DB::create(*hist_encrypt, path, DBOptions(key)), InvalidDatabase);
     }
 }
 #endif
