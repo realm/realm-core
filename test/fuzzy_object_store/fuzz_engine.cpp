@@ -32,16 +32,28 @@ const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bool enable_logging,
                            const std::string& path)
 {
+    auto configure = [&](auto fuzzer) {
+        try {
+            FuzzConfigurator cnf(fuzzer, input, false, name);
+            if (enable_logging) {
+                cnf.get_logger().enable_logging(path);
+                cnf.print_cnf();
+            }
+            return cnf;
+        }
+        catch (const EndOfFile& e) {
+            std::cout << "Error, cnf is invalid" << std::endl;
+            throw std::runtime_error{"Realm cnf is invalid"};
+        }
+    };
+
     try {
         FuzzObject fuzzer;
-        FuzzConfigurator cnf(fuzzer, input, false, name);
-        if (enable_logging) {
-            cnf.get_logger().enable_logging(path);
-            cnf.print_cnf();
-        }
+        auto cnf = configure(fuzzer);
         do_fuzz(cnf);
     }
     catch (const EndOfFile&) {
+        std::cout << "End of input ... " << std::endl;
     }
     return 0;
 }

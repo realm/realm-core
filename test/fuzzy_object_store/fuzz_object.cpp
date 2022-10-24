@@ -47,9 +47,15 @@ unsigned char FuzzObject::get_next_token(State& s) const
 
 void FuzzObject::create_table(Group& group, FuzzLog& log)
 {
-    std::string name = create_table_name();
-    log << "group.add_table(\"" << name << "\");\n";
-    group.add_table(name);
+    try {
+        log << "FuzzObject::create_table();\n";
+        std::string name = create_table_name();
+        log << "group.add_table(\"" << name << "\");\n";
+        group.add_table(name);
+    }
+    catch (const std::exception& e) {
+        log << "// Exception ==> " << e.what() << "\n";
+    }
 }
 
 void FuzzObject::remove_table(Group& group, FuzzLog& log, State& s)
@@ -177,16 +183,21 @@ void FuzzObject::add_column_link(Group& group, FuzzLog& log, State& s)
 
 void FuzzObject::add_column_link_list(Group& group, FuzzLog& log, State& s)
 {
-    log << "FuzzObject::add_column_link_list();\n";
-    TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
-    TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
-    TableRef t1 = group.get_table(table_key_1);
-    TableRef t2 = group.get_table(table_key_2);
-    std::string name = create_column_name(type_LinkList);
-    log << "group.get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
-        << "\", group.get_table(" << table_key_2 << "));";
-    auto col = t1->add_column_list(*t2, name);
-    log << " // -> " << col << "\n";
+    try {
+        log << "FuzzObject::add_column_link_list();\n";
+        TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
+        TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
+        TableRef t1 = group.get_table(table_key_1);
+        TableRef t2 = group.get_table(table_key_2);
+        std::string name = create_column_name(type_LinkList);
+        log << "group.get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
+            << "\", group.get_table(" << table_key_2 << "));";
+        auto col = t1->add_column_list(*t2, name);
+        log << " // -> " << col << "\n";
+    }
+    catch (const std::exception& e) {
+        log << "Exception" << e.what() << "\n";
+    }
 }
 
 void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
@@ -294,6 +305,10 @@ void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
             }
         }
         log << "}\n";
+    }
+    else {
+        log << "table " << table_key << " has size = " << t->size()
+            << " and get_column_keys size = " << all_col_keys.size() << "\n";
     }
 }
 

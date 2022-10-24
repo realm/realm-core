@@ -93,7 +93,7 @@ void FuzzConfigurator::init(const std::string& input)
 void FuzzConfigurator::set_state(const std::string& input)
 {
     m_state = State{input, 0};
-    m_use_encryption = m_fuzzer.get_next_token(m_state) % 2 == 0;
+    m_use_encryption = false; // m_fuzzer.get_next_token(m_state) % 2 == 0;
 }
 
 void FuzzConfigurator::print_cnf()
