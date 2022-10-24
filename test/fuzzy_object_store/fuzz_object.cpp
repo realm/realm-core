@@ -47,30 +47,20 @@ unsigned char FuzzObject::get_next_token(State& s) const
 
 void FuzzObject::create_table(Group& group, FuzzLog& log)
 {
-    try {
-        log << "FuzzObject::create_table();\n";
-        std::string name = create_table_name();
-        log << "group.add_table(\"" << name << "\");\n";
-        group.add_table(name);
-    }
-    catch (const std::exception& e) {
-        log << "// Exception ==> " << e.what() << "\n";
-    }
+    log << "FuzzObject::create_table();\n";
+    std::string name = create_table_name();
+    log << "group.add_table(\"" << name << "\");\n";
+    group.add_table(name);
 }
 
 void FuzzObject::remove_table(Group& group, FuzzLog& log, State& s)
 {
-    try {
-        log << "FuzzObject::remove_table();\n";
-        TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
-        log << "try { group.remove_table(" << table_key
-            << "); }"
-               " catch (const CrossTableLinkTarget&) { }\n";
-        group.remove_table(table_key);
-    }
-    catch (const CrossTableLinkTarget&) {
-        log << "// Exception\n";
-    }
+    log << "FuzzObject::remove_table();\n";
+    TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
+    log << "try { group.remove_table(" << table_key
+        << "); }"
+           " catch (const CrossTableLinkTarget&) { }\n";
+    group.remove_table(table_key);
 }
 
 void FuzzObject::clear_table(Group& group, FuzzLog& log, State& s)
@@ -183,21 +173,16 @@ void FuzzObject::add_column_link(Group& group, FuzzLog& log, State& s)
 
 void FuzzObject::add_column_link_list(Group& group, FuzzLog& log, State& s)
 {
-    try {
-        log << "FuzzObject::add_column_link_list();\n";
-        TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
-        TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
-        TableRef t1 = group.get_table(table_key_1);
-        TableRef t2 = group.get_table(table_key_2);
-        std::string name = create_column_name(type_LinkList);
-        log << "group.get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
-            << "\", group.get_table(" << table_key_2 << "));";
-        auto col = t1->add_column_list(*t2, name);
-        log << " // -> " << col << "\n";
-    }
-    catch (const std::exception& e) {
-        log << "Exception" << e.what() << "\n";
-    }
+    log << "FuzzObject::add_column_link_list();\n";
+    TableKey table_key_1 = group.get_table_keys()[get_next_token(s) % group.size()];
+    TableKey table_key_2 = group.get_table_keys()[get_next_token(s) % group.size()];
+    TableRef t1 = group.get_table(table_key_1);
+    TableRef t2 = group.get_table(table_key_2);
+    std::string name = create_column_name(type_LinkList);
+    log << "group.get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
+        << "\", group.get_table(" << table_key_2 << "));";
+    auto col = t1->add_column_list(*t2, name);
+    log << " // -> " << col << "\n";
 }
 
 void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
