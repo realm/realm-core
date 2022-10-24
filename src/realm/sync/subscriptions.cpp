@@ -133,6 +133,7 @@ size_t state_to_order(SubscriptionSet::State needle)
         case State::Superseded:
             return 6;
     }
+    REALM_UNREACHABLE();
 }
 
 } // namespace
