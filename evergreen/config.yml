@@ -232,6 +232,7 @@ functions:
                   --instr-profile=${task_name}.profdata \
                   --format=html \
                   --object="$TEST_EXECUTABLE_NAME" \
+                  --ignore-filename-regex='(src/)?external/' \
                   --output-dir=coverage_report_${task_name}
           fi
 
