@@ -333,11 +333,10 @@ TestAppSession::~TestAppSession()
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
+    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
+    , m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    if (config.transport)
-        transport = config.transport;
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
 
