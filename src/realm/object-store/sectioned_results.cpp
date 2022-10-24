@@ -328,7 +328,7 @@ void SectionedResults::calculate_sections_if_required()
 {
     if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    else if ((m_results.is_frozen() || !m_results.has_changed()) && has_performed_initial_evalutation)
+    if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evalutation)
         return;
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
@@ -336,8 +336,6 @@ void SectionedResults::calculate_sections_if_required()
     }
 
     calculate_sections();
-    if (!has_performed_initial_evalutation)
-        has_performed_initial_evalutation = true;
 }
 
 template <typename StringType>
@@ -401,7 +399,7 @@ void SectionedResults::calculate_sections()
             m_row_to_index_path[i] = {section.index, section.indices.size() - 1};
         }
     }
-    if (!has_performed_initial_evalutation) {
+    if (!m_has_performed_initial_evalutation) {
         REALM_ASSERT_EX(m_previous_key_to_index_lookup.size() == 0, m_previous_key_to_index_lookup.size());
         REALM_ASSERT_EX(m_prev_section_index_to_key.size() == 0, m_prev_section_index_to_key.size());
         for (auto& [key, section] : m_sections) {
@@ -409,6 +407,7 @@ void SectionedResults::calculate_sections()
             m_prev_section_index_to_key[section.index] = section.key;
         }
     }
+    m_has_performed_initial_evalutation = true;
 }
 
 size_t SectionedResults::size()
@@ -513,7 +512,12 @@ void SectionedResults::reset_section_callback(SectionKeyFunc section_callback)
 {
     util::CheckedUniqueLock lock(m_mutex);
     m_callback = std::move(section_callback);
-    has_performed_initial_evalutation = false;
+    m_has_performed_initial_evalutation = false;
+    m_sections.clear();
+    m_current_section_index_to_key_lookup.clear();
+    m_row_to_index_path.clear();
+    m_previous_key_to_index_lookup.clear();
+    m_prev_section_index_to_key.clear();
 }
 
 SectionedResults::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
