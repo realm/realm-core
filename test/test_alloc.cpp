@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/group.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
 
@@ -318,6 +319,9 @@ TEST(Alloc_Fuzzy)
 NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
 {
     GROUP_TEST_PATH(path);
+
+    // Write a minimal file in streaming form so that it'll try to map the footer
+    Group().write(path);
 
     SlabAlloc::Config cfg;
     SlabAlloc alloc;

@@ -101,30 +101,47 @@ void setup_table(T t)
 
 
 #if REALM_ENABLE_ENCRYPTION
-TEST(Group_OpenUnencryptedFileWithKey)
+TEST(Group_OpenUnencryptedFileWithKey_SinglePage)
 {
+    // This results in a file which is too small to be an encrypted file
+    GROUP_TEST_PATH(path);
+    Group().write(path);
+    CHECK_THROW(Group(path, crypt_key(true)), InvalidDatabase);
+}
+
+TEST(Group_OpenUnencryptedFileWithKey_TwoPages)
+{
+    // This results in a file which is large enough to be an encrypted file,
+    // but the first four bytes will be zero, making the encryption layer think
+    // it hasn't been written to
     GROUP_TEST_PATH(path);
     {
         Group group;
+        TableRef table = group.get_or_add_table("table");
+        auto col = table->add_column(type_String, "str");
+        table->create_object().set(col, std::string(page_size() - 100, '\1'));
+        group.write(path);
+    }
 
-        // We want the file to be exactly three pages in size so that trying to
-        // read the footer would use the first non-zero field of the header as
-        // the IV
+    CHECK_THROW(Group(path, crypt_key(true)), InvalidDatabase);
+}
+
+TEST(Group_OpenUnencryptedFileWithKey_ThreePages)
+{
+    // This creates a three-page file so that the footer's IV field is the first
+    // non-zero field in an unencrypted streaming format file
+    GROUP_TEST_PATH(path);
+    {
+        Group group;
         TableRef table = group.get_or_add_table("table");
         auto col = table->add_column(type_String, "str");
         std::string data(page_size() - 100, '\1');
         table->create_object().set<String>(col, data);
         table->create_object().set<String>(col, data);
-
         group.write(path);
     }
 
-    {
-        auto group_open = [&] {
-            Group group(path, crypt_key(true));
-        };
-        CHECK_THROW(group_open(), InvalidDatabase);
-    }
+    CHECK_THROW(Group(path, crypt_key(true)), InvalidDatabase);
 }
 #endif // REALM_ENABLE_ENCRYPTION
 
@@ -157,12 +174,7 @@ TEST(Group_Permissions)
     chmod(path.c_str(), S_IWUSR);
 #endif
 
-    {
-        auto group_open = [&] {
-            Group group(path, crypt_key());
-        };
-        CHECK_THROW(group_open(), File::PermissionDenied);
-    }
+    CHECK_THROW(Group(path, crypt_key()), File::PermissionDenied);
 }
 #endif
 

@@ -23,6 +23,8 @@
 #include "flx_sync_harness.hpp"
 #include "sync/sync_test_utils.hpp"
 #include "util/test_file.hpp"
+#include "util/crypt_key.hpp"
+
 #include "realm/object-store/binding_context.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/object-store/impl/realm_coordinator.hpp"
@@ -40,7 +42,6 @@
 #include "realm/sync/subscriptions.hpp"
 #include "realm/util/future.hpp"
 #include "realm/util/logger.hpp"
-#include "util/test_file.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -1189,7 +1190,9 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     _impl::RealmCoordinator::assert_no_open_realms();
 
     {
-        auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
         auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
         REQUIRE(sub_store->get_active_and_latest_versions() == std::pair<int64_t, int64_t>{0, 1});
         auto latest_subs = sub_store->get_latest();
@@ -1648,7 +1651,9 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
         {
-            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+            DBOptions options;
+            options.encryption_key = test_util::crypt_key();
+            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             util::StderrLogger logger;
             sync::PendingBootstrapStore bootstrap_store(realm, &logger);
             REQUIRE(bootstrap_store.has_pending());
@@ -1715,7 +1720,9 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
         {
-            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+            DBOptions options;
+            options.encryption_key = test_util::crypt_key();
+            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             util::StderrLogger logger;
             sync::PendingBootstrapStore bootstrap_store(realm, &logger);
             REQUIRE(bootstrap_store.has_pending());
@@ -1792,7 +1799,9 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
         {
-            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+            DBOptions options;
+            options.encryption_key = test_util::crypt_key();
+            auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
             util::StderrLogger logger;
             sync::PendingBootstrapStore bootstrap_store(realm, &logger);
             REQUIRE(bootstrap_store.has_pending());

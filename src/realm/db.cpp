@@ -904,7 +904,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
-            cfg.encryption_key = m_key;
+            cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -1048,7 +1048,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                                                     path);
                 }
 
-                if (m_key) {
+                if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
@@ -1099,7 +1099,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 uint64_t pid = getpid();
 #endif
 
-                if (m_key && info->session_initiator_pid != pid) {
+                if (options.encryption_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
@@ -1280,7 +1280,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     SharedInfo* info = m_file_map.get_addr();
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
@@ -2500,8 +2500,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 }
 
 inline DB::DB(const DBOptions& options)
-    : m_key(options.encryption_key)
-    , m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);
