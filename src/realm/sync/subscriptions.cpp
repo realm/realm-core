@@ -196,7 +196,8 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, con
     , m_cur_version(tr.get_version())
     , m_version(obj.get_primary_key().get_int())
 {
-    if (!making_mutable_copy && obj.is_valid()) {
+    REALM_ASSERT(obj.is_valid());
+    if (!making_mutable_copy) {
         load_from_database(std::move(obj));
     }
 }
@@ -723,8 +724,9 @@ SubscriptionSet SubscriptionStore::get_active() const
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
+    // If there is no active subscription yet, return the zero'th subscription.
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(int64_t(0)));
     }
     return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
