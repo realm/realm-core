@@ -190,11 +190,14 @@ std::string_view Subscription::query_string() const
     return m_query_string;
 }
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
+                                 MakingMutableCopy making_mutable_copy)
     : m_mgr(mgr)
+    , m_cur_version(tr.get_version())
+    , m_version(obj.get_primary_key().get_int())
 {
-    if (obj.is_valid()) {
-        load_from_database(tr, std::move(obj));
+    if (!making_mutable_copy && obj.is_valid()) {
+        load_from_database(std::move(obj));
     }
 }
 
@@ -205,12 +208,10 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
+void SubscriptionSet::load_from_database(Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    m_cur_version = tr.get_version();
-    m_version = obj.get_primary_key().get_int();
     m_state = state_from_storage(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
@@ -288,8 +289,9 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
     });
 }
 
-MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, *tr, obj)
+MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
+                                               MakingMutableCopy making_mutable_copy)
+    : SubscriptionSet(mgr, *tr, obj, making_mutable_copy)
     , m_tr(std::move(tr))
     , m_obj(std::move(obj))
     , m_old_state(state())
@@ -898,7 +900,8 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     auto new_pk = sub_sets->max(sub_sets->get_primary_key_column())->get_int() + 1;
 
     MutableSubscriptionSet new_set_obj(weak_from_this(), std::move(new_tr),
-                                       sub_sets->create_object_with_primary_key(Mixed{new_pk}));
+                                       sub_sets->create_object_with_primary_key(Mixed{new_pk}),
+                                       SubscriptionSet::MakingMutableCopy{true});
     for (const auto& sub : set) {
         new_set_obj.insert_sub(sub);
     }
