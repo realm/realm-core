@@ -29,6 +29,16 @@
 using namespace realm;
 const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
+const char hex_digits[] = "0123456789abcdefgh";
+char hex_buffer[3];
+
+static const char* to_hex(char c)
+{
+    hex_buffer[0] = hex_digits[(c >> 4) & 0x0f];
+    hex_buffer[1] = hex_digits[c & 0x0f];
+    return hex_buffer;
+}
+
 int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bool enable_logging,
                            const std::string& path)
 {
@@ -55,7 +65,11 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
     auto shared_realm = Realm::get_shared_realm(cnf.get_config());
     std::vector<TableView> table_views;
 
-    log << "Start fuzzing with state = " << state.str << "\n";
+    log << "Start fuzzing with state = ";
+    for (auto c : state.str) {
+        log << to_hex(c) << " ";
+    }
+    log << "\n";
 
     auto begin_write = [&log](SharedRealm shared_realm) -> Group& {
         log << "begin_write() - check : shared_realm->is_in_transaction()\n";
