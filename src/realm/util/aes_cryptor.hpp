@@ -37,8 +37,7 @@
 #include <openssl/evp.h>
 #endif
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 struct iv_table;
 class EncryptedFileMapping;
@@ -53,6 +52,8 @@ public:
     bool read(FileDesc fd, off_t pos, char* dst, size_t size);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
+
+    void check_key(const uint8_t* key);
 
 private:
     enum EncryptionMode {
@@ -74,10 +75,10 @@ private:
 #elif defined(_WIN32)
     BCRYPT_KEY_HANDLE m_aes_key_handle;
 #else
-    uint8_t m_aesKey[32];
     EVP_CIPHER_CTX* m_ctx;
 #endif
 
+    uint8_t m_aesKey[32];
     uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
     std::unique_ptr<char[]> m_rw_buffer;
@@ -106,9 +107,8 @@ struct SharedFileInfo {
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
-    SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
+    SharedFileInfo(const uint8_t* key);
 };
-}
-}
+} // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
