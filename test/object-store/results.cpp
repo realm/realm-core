@@ -4803,7 +4803,7 @@ TEST_CASE("results: public name declared") {
     config.schema = Schema{
         {"object",
          {
-             {"value", PropertyType::Int, false, false, "public_value"},
+             {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "public_value"},
          }},
     };
 
