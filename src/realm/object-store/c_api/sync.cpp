@@ -213,47 +213,19 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) 
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
 
-SubscriptionSet::State sub_state_from_c_enum(realm_flx_sync_subscription_set_state_e value)
-{
-    switch (value) {
-        case RLM_SYNC_SUBSCRIPTION_PENDING:
-            return SubscriptionSet::State::Pending;
-        case RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING:
-            return SubscriptionSet::State::Bootstrapping;
-        case RLM_SYNC_SUBSCRIPTION_AWAITING_MARK:
-            return SubscriptionSet::State::AwaitingMark;
-        case RLM_SYNC_SUBSCRIPTION_COMPLETE:
-            return SubscriptionSet::State::Complete;
-        case RLM_SYNC_SUBSCRIPTION_ERROR:
-            return SubscriptionSet::State::Error;
-        case RLM_SYNC_SUBSCRIPTION_SUPERSEDED:
-            return SubscriptionSet::State::Superseded;
-        case RLM_SYNC_SUBSCRIPTION_UNCOMMITTED:
-            return SubscriptionSet::State::Uncommitted;
-    }
-    REALM_UNREACHABLE();
-}
-
-realm_flx_sync_subscription_set_state_e sub_state_to_c_enum(SubscriptionSet::State state)
-{
-    switch (state) {
-        case SubscriptionSet::State::Pending:
-            return RLM_SYNC_SUBSCRIPTION_PENDING;
-        case SubscriptionSet::State::Bootstrapping:
-            return RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING;
-        case SubscriptionSet::State::AwaitingMark:
-            return RLM_SYNC_SUBSCRIPTION_AWAITING_MARK;
-        case SubscriptionSet::State::Complete:
-            return RLM_SYNC_SUBSCRIPTION_COMPLETE;
-        case SubscriptionSet::State::Error:
-            return RLM_SYNC_SUBSCRIPTION_ERROR;
-        case SubscriptionSet::State::Uncommitted:
-            return RLM_SYNC_SUBSCRIPTION_UNCOMMITTED;
-        case SubscriptionSet::State::Superseded:
-            return RLM_SYNC_SUBSCRIPTION_SUPERSEDED;
-    }
-    REALM_UNREACHABLE();
-}
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
+              RLM_SYNC_SUBSCRIPTION_PENDING);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Bootstrapping) ==
+              RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::AwaitingMark) ==
+              RLM_SYNC_SUBSCRIPTION_AWAITING_MARK);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Complete) ==
+              RLM_SYNC_SUBSCRIPTION_COMPLETE);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Error) == RLM_SYNC_SUBSCRIPTION_ERROR);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Superseded) ==
+              RLM_SYNC_SUBSCRIPTION_SUPERSEDED);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
+              RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
 } // namespace
 
@@ -612,8 +584,8 @@ realm_sync_on_subscription_set_state_change_wait(const realm_flx_sync_subscripti
 {
     REALM_ASSERT(subscription_set != nullptr);
     SubscriptionSet::State state =
-        subscription_set->get_state_change_notification(sub_state_from_c_enum(notify_when)).get();
-    return sub_state_to_c_enum(state);
+        subscription_set->get_state_change_notification(static_cast<SubscriptionSet::State>(notify_when)).get();
+    return static_cast<realm_flx_sync_subscription_set_state_e>(state);
 }
 
 RLM_API bool
@@ -624,12 +596,13 @@ realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscript
 {
     REALM_ASSERT(subscription_set != nullptr && callback != nullptr);
     return wrap_err([&]() {
-        auto future_state = subscription_set->get_state_change_notification(sub_state_from_c_enum(notify_when));
+        auto future_state =
+            subscription_set->get_state_change_notification(static_cast<SubscriptionSet::State>(notify_when));
         std::move(future_state)
             .get_async([callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                            const StatusWith<SubscriptionSet::State>& state) -> void {
                 if (state.is_ok())
-                    callback(userdata.get(), sub_state_to_c_enum(state.get_value()));
+                    callback(userdata.get(), static_cast<realm_flx_sync_subscription_set_state_e>(state.get_value()));
                 else
                     callback(userdata.get(), realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_ERROR);
             });

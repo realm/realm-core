@@ -58,9 +58,6 @@ constexpr static std::string_view c_flx_sub_query_str_field("query");
 using OptionalString = util::Optional<std::string>;
 
 enum class SubscriptionStateForStorage : int64_t {
-    // This subscription set has not been persisted and has not been sent to the server. This state is only valid
-    // for MutableSubscriptionSets
-    Uncommitted = 0,
     // The subscription set has been persisted locally but has not been acknowledged by the server yet.
     Pending = 1,
     // The server is currently sending the initial state that represents this subscription set to the client.
@@ -77,8 +74,6 @@ enum class SubscriptionStateForStorage : int64_t {
 SubscriptionSet::State state_from_storage(int64_t value)
 {
     switch (static_cast<SubscriptionStateForStorage>(value)) {
-        case SubscriptionStateForStorage::Uncommitted:
-            return SubscriptionSet::State::Uncommitted;
         case SubscriptionStateForStorage::Pending:
             return SubscriptionSet::State::Pending;
         case SubscriptionStateForStorage::Bootstrapping:
@@ -90,15 +85,13 @@ SubscriptionSet::State state_from_storage(int64_t value)
         case SubscriptionStateForStorage::Error:
             return SubscriptionSet::State::Error;
         default:
-            REALM_UNREACHABLE();
+            throw std::runtime_error(util::format("Invalid state for SubscriptionSet stored on disk: %1", value));
     }
 }
 
 int64_t state_to_storage(SubscriptionSet::State state)
 {
     switch (state) {
-        case SubscriptionSet::State::Uncommitted:
-            return static_cast<int64_t>(SubscriptionStateForStorage::Uncommitted);
         case SubscriptionSet::State::Pending:
             return static_cast<int64_t>(SubscriptionStateForStorage::Pending);
         case SubscriptionSet::State::Bootstrapping:
