@@ -184,7 +184,7 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
             }
         }
         catch (const std::exception& e) {
-            log << "Exception thrown during execution:" << e.what() << "\n";
+            log << "\nException thrown during execution:\n" << e.what() << "\n";
         }
     }
 }
