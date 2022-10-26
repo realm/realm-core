@@ -1078,9 +1078,8 @@ void Table::set_table_type(Type table_type, bool handle_backlinks)
     }
 
     if (m_table_type == Type::TopLevelAsymmetric || table_type == Type::TopLevelAsymmetric) {
-        throw LogicError(ErrorCodes::IllegalOperation,
-                         util::format("Cannot change '%1' from %2 to %3",
-                                      get_class_name(), m_table_type, table_type));
+        throw LogicError(ErrorCodes::IllegalOperation, util::format("Cannot change '%1' from %2 to %3",
+                                                                    get_class_name(), m_table_type, table_type));
     }
 
     REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);

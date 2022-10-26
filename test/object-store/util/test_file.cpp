@@ -221,8 +221,7 @@ struct WaitForSessionState {
     Status status = Status::OK();
 };
 
-static Status wait_for_session(Realm& realm,
-                               void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
+static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
                                std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();

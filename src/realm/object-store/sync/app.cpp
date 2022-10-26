@@ -595,8 +595,8 @@ void App::log_in_with_credentials(
                [completion = std::move(completion), credentials, linking_user,
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log("App: log_in_with_credentials failed: %1 message: %2",
-                                 response.http_status_code, error->what());
+                       self->log("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                 error->what());
                        return completion(nullptr, std::move(error));
                    }
 
