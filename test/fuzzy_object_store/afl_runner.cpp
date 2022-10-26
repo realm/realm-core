@@ -26,7 +26,7 @@ int main(int argc, const char* argv[])
     std::string path = "real-afl.txt";
     size_t input_index = 0;
     for (size_t i = 0; i < (size_t)argc; ++i) {
-        if (argv[i] == "--log") {
+        if (strcmp(argv[i], "--log") == 0) {
             enable_logging = true;
         }
         else {
