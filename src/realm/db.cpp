@@ -762,9 +762,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         dg.release();
         return;
     }
-    m_lockfile_path = get_core_file(path, CoreFileType::Lock);
-    m_coordination_dir = get_core_file(path, CoreFileType::Management);
-    m_lockfile_prefix = m_coordination_dir + "/access_control";
+    std::string lockfile_path = get_core_file(path, CoreFileType::Lock);
+    std::string coordination_dir = get_core_file(path, CoreFileType::Management);
+    std::string lockfile_prefix = coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
@@ -796,9 +796,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             millisleep(msecs);
         }
 
-        m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+        m_file.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
-        m_file.set_fifo_path(m_coordination_dir, "lock.fifo");
+        m_file.set_fifo_path(coordination_dir, "lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -845,7 +845,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         // This should be safe but a waste of resources.
         // Unfortunately it cannot be created at an earlier point, because
         // it may then be deleted during the above lock_shared() operation.
-        try_make_dir(m_coordination_dir);
+        try_make_dir(coordination_dir);
 
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
@@ -946,9 +946,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                << ".";
             throw IncompatibleLockFile(ss.str());
         }
-        m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
-        m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
-        m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, m_lockfile_prefix, "versions");
+        m_writemutex.set_shared_part(info->shared_writemutex, lockfile_prefix, "write");
+        m_controlmutex.set_shared_part(info->shared_controlmutex, lockfile_prefix, "control");
+        m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, lockfile_prefix, "versions");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
@@ -1212,9 +1212,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 alloc.init_mapping_management(version);
             }
 
-            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
+            m_new_commit_available.set_shared_part(info->new_commit_available, lockfile_prefix, "new_commit",
                                                    options.temp_dir);
-            m_pick_next_writer.set_shared_part(info->pick_next_writer, m_lockfile_prefix, "pick_writer",
+            m_pick_next_writer.set_shared_part(info->pick_next_writer, lockfile_prefix, "pick_writer",
                                                options.temp_dir);
 
             // make our presence noted:
@@ -1341,6 +1341,8 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
 bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
+    NO_THREAD_SAFETY_ANALYSIS // this would work except for a known limitation: "No alias analysis" where clang cannot
+                              // tell that tr->db->m_mutex is the same thing as m_mutex
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
@@ -1365,11 +1367,16 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
         // Holding the controlmutex prevents any other DB from attaching to the file.
 
+        // Using start_read here ensures that we have access to the latest entry
+        // in the VersionList. We need to have access to that later to update top_ref and file_size.
+        // This is also needed to attach the group (get the proper top pointer, etc)
+        TransactionRef tr = start_read();
+
         // local lock blocking any transaction from starting (and stopping)
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        CheckedLockGuard local_lock(m_mutex);
 
         // We should be the only transaction active - otherwise back out
-        if (m_transaction_count != 0)
+        if (m_transaction_count != 1)
             return false;
 
         // group::write() will throw if the file already exists.
@@ -1377,10 +1384,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // before calling group::write().
         File::try_remove(tmp_path);
 
-        // Using start_read here ensures that we have access to the latest entry
-        // in the VersionList. We need to have access to that later to update top_ref and file_size.
-        // This is also needed to attach the group (get the proper top pointer, etc)
-        TransactionRef tr = start_read();
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
         try {
@@ -1409,7 +1412,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
-        tr->close();
+        tr->close_read_with_lock();
         m_alloc.detach();
 
 #ifdef _WIN32
@@ -1496,7 +1499,7 @@ DB::~DB() noexcept
 void DB::release_all_read_locks() noexcept
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
-    std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_local_locks_held
+    CheckedLockGuard local_lock(m_mutex); // mx on m_local_locks_held
     for (auto& read_lock : m_local_locks_held) {
         --m_transaction_count;
         m_version_manager->release_read_lock(read_lock);
@@ -1511,7 +1514,6 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
     if (m_key) {
         version_type from;
         {
-            // No longer: std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on m_last_seen_version
             if (!m_last_encryption_page_reader) {
                 alloc.refresh_all_encrypted_pages();
                 m_last_encryption_page_reader = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
@@ -1527,8 +1529,6 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 
         alloc.refresh_pages_for_versions(read_locks);
 
-        // No longer: std::lock_guard<std::recursive_mutex> local_lock(m_mutex); // mx on
-        // m_last_encryption_page_reader
         auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full);
         m_version_manager->release_read_lock(*m_last_encryption_page_reader);
         m_last_encryption_page_reader = tmp_rl;
@@ -1548,7 +1548,7 @@ void DB::close(bool allow_open_read_transactions)
         if (!is_attached())
             return;
         {
-            std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+            CheckedLockGuard local_lock(m_mutex);
             if (!allow_open_read_transactions && m_transaction_count)
                 throw LogicError(LogicError::wrong_transact_state);
         }
@@ -1568,7 +1568,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         return;
 
     {
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        CheckedLockGuard local_lock(m_mutex);
         if (m_write_transaction_open)
             throw LogicError(LogicError::wrong_transact_state);
         if (!allow_open_read_transactions && m_transaction_count)
@@ -1605,7 +1605,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         lock.unlock();
     }
     {
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        CheckedLockGuard local_lock(m_mutex);
 
         m_new_commit_available.close();
         m_pick_next_writer.close();
@@ -1643,10 +1643,9 @@ public:
             REALM_ASSERT(changed);
             auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
             ReadLockGuard rlg(m_db, readlock);
-            std::lock_guard<std::recursive_mutex> lock_guard(m_db.m_mutex);
-            alloc.update_reader_view(readlock.m_file_size, [&]() {
-                m_db.refresh_encrypted_mappings(VersionID{readlock.m_version, readlock.m_reader_idx}, alloc);
-            });
+            CheckedLockGuard lock_guard(m_db.m_mutex);
+            alloc.update_reader_view(readlock.m_file_size, &m_db,
+                                     VersionID{readlock.m_version, readlock.m_reader_idx});
         }
     }
     void start()
@@ -2075,14 +2074,19 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
     }
 }
 
-
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
     // ignore if opened with immutable file (then we have no lockfile)
     if (m_fake_read_lock_if_immutable)
         return;
-    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
+    CheckedLockGuard lock(m_mutex); // mx on m_local_locks_held
+    do_release_read_lock(read_lock);
+}
 
+// this is called with m_mutex locked
+void DB::do_release_read_lock(ReadLockInfo& read_lock) noexcept
+{
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     bool found_match = false;
     // simple linear search and move-last-over if a match is found.
     // common case should have only a modest number of transactions in play..
@@ -2106,7 +2110,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 DB::ReadLockInfo DB::grab_read_lock(ReadLockInfo::Type type, VersionID version_id)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
+    CheckedLockGuard lock(m_mutex); // mx on m_local_locks_held
     REALM_ASSERT_RELEASE(is_attached());
     auto read_lock = m_version_manager->grab_read_lock(type, version_id);
 
@@ -2118,7 +2122,7 @@ DB::ReadLockInfo DB::grab_read_lock(ReadLockInfo::Type type, VersionID version_i
 
 void DB::leak_read_lock(ReadLockInfo& read_lock) noexcept
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex); // mx on m_local_locks_held
+    CheckedLockGuard lock(m_mutex); // mx on m_local_locks_held
     // simple linear search and move-last-over if a match is found.
     // common case should have only a modest number of transactions in play..
     for (size_t j = 0; j < m_local_locks_held.size(); ++j) {
@@ -2215,7 +2219,7 @@ void DB::finish_begin_write()
 
 
     {
-        std::lock_guard local_lock(m_mutex);
+        CheckedLockGuard local_lock(m_mutex);
         m_write_transaction_open = true;
     }
     m_alloc.set_read_only(false);
@@ -2226,7 +2230,7 @@ void DB::do_end_write() noexcept
     SharedInfo* info = m_file_map.get_addr();
     info->next_served.fetch_add(1, std::memory_order_relaxed);
 
-    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    CheckedLockGuard local_lock(m_mutex);
     REALM_ASSERT(m_write_transaction_open);
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
@@ -2288,7 +2292,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     TopRefMap top_refs;
     bool any_new_unreachables;
     {
-        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        CheckedLockGuard lock(m_mutex);
         m_version_manager->cleanup_versions(oldest_live_version, top_refs, any_new_unreachables);
         oldest_version = top_refs.begin()->first;
         // Allow for trimming of the history. Some types of histories do not
@@ -2317,7 +2321,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     }
     {
         // protect access to shared variables and m_reader_mapping from here
-        std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
+        CheckedLockGuard lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_file_size() - m_free_space;
@@ -2483,8 +2487,9 @@ TransactionRef DB::start_write(bool nonblocking)
         do_begin_write();
     }
     {
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        CheckedUniqueLock local_lock(m_mutex);
         if (!is_attached()) {
+            local_lock.unlock();
             end_write_on_correct_thread();
             throw LogicError(LogicError::wrong_transact_state);
         }
@@ -2561,21 +2566,22 @@ public:
 };
 } // namespace
 
-DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
+DBRef DB::create(const std::string& file, bool no_create, const DBOptions options) NO_THREAD_SAFETY_ANALYSIS
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
 
-DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options)
+DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options) NO_THREAD_SAFETY_ANALYSIS
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, file, options);
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions options)
+DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
+                 const DBOptions options) NO_THREAD_SAFETY_ANALYSIS
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);
@@ -2584,7 +2590,7 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, con
     return retval;
 }
 
-DBRef DB::create(BinaryData buffer, bool take_ownership)
+DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYSIS
 {
     DBOptions options;
     options.is_immutable = true;

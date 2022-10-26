@@ -595,14 +595,13 @@ void Group::update_num_objects()
 }
 
 // Caller must hold any mutex needed for the 'refresh_encrypted_pages' parameter
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
-                          util::UniqueFunction<void()> refresh_encrypted_pages)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version, DB* db)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size, std::move(refresh_encrypted_pages)); // Throws
+    m_alloc.update_reader_view(new_file_size, db, version); // Throws
     update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
@@ -613,7 +612,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // nodes to attached them to. In the case of write transactions, the nodes
     // have to be created, as they have to be ready for being modified.
     bool create_group_when_missing = writable;
-    attach(new_top_ref, writable, create_group_when_missing, new_file_size, version); // Throws
+    attach(new_top_ref, writable, create_group_when_missing, new_file_size, version.version); // Throws
 }
 
 

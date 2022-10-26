@@ -34,6 +34,7 @@
 #include <cstdlib>
 #endif
 
+#include <realm/db.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
@@ -1115,13 +1116,13 @@ inline bool randomly_false_in_debug(bool x)
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
  */
-void SlabAlloc::update_reader_view(size_t file_size, util::UniqueFunction<void()> refresh_mappings)
+void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) REQUIRES(db->m_mutex)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     if (file_size <= old_baseline) {
-        if (refresh_mappings) {
-            refresh_mappings();
+        if (db) {
+            db->refresh_encrypted_mappings(version, *this);
         }
         return;
     }
@@ -1213,8 +1214,8 @@ void SlabAlloc::update_reader_view(size_t file_size, util::UniqueFunction<void()
         }
     }
 
-    if (refresh_mappings) {
-        refresh_mappings();
+    if (db) {
+        db->refresh_encrypted_mappings(version, *this);
     }
     rebuild_freelists_from_slab();
 

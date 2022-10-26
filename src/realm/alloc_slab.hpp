@@ -26,16 +26,19 @@
 #include <atomic>
 #include <mutex>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
 // Pre-declarations
+class DB;
 class Group;
 class GroupWriter;
 
@@ -47,7 +50,6 @@ struct SharedFileInfo;
 /// (or memory buffer) does not appear to contain a valid Realm
 /// database.
 struct InvalidDatabase;
-
 
 /// The allocator that is used to manage the memory of a Realm
 /// group, i.e., a Realm database.
@@ -294,7 +296,7 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    void update_reader_view(size_t file_size, util::UniqueFunction<void()> refresh_mappings = nullptr);
+    void update_reader_view(size_t file_size, DB* db = nullptr, VersionID version = {});
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
     void init_mapping_management(uint64_t currently_live_version);
 

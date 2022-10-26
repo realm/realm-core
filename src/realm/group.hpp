@@ -652,8 +652,7 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version,
-                       util::UniqueFunction<void()> refresh_encrypted_pages);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version, DB* db);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);

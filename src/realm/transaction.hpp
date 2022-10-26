@@ -179,7 +179,7 @@ private:
     }
 
     template <class O>
-    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
+    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool) REQUIRES(!db->m_mutex);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept REQUIRES(!m_async_mutex);
     void initialize_replication();
@@ -187,6 +187,8 @@ private:
     void replicate(Transaction* dest, Replication& repl) const;
     void complete_async_commit();
     void acquire_write_lock() REQUIRES(!m_async_mutex);
+
+    void close_read_with_lock() REQUIRES(!m_async_mutex, db->m_mutex);
 
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
@@ -462,10 +464,9 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
     {
-        std::lock_guard<std::recursive_mutex> lock_guard(db->m_mutex);
-        alloc.update_reader_view(new_file_size, [&]() {
-            db->refresh_encrypted_mappings(VersionID{new_read_lock.m_version, new_read_lock.m_reader_idx}, alloc);
-        });
+        util::CheckedLockGuard lock_guard(db->m_mutex);
+        alloc.update_reader_view(new_file_size, db.get(),
+                                 VersionID{new_read_lock.m_version, new_read_lock.m_reader_idx});
     }
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;

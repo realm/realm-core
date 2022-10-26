@@ -112,11 +112,9 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
     // to avoid deadlock we must take DB::m_mutex here.... this is not an ideal design
-    std::lock_guard<std::recursive_mutex> lock(db->m_mutex);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version,
-                  [_db, rli, alloc]() {
-                      _db->refresh_encrypted_mappings(VersionID{rli.m_version, rli.m_reader_idx}, *alloc);
-                  });
+    util::CheckedLockGuard lock(db->m_mutex);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
+                  VersionID{rli.m_version, rli.m_reader_idx}, db.get());
 }
 
 Transaction::~Transaction()
@@ -863,6 +861,26 @@ void Transaction::do_end_read() noexcept
     db.reset();
 }
 
+void Transaction::close_read_with_lock()
+{
+    REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+    util::CheckedLockGuard lck(m_async_mutex);
+    REALM_ASSERT_EX(m_async_stage == AsyncState::Idle, size_t(m_async_stage));
+
+    detach();
+    REALM_ASSERT_EX(!m_oldest_version_not_persisted, m_oldest_version_not_persisted->m_type,
+                    m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_top_ref,
+                    m_oldest_version_not_persisted->m_file_size);
+    db->do_release_read_lock(m_read_lock);
+
+    m_alloc.note_reader_end(this);
+    set_transact_stage(DB::transact_Ready);
+    // reset the std::shared_ptr to allow the DB object to release resources
+    // as early as possible.
+    db.reset();
+}
+
+
 void Transaction::initialize_replication()
 {
     if (m_transact_stage == DB::transact_Writing) {
@@ -879,8 +897,9 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #if REALM_METRICS
     REALM_ASSERT(m_metrics == db->m_metrics);
     if (m_metrics) { // null if metrics are disabled
-        size_t total_size = db->m_used_space + db->m_free_space;
-        size_t free_space = db->m_free_space;
+        size_t free_space, used_space;
+        db->get_stats(free_space, used_space);
+        size_t total_size = free_space + used_space;
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
         size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
