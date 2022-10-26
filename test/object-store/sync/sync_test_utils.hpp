@@ -50,6 +50,48 @@ void timed_wait_for(util::FunctionRef<bool()> condition,
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
                              std::chrono::milliseconds max_ms = std::chrono::seconds(30));
 
+template <typename T>
+struct TimedFutureState : public util::AtomicRefCountBase {
+    TimedFutureState(util::Promise<T>&& promise)
+        : promise(std::move(promise))
+    {
+    }
+
+    util::Promise<T> promise;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool finished = false;
+};
+
+template <typename T>
+util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::milliseconds max_ms)
+{
+    auto pf = util::make_promise_future<T>();
+    auto shared_state = util::make_bind<TimedFutureState<T>>(std::move(pf.promise));
+    std::move(input).get_async([shared_state](StatusOrStatusWith<T> value) {
+        std::unique_lock lk(shared_state->mutex);
+        // If the state has already expired, then just return without doing anything.
+        if (std::exchange(shared_state->finished, true)) {
+            return;
+        }
+
+        shared_state->promise.set_from_status_with(std::move(value));
+        shared_state->cv.notify_one();
+        lk.unlock();
+    });
+
+    std::unique_lock lk(shared_state->mutex);
+    if (!shared_state->cv.wait_for(lk, max_ms, [&] {
+            return shared_state->finished;
+        })) {
+        shared_state->finished = true;
+        shared_state->promise.set_error(
+            {ErrorCodes::RuntimeError, util::format("timed_future wait exceeded %1 ms", max_ms.count())});
+    }
+
+    return std::move(pf.future);
+}
+
 struct ExpectedRealmPaths {
     ExpectedRealmPaths(const std::string& base_path, const std::string& app_id, const std::string& user_identity,
                        const std::string& local_identity, const std::string& partition);
