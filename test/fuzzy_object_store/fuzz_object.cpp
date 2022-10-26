@@ -355,7 +355,8 @@ void FuzzObject::commit(SharedRealm shared_realm, FuzzLog& log)
     if (shared_realm->is_in_transaction()) {
         log << "FuzzObject::commit() - shared_realm->commit_transaction();\n";
         shared_realm->commit_transaction();
-        REALM_DO_IF_VERIFY(log, shared_realm->read_group().verify());
+        auto& group = shared_realm->read_group();
+        REALM_DO_IF_VERIFY(log, group.verify());
     }
 }
 
@@ -380,18 +381,12 @@ void FuzzObject::advance(realm::SharedRealm shared_realm, FuzzLog& log)
 void FuzzObject::close_and_reopen(SharedRealm& shared_realm, FuzzLog& log, const Realm::Config& config)
 {
     log << "Open/close realm\n";
-    if (!shared_realm->is_closed()) {
-        log << "Close realm file \n";
-        shared_realm->close();
-        shared_realm.reset();
-        shared_realm = Realm::get_shared_realm(config);
-        log << "Reopened realm file \n";
-    }
+    shared_realm->close();
+    shared_realm.reset();
+    shared_realm = Realm::get_shared_realm(config);
     log << "Verify group after realm got reopened\n";
     auto& group = shared_realm->read_group();
-    log << "Get group\n";
     REALM_DO_IF_VERIFY(log, group.verify());
-    log << "Group verified\n";
 }
 
 void FuzzObject::create_table_view(Group& group, FuzzLog& log, State& s, std::vector<TableView>& table_views)

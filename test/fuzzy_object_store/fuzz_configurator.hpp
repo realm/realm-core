@@ -27,7 +27,7 @@
 class FuzzObject;
 class FuzzConfigurator {
 public:
-    FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_inpout_file, const std::string& name);
+    FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_input_file, const std::string& name);
     const realm::Realm::Config& get_config() const;
     FuzzObject& get_fuzzer();
     const std::string& get_realm_path() const;
