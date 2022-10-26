@@ -154,7 +154,7 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
     }
 
     if (!status.get_std_error_code())
-        status = Status(make_error_code(util::error::operation_aborted), "SyncSession::become_inactive");
+        status = Status(make_error_code(util::error::operation_aborted), "Sync session became inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : waits)
@@ -168,7 +168,7 @@ void SyncSession::become_waiting_for_access_token()
 }
 
 void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
-                                  const std::string& context_message)
+                                  std::string_view context_message)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {

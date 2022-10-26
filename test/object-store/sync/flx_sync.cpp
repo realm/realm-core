@@ -1495,7 +1495,8 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->partition_value = "\"foobar\"";
 
-    REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::get_shared_realm(config), ErrorCodes::IllegalCombination);
+    REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                      "Cannot specify a partition value when flexible sync is enabled");
 }
 
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
@@ -2096,7 +2097,9 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         };
 
         SyncTestFile config(harness->app(), bson::Bson{}, schema);
-        REQUIRE_THROWS(Realm::get_shared_realm(config));
+        REQUIRE_EXCEPTION(
+            Realm::get_shared_realm(config), SchemaValidationFailed,
+            Catch::Matchers::ContainsSubstring("Asymmetric table 'Asymmetric2' not allowed in partition based sync"));
     }
 
     // Add any new test sections above this point

@@ -211,7 +211,10 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
         std::lock_guard<std::mutex> lock(m_realm_mutex);
         REALM_ASSERT(m_realm);
         m_realm->verify_thread();
-        m_realm->verify_in_write();
+        if (!m_realm->is_in_transaction()) {
+            throw WrongTransactionState("Suppressing the notification from a write transaction must be done from "
+                                        "inside the write transaction.");
+        }
     }
 
     util::CheckedLockGuard lock(m_callback_mutex);

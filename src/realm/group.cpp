@@ -410,7 +410,10 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
     }
     if (REALM_UNLIKELY(!file_format_ok))
         throw FileAccessError(ErrorCodes::FileFormatUpgradeRequired,
-                              "Realm file needs upgrade before opening in RO mode", path, 0);
+                              util::format("Realm file at path '%1' cannot be opened in read-only mode because it "
+                                           "has a file format version (%2) which requires an upgrade",
+                                           path, file_format_version),
+                              path);
     return file_format_version;
 }
 

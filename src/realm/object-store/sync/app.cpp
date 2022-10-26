@@ -233,15 +233,15 @@ App::App(const Config& config)
     REALM_ASSERT(m_config.transport);
 
     if (m_config.platform.empty()) {
-        throw std::runtime_error("You must specify the Platform in App::Config");
+        throw InvalidArgument("You must specify the Platform in App::Config");
     }
 
     if (m_config.platform_version.empty()) {
-        throw std::runtime_error("You must specify the Platform Version in App::Config");
+        throw InvalidArgument("You must specify the Platform Version in App::Config");
     }
 
     if (m_config.sdk_version.empty()) {
-        throw std::runtime_error("You must specify the SDK Version in App::Config");
+        throw InvalidArgument("You must specify the SDK Version in App::Config");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -595,8 +595,8 @@ void App::log_in_with_credentials(
                [completion = std::move(completion), credentials, linking_user,
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log("App: log_in_with_credentials failed: %1 message: %2",
-                                 response.http_status_code, error->what());
+                       self->log("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                 error->what());
                        return completion(nullptr, std::move(error));
                    }
 

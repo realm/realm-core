@@ -445,7 +445,10 @@ DescriptorType DescriptorOrdering::get_type(size_t index) const
 
 const BaseDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 {
-    return m_descriptors.at(ndx).get(); // may throw std::out_of_range
+    if (ndx >= m_descriptors.size()) {
+        throw OutOfBounds("DescriptorOrdering[]", ndx, m_descriptors.size());
+    }
+    return m_descriptors[ndx].get();
 }
 
 bool DescriptorOrdering::will_apply_sort() const

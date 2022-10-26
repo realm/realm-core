@@ -31,19 +31,14 @@
 #include <stdexcept>
 
 namespace realm {
-
-static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
+[[noreturn]] static void unsupported_operation(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
+    std::string_view collection_type = column.is_collection() ? collection_type_name(column) : "property";
     const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
-    if (is_array(type))
-        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
-    if (is_set(type))
-        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
-    if (is_dictionary(type))
-        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
-    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
-                        table.get_column_name(column), column_type);
+    throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
+                                        column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
+                                        table.get_column_name(column)));
 }
 
 Results::Results() = default;
@@ -562,7 +557,6 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
-
 namespace {
 struct CollectionAggregateAdaptor {
     const CollectionBase& list;
@@ -624,11 +618,10 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
     // which is the collection if it's not a link collection and the target
     // of the links otherwise
     if (m_mode == Mode::Collection && do_get_type() != PropertyType::Object) {
-        throw IllegalOperation{
-            unsupported_operation_msg(m_collection->get_col_key(), *m_collection->get_table(), name)};
+        unsupported_operation(m_collection->get_col_key(), *m_collection->get_table(), name);
     }
     else {
-        throw IllegalOperation{unsupported_operation_msg(column, *m_table, name)};
+        unsupported_operation(column, *m_table, name);
     }
 }
 
@@ -655,7 +648,7 @@ util::Optional<Mixed> Results::sum(ColKey column)
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
-    return aggregate(column, "avg", [column](auto&& helper) {
+    return aggregate(column, "average", [column](auto&& helper) {
         return helper.avg(column);
     });
 }
@@ -809,7 +802,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
 {
     auto check = [&](bool condition, const char* fmt, auto... args) {
         if (!condition) {
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': %2.", keypath, util::format(fmt, args...)));
         }
     };
@@ -853,10 +846,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0].first != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                              keypaths[0].first, string_for_property_type(type & ~PropertyType::Flags)));
         return sort({{{}}, {keypaths[0].second}});
@@ -928,10 +921,10 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0] != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'", keypaths[0],
                              string_for_property_type(type & ~PropertyType::Flags)));
         return distinct(DistinctDescriptor({{ColKey()}}));
@@ -1000,7 +993,8 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
         return;
     if (m_update_policy == UpdatePolicy::Never) {
         if (force)
-            throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
+            throw LogicError(ErrorCodes::IllegalOperation,
+                             "Cannot create asynchronous query for snapshotted Results.");
         return;
     }
 

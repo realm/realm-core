@@ -69,9 +69,7 @@ public:
     T get(size_t ndx) const
     {
         const auto current_size = size();
-        if (ndx >= current_size) {
-            throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
-        }
+        CollectionBase::validate_index("get()", ndx, current_size);
         return m_tree->get(ndx);
     }
 

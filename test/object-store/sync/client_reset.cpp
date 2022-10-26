@@ -1619,10 +1619,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
          }},
         {"test type",
          {{"_id", PropertyType::Int, Property::IsPrimary{true}},
-          {"value", TestType::property_type()},
-          {"list", PropertyType::Array | TestType::property_type()},
-          {"dictionary", PropertyType::Dictionary | TestType::property_type()},
-          {"set", PropertyType::Set | TestType::property_type()}}},
+          {"value", TestType::property_type},
+          {"list", PropertyType::Array | TestType::property_type},
+          {"dictionary", PropertyType::Dictionary | TestType::property_type},
+          {"set", PropertyType::Set | TestType::property_type}}},
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");

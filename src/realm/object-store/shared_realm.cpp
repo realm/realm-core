@@ -189,26 +189,26 @@ std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 
 std::shared_ptr<SyncSession> Realm::sync_session() const
 {
-    return m_coordinator->sync_session();
+    return m_coordinator ? m_coordinator->sync_session() : nullptr;
 }
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
+    verify_open();
     // If there is a subscription store, then return the latest set
     if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
         return flx_sub_store->get_latest();
     }
-    // Otherwise, throw runtime_error
     throw std::runtime_error("Flexible sync is not enabled");
 }
 
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
+    verify_open();
     // If there is a subscription store, then return the active set
     if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
         return flx_sub_store->get_active();
     }
-    // Otherwise, throw runtime_error
     throw std::runtime_error("Flexible sync is not enabled");
 }
 #endif
@@ -352,6 +352,8 @@ Schema Realm::get_full_schema()
 
 void Realm::set_schema_subset(Schema schema)
 {
+    verify_thread();
+    verify_open();
     REALM_ASSERT(m_dynamic_schema);
     REALM_ASSERT(m_schema_version != ObjectStore::NotVersioned);
 
@@ -556,6 +558,8 @@ void Realm::notify_schema_changed()
 
 static void check_can_create_write_transaction(const Realm* realm)
 {
+    realm->verify_thread();
+    realm->verify_open();
     if (realm->config().immutable() || realm->config().read_only()) {
         throw WrongTransactionState("Can't perform transactions on read-only Realms.");
     }
@@ -593,7 +597,8 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
 {
     if (is_frozen()) {
         if (throw_on_error)
-            throw WrongTransactionState("Notifications are not available on frozen lists since they do not change.");
+            throw WrongTransactionState(
+                "Notifications are not available on frozen collections since they do not change.");
         return false;
     }
     if (config().immutable()) {
@@ -659,11 +664,13 @@ util::Optional<DB::version_type> Realm::latest_snapshot_version() const
 
 void Realm::enable_wait_for_change()
 {
+    verify_open();
     m_coordinator->enable_wait_for_change();
 }
 
 bool Realm::wait_for_change()
 {
+    verify_open();
     if (m_frozen_version) {
         return false;
     }
@@ -672,6 +679,7 @@ bool Realm::wait_for_change()
 
 void Realm::wait_for_change_release()
 {
+    verify_open();
     m_coordinator->wait_for_change_release();
 }
 
@@ -833,7 +841,6 @@ void Realm::run_writes()
 
 auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_block, bool notify_only) -> AsyncHandle
 {
-    verify_thread();
     check_can_create_write_transaction(this);
     if (m_is_running_async_commit_completions) {
         throw WrongTransactionState("Can't begin a write transaction from inside a commit completion callback.");
@@ -859,7 +866,7 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
 auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& completion, bool allow_grouping)
     -> AsyncHandle
 {
-    verify_thread();
+    check_can_create_write_transaction(this);
     if (m_is_running_async_commit_completions) {
         throw WrongTransactionState("Can't commit a write transaction from inside a commit completion callback.");
     }
@@ -922,6 +929,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
 bool Realm::async_cancel_transaction(AsyncHandle handle)
 {
     verify_thread();
+    verify_open();
     auto compare = [handle](auto& elem) {
         return elem.handle == handle;
     };
@@ -943,7 +951,6 @@ bool Realm::async_cancel_transaction(AsyncHandle handle)
 
 void Realm::begin_transaction()
 {
-    verify_thread();
     check_can_create_write_transaction(this);
 
     if (is_in_transaction()) {
@@ -979,7 +986,6 @@ void Realm::do_begin_transaction()
 void Realm::commit_transaction()
 {
     check_can_create_write_transaction(this);
-    verify_thread();
 
     if (!is_in_transaction()) {
         throw WrongTransactionState("Can't commit a non-existing write transaction");
@@ -1008,7 +1014,6 @@ void Realm::commit_transaction()
 void Realm::cancel_transaction()
 {
     check_can_create_write_transaction(this);
-    verify_thread();
 
     if (m_is_running_async_commit_completions) {
         throw WrongTransactionState("Can't cancel a write transaction from inside a commit completion callback.");
@@ -1031,8 +1036,8 @@ void Realm::cancel_transaction()
 
 void Realm::invalidate()
 {
-    verify_open();
     verify_thread();
+    verify_open();
 
     if (m_is_sending_notifications) {
         // This was originally because closing the Realm during notification
@@ -1081,10 +1086,11 @@ bool Realm::compact()
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
+    verify_open();
 
 #if REALM_ENABLE_SYNC
     if (config.sync_config && config.sync_config->flx_sync_requested) {
-        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
+        throw IllegalOperation("Cannot convert Realms to flexible sync Realms");
     }
 #endif
 
@@ -1205,7 +1211,7 @@ bool Realm::do_refresh()
     }
 
     if (m_config.immutable()) {
-        throw std::logic_error("Can't refresh a read-only Realm.");
+        throw WrongTransactionState("Can't refresh an immutable Realm.");
     }
 
     // can't be any new changes if we're in a write transaction
@@ -1248,7 +1254,7 @@ bool Realm::do_refresh()
 void Realm::set_auto_refresh(bool auto_refresh)
 {
     if (is_frozen() && auto_refresh) {
-        throw std::logic_error("Auto-refresh cannot be enabled for frozen Realms.");
+        throw WrongTransactionState("Auto-refresh cannot be enabled for frozen Realms.");
     }
     m_auto_refresh = auto_refresh;
 }
@@ -1331,9 +1337,10 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
         return;
     }
     if (!lock_successful) {
-        throw LogicError(
+        throw FileAccessError(
             ErrorCodes::DeleteOnOpenRealm,
-            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
+            util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path),
+            realm_file_path);
     }
 }
 

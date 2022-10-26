@@ -132,61 +132,74 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     SECTION("should validate that the config is sensible") {
         SECTION("bad encryption key") {
             config.encryption_key = std::vector<char>(2, 0);
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidEncryptionKey,
+                              "Encryption key must be 64 bytes.");
         }
 
         SECTION("schema without schema version") {
             config.schema_version = ObjectStore::NotVersioned;
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "A schema version must be specified when the schema is specified");
         }
 
         SECTION("migration function for immutable") {
             config.schema_mode = SchemaMode::Immutable;
             config.migration_function = [](auto, auto, auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in immutable mode do not use a migration function");
         }
 
         SECTION("migration function for read-only") {
             config.schema_mode = SchemaMode::ReadOnly;
             config.migration_function = [](auto, auto, auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in read-only mode do not use a migration function");
         }
 
         SECTION("migration function for additive discovered") {
             config.schema_mode = SchemaMode::AdditiveDiscovered;
             config.migration_function = [](auto, auto, auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in Additive-only schema mode do not use a migration function");
         }
 
         SECTION("migration function for additive explicit") {
             config.schema_mode = SchemaMode::AdditiveExplicit;
             config.migration_function = [](auto, auto, auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in Additive-only schema mode do not use a migration function");
         }
 
         SECTION("initialization function for immutable") {
             config.schema_mode = SchemaMode::Immutable;
             config.initialization_function = [](auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in immutable mode do not use an initialization function");
         }
 
         SECTION("initialization function for read-only") {
             config.schema_mode = SchemaMode::ReadOnly;
             config.initialization_function = [](auto) {};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Realms opened in read-only mode do not use an initialization function");
         }
         SECTION("in-memory encrypted realms are rejected") {
             config.in_memory = true;
             config.encryption_key = make_test_encryption_key();
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), IllegalCombination,
+                              "Encryption is not supported for in-memory realms");
         }
     }
 
     SECTION("should reject mismatched config") {
+        config.encryption_key.clear(); // may be set already when encrypting all
+
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
             config.schema_version = 2;
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), MismatchedConfig,
+                Catch::Matchers::Matches("Realm at path '.*' already opened with different schema version."));
 
             config.schema = util::none;
             config.schema_version = ObjectStore::NotVersioned;
@@ -196,13 +209,17 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         SECTION("schema mode") {
             auto realm = Realm::get_shared_realm(config);
             config.schema_mode = SchemaMode::Manual;
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), MismatchedConfig,
+                Catch::Matchers::Matches("Realm at path '.*' already opened with a different schema mode."));
         }
 
         SECTION("durability") {
             auto realm = Realm::get_shared_realm(config);
             config.in_memory = true;
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), MismatchedConfig,
+                Catch::Matchers::Matches("Realm at path '.*' already opened with different inMemory settings."));
         }
 
         SECTION("schema") {
@@ -210,7 +227,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             config.schema = Schema{
                 {"object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
             };
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), SchemaMismatch,
+                Catch::Matchers::ContainsSubstring("Migration is required due to the following errors:"));
         }
     }
 
@@ -233,7 +252,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
                                           std::hash<std::string>()(config.path)); // Mirror internal implementation
         REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
-        realm::util::remove_dir_recursive(fallback_dir);
+        REQUIRE(realm::util::try_remove_dir_recursive(fallback_dir));
     }
 
     SECTION("automatically append dir separator to end of fallback path") {
@@ -252,7 +271,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
                                           std::hash<std::string>()(config.path)); // Mirror internal implementation
         REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
-        realm::util::remove_dir_recursive(fallback_dir);
+        REQUIRE(realm::util::try_remove_dir_recursive(fallback_dir));
     }
 #endif
 
@@ -397,7 +416,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
 
         SECTION("refreshing an immutable Realm throws") {
-            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh a read-only Realm.");
+            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh an immutable Realm.");
         }
     }
 
@@ -433,14 +452,19 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         // The ExternalCommitHelper implementation on Windows doesn't rely on FIFOs
+        std::string expected_path = config.path + ".note";
         REQUIRE(util::try_make_dir(config.path + ".note"));
-        auto sys_fallback_file =
-            util::format("%1realm_%2.note", util::normalize_dir(DBOptions::get_sys_tmp_dir()),
-                         std::hash<std::string>()(config.path)); // Mirror internal implementation
-        REQUIRE(util::try_make_dir(sys_fallback_file));
-        REQUIRE_THROWS(Realm::get_shared_realm(config));
+        if (auto tmp_dir = DBOptions::get_sys_tmp_dir(); !tmp_dir.empty()) {
+            expected_path = util::format("%1realm_%2.note", util::normalize_dir(tmp_dir),
+                                         std::hash<std::string>()(config.path)); // Mirror internal implementation
+            REQUIRE(util::try_make_dir(expected_path));
+        }
+        REQUIRE_EXCEPTION(
+            Realm::get_shared_realm(config), FileAlreadyExists,
+            util::format("Cannot create fifo at path '%1': a non-fifo entry already exists at that path.",
+                         expected_path));
         util::remove_dir(config.path + ".note");
-        util::remove_dir(sys_fallback_file);
+        util::try_remove_dir(expected_path);
     }
 #endif
 
@@ -873,8 +897,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
-            REQUIRE_EXCEPTION(std::rethrow_exception(error),
-                              HTTPError, "http error code considered fatal. Client Error: 403");
+            REQUIRE_EXCEPTION(std::rethrow_exception(error), HTTPError,
+                              "http error code considered fatal. Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });
@@ -1099,7 +1123,8 @@ TEST_CASE("SharedRealm: convert") {
     SECTION("cannot convert from local realm to flx sync") {
         SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
         auto local_realm = Realm::get_shared_realm(local_config1);
-        REQUIRE_THROWS(local_realm->convert(sync_config));
+        REQUIRE_EXCEPTION(local_realm->convert(sync_config), IllegalOperation,
+                          "Cannot convert Realms to flexible sync Realms");
     }
 
     SECTION("can copy a local realm to a local realm") {
@@ -2428,19 +2453,48 @@ TEST_CASE("SharedRealm: close()") {
     auto realm = Realm::get_shared_realm(config);
 
     SECTION("all functions throw ClosedRealmException after close") {
+        const char* msg = "Cannot access realm that has been closed.";
+
         realm->close();
-
         REQUIRE(realm->is_closed());
+        REQUIRE_EXCEPTION(realm->verify_open(), ClosedRealm, msg);
 
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->read_group(), ErrorCodes::ClosedRealm);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->begin_transaction(), ErrorCodes::ClosedRealm);
+        REQUIRE_EXCEPTION(realm->update_schema(Schema{}), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->rename_property(Schema{}, "", "", ""), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->set_schema_subset(Schema{}), ClosedRealm, msg);
+
+        REQUIRE_EXCEPTION(realm->begin_transaction(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->commit_transaction(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->cancel_transaction(), ClosedRealm, msg);
         REQUIRE(!realm->is_in_transaction());
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->commit_transaction(), ErrorCodes::WrongTransactionState);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->cancel_transaction(), ErrorCodes::WrongTransactionState);
 
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->refresh(), ErrorCodes::ClosedRealm);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->invalidate(), ErrorCodes::ClosedRealm);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->compact(), ErrorCodes::ClosedRealm);
+        REQUIRE_EXCEPTION(realm->async_begin_transaction(nullptr), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->async_commit_transaction(nullptr), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->async_cancel_transaction(0), ClosedRealm, msg);
+        REQUIRE_FALSE(realm->is_in_async_transaction());
+
+        REQUIRE_EXCEPTION(realm->freeze(), ClosedRealm, msg);
+        REQUIRE_FALSE(realm->is_frozen());
+        REQUIRE_EXCEPTION(realm->get_number_of_versions(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->read_transaction_version(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->duplicate(), ClosedRealm, msg);
+
+        REQUIRE_EXCEPTION(realm->enable_wait_for_change(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->wait_for_change(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->wait_for_change_release(), ClosedRealm, msg);
+
+        REQUIRE_NOTHROW(realm->notify());
+        REQUIRE_EXCEPTION(realm->refresh(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->invalidate(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->compact(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->convert(realm->config()), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->write_copy(), ClosedRealm, msg);
+
+#if REALM_ENABLE_SYNC
+        REQUIRE_FALSE(realm->sync_session());
+        REQUIRE_EXCEPTION(realm->get_latest_subscription_set(), ClosedRealm, msg);
+        REQUIRE_EXCEPTION(realm->get_active_subscription_set(), ClosedRealm, msg);
+#endif
     }
 
     SECTION("fully closes database file even with live notifiers") {
@@ -2496,7 +2550,8 @@ TEST_CASE("Realm::delete_files()") {
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::delete_files(path), ErrorCodes::DeleteOnOpenRealm);
+        REQUIRE_EXCEPTION(Realm::delete_files(path), ErrorCodes::DeleteOnOpenRealm,
+                          util::format("Cannot delete files of an open Realm: '%1' is still in use.", path));
         REQUIRE(util::File::exists(path + ".lock"));
         REQUIRE(util::File::exists(path));
         REQUIRE(util::File::exists(path + ".management"));
@@ -2566,16 +2621,19 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         // Test invalid configs
         realm::Realm::Config config3;
         config3.realm_data = realm_buffer.get();
-        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // missing in_memory and immutable
+        REQUIRE_EXCEPTION(Realm::get_shared_realm(config3), IllegalCombination,
+                          "In-memory realms initialized from memory buffers can only be opened in read-only mode");
 
         config3.in_memory = true;
         config3.schema_mode = SchemaMode::Immutable;
         config3.path = "path";
-        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and path
+        REQUIRE_EXCEPTION(Realm::get_shared_realm(config3), IllegalCombination,
+                          "Specifying both memory buffer and path is invalid");
 
         config3.path = "";
-        config3.encryption_key = {'a'};
-        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and encryption
+        config3.encryption_key = std::vector<char>(64, 'a');
+        REQUIRE_EXCEPTION(Realm::get_shared_realm(config3), IllegalCombination,
+                          "Memory buffers do not support encryption");
     }
 }
 
@@ -3542,7 +3600,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto realm = Realm::get_shared_realm(std::move(ref));
         REQUIRE_NOTHROW(realm->verify_thread());
         std::thread([&] {
-            REQUIRE_THROWS(realm->verify_thread());
+            REQUIRE_EXCEPTION(realm->verify_thread(), WrongThread, "Realm accessed from incorrect thread.");
         }).join();
     }
 

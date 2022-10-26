@@ -33,7 +33,7 @@ public:
 
     const char* what() const noexcept final;
     const Status& to_status() const;
-    const std::string& reason() const noexcept;
+    std::string_view reason() const noexcept;
     ErrorCodes::Error code() const noexcept;
     std::string_view code_string() const noexcept;
 
@@ -65,7 +65,7 @@ struct UnsupportedFileFormatVersion : Exception {
 
 /// Thrown when a key is already existing when trying to create a new object
 struct KeyAlreadyUsed : Exception {
-    KeyAlreadyUsed(const std::string& msg)
+    KeyAlreadyUsed(std::string_view msg)
         : Exception(ErrorCodes::KeyAlreadyUsed, msg)
     {
     }
@@ -102,18 +102,18 @@ struct KeyAlreadyUsed : Exception {
 /// Behaviour" cases is to help the user know what the limits are, without
 /// constraining the database to handle every and any use-case thrown at it.
 struct LogicError : Exception {
-    LogicError(ErrorCodes::Error code, const std::string& msg);
+    LogicError(ErrorCodes::Error code, std::string_view msg);
     ~LogicError() noexcept override;
 };
 
 struct RuntimeError : Exception {
-    RuntimeError(ErrorCodes::Error code, const std::string& msg);
+    RuntimeError(ErrorCodes::Error code, std::string_view msg);
     ~RuntimeError() noexcept override;
 };
 
 /// Thrown when creating references that are too large to be contained in our ref_type (size_t)
 struct MaximumFileSizeExceeded : RuntimeError {
-    MaximumFileSizeExceeded(const std::string& msg)
+    MaximumFileSizeExceeded(std::string_view msg)
         : RuntimeError(ErrorCodes::MaximumFileSizeExceeded, msg)
     {
     }
@@ -122,7 +122,7 @@ struct MaximumFileSizeExceeded : RuntimeError {
 
 /// Thrown when writing fails because the disk is full.
 struct OutOfDiskSpace : RuntimeError {
-    OutOfDiskSpace(const std::string& msg)
+    OutOfDiskSpace(std::string_view msg)
         : RuntimeError(ErrorCodes::OutOfDiskSpace, msg)
     {
     }
@@ -143,7 +143,7 @@ struct MultipleSyncAgents : RuntimeError {
 
 /// Thrown when memory can no longer be mapped to. When mmap/remap fails.
 struct AddressSpaceExhausted : RuntimeError {
-    AddressSpaceExhausted(const std::string& msg)
+    AddressSpaceExhausted(std::string_view msg)
         : RuntimeError(ErrorCodes::AddressSpaceExhausted, msg)
     {
     }
@@ -151,7 +151,8 @@ struct AddressSpaceExhausted : RuntimeError {
 };
 
 struct InvalidArgument : LogicError {
-    InvalidArgument(ErrorCodes::Error code, const std::string& msg);
+    InvalidArgument(std::string_view msg);
+    InvalidArgument(ErrorCodes::Error code, std::string_view msg);
     ~InvalidArgument() noexcept override;
 };
 
@@ -191,7 +192,7 @@ struct TableNameInUse : InvalidArgument {
 
 /// Thrown when a key can not by found
 struct KeyNotFound : InvalidArgument {
-    KeyNotFound(const std::string& msg)
+    KeyNotFound(std::string_view msg)
         : InvalidArgument(ErrorCodes::KeyNotFound, msg)
     {
     }
@@ -200,10 +201,14 @@ struct KeyNotFound : InvalidArgument {
 
 
 struct NotNullable : InvalidArgument {
+    NotNullable(std::string_view msg)
+        : InvalidArgument(ErrorCodes::PropertyNotNullable, msg)
+    {
+    }
     template <class T, class U>
     NotNullable(const T& object_type, const U& property_name)
-        : InvalidArgument(ErrorCodes::PropertyNotNullable,
-                          util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
+        : NotNullable(
+              util::format("Invalid null value for non-nullable property '%1.%2'.", object_type, property_name))
     {
     }
     ~NotNullable() noexcept override;
@@ -213,14 +218,14 @@ struct PropertyTypeMismatch : InvalidArgument {
     template <class T, class U>
     PropertyTypeMismatch(const T& object_type, const U& property_name)
         : InvalidArgument(ErrorCodes::TypeMismatch,
-                          util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
+                          util::format("Type mismatch for property '%1.%2'.", object_type, property_name))
     {
     }
     ~PropertyTypeMismatch() noexcept override;
 };
 
 struct OutOfBounds : InvalidArgument {
-    OutOfBounds(const std::string& msg, size_t idx, size_t sz);
+    OutOfBounds(std::string_view msg, size_t idx, size_t sz);
     ~OutOfBounds() noexcept override;
     size_t index;
     size_t size;
@@ -235,7 +240,7 @@ struct InvalidEncryptionKey : InvalidArgument {
 };
 
 struct StaleAccessor : LogicError {
-    StaleAccessor(const std::string& msg)
+    StaleAccessor(std::string_view msg)
         : LogicError(ErrorCodes::StaleAccessor, msg)
     {
     }
@@ -243,7 +248,7 @@ struct StaleAccessor : LogicError {
 };
 
 struct IllegalOperation : LogicError {
-    IllegalOperation(const std::string& msg)
+    IllegalOperation(std::string_view msg)
         : LogicError(ErrorCodes::IllegalOperation, msg)
     {
     }
@@ -251,7 +256,7 @@ struct IllegalOperation : LogicError {
 };
 
 struct NoSubscriptionForWrite : RuntimeError {
-    NoSubscriptionForWrite(const std::string& msg)
+    NoSubscriptionForWrite(std::string_view msg)
         : RuntimeError(ErrorCodes::NoSubscriptionForWrite, msg)
     {
     }
@@ -260,7 +265,7 @@ struct NoSubscriptionForWrite : RuntimeError {
 
 
 struct WrongTransactionState : LogicError {
-    WrongTransactionState(const std::string& msg)
+    WrongTransactionState(std::string_view msg)
         : LogicError(ErrorCodes::WrongTransactionState, msg)
     {
     }
@@ -276,7 +281,7 @@ struct InvalidTableRef : LogicError {
 };
 
 struct SerializationError : LogicError {
-    SerializationError(const std::string& msg)
+    SerializationError(std::string_view msg)
         : LogicError(ErrorCodes::SerializationError, msg)
     {
     }
@@ -292,7 +297,7 @@ struct NotImplemented : LogicError {
 };
 
 struct MigrationFailed : LogicError {
-    MigrationFailed(const std::string& msg)
+    MigrationFailed(std::string_view msg)
         : LogicError(ErrorCodes::MigrationFailed, msg)
     {
     }
@@ -328,13 +333,12 @@ struct CrossTableLinkTarget : LogicError {
 /// types that are used for various specific types of errors.
 class FileAccessError : public RuntimeError {
 public:
-    FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path, int err);
-    FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path);
+    FileAccessError(ErrorCodes::Error code, std::string_view msg, std::string_view path, int err = 0);
     ~FileAccessError() noexcept override;
 
     /// Return the associated file system path, or the empty string if there is
     /// no associated file system path, or if the file system path is unknown.
-    const std::string& get_path() const
+    std::string_view get_path() const
     {
         return m_path;
     }
@@ -349,13 +353,13 @@ private:
 };
 
 struct SystemError : RuntimeError {
-    SystemError(std::error_code err, const std::string& msg)
+    SystemError(std::error_code err, std::string_view msg)
         : RuntimeError(ErrorCodes::SystemError, msg)
     {
         const_cast<Status&>(to_status()).set_std_error_code(err);
     }
 
-    SystemError(int err_no, const std::string& msg)
+    SystemError(int err_no, std::string_view msg)
         : SystemError(std::error_code(err_no, std::system_category()), msg)
     {
     }
@@ -377,7 +381,7 @@ namespace query_parser {
 
 /// Exception thrown when parsing fails due to invalid syntax.
 struct SyntaxError : InvalidArgument {
-    SyntaxError(const std::string& msg)
+    SyntaxError(std::string_view msg)
         : InvalidArgument(ErrorCodes::SyntaxError, msg)
     {
     }
@@ -386,9 +390,9 @@ struct SyntaxError : InvalidArgument {
 
 /// Exception thrown when binding a syntactically valid query string in a
 /// context where it does not make sense.
-struct InvalidQueryError : RuntimeError {
-    InvalidQueryError(const std::string& msg)
-        : RuntimeError(ErrorCodes::InvalidQuery, msg)
+struct InvalidQueryError : LogicError {
+    InvalidQueryError(std::string_view msg)
+        : LogicError(ErrorCodes::InvalidQuery, msg)
     {
     }
     ~InvalidQueryError() noexcept override;
@@ -396,7 +400,7 @@ struct InvalidQueryError : RuntimeError {
 
 /// Exception thrown when there is a problem accessing the arguments in a query string
 struct InvalidQueryArgError : InvalidArgument {
-    InvalidQueryArgError(const std::string& msg)
+    InvalidQueryArgError(std::string_view msg)
         : InvalidArgument(ErrorCodes::InvalidQueryArg, msg)
     {
     }

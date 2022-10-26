@@ -21,6 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
@@ -34,10 +35,6 @@
 
 #include <realm/group.hpp>
 #include <realm/util/any.hpp>
-
-#if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
-#endif // REALM_ENABLE_AUTH_TESTS
 
 #include <cstdint>
 
@@ -485,7 +482,8 @@ TEST_CASE("object") {
             write([&] {
                 obj.remove();
             });
-            REQUIRE_THROWS(require_change(object));
+            REQUIRE_EXCEPTION(require_change(object), InvalidatedObject,
+                              "Accessing object of type table which has been invalidated or deleted");
         }
 
         SECTION("keypath filtered notifications") {
@@ -1139,10 +1137,8 @@ TEST_CASE("object") {
     }
 
     SECTION("create throws for missing values if there is no default") {
-        REQUIRE_THROWS(create(AnyDict{
-            {"_id", INT64_C(1)},
-            {"float", 6.6f},
-        }));
+        REQUIRE_EXCEPTION(create(AnyDict{{"_id", INT64_C(1)}, {"float", 6.6f}}), MissingPropertyValue,
+                          "Missing value for property 'all types.bool'");
     }
 
     SECTION("create always sets the PK first") {
@@ -1599,22 +1595,25 @@ TEST_CASE("object") {
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
             {"dictionary", AnyDict{{"key", "value"s}}},
         });
-        REQUIRE_THROWS(create(AnyDict{
-            {"_id", INT64_C(1)},
-            {"bool", true},
-            {"int", INT64_C(5)},
-            {"float", 2.2f},
-            {"double", 3.3},
-            {"string", "hello"s},
-            {"data", "olleh"s},
-            {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
-            {"object id", ObjectId("000000000000000000000001")},
-            {"decimal", Decimal128("1.23e45")},
-            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
-            {"dictionary", AnyDict{{"key", "value"s}}},
-        }));
+        REQUIRE_EXCEPTION(create(AnyDict{
+                              {"_id", INT64_C(1)},
+                              {"bool", true},
+                              {"int", INT64_C(5)},
+                              {"float", 2.2f},
+                              {"double", 3.3},
+                              {"string", "hello"s},
+                              {"data", "olleh"s},
+                              {"date", Timestamp(10, 20)},
+                              {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
+                              {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+                              {"object id", ObjectId("000000000000000000000001")},
+                              {"decimal", Decimal128("1.23e45")},
+                              {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+                              {"dictionary", AnyDict{{"key", "value"s}}},
+                          }),
+                          ObjectAlreadyExists,
+                          "Attempting to create an object of type 'all types' with an existing primary key value "
+                          "'not implemented'");
     }
 
     SECTION("create with explicit null pk does not fall back to default") {
@@ -1748,13 +1747,17 @@ TEST_CASE("object") {
         auto linking = util::any_cast<Results>(linkobj.get_property_value<std::any>(d, "origin"));
         REQUIRE(linking.size() == 1);
 
-        REQUIRE_THROWS(obj.set_property_value(d, "_id", std::any(INT64_C(5))));
-        REQUIRE_THROWS(obj.set_property_value(d, "not a property", std::any(INT64_C(5))));
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "_id", std::any(INT64_C(5))), ModifyPrimaryKey,
+                          "Cannot modify primary key after creation: 'all types._id'");
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "not a property", std::any(INT64_C(5))), InvalidProperty,
+                          "Property 'all types.not a property' does not exist");
 
         r->commit_transaction();
 
-        REQUIRE_THROWS(obj.get_property_value<std::any>(d, "not a property"));
-        REQUIRE_THROWS(obj.set_property_value(d, "int", std::any(INT64_C(5))));
+        REQUIRE_EXCEPTION(obj.get_property_value<std::any>(d, "not a property"), InvalidProperty,
+                          "Property 'all types.not a property' does not exist");
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "int", std::any(INT64_C(5))), WrongTransactionState,
+                          "Cannot modify managed objects outside of a write transaction.");
     }
 
     SECTION("setter has correct create policy") {
@@ -1993,9 +1996,8 @@ TEST_CASE("Embedded Object") {
 
         SECTION("throws when given a managed object") {
             realm->begin_transaction();
-            REQUIRE_THROWS_WITH(
-                obj.set_property_value(ctx, "object", obj.get_property_value<std::any>(ctx, "object")),
-                "Cannot set a link to an existing managed embedded object");
+            REQUIRE_EXCEPTION(obj.set_property_value(ctx, "object", obj.get_property_value<std::any>(ctx, "object")),
+                              InvalidArgument, "Cannot set a link to an existing managed embedded object");
             realm->cancel_transaction();
         }
 
@@ -2169,33 +2171,25 @@ TEST_CASE("Embedded Object") {
     }
 }
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_SYNC
 
 TEST_CASE("Asymmetric Object") {
     Schema schema{
         {"asymmetric",
          ObjectSchema::ObjectType::TopLevelAsymmetric,
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"location", PropertyType::Int},
-             {"reading", PropertyType::Int},
-         }},
+         {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
         {"asymmetric_link",
          ObjectSchema::ObjectType::TopLevelAsymmetric,
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"location", PropertyType::Mixed | PropertyType::Nullable},
          }},
-        {"table",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"location", PropertyType::Int},
-             {"reading", PropertyType::Int},
-         }},
+        {"table", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
     };
 
-    realm::app::FLXSyncTestHarness harness("asymmetric_sync", {schema});
-    SyncTestFile config(harness.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
+    TestSyncManager tsm({}, {/*.start_immediately =*/false});
+    SyncTestFile config(tsm.fake_user(), schema, SyncConfig::FLXSyncEnabled{});
+    config.sync_config->flx_sync_requested = true;
 
     auto realm = Realm::get_shared_realm(config);
     {
@@ -2213,35 +2207,24 @@ TEST_CASE("Asymmetric Object") {
     };
 
     SECTION("Basic object creation") {
-        auto obj = create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", INT64_C(10)},
-                {"reading", INT64_C(20)},
-            },
-            "asymmetric");
+        auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "asymmetric");
         // Object returned is not valid.
         REQUIRE(!obj.obj().is_valid());
         // Object gets deleted immediately.
-        REQUIRE(Results(realm, realm->read_group().get_table("class_table")).size() == 0);
+        REQUIRE(ObjectStore::is_empty(realm->read_group()));
     }
 
     SECTION("Outgoing link not allowed") {
-        auto obj = create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", INT64_C(10)},
-                {"reading", INT64_C(20)},
-            },
-            "table");
+        auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "table");
         auto table = realm->read_group().get_table("class_table");
-        REQUIRE_THROWS(create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
-            },
-            "asymmetric_link"));
+        REQUIRE_EXCEPTION(create(
+                              AnyDict{
+                                  {"_id", INT64_C(1)},
+                                  {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
+                              },
+                              "asymmetric_link"),
+                          IllegalOperation, "Links not allowed in asymmetric tables");
     }
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

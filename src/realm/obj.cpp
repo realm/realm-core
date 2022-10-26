@@ -516,7 +516,7 @@ Obj Obj::get_parent_object() const
     update_if_needed();
 
     if (!m_table->is_embedded()) {
-        throw std::runtime_error("Object is not embedded");
+        throw LogicError(ErrorCodes::TopLevelObject, "Object is not embedded");
     }
     m_table->for_each_backlink_column([&](ColKey backlink_col_key) {
         if (get_backlink_cnt(backlink_col_key) == 1) {
@@ -1072,12 +1072,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
             if (output_mode == output_mode_xjson_plus) {
                 open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-                if (ck.is_list())
-                    open_str += "List";
-                else if (ck.is_set())
-                    open_str += "Set";
-                else if (ck.is_dictionary())
-                    open_str += "Dictionary";
+                open_str += collection_type_name(ck, true);
                 open_str += "\": ";
                 close_str += " }";
             }

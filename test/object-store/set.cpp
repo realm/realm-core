@@ -81,7 +81,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",
-         {{"value_set", PropertyType::Set | Test::property_type()},
+         {{"value_set", PropertyType::Set | Test::property_type},
           {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
         {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
     });
@@ -116,15 +116,16 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
         REQUIRE(set().is_valid());
         REQUIRE_NOTHROW(set().verify_attached());
         object_store::Set unattached;
-        REQUIRE_THROWS(unattached.verify_attached());
-        REQUIRE(!unattached.is_valid());
+        REQUIRE_EXCEPTION(unattached.verify_attached(), InvalidatedObject,
+                          "Set was never initialized and is invalid.");
+        REQUIRE_FALSE(unattached.is_valid());
     }
 
     SECTION("basic value operations") {
         REQUIRE(set().size() == 0);
-        REQUIRE(set().get_type() == Test::property_type());
-        REQUIRE(set_as_results().get_type() == Test::property_type());
-        write([&]() {
+        REQUIRE(set().get_type() == Test::property_type);
+        REQUIRE(set_as_results().get_type() == Test::property_type);
+        write([&] {
             for (size_t i = 0; i < values.size(); ++i) {
                 auto result = set().insert(T(values[i]));
                 REQUIRE(result.first < values.size());
@@ -172,7 +173,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
             }
         };
         SECTION("remove()") {
-            write([&]() {
+            write([&] {
                 for (size_t i = 0; i < values.size(); ++i) {
                     auto result = set().remove(T(values[i]));
                     REQUIRE(result.first < values.size());
@@ -184,7 +185,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
             check_empty();
         }
         SECTION("remove_any()") {
-            write([&]() {
+            write([&] {
                 for (size_t i = 0; i < values.size(); ++i) {
                     auto result = set().remove_any(Mixed(T(values[i])));
                     REQUIRE(result.first < values.size());
@@ -196,7 +197,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
             check_empty();
         }
         SECTION("remove(ctx)") {
-            write([&]() {
+            write([&] {
                 for (size_t i = 0; i < values.size(); ++i) {
                     auto result = set().remove(ctx, Test::to_any(T(values[i])));
                     REQUIRE(result.first < values.size());
@@ -208,88 +209,108 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
             check_empty();
         }
         SECTION("remove_all()") {
-            write([&]() {
+            write([&] {
                 set().remove_all();
             });
             check_empty();
         }
         SECTION("delete_all()") {
-            write([&]() {
+            write([&] {
                 set().delete_all();
             });
             check_empty();
         }
         SECTION("Results::clear()") {
-            write([&]() {
+            write([&] {
                 set_as_results().clear();
             });
             check_empty();
         }
         SECTION("min()") {
-            if (!Test::can_minmax()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_minmax) {
+                REQUIRE_EXCEPTION(
+                    set().min(), IllegalOperation,
+                    util::format("Operation 'min' not supported for %1 set 'table.value_set'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().min(), IllegalOperation,
+                    util::format("Operation 'min' not supported for %1 set 'table.value_set'", Test::name));
             }
-            REQUIRE(Mixed(Test::min()) == set().min());
-            REQUIRE(Mixed(Test::min()) == set_as_results().min());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().min());
-            REQUIRE(!set_as_results().min());
+            else {
+                REQUIRE(Mixed(Test::min()) == set().min());
+                REQUIRE(Mixed(Test::min()) == set_as_results().min());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().min());
+                REQUIRE(!set_as_results().min());
+            }
         }
         SECTION("max()") {
-            if (!Test::can_minmax()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_minmax) {
+                REQUIRE_EXCEPTION(
+                    set().max(), IllegalOperation,
+                    util::format("Operation 'max' not supported for %1 set 'table.value_set'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().max(), IllegalOperation,
+                    util::format("Operation 'max' not supported for %1 set 'table.value_set'", Test::name));
             }
-            REQUIRE(Mixed(Test::max()) == set().max());
-            REQUIRE(Mixed(Test::max()) == set_as_results().max());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().max());
-            REQUIRE(!set_as_results().max());
+            else {
+                REQUIRE(Mixed(Test::max()) == set().max());
+                REQUIRE(Mixed(Test::max()) == set_as_results().max());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().max());
+                REQUIRE(!set_as_results().max());
+            }
         }
         SECTION("sum()") {
-            if (!Test::can_sum()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_sum) {
+                REQUIRE_EXCEPTION(
+                    set().sum(), IllegalOperation,
+                    util::format("Operation 'sum' not supported for %1 set 'table.value_set'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().sum(), IllegalOperation,
+                    util::format("Operation 'sum' not supported for %1 set 'table.value_set'", Test::name));
             }
-            REQUIRE(cf::get<W>(set().sum()) == Test::sum());
-            REQUIRE(cf::get<W>(*set_as_results().sum()) == Test::sum());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(set().sum() == 0);
-            REQUIRE(set_as_results().sum() == 0);
+            else {
+                REQUIRE(cf::get<W>(set().sum()) == Test::sum());
+                REQUIRE(cf::get<W>(*set_as_results().sum()) == Test::sum());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(set().sum() == 0);
+                REQUIRE(set_as_results().sum() == 0);
+            }
         }
         SECTION("average()") {
-            if (!Test::can_average()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_average) {
+                REQUIRE_EXCEPTION(
+                    set().average(), IllegalOperation,
+                    util::format("Operation 'average' not supported for %1 set 'table.value_set'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().average(), IllegalOperation,
+                    util::format("Operation 'average' not supported for %1 set 'table.value_set'", Test::name));
             }
-            REQUIRE(cf::get<typename Test::AvgType>(*set().average()) == Test::average());
-            REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average()) == Test::average());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().average());
-            REQUIRE(!set_as_results().average());
+            else {
+                REQUIRE(cf::get<typename Test::AvgType>(*set().average()) == Test::average());
+                REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average()) == Test::average());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().average());
+                REQUIRE(!set_as_results().average());
+            }
         }
         SECTION("sort") {
             SECTION("ascending") {
                 auto sorted = set_as_results().sort({{"self", true}});
-                std::sort(begin(values), end(values), cf::less());
+                std::sort(begin(values), end(values), std::less<>());
                 REQUIRE(sorted == values);
             }
             SECTION("descending") {
                 auto sorted = set_as_results().sort({{"self", false}});
-                std::sort(begin(values), end(values), cf::greater());
+                std::sort(begin(values), end(values), std::greater<>());
                 REQUIRE(sorted == values);
             }
         }
@@ -312,7 +333,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({{"table", {{"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
-                      {"table2", {{"value", Test::property_type()}}}});
+                      {"table2", {{"value", Test::property_type}}}});
     auto table = r->read_group().get_table("class_table");
     ColKey col_set = table->get_column_key("link_set");
     auto target = r->read_group().get_table("class_table2");
@@ -353,7 +374,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         REQUIRE(set().is_valid());
         REQUIRE_NOTHROW(set().verify_attached());
         object_store::Set unattached;
-        REQUIRE_THROWS(unattached.verify_attached());
+        REQUIRE_EXCEPTION(unattached.verify_attached(), InvalidatedObject,
+                          "Set was never initialized and is invalid.");
         REQUIRE(!unattached.is_valid());
     }
 
@@ -361,7 +383,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         REQUIRE(set().size() == 0);
         REQUIRE(set().get_type() == PropertyType::Object);
         REQUIRE(set_as_results().get_type() == PropertyType::Object);
-        write([&]() {
+        write([&] {
             for (auto key : keys) {
                 auto result = set().insert(key);
                 REQUIRE(result.first < values.size());
@@ -385,14 +407,14 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
             }
         }
 
-        auto check_empty = [&]() {
+        auto check_empty = [&] {
             REQUIRE(set().size() == 0);
             for (auto key : keys) {
                 REQUIRE(set().find(key) == realm::not_found);
             }
         };
         SECTION("remove()") {
-            write([&]() {
+            write([&] {
                 for (auto key : keys) {
                     auto result = set().remove(key);
                     REQUIRE(result.first < keys.size());
@@ -404,100 +426,120 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
             check_empty();
         }
         SECTION("remove_all()") {
-            write([&]() {
+            write([&] {
                 set().remove_all();
             });
             check_empty();
             REQUIRE(target->size() != 0);
         }
         SECTION("delete_all()") {
-            write([&]() {
+            write([&] {
                 set().delete_all();
             });
             check_empty();
             REQUIRE(target->size() == 0);
         }
         SECTION("Results::clear()") {
-            write([&]() {
+            write([&] {
                 set_as_results().clear();
             });
             check_empty();
             REQUIRE(target->size() == 0);
         }
         SECTION("min()") {
-            if (!Test::can_minmax()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(target_col), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(target_col), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_minmax) {
+                REQUIRE_EXCEPTION(
+                    set().min(target_col), IllegalOperation,
+                    util::format("Operation 'min' not supported for %1 property 'table2.value'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().min(target_col), IllegalOperation,
+                    util::format("Operation 'min' not supported for %1 property 'table2.value'", Test::name));
             }
-            REQUIRE(Mixed(Test::min()) == set().min(target_col));
-            REQUIRE(Mixed(Test::min()) == set_as_results().min(target_col));
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().min(target_col));
-            REQUIRE(!set_as_results().min(target_col));
+            else {
+                REQUIRE(Mixed(Test::min()) == set().min(target_col));
+                REQUIRE(Mixed(Test::min()) == set_as_results().min(target_col));
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().min(target_col));
+                REQUIRE(!set_as_results().min(target_col));
+            }
         }
         SECTION("max()") {
-            if (!Test::can_minmax()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(target_col), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(target_col), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_minmax) {
+                REQUIRE_EXCEPTION(
+                    set().max(target_col), IllegalOperation,
+                    util::format("Operation 'max' not supported for %1 property 'table2.value'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().max(target_col), IllegalOperation,
+                    util::format("Operation 'max' not supported for %1 property 'table2.value'", Test::name));
             }
-            REQUIRE(Mixed(Test::max()) == set().max(target_col));
-            REQUIRE(Mixed(Test::max()) == set_as_results().max(target_col));
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().max(target_col));
-            REQUIRE(!set_as_results().max(target_col));
+            else {
+                REQUIRE(Mixed(Test::max()) == set().max(target_col));
+                REQUIRE(Mixed(Test::max()) == set_as_results().max(target_col));
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().max(target_col));
+                REQUIRE(!set_as_results().max(target_col));
+            }
         }
         SECTION("sum()") {
-            if (!Test::can_sum()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(target_col), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(target_col), ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_sum) {
+                REQUIRE_EXCEPTION(
+                    set().sum(target_col), IllegalOperation,
+                    util::format("Operation 'sum' not supported for %1 property 'table2.value'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().sum(target_col), IllegalOperation,
+                    util::format("Operation 'sum' not supported for %1 property 'table2.value'", Test::name));
             }
-            REQUIRE(cf::get<W>(set().sum(target_col)) == Test::sum());
-            REQUIRE(cf::get<W>(*set_as_results().sum(target_col)) == Test::sum());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(set().sum(target_col) == 0);
-            REQUIRE(set_as_results().sum(target_col) == 0);
+            else {
+                REQUIRE(cf::get<W>(set().sum(target_col)) == Test::sum());
+                REQUIRE(cf::get<W>(*set_as_results().sum(target_col)) == Test::sum());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(set().sum(target_col) == 0);
+                REQUIRE(set_as_results().sum(target_col) == 0);
+            }
         }
         SECTION("average()") {
-            if (!Test::can_average()) {
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(target_col), ErrorCodes::IllegalOperation);
-                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(target_col),
-                                                    ErrorCodes::IllegalOperation);
-                return;
+            if constexpr (!Test::can_average) {
+                REQUIRE_EXCEPTION(
+                    set().average(target_col), IllegalOperation,
+                    util::format("Operation 'average' not supported for %1 property 'table2.value'", Test::name));
+                REQUIRE_EXCEPTION(
+                    set_as_results().average(target_col), IllegalOperation,
+                    util::format("Operation 'average' not supported for %1 property 'table2.value'", Test::name));
             }
-            REQUIRE(cf::get<typename Test::AvgType>(*set().average(target_col)) == Test::average());
-            REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average(target_col)) == Test::average());
-            write([&]() {
-                set().remove_all();
-            });
-            REQUIRE(!set().average(target_col));
-            REQUIRE(!set_as_results().average(target_col));
+            else {
+                REQUIRE(cf::get<typename Test::AvgType>(*set().average(target_col)) == Test::average());
+                REQUIRE(cf::get<typename Test::AvgType>(*set_as_results().average(target_col)) == Test::average());
+                write([&] {
+                    set().remove_all();
+                });
+                REQUIRE(!set().average(target_col));
+                REQUIRE(!set_as_results().average(target_col));
+            }
         }
         SECTION("sort") {
-            if (!Test::can_sort()) {
+            if constexpr (!Test::can_sort) {
                 REQUIRE_THROWS_CONTAINING(set_as_results().sort({{"value", true}}), "is of unsupported type");
-                return;
             }
-            SECTION("ascending") {
-                auto sorted = set_as_results().sort({{"value", true}});
-                std::sort(begin(values), end(values), cf::less());
-                for (size_t i = 0; i < values.size(); ++i) {
-                    REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+            else {
+                SECTION("ascending") {
+                    auto sorted = set_as_results().sort({{"value", true}});
+                    std::sort(begin(values), end(values), std::less<>());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                    }
                 }
-            }
-            SECTION("descending") {
-                auto sorted = set_as_results().sort({{"value", false}});
-                std::sort(begin(values), end(values), cf::greater());
-                for (size_t i = 0; i < values.size(); ++i) {
-                    REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                SECTION("descending") {
+                    auto sorted = set_as_results().sort({{"value", false}});
+                    std::sort(begin(values), end(values), std::greater<>());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        REQUIRE(sorted.get(i).template get<T>(target_col) == values[i]);
+                    }
                 }
             }
         }
@@ -565,7 +607,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
     SECTION("basics") {
         auto set = TestType::get_set(r, obj, col_int_set);
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(123).second);
             CHECK(set().insert(456).second);
             CHECK(set().insert(0).second);
@@ -581,7 +623,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         CHECK(set().find_any(456) == 3);
         CHECK(set().find(999) == size_t(-1));
 
-        write([&]() {
+        write([&] {
             CHECK(set().remove(123).second);
             CHECK(!set().remove(123).second);
             CHECK(set().remove_any(-1).second);
@@ -589,7 +631,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
         CHECK(set().size() == 2);
 
-        write([&]() {
+        write([&] {
             obj.remove();
         });
         CHECK(!set().is_valid());
@@ -599,7 +641,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set = TestType::get_set(r, obj, col_decimal_set);
         auto results = set().as_results();
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(Decimal128(5)).second);
             CHECK(set().insert(Decimal128(realm::null())).second);
             CHECK(set().insert(Decimal128(7)).second);
@@ -616,13 +658,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set = TestType::get_set(r, obj, col_link_set);
 
         Obj target1, target2, target3;
-        write([&]() {
+        write([&] {
             target1 = table2->create_object_with_primary_key(123);
             target2 = table2->create_object_with_primary_key(456);
             target3 = table2->create_object_with_primary_key(789);
         });
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(target1).second);
             CHECK(!set().insert(target1).second);
             CHECK(set().insert(target2).second);
@@ -636,17 +678,17 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         CHECK(set().find(target2) != size_t(-1));
         CHECK(set().find(target3) != size_t(-1));
 
-        write([&]() {
+        write([&] {
             target2.invalidate();
         });
 
         // Invalidating the object changes the reported size of the set().
         CHECK(set().size() == 2);
 
-        CHECK_THROWS(set().find(target2));
+        REQUIRE_EXCEPTION(set().find(target2), StaleAccessor, "Object has been deleted or invalidated");
 
         // Resurrect the tombstone of target2.
-        write([&]() {
+        write([&] {
             target2 = table2->create_object_with_primary_key(456);
         });
         CHECK(set().find(target2));
@@ -656,7 +698,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
     SECTION("max / min / sum / avg") {
         auto set = TestType::get_set(r, obj, col_int_set);
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(123).second);
             CHECK(set().insert(456).second);
             CHECK(set().insert(0).second);
@@ -697,7 +739,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
         SECTION("modifying the set sends change notifications") {
             Obj target1, target2, target3;
-            write([&]() {
+            write([&] {
                 target1 = table2->create_object_with_primary_key(123);
                 target2 = table2->create_object_with_primary_key(456);
                 target3 = table2->create_object_with_primary_key(789);
@@ -705,7 +747,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
             auto token = require_change();
 
-            write([&]() {
+            write([&] {
                 CHECK(link_set.insert(target1).second);
                 CHECK(!link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
@@ -733,13 +775,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             auto token = require_change();
 
             Obj target1, target2, target3;
-            write([&]() {
+            write([&] {
                 target1 = table2->create_object_with_primary_key(123);
                 target2 = table2->create_object_with_primary_key(456);
                 target3 = table2->create_object_with_primary_key(789);
             });
 
-            write([&]() {
+            write([&] {
                 CHECK(link_set.insert(target1).second);
                 CHECK(!link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
@@ -764,14 +806,14 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             auto token = require_change();
 
             Obj target1, target2, target3, target4;
-            write([&]() {
+            write([&] {
                 target1 = table2->create_object_with_primary_key(123);
                 target2 = table2->create_object_with_primary_key(456);
                 target3 = table2->create_object_with_primary_key(789);
                 target4 = table2->create_object_with_primary_key(101);
             });
 
-            write([&]() {
+            write([&] {
                 CHECK(link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
                 CHECK(link_set.insert(target3).second);
@@ -790,13 +832,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             auto token = require_change();
 
             Obj target1, target2, target3;
-            write([&]() {
+            write([&] {
                 target1 = table2->create_object_with_primary_key(123);
                 target2 = table2->create_object_with_primary_key(456);
                 target3 = table2->create_object_with_primary_key(789);
             });
 
-            write([&]() {
+            write([&] {
                 CHECK(link_set.insert(target1).second);
                 CHECK(!link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
@@ -824,7 +866,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             REQUIRE(link_set.size() == 0);
             REQUIRE(!change.collection_root_was_deleted);
 
-            write([&]() {
+            write([&] {
                 obj.remove();
             });
             REQUIRE(change.deletions.empty());
@@ -882,7 +924,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             };
 
             Obj target;
-            write([&]() {
+            write([&] {
                 target = table2->create_object_with_primary_key(42);
                 target.set(col_table2_value, 42);
                 link_set.insert(target);
@@ -977,13 +1019,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set = TestType::get_set(r, obj, col_link_set);
 
         Obj target1, target2, target3;
-        write([&]() {
+        write([&] {
             target1 = table2->create_object_with_primary_key(123);
             target2 = table2->create_object_with_primary_key(456);
             target3 = table2->create_object_with_primary_key(789);
         });
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(target1).second);
             CHECK(!set().insert(target1).second);
             CHECK(set().insert(target2).second);
@@ -1005,7 +1047,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set2 = TestType::get_set(r, other_obj, other_col_link_set);
 
         std::vector<Obj> targets;
-        write([&]() {
+        write([&] {
             targets.push_back(table2->create_object_with_primary_key(123));
             targets.push_back(table2->create_object_with_primary_key(456));
             targets.push_back(table2->create_object_with_primary_key(789));
@@ -1014,7 +1056,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             targets.push_back(table2->create_object_with_primary_key(987));
         });
 
-        write([&]() {
+        write([&] {
             for (auto& obj : targets) {
                 CHECK(set().insert(obj).second);
             }
@@ -1039,7 +1081,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set2 = TestType::get_set(r, other_obj, other_col_link_set);
 
         std::vector<Obj> targets;
-        write([&]() {
+        write([&] {
             targets.push_back(table2->create_object_with_primary_key(123));
             targets.push_back(table2->create_object_with_primary_key(456));
             targets.push_back(table2->create_object_with_primary_key(789));
@@ -1049,13 +1091,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         });
 
         std::vector<Obj> other_targets;
-        write([&]() {
+        write([&] {
             other_targets.push_back(other_table2->create_object_with_primary_key(111));
             other_targets.push_back(other_table2->create_object_with_primary_key(222));
             other_targets.push_back(other_table2->create_object_with_primary_key(333));
         });
 
-        write([&]() {
+        write([&] {
             for (auto& obj : targets) {
                 CHECK(set().insert(obj).second);
             }
@@ -1077,7 +1119,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             // (123, 456, 789, (321, 654, 987), 111, 222, 333)
             REQUIRE(set2().intersects(set()));
             REQUIRE(set().intersects(set2()));
-            write([&]() {
+            write([&] {
                 set2().remove(targets[0]);
                 set2().remove(targets[1]);
                 set2().remove(targets[2]);
@@ -1092,7 +1134,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set2 = TestType::get_set(r, other_obj, other_col_link_set);
 
         std::vector<Obj> targets;
-        write([&]() {
+        write([&] {
             targets.push_back(table2->create_object_with_primary_key(123));
             targets.push_back(table2->create_object_with_primary_key(456));
             targets.push_back(table2->create_object_with_primary_key(789));
@@ -1102,13 +1144,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         });
 
         std::vector<Obj> other_targets;
-        write([&]() {
+        write([&] {
             other_targets.push_back(other_table2->create_object_with_primary_key(111));
             other_targets.push_back(other_table2->create_object_with_primary_key(222));
             other_targets.push_back(other_table2->create_object_with_primary_key(333));
         });
 
-        write([&]() {
+        write([&] {
             for (auto& obj : targets) {
                 CHECK(set().insert(obj).second);
             }
@@ -1139,7 +1181,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set2 = TestType::get_set(r, other_obj, other_col_link_set);
 
         std::vector<Obj> targets;
-        write([&]() {
+        write([&] {
             targets.push_back(table2->create_object_with_primary_key(123));
             targets.push_back(table2->create_object_with_primary_key(456));
             targets.push_back(table2->create_object_with_primary_key(789));
@@ -1149,13 +1191,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         });
 
         std::vector<Obj> other_targets;
-        write([&]() {
+        write([&] {
             other_targets.push_back(other_table2->create_object_with_primary_key(111));
             other_targets.push_back(other_table2->create_object_with_primary_key(222));
             other_targets.push_back(other_table2->create_object_with_primary_key(333));
         });
 
-        write([&]() {
+        write([&] {
             for (auto& obj : targets) {
                 CHECK(set().insert(obj).second);
             }
@@ -1186,7 +1228,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set2 = TestType::get_set(r, other_obj, other_col_link_set);
 
         std::vector<Obj> targets;
-        write([&]() {
+        write([&] {
             targets.push_back(table2->create_object_with_primary_key(123));
             targets.push_back(table2->create_object_with_primary_key(456));
             targets.push_back(table2->create_object_with_primary_key(789));
@@ -1196,13 +1238,13 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         });
 
         std::vector<Obj> other_targets;
-        write([&]() {
+        write([&] {
             other_targets.push_back(other_table2->create_object_with_primary_key(111));
             other_targets.push_back(other_table2->create_object_with_primary_key(222));
             other_targets.push_back(other_table2->create_object_with_primary_key(333));
         });
 
-        write([&]() {
+        write([&] {
             for (auto& obj : targets) {
                 CHECK(set().insert(obj).second);
             }
@@ -1232,39 +1274,39 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         auto set = TestType::get_set(r, obj, col_decimal_set);
         List list{r, obj, col_decimal_list};
 
-        write([&]() {
+        write([&] {
             CHECK(set().insert(Decimal128(5)).second);
             CHECK(set().insert(Decimal128(realm::null())).second);
             CHECK(set().insert(Decimal128(7)).second);
         });
 
-        write([&]() {
+        write([&] {
             list.add(Decimal128(4));
             list.add(Decimal128(realm::null()));
             list.add(Decimal128(7));
             list.add(Decimal128(4));
         });
         REQUIRE(set().intersects(list));
-        write([&]() {
+        write([&] {
             set().assign_union(list); // set == { null, 4, 5, 7 }
         });
         REQUIRE(set().size() == 4);
         REQUIRE(set().is_strict_superset_of(list));
-        write([&]() {
+        write([&] {
             set().assign_difference(list); // set == { 5 }
         });
         REQUIRE(set().size() == 1);
-        write([&]() {
+        write([&] {
             CHECK(set().insert(Decimal128(4)).second); // set == { 4, 5 }
             set().assign_symmetric_difference(list);   // set == { null, 5, 7 }
         });
         REQUIRE(set().size() == 3);
-        write([&]() {
+        write([&] {
             set().assign_intersection(list); // set == { null, 7 }
         });
         REQUIRE(set().size() == 2);
         REQUIRE(set().is_strict_subset_of(list));
-        write([&]() {
+        write([&] {
             CHECK(set().insert(Decimal128(4)).second); // set == { null, 4, 7 }
         });
         REQUIRE(set().set_equals(list));

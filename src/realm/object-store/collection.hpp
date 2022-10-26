@@ -126,7 +126,6 @@ protected:
     Collection& operator=(Collection&&);
 
     void validate(const Obj&) const;
-    void not_supported(const char* operation) const;
 
     template <typename T, typename Context>
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
@@ -138,13 +137,15 @@ protected:
 
 private:
     Collection(std::shared_ptr<Realm>&& r, CollectionBasePtr&& coll, PropertyType type);
+
+    virtual const char* type_name() const noexcept = 0;
 };
 
 template <typename T, typename Context>
 void Collection::validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const
 {
     if (!policy.copy && ctx.template unbox<Obj>(value, CreatePolicy::Skip).is_valid())
-        throw IllegalOperation("Cannot add an existing managed embedded object to a List.");
+        throw IllegalOperation(util::format("Cannot add an existing managed embedded object to a %1.", type_name()));
 }
 
 } // namespace object_store

@@ -946,7 +946,7 @@ bool Dictionary::try_erase(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     if (!try_erase(key)) {
-        throw KeyNotFound("Dictionary::erase");
+        throw KeyNotFound(util::format("Cannot remove key %1 from dictionary: key not found", key));
     }
 }
 

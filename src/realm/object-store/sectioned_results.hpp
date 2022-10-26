@@ -19,7 +19,7 @@
 #ifndef REALM_SECTIONED_RESULTS_HPP
 #define REALM_SECTIONED_RESULTS_HPP
 
-#include <realm/util/functional.hpp>
+#include <realm/object-store/results.hpp>
 
 #include <list>
 
@@ -105,7 +105,7 @@ private:
 class SectionedResults {
 public:
     SectionedResults() = default;
-    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
+    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)>;
 
     /**
      * Returns a `ResultsSection` which will be bound to a section key present at the given index in

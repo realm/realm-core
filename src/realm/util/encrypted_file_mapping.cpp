@@ -16,11 +16,16 @@
  *
  **************************************************************************/
 
-#include <realm/util/aes_cryptor.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
+
 #include <realm/util/file_mapper.hpp>
-#include <realm/utilities.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
+#include <realm/util/aes_cryptor.hpp>
+#include <realm/util/errno.hpp>
+#include <realm/utilities.hpp>
+#include <realm/util/terminate.hpp>
+
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
@@ -45,14 +50,7 @@
 #include <pthread.h>
 #endif
 
-#include <realm/util/encrypted_file_mapping.hpp>
-#include <realm/util/terminate.hpp>
-#endif
-
 namespace realm::util {
-
-#if REALM_ENABLE_ENCRYPTION
-
 SharedFileInfo::SharedFileInfo(const uint8_t* key)
     : cryptor(key)
 {
@@ -657,10 +655,11 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
     void* addr = page_addr(page_ndx);
     void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
     if (addr != addr2) {
-        if (addr2 == 0)
-            throw std::system_error(errno, std::system_category(), std::string("using mmap() to clear page failed"));
-        else
-            throw std::runtime_error("internal error in mmap()");
+        if (addr2 == 0) {
+            int err = errno;
+            throw SystemError(err, get_errno_msg("using mmap() to clear page failed", err));
+        }
+        throw std::runtime_error("internal error in mmap()");
     }
 #endif
 }
@@ -918,9 +917,10 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
     size_t ps = page_size();
     return real_offset((size + ps - 1) & ~(ps - 1));
 }
-
+} // namespace realm::util
 #else
 
+namespace realm::util {
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
 {
     return size;
@@ -930,7 +930,5 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 {
     return size;
 }
-
-#endif // REALM_ENABLE_ENCRYPTION
-
 } // namespace realm::util
+#endif // REALM_ENABLE_ENCRYPTION

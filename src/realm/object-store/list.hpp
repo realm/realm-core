@@ -111,6 +111,11 @@ public:
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
 private:
+    const char* type_name() const noexcept override
+    {
+        return "List";
+    }
+
     LstBase& list_base() const noexcept
     {
         REALM_ASSERT_DEBUG(dynamic_cast<LstBase*>(m_coll_base.get()));

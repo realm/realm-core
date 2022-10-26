@@ -87,7 +87,6 @@ public:
         MaximumFileSizeExceeded = RLM_ERR_MAXIMUM_FILE_SIZE_EXCEEDED,
         IncompatibleSession = RLM_ERR_INCOMPATIBLE_SESSION,
         IncompatibleLockFile = RLM_ERR_INCOMPATIBLE_LOCK_FILE,
-        InvalidQuery = RLM_ERR_INVALID_QUERY,
         UnsupportedFileFormatVersion = RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
         MultipleSyncAgents = RLM_ERR_MULTIPLE_SYNC_AGENTS,
         ObjectAlreadyExists = RLM_ERR_OBJECT_ALREADY_EXISTS,
@@ -129,6 +128,7 @@ public:
         InvalidSchemaVersion = RLM_ERR_INVALID_SCHEMA_VERSION,
         InvalidSchemaChange = RLM_ERR_INVALID_SCHEMA_CHANGE,
         MigrationFailed = RLM_ERR_MIGRATION_FAILED,
+        InvalidQuery = RLM_ERR_INVALID_QUERY,
 
         BadServerUrl = RLM_ERR_BAD_SERVER_URL,
         InvalidArgument = RLM_ERR_INVALID_ARGUMENT,
@@ -154,6 +154,7 @@ public:
         NoSuchTable = RLM_ERR_NO_SUCH_TABLE,
         TableNameInUse = RLM_ERR_TABLE_NAME_IN_USE,
         IllegalCombination = RLM_ERR_ILLEGAL_COMBINATION,
+        TopLevelObject = RLM_ERR_TOP_LEVEL_OBJECT,
 
         CustomError = RLM_ERR_CUSTOM_ERROR,
 

@@ -18,29 +18,34 @@
 
 #include <realm/util/fifo_helper.hpp>
 
+#include <realm/exceptions.hpp>
+#include <realm/util/errno.hpp>
+
 #include <sstream>
 #include <system_error>
 #include <sys/stat.h>
 
 // FIFOs do not work on Windows.
-namespace realm {
-namespace util {
+namespace realm::util {
 
 namespace {
-void check_is_fifo(const std::string& path)
+void check_is_fifo(std::string_view path)
 {
 #ifndef _WIN32
     struct stat stat_buf;
-    if (stat(path.c_str(), &stat_buf) == 0) {
+    if (stat(path.data(), &stat_buf) == 0) {
         if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
-            throw std::runtime_error(path + " exists and it is not a fifo.");
+            throw FileAccessError(
+                ErrorCodes::FileAlreadyExists,
+                util::format("Cannot create fifo at path '%1': a non-fifo entry already exists at that path.", path),
+                path);
         }
     }
 #endif
 }
 } // Anonymous namespace
 
-void create_fifo(std::string path)
+void create_fifo(std::string_view path)
 {
 #ifndef _WIN32
 #ifdef REALM_ANDROID
@@ -59,42 +64,42 @@ void create_fifo(std::string path)
 #endif
 
     // Create and open the named pipe
-    int ret = mkfifo(path.c_str(), mode);
+    int ret = mkfifo(path.data(), mode);
     if (ret == -1) {
         int err = errno;
-        // the fifo already existing isn't an error
-        if (err != EEXIST) {
 #ifdef REALM_ANDROID
-            // Workaround for a mkfifo bug on Blackberry devices:
-            // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
-            // In this case, we use stat to check if the path exists and it is a fifo.
-            if (err == ENOSYS) {
-                check_is_fifo(path);
-            }
-            else {
-                throw std::system_error(err, std::system_category());
-            }
-#else
-            throw std::system_error(err, std::system_category());
-#endif
+        // Workaround for a mkfifo bug on Blackberry devices:
+        // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
+        // In this case, we use stat to check if the path exists and it is a fifo.
+        if (err == ENOSYS) {
+            err = EEXIST;
         }
-        else {
+#endif
+        // the fifo already existing isn't an error
+        if (err == EEXIST) {
             // If the file already exists, verify it is a FIFO
             return check_is_fifo(path);
         }
+        throw SystemError(err, format_errno("Failed to create fifo at '%2': %1", err, path));
     }
 #endif
 }
 
-bool try_create_fifo(const std::string& path)
+bool try_create_fifo(std::string_view path, bool has_more_fallbacks)
 {
-    try {
+    if (has_more_fallbacks) {
+        try {
+            create_fifo(path);
+            return true;
+        }
+        catch (...) {
+            return false;
+        }
+    }
+    else {
         create_fifo(path);
         return true;
-    } catch (...) {
-        return false;
     }
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

@@ -451,7 +451,8 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             }
 
             // Verify that the file is actually encrypted
-            REQUIRE_THROWS_AS(Group(metadata_path), InvalidDatabase);
+            REQUIRE_EXCEPTION(Group(metadata_path), InvalidDatabase,
+                              Catch::Matchers::ContainsSubstring("invalid mnemonic"));
         }
 
         SECTION("leaves existing unencrypted files unencrypted") {
@@ -480,10 +481,12 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
                 REQUIRE(manager.get_current_user_identity() == none);
             }
             // New file should be encrypted
-            REQUIRE_THROWS_AS(Group(metadata_path), InvalidDatabase);
+            REQUIRE_EXCEPTION(Group(metadata_path), InvalidDatabase,
+                              Catch::Matchers::ContainsSubstring("invalid mnemonic"));
         }
 #else
-        REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, none));
+        REQUIRE_EXCEPTION(SyncMetadataManager(metadata_path, true, none), InvalidArgument,
+                          "Metadata Realm encryption was specified, but no encryption key was provided.");
 #endif
     }
 }

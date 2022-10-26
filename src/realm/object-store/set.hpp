@@ -113,6 +113,11 @@ public:
     };
 
 private:
+    const char* type_name() const noexcept override
+    {
+        return "Set";
+    }
+
     SetBase& set_base() const noexcept
     {
         REALM_ASSERT_DEBUG(dynamic_cast<SetBase*>(m_coll_base.get()));

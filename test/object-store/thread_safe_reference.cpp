@@ -867,14 +867,18 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            REQUIRE_THROWS(create_ref([](auto& r) {
-                auto obj =
-                    create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
-                                      .sort({{"value", true}});
-                REQUIRE(results.size() == 1);
-                return results;
-            }));
+            REQUIRE_EXCEPTION(create_ref([](auto& r) {
+                                  auto obj = create_object(r, "int array object",
+                                                           {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                                  Results results =
+                                      List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                          .sort({{"value", true}});
+                                  REQUIRE(results.size() == 1);
+                                  return results;
+                              }),
+                              WrongTransactionState,
+                              "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                              "inside the write transaction which created the collection.");
         }
 
         SECTION("int results") {
@@ -992,14 +996,18 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            REQUIRE_THROWS(create_ref([](auto& r) {
-                auto obj =
-                    create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
-                                      .sort({{"value", true}});
-                REQUIRE(results.size() == 1);
-                return results;
-            }));
+            REQUIRE_EXCEPTION(create_ref([](auto& r) {
+                                  auto obj = create_object(r, "int array object",
+                                                           {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                                  Results results =
+                                      List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                          .sort({{"value", true}});
+                                  REQUIRE(results.size() == 1);
+                                  return results;
+                              }),
+                              WrongTransactionState,
+                              "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                              "inside the write transaction which created the collection.");
         }
 
         SECTION("int results") {

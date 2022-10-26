@@ -131,7 +131,29 @@ protected:
     CollectionBase(CollectionBase&&) noexcept = default;
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
+
+    void validate_index(const char* msg, size_t index, size_t size) const;
 };
+
+inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
+{
+    if (col.is_list())
+        return uppercase ? "List" : "list";
+    if (col.is_set())
+        return uppercase ? "Set" : "set";
+    if (col.is_dictionary())
+        return uppercase ? "Dictionary" : "dictionary";
+    return "";
+}
+
+inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
+{
+    if (index >= size) {
+        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_col_key()),
+                                       get_table()->get_class_name(), get_property_name()),
+                          index, size);
+    }
+}
 
 
 template <class T>

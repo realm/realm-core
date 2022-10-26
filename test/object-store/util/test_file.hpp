@@ -247,6 +247,8 @@ public:
         return m_sync_server;
     }
 
+    std::shared_ptr<realm::SyncUser> fake_user(const std::string& name = "test");
+
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
     realm::util::UniqueFunction<void(const realm::app::Response&)> network_callback;

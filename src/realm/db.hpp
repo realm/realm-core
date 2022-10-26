@@ -45,11 +45,19 @@ using TransactionRef = std::shared_ptr<Transaction>;
 
 /// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile : RuntimeError {
-    IncompatibleLockFile(const std::string& msg)
-        : RuntimeError(
+struct IncompatibleLockFile : FileAccessError {
+    IncompatibleLockFile(const std::string& path, const std::string& msg)
+        : FileAccessError(
               ErrorCodes::IncompatibleLockFile,
-              "Realm file is currently open in another process which cannot share access with this process. " + msg)
+              util::format(
+                  "Realm file '%1' is currently open in another process which cannot share access with this process. "
+                  "This could either be due to the existing process being a different architecture or due to the "
+                  "existing process using an incompatible version of Realm. "
+                  "If the other process is Realm Studio, you may need to update it (or update Realm if your Studio "
+                  "version is too new), and if using an iOS simulator, make sure that you are using a 64-bit "
+                  "simulator. Underlying problem: %2",
+                  path, msg),
+              path)
     {
     }
 };
@@ -65,7 +73,8 @@ struct IncompatibleLockFile : RuntimeError {
 /// (Replication::is_upgradable_history_schema()).
 struct IncompatibleHistories : FileAccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
-        : FileAccessError(ErrorCodes::IncompatibleHistories, "Incompatible histories. " + msg, path, 0)
+        : FileAccessError(ErrorCodes::IncompatibleHistories,
+                          msg + " Synchronized Realms cannot be opened in non-sync mode, and vice versa.", path)
     {
     }
 };

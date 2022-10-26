@@ -428,31 +428,6 @@ void RealmCoordinator::open_db()
         util::File::remove(m_config.path);
         return open_db();
     }
-    catch (const FileAccessError& ex) {
-        // Errors for `open()` include the path, but other errors don't. We
-        // don't want two copies of the path in the error, so strip it out if it
-        // appears, and then include it in our prefix.
-        std::string underlying = ex.what();
-        auto& path = ex.get_path();
-        auto pos = underlying.find(", path:");
-        if (pos != std::string::npos && pos > 0) {
-            underlying.erase(pos);
-        }
-        switch (ex.code()) {
-            case ErrorCodes::PermissionDenied:
-                throw FileAccessError(ex.code(),
-                                      util::format("Please use a path where your app has %1 permissions. %2",
-                                                   m_config.immutable() ? "read" : "read-write", underlying),
-                                      path, ex.get_errno());
-            case ErrorCodes::FileNotFound:
-                throw FileAccessError(
-                    ex.code(),
-                    util::format("%1 does not exist. %2", m_config.immutable() ? "File" : "Directory", underlying),
-                    path, ex.get_errno());
-            default:
-                throw;
-        }
-    }
 
     if (m_config.should_compact_on_launch_function) {
         size_t free_space = 0;

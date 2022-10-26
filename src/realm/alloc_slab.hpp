@@ -631,7 +631,7 @@ private:
     /// Returns the top_ref for the latest commit.
     ref_type validate_header(const char* data, size_t len, const std::string& path);
     ref_type validate_header(const Header* header, const StreamingFooter* footer, size_t size,
-                             const std::string& path);
+                             const std::string& path, bool is_encrypted = false);
     void throw_header_exception(std::string msg, const Header& header, const std::string& path);
 
     static bool is_file_on_streaming_form(const Header& header);
@@ -668,7 +668,10 @@ private:
 
 struct InvalidDatabase : FileAccessError {
     InvalidDatabase(const std::string& msg, const std::string& path)
-        : FileAccessError(ErrorCodes::InvalidDatabase, msg, path, 0)
+        : FileAccessError(ErrorCodes::InvalidDatabase,
+                          path.empty() ? "Failed to memory buffer:" + msg
+                                       : util::format("Failed to open Realm file at path '%1': %2", path, msg),
+                          path)
     {
     }
 };

@@ -980,8 +980,8 @@ public:
     {
         auto ck = m_current_table->get_column_key(col_name);
         if (!ck) {
-            throw std::runtime_error(
-                util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+            throw LogicError(ErrorCodes::InvalidProperty,
+                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
         }
         add(ck);
         return *this;

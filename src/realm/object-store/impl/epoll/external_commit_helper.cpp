@@ -291,10 +291,6 @@ void FdHolder::close()
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
     : m_parent(parent)
 {
-    std::string path;
-    std::string temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
-    std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
-
     // Object Store needs to create a named pipe in order to coordinate notifications.
     // This can be a problem on some file systems (e.g. FAT32) or due to security policies in SELinux. Most commonly
     // it is a problem when saving Realms on external storage:
@@ -313,15 +309,20 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const Realm
     // Note that hash collisions are okay here because they just result in doing extra work instead of resulting
     // in correctness problems.
 
-    path = config.path + ".note";
-    bool fifo_created = util::try_create_fifo(path);
+    std::string path;
+    std::string temp_dir = util::normalize_dir(config.fifo_files_fallback_path);
+    std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
+    path = DB::get_core_file(config.path, DB::CoreFileType::Note);
+    bool fifo_created = realm::util::try_create_fifo(path, !temp_dir.empty() || !sys_temp_dir.empty());
     if (!fifo_created && !temp_dir.empty()) {
-        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(config.path));
-        fifo_created = util::try_create_fifo(path);
+        path = DB::get_core_file(util::format("%1realm_%2", temp_dir, std::hash<std::string>()(config.path)),
+                                 DB::CoreFileType::Note);
+        fifo_created = realm::util::try_create_fifo(path, !sys_temp_dir.empty());
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(config.path));
-        util::create_fifo(path);
+        path = DB::get_core_file(util::format("%1realm_%2", sys_temp_dir, std::hash<std::string>()(config.path)),
+                                 DB::CoreFileType::Note);
+        realm::util::create_fifo(path);
     }
 
     m_notify_fd = open(path.c_str(), O_RDWR);

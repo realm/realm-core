@@ -104,9 +104,7 @@ struct TestContext : CppContext {
 
 
 TEST_CASE("notifications: async delivery") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -843,9 +841,7 @@ TEST_CASE("notifications: async delivery") {
 }
 
 TEST_CASE("notifications: skip") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -979,14 +975,16 @@ TEST_CASE("notifications: skip") {
     }
 
     SECTION("skipping must be done from within a write transaction") {
-        REQUIRE_THROWS(token1.suppress_next());
+        REQUIRE_EXCEPTION(
+            token1.suppress_next(), WrongTransactionState,
+            "Suppressing the notification from a write transaction must be done from inside the write transaction.");
     }
 
     SECTION("skipping must be done from the Realm's thread") {
         advance_and_notify(*r);
         r->begin_transaction();
         std::thread([&] {
-            REQUIRE_THROWS(token1.suppress_next());
+            REQUIRE_EXCEPTION(token1.suppress_next(), WrongThread, "Realm accessed from incorrect thread.");
         }).join();
         r->cancel_transaction();
     }
@@ -1209,9 +1207,7 @@ TEST_CASE("notifications: skip") {
 }
 
 TEST_CASE("notifications: TableView delivery") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -1420,9 +1416,7 @@ TEST_CASE("notifications: sync") {
 #endif
 
 TEST_CASE("notifications: results") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -3139,9 +3133,7 @@ TEST_CASE("results: notifications after move") {
 }
 
 TEST_CASE("results: notifier with no callbacks") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -3214,33 +3206,6 @@ TEST_CASE("results: notifier with no callbacks") {
 
         // Would now be 3 if the closed Realm is still pinning the version it was at
         REQUIRE(shared_group->get_number_of_versions() == 2);
-    }
-}
-
-TEST_CASE("results: error messages") {
-    InMemoryTestFile config;
-    config.schema = Schema{
-        {"object",
-         {
-             {"value", PropertyType::String},
-         }},
-    };
-
-    auto r = Realm::get_shared_realm(config);
-    auto table = r->read_group().get_table("class_object");
-    Results results(r, table);
-
-    r->begin_transaction();
-    table->create_object();
-    r->commit_transaction();
-
-    SECTION("out of bounds access") {
-        REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 calling get() on Results when max is 0");
-    }
-
-    SECTION("unsupported aggregate operation") {
-        REQUIRE_THROWS_WITH(results.sum("value"),
-                            "Cannot sum property 'value': operation not supported for 'string' properties");
     }
 }
 
@@ -3544,7 +3509,8 @@ TEST_CASE("results: snapshots") {
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
         auto snapshot = results.snapshot();
-        CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(snapshot.add_notification_callback([](CollectionChangeSet) {}), IllegalOperation,
+                          "Cannot create asynchronous query for snapshotted Results.");
     }
 
     SECTION("accessors should return none for detached row") {
@@ -3555,7 +3521,6 @@ TEST_CASE("results: snapshots") {
         Results results(r, table);
         auto snapshot = results.snapshot();
         write([=] {
-            ;
             table->clear();
         });
 
@@ -3994,7 +3959,7 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
             CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
         for (int i = 0; i < 10; ++i)
             CHECK(results.get<Obj>(i).get<int64_t>(col_value) == i);
-        CHECK_THROWS(results.get(11));
+        REQUIRE_EXCEPTION(results.get(10), OutOfBounds, "Requested index 10 calling get() on Results when max is 9");
     }
     SECTION("sequential in decreasing order") {
         for (int i = 9; i >= 0; --i)
@@ -4096,10 +4061,10 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     Results empty_results = TestType::call(r, table);
     CppContext ctx(r, &empty_results.get_object_schema());
 
-#ifndef _WIN32
     SECTION("no objects") {
         SECTION("get()") {
-            CHECK_THROWS_WITH(empty_results.get(ctx, 0), "Requested index 0 calling get() on Results when empty");
+            REQUIRE_EXCEPTION(empty_results.get(ctx, 0), OutOfBounds,
+                              "Requested index 0 calling get() on Results when empty");
         }
         SECTION("first()") {
             CHECK_FALSE(empty_results.first(ctx));
@@ -4108,7 +4073,6 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
             CHECK_FALSE(empty_results.last(ctx));
         }
     }
-#endif
 
     r->begin_transaction();
     auto other_obj = r->read_group().get_table("class_different type")->create_object();
@@ -4122,7 +4086,8 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     SECTION("get()") {
         for (int i = 0; i < 10; ++i)
             CHECK(util::any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
-        CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 calling get() on Results when max is 9");
+        REQUIRE_EXCEPTION(results.get(ctx, 10), OutOfBounds,
+                          "Requested index 10 calling get() on Results when max is 9");
     }
 
     SECTION("first()") {
@@ -4139,17 +4104,17 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
                 REQUIRE(results.index_of(ctx, std::any(results.get<Obj>(i))) == i);
         }
         SECTION("wrong object type") {
-            CHECK_THROWS_WITH(results.index_of(ctx, std::any(other_obj)),
+            REQUIRE_EXCEPTION(results.index_of(ctx, std::any(other_obj)), ObjectTypeMismatch,
                               "Object of type 'different type' does not match Results type 'object'");
         }
         SECTION("wrong realm") {
             auto obj = r2->read_group().get_table("class_object")->get_object(0);
-            CHECK_THROWS_WITH(results.index_of(ctx, std::any(obj)),
+            REQUIRE_EXCEPTION(results.index_of(ctx, std::any(obj)), ObjectTypeMismatch,
                               "Object of type 'object' does not match Results type 'object'");
         }
         SECTION("detached object") {
             Obj detached_obj;
-            CHECK_THROWS_WITH(results.index_of(ctx, std::any(detached_obj)),
+            REQUIRE_EXCEPTION(results.index_of(ctx, std::any(detached_obj)), StaleAccessor,
                               "Attempting to access an invalid object");
         }
     }
@@ -4275,8 +4240,9 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_float)->get_float() == 2.f);
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(col_int_list), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(col_invalid), ErrorCodes::InvalidProperty);
+            REQUIRE_EXCEPTION(results.max(col_int_list), IllegalOperation,
+                              "Operation 'max' not supported for int list 'object.int list'");
+            REQUIRE_EXCEPTION(results.max(col_invalid), InvalidProperty, "Invalid column key");
         }
 
         SECTION("min") {
@@ -4284,26 +4250,31 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_float)->get_float() == 0.f);
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(col_int_list), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(col_invalid), ErrorCodes::InvalidProperty);
+            REQUIRE_EXCEPTION(results.min(col_int_list), IllegalOperation,
+                              "Operation 'min' not supported for int list 'object.int list'");
+            REQUIRE_EXCEPTION(results.min(col_invalid), InvalidProperty, "Invalid column key");
         }
 
         SECTION("average") {
             REQUIRE(results.average(col_int) == 1.0);
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_int_list), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_invalid), ErrorCodes::InvalidProperty);
+            REQUIRE_EXCEPTION(results.average(col_int_list), IllegalOperation,
+                              "Operation 'average' not supported for int list 'object.int list'");
+            REQUIRE_EXCEPTION(results.average(col_date), IllegalOperation,
+                              "Operation 'average' not supported for date? property 'object.date'");
+            REQUIRE_EXCEPTION(results.average(col_invalid), InvalidProperty, "Invalid column key");
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 2);
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_int_list), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_invalid), ErrorCodes::InvalidProperty);
+            REQUIRE_EXCEPTION(results.sum(col_int_list), IllegalOperation,
+                              "Operation 'sum' not supported for int list 'object.int list'");
+            REQUIRE_EXCEPTION(results.sum(col_date), IllegalOperation,
+                              "Operation 'sum' not supported for date? property 'object.date'");
+            REQUIRE_EXCEPTION(results.sum(col_invalid), InvalidProperty, "Invalid column key");
         }
     }
 
@@ -4338,14 +4309,16 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(!results.average(col_int));
             REQUIRE(!results.average(col_float));
             REQUIRE(!results.average(col_double));
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(results.average(col_date), IllegalOperation,
+                              "Operation 'average' not supported for date? property 'object.date'");
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 0);
             REQUIRE(results.sum(col_float)->get_double() == 0.0);
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(results.sum(col_date), IllegalOperation,
+                              "Operation 'sum' not supported for date? property 'object.date'");
         }
     }
 
@@ -4370,14 +4343,16 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(!results.average(col_int));
             REQUIRE(!results.average(col_float));
             REQUIRE(!results.average(col_double));
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(results.average(col_date), IllegalOperation,
+                              "Operation 'average' not supported for date? property 'object.date'");
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 0);
             REQUIRE(results.sum(col_float)->get_double() == 0.0);
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
-            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
+            REQUIRE_EXCEPTION(results.sum(col_date), IllegalOperation,
+                              "Operation 'sum' not supported for date? property 'object.date'");
         }
     }
 }
@@ -4795,14 +4770,13 @@ TEST_CASE("results: limit", "[limit]") {
 
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
-        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(limited.filter(table->where()), ErrorCodes::IllegalOperation);
+        REQUIRE_EXCEPTION(limited.filter(table->where()), IllegalOperation,
+                          "Filtering a Results with a limit is not yet implemented");
     }
 }
 
 TEST_CASE("notifications: objects with PK recreated") {
-#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;

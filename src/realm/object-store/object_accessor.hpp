@@ -83,7 +83,7 @@ struct ValueUpdater {
         policy2.create = false;
         auto link = child_ctx.template unbox<Obj>(value, policy2);
         if (!policy.copy && link && link.get_table()->is_embedded())
-            throw std::logic_error("Cannot set a link to an existing managed embedded object");
+            throw InvalidArgument("Cannot set a link to an existing managed embedded object");
 
         ObjKey curr_link;
         if (policy.diff)
@@ -391,7 +391,8 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
     if (!table)
         return Object(realm, object_schema, Obj());
     if (ctx.is_null(primary_value) && !is_nullable(primary_prop->type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
+        throw NotNullable(util::format("Invalid null value for non-nullable primary key '%1.%2'.", object_schema.name,
+                                       primary_prop->name));
 
     auto primary_key_value = switch_on_type(primary_prop->type, [&](auto* t) {
         return Mixed(ctx.template unbox<NonObjTypeT<decltype(*t)>>(primary_value));
@@ -406,7 +407,8 @@ ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& t
 {
     bool is_null = ctx.is_null(primary_value);
     if (is_null && !is_nullable(primary_prop.type))
-        throw std::logic_error("Invalid null value for non-nullable primary key.");
+        throw NotNullable(util::format("Invalid null value for non-nullable primary key '%1.%2'.",
+                                       table.get_class_name(), primary_prop.name));
     if (primary_prop.type == PropertyType::String) {
         return table.find_first(primary_prop.column_key, ctx.template unbox<StringData>(primary_value));
     }

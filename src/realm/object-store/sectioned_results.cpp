@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/results.hpp>
 #include <realm/object-store/sectioned_results.hpp>
+
 #include <realm/exceptions.hpp>
 
 namespace realm {
@@ -327,6 +327,7 @@ void SectionedResults::calculate_sections_if_required()
         return;
     if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evalutation)
         return;
+
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
         m_results.ensure_up_to_date();
@@ -371,7 +372,7 @@ void SectionedResults::calculate_sections()
         // Disallow links as section keys. It would be uncommon to use them to begin with
         // and if the object acting as the key was deleted bad things would happen.
         if (key.is_type(type_Link, type_TypedLink)) {
-            throw std::logic_error("Links are not supported as section keys.");
+            throw InvalidArgument("Links are not supported as section keys.");
         }
 
         auto it = m_sections.find(key);
@@ -432,11 +433,11 @@ ResultsSection SectionedResults::operator[](Mixed key)
     util::CheckedUniqueLock lock(m_mutex);
     check_valid();
     calculate_sections_if_required();
-    auto it = m_sections.find(key);
-    if (it == m_sections.end()) {
-        throw std::logic_error("Key does not exist for any sections.");
+    if (auto it = m_sections.find(key); it != m_sections.end()) {
+        return ResultsSection(this, it->second.key);
     }
-    return ResultsSection(this, it->second.key);
+
+    throw InvalidArgument(util::format("Section key %1 not found.", key));
 }
 
 NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,

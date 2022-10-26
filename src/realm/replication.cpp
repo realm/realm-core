@@ -23,6 +23,24 @@
 using namespace realm;
 using namespace realm::util;
 
+const char* Replication::history_type_name(int type)
+{
+    switch (type) {
+        case hist_None:
+            return "None";
+        case hist_OutOfRealm:
+            return "Local out of Realm";
+        case hist_InRealm:
+            return "Local in-Realm";
+        case hist_SyncClient:
+            return "SyncClient";
+        case hist_SyncServer:
+            return "SyncServer";
+        default:
+            return "Unknown";
+    }
+}
+
 void Replication::initialize(DB&)
 {
     // Nothing needs to be done here

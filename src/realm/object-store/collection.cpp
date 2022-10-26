@@ -73,7 +73,7 @@ Collection& Collection::operator=(Collection&&) = default;
 
 bool Collection::is_valid() const
 {
-    if (!m_realm)
+    if (!m_realm || !m_coll_base)
         return false;
     m_realm->verify_thread();
     if (!m_realm->is_in_read_transaction())
@@ -99,55 +99,41 @@ TableKey Collection::get_parent_table_key() const
     return m_coll_base->get_table()->get_key();
 }
 
-static StringData object_name(Table const& table)
-{
-    return ObjectStore::object_type_for_table_name(table.get_name());
-}
-
 void Collection::validate(const Obj& obj) const
 {
     if (!obj.is_valid())
-        throw std::invalid_argument("Object has been deleted or invalidated");
+        throw StaleAccessor("Object has been deleted or invalidated");
     // FIXME: This does not work for TypedLink.
     auto target = m_coll_base->get_target_table();
     if (obj.get_table() != target)
-        throw std::invalid_argument(util::format("Object of type (%1) does not match List type (%2)",
-                                                 object_name(*obj.get_table()), object_name(*target)));
-}
-
-void Collection::not_supported(const char* operation) const
-{
-    auto col_key = m_coll_base->get_col_key();
-    const char* type_name = get_data_type_name(DataType(col_key.get_type()));
-    if (col_key.is_list())
-        throw IllegalOperation(util::format("Cannot %1 '%2' array: operation not supported", operation, type_name));
-    else if (col_key.is_dictionary())
-        throw IllegalOperation(
-            util::format("Cannot %1 '%2' dictionary: operation not supported", operation, type_name));
-    else if (col_key.is_set())
-        throw IllegalOperation(util::format("Cannot %1 '%2' set: operation not supported", operation, type_name));
-
-    throw LogicError(ErrorCodes::BrokenInvariant, "Unexpected collection type");
+        throw InvalidArgument(ErrorCodes::ObjectTypeMismatch,
+                              util::format("Object of type (%1) does not match %2 type (%3)",
+                                           obj.get_table()->get_class_name(), type_name(), target->get_class_name()));
 }
 
 void Collection::verify_attached() const
 {
-    if (!is_valid()) {
-        std::string coll_type = "Collection";
-        if (is_array(m_type))
-            coll_type = "List";
-        else if (is_dictionary(m_type))
-            coll_type = "Dictionary";
-        else if (is_set(m_type))
-            coll_type = "Set";
-        throw LogicError(ErrorCodes::InvalidatedObject, util::format("Access to invalidated %1 object", coll_type));
+    if (REALM_LIKELY(is_valid())) {
+        return;
     }
+    if (!m_coll_base) {
+        throw LogicError(ErrorCodes::InvalidatedObject,
+                         util::format("%1 was never initialized and is invalid.", type_name()));
+    }
+
+    throw LogicError(ErrorCodes::InvalidatedObject,
+                     util::format("%1 is no longer valid. Either the parent object was deleted or the containing "
+                                  "Realm has been invalidated or closed.",
+                                  type_name()));
 }
 
 void Collection::verify_in_transaction() const
 {
     verify_attached();
-    m_realm->verify_in_write();
+    if (REALM_UNLIKELY(!m_realm->is_in_transaction())) {
+        throw WrongTransactionState(
+            util::format("Cannot modify managed %1 outside of a write transaction.", type_name()));
+    }
 }
 
 size_t Collection::size() const
@@ -163,7 +149,7 @@ const ObjectSchema& Collection::get_object_schema() const
     REALM_ASSERT(get_type() == PropertyType::Object);
     auto object_schema = m_object_schema.load();
     if (!object_schema) {
-        auto object_type = object_name(*m_coll_base->get_target_table());
+        auto object_type = m_coll_base->get_target_table()->get_class_name();
         auto it = m_realm->schema().find(object_type);
         REALM_ASSERT(it != m_realm->schema().end());
         m_object_schema = object_schema = &*it;

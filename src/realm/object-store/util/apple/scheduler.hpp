@@ -17,6 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/util/scheduler.hpp>
+
+#include <realm/exceptions.hpp>
 #include <realm/util/to_string.hpp>
 
 #include <atomic>
@@ -158,7 +160,7 @@ DispatchQueueScheduler::DispatchQueueScheduler(dispatch_queue_t queue)
             auto msg = util::format(
                 "Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
                 dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
-            throw std::logic_error(msg);
+            throw InvalidArgument(msg);
         }
     }
     dispatch_retain(m_queue);

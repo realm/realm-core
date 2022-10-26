@@ -204,9 +204,8 @@ public:
 
     std::shared_ptr<SyncSession> sync_session() const;
 
-    // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
-    // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
-    // sync mode if they aren't already.
+    // Returns the latest/active subscription set for a FLX-sync enabled realm.
+    // Throws an exception for a non-FLX realm
     sync::SubscriptionSet get_latest_subscription_set();
     sync::SubscriptionSet get_active_subscription_set();
 #endif
