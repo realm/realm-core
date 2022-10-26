@@ -771,7 +771,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testi
     std::unique_ptr<Replication> hist(realm::make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     TransactionRef rt = sg->start_read();
-
+    sg->internal_prep_fork();
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         size_t free_space, used_space;
@@ -799,6 +799,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testi
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "make many tables");
     }
     size_t reported_used_space = 0;
@@ -925,6 +926,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_InsertTable, testing_su
     ConstTableRef table1 = rt->get_table("table1");
     ConstTableRef table2 = rt->get_table("table2");
 
+    sg->internal_prep_fork();
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history());
@@ -941,6 +943,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_InsertTable, testing_su
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "add table");
     }
 
@@ -1047,6 +1050,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     CHECK_EQUAL(0, rt->size());
 
     // Create 5 columns, and make 3 of them indexed
+    sg->internal_prep_fork();
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::vector<ObjKey> keys;
@@ -1067,6 +1071,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "init");
     }
     rt->advance_read();
@@ -1079,6 +1084,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     CHECK(table->has_search_index(table->get_column_key("i4")));
 
     // Remove the previous search indexes and add 2 new ones
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::vector<ObjKey> keys;
@@ -1096,6 +1102,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "change indexes");
     }
     rt->advance_read();
@@ -1107,6 +1114,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     CHECK_NOT(table->has_search_index(table->get_column_key("i4")));
 
     // Add some searchable contents
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist = make_in_realm_history();
@@ -1124,6 +1132,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "add content");
     }
     rt->advance_read();
@@ -1139,6 +1148,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     CHECK_EQUAL(ObjKey(13), table->find_first_int(table->get_column_key("i3"), 508));
 
     // Move the indexed columns by removal
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist = make_in_realm_history();
@@ -1151,6 +1161,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "move/remove");
     }
     rt->advance_read();
@@ -1467,6 +1478,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     TransactionRef rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
 
+    sg->internal_prep_fork();
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1486,6 +1498,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "initial write");
     }
     rt->advance_read();
@@ -1500,6 +1513,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
 
     // Remove table with columns, but no link columns, and table is not a link
     // target.
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1510,6 +1524,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "remove alpha");
     }
     rt->advance_read();
@@ -1523,6 +1538,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     CHECK(epsilon);
 
     // Remove table with link column, and table is not a link target.
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1533,6 +1549,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "remove beta");
     }
     rt->advance_read();
@@ -1546,6 +1563,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
 
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1556,6 +1574,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "remove gamma");
     }
     rt->advance_read();
@@ -1568,6 +1587,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
 
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
+    sg->internal_prep_fork();
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1578,6 +1598,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "remove delta");
     }
     rt->advance_read();
@@ -1821,6 +1842,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_sup
     auto obj = *table->begin();
     CHECK(obj.is_valid());
 
+    sg->internal_prep_fork();
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist_w(make_in_realm_history());
@@ -1832,6 +1854,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_sup
         exit(0);
     }
     else {
+        sg->internal_post_fork();
         test_util::waitpid_checked(pid, 0, "external clear");
     }
 
@@ -2344,8 +2367,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;

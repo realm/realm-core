@@ -715,6 +715,7 @@ NONCONCURRENT_TEST_IF(Shared_Initial2, testing_supports_fork)
         // Create a new shared db
         std::unique_ptr<Replication> hist_r(make_in_realm_history());
         DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+        sg->internal_prep_fork();
         int pid = test_util::fork_and_update_mappings();
         if (pid == 0) {
             // Open the same db again (in empty state)
@@ -739,6 +740,7 @@ NONCONCURRENT_TEST_IF(Shared_Initial2, testing_supports_fork)
             exit(0);
         }
         else {
+            sg->internal_post_fork();
             test_util::waitpid_checked(pid, 0, "init");
         }
 

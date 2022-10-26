@@ -1670,6 +1670,18 @@ private:
     std::atomic<bool> m_should_run = false;
 };
 
+void DB::internal_prep_fork()
+{
+    if (m_page_refresher)
+        m_page_refresher->stop();
+}
+
+void DB::internal_post_fork()
+{
+    if (m_page_refresher)
+        m_page_refresher->start();
+}
+
 bool DB::other_writers_waiting_for_lock() const
 {
     SharedInfo* info = m_file_map.get_addr();
