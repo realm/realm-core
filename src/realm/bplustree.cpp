@@ -643,6 +643,7 @@ void BPlusTreeInner::verify() const
         }
         else {
             BPlusTreeInner node(m_tree);
+            node.set_parent(const_cast<BPlusTreeInner*>(this), i + 1);
             node.init_from_mem(mem);
             node.verify();
             elems_in_child = node.get_tree_size();
