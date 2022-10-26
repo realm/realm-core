@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix `BPlusTreeInner::verify()` ([#5974]( https://github.com/realm/realm-core/pull/5974)).
 
 ----------------------------------------------
 
