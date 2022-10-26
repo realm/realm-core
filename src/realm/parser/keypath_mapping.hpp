@@ -72,17 +72,11 @@ public:
     bool remove_table_mapping(std::string alias_to_remove);
     bool has_table_mapping(const std::string& alias) const;
     util::Optional<std::string> get_table_mapping(const std::string name) const;
-    void set_backlink_class_prefix(std::string prefix);
-    const std::string& get_backlink_class_prefix() const
-    {
-        return m_backlink_class_prefix;
-    }
     std::string translate(LinkChain&, const std::string& identifier);
     std::string translate(ConstTableRef table, const std::string& identifier);
     std::string translate_table_name(const std::string& identifier);
 
 protected:
-    std::string m_backlink_class_prefix;
     std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;
     std::unordered_map<std::string, std::string> m_table_mappings;
 };

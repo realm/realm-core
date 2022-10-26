@@ -53,9 +53,6 @@ Initialization initialization;
 
 } // anonymous namespace
 
-constexpr char Group::g_class_name_prefix[];
-constexpr size_t Group::g_class_name_prefix_len;
-
 Group::Group()
     : m_local_alloc(new SlabAlloc)
     , m_alloc(*m_local_alloc) // Throws

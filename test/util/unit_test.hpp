@@ -89,6 +89,8 @@
 
 #define CHECK_GREATER_EQUAL(a, b) test_context.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
+#define CHECK_STRING_CONTAINS(a, b) test_context.check_string_contains((a), (b), __FILE__, __LINE__, #a, #b)
+
 #define CHECK_OR_RETURN(cond)                                                                                        \
     do {                                                                                                             \
         if (!CHECK(cond))                                                                                            \
@@ -102,7 +104,7 @@
             test_context.throw_failed(__FILE__, __LINE__, #expr, #exception_class);                                  \
         }                                                                                                            \
         catch (exception_class&) {                                                                                   \
-            test_context.check_succeeded();                                                                          \
+            test_context.check_succeeded(__LINE__);                                                                  \
             return true;                                                                                             \
         }                                                                                                            \
         return false;                                                                                                \
@@ -116,7 +118,7 @@
         }                                                                                                            \
         catch (exception_class & e) {                                                                                \
             if (exception_cond) {                                                                                    \
-                test_context.check_succeeded();                                                                      \
+                test_context.check_succeeded(__LINE__);                                                              \
                 return true;                                                                                         \
             }                                                                                                        \
             test_context.throw_ex_cond_failed(__FILE__, __LINE__, e.what(), #expr, #exception_class,                 \
@@ -132,7 +134,7 @@
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
         }                                                                                                            \
         catch (...) {                                                                                                \
-            test_context.check_succeeded();                                                                          \
+            test_context.check_succeeded(__LINE__);                                                                  \
             return true;                                                                                             \
         }                                                                                                            \
         return false;                                                                                                \
@@ -144,9 +146,20 @@
             (expr);                                                                                                  \
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
         }                                                                                                            \
-        catch (std::exception & e) {                                                                                 \
-            test_context.check_succeeded();                                                                          \
+        catch (const std::exception& e) {                                                                            \
+            test_context.check_succeeded(__LINE__);                                                                  \
             message = e.what();                                                                                      \
+        }                                                                                                            \
+    }())
+
+#define CHECK_THROW_CONTAINING_MESSAGE(expr, message)                                                                \
+    ([&] {                                                                                                           \
+        try {                                                                                                        \
+            (expr);                                                                                                  \
+            test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
+        }                                                                                                            \
+        catch (const std::exception& e) {                                                                            \
+            CHECK_STRING_CONTAINS(e.what(), message);                                                                \
         }                                                                                                            \
     }())
 
@@ -154,7 +167,7 @@
     ([&] {                                                                                                           \
         try {                                                                                                        \
             (expr);                                                                                                  \
-            test_context.check_succeeded();                                                                          \
+            test_context.check_succeeded(__LINE__);                                                                  \
             return true;                                                                                             \
         }                                                                                                            \
         catch (std::exception & ex) {                                                                                \
@@ -505,6 +518,9 @@ public:
     bool check_greater_equal(const A& a, const B& b, const char* file, long line, const char* a_text,
                              const char* b_text);
 
+    bool check_string_contains(std::string_view a, std::string_view b, const char* file, long line,
+                               const char* a_text, const char* b_text);
+
     bool check_approximately_equal(long double a, long double b, long double eps, const char* file, long line,
                                    const char* a_text, const char* b_text, const char* eps_text);
 
@@ -517,7 +533,7 @@ public:
     bool check_definitely_greater(long double a, long double b, long double eps, const char* file, long line,
                                   const char* a_text, const char* b_text, const char* eps_text);
 
-    void check_succeeded();
+    void check_succeeded(long line);
 
     void throw_failed(const char* file, long line, const char* expr_text, const char* exception_name);
     void throw_ex_failed(const char* file, long line, const char* expr_text, const char* exception_name,
@@ -768,7 +784,7 @@ inline bool TestContext::check_cond(bool cond, const char* file, long line, cons
                                     const char* cond_text)
 {
     if (REALM_LIKELY(cond)) {
-        check_succeeded();
+        check_succeeded(line);
     }
     else {
         cond_failed(file, line, macro_name, cond_text);
@@ -791,7 +807,7 @@ inline bool TestContext::check_compare(bool cond, const A& a, const B& b, const 
                                        const char* macro_name, const char* a_text, const char* b_text)
 {
     if (REALM_LIKELY(cond)) {
-        check_succeeded();
+        check_succeeded(line);
     }
     else {
         std::string a_val, b_val;
@@ -807,7 +823,7 @@ inline bool TestContext::check_inexact_compare(bool cond, long double a, long do
                                                const char* a_text, const char* b_text, const char* eps_text)
 {
     if (REALM_LIKELY(cond)) {
-        check_succeeded();
+        check_succeeded(line);
     }
     else {
         inexact_compare_failed(file, line, macro_name, a_text, b_text, eps_text, a, b, eps);

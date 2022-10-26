@@ -336,7 +336,7 @@ void verifier_thread_advance(TestContext& test_context, int limit, DBRef db, Tab
 }
 } // namespace
 
-TEST(Transactions_Threaded)
+TEST_IF(Transactions_Threaded, !running_with_valgrind)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
@@ -373,7 +373,7 @@ TEST(Transactions_Threaded)
     }
 }
 
-TEST(Transactions_ThreadedAdvanceRead)
+TEST_IF(Transactions_ThreadedAdvanceRead, !running_with_valgrind)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
