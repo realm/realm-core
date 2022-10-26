@@ -337,6 +337,7 @@ protected:
                             WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
 private:
+    friend class NodeTree;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
     bool m_missing_parent_update = false;

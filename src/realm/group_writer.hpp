@@ -61,6 +61,7 @@ using VersionVector = std::vector<uint64_t>;
 /// particular, do not reuse it in case any of the functions throw.
 class GroupWriter : public _impl::ArrayWriterBase {
 public:
+    enum class EvacuationStage { idle, evacuating, waiting, blocked };
     // For groups in transactional mode (Group::m_is_shared), this constructor
     // must be called while a write transaction is in progress.
     //
@@ -105,10 +106,62 @@ public:
         return m_locked_space_size;
     }
 
+    size_t get_logical_size() const noexcept
+    {
+        return m_logical_size;
+    }
+
+    size_t get_evacuation_limit() const noexcept
+    {
+        return m_backoff ? 0 : m_evacuation_limit;
+    }
+
+    std::vector<size_t>& get_evacuation_progress()
+    {
+        return m_evacuation_progress;
+    }
+
+    EvacuationStage get_evacuation_stage() const noexcept
+    {
+        if (m_evacuation_limit == 0) {
+            if (m_backoff == 0) {
+                return EvacuationStage::idle;
+            }
+            else {
+                return EvacuationStage::blocked;
+            }
+        }
+        else {
+            if (m_backoff == 0) {
+                return EvacuationStage::evacuating;
+            }
+            else {
+                return EvacuationStage::waiting;
+            }
+        }
+    }
+
+
     // Flush all cached memory mappings
     void flush_all_mappings();
 
 private:
+    struct FreeSpaceEntry {
+        FreeSpaceEntry(size_t r, size_t s, uint64_t v)
+            : ref(r)
+            , size(s)
+            , released_at_version(v)
+        {
+        }
+        size_t ref;
+        size_t size;
+        uint64_t released_at_version;
+    };
+
+    static void merge_adjacent_entries_in_freelist(std::vector<FreeSpaceEntry>& list);
+    static void move_free_in_file_to_size_map(const std::vector<GroupWriter::FreeSpaceEntry>& list,
+                                              std::multimap<size_t, size_t>& size_map);
+
     class MapWindow;
     Group& m_group;
     SlabAlloc& m_alloc;
@@ -122,30 +175,16 @@ private:
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
+    size_t m_evacuation_limit;
+    int64_t m_backoff;
+    size_t m_logical_size = 0;
     Durability m_durability;
 
-    struct FreeSpaceEntry {
-        FreeSpaceEntry(size_t r, size_t s, uint64_t v)
-            : ref(r)
-            , size(s)
-            , released_at_version(v)
-        {
-        }
-        size_t ref;
-        size_t size;
-        uint64_t released_at_version;
-    };
-    class FreeList : public std::vector<FreeSpaceEntry> {
-    public:
-        FreeList() = default;
-        // Merge adjacent chunks
-        void merge_adjacent_entries_in_freelist();
-        // Copy free space entries to structure where entries are sorted by size
-        void move_free_in_file_to_size_map(std::multimap<size_t, size_t>& size_map);
-    };
     //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
+    std::vector<FreeSpaceEntry> m_under_evacuation;
     std::multimap<size_t, size_t> m_size_map;
+    std::vector<size_t> m_evacuation_progress;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
     void read_in_freelist();

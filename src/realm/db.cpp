@@ -2152,6 +2152,14 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
+
+    if (auto limit = out.get_evacuation_limit()) {
+        // Get a work limit based on the size of the transaction we're about to commit
+        // Assume at least 4K on top of that for the top arrays
+        size_t work_limit = 4 * 1024 + m_alloc.get_commit_size() / 2;
+        transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
+    }
+
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2164,7 +2172,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
-        m_used_space = out.get_file_size() - m_free_space;
+        m_used_space = out.get_logical_size() - m_free_space;
+        m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
@@ -2182,7 +2191,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                 // mode the file on disk may very likely be in an invalid state.
                 break;
         }
-        size_t new_file_size = out.get_file_size();
+        size_t new_file_size = out.get_logical_size();
         // We must reset the allocators free space tracking before communicating the new
         // version through the ring buffer. If not, a reader may start updating the allocators
         // mappings while the allocator is in dirty state.

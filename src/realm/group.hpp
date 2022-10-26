@@ -526,6 +526,21 @@ public:
 #endif
 
 protected:
+    static constexpr size_t s_table_name_ndx = 0;
+    static constexpr size_t s_table_refs_ndx = 1;
+    static constexpr size_t s_file_size_ndx = 2;
+    static constexpr size_t s_free_pos_ndx = 3;
+    static constexpr size_t s_free_size_ndx = 4;
+    static constexpr size_t s_free_version_ndx = 5;
+    static constexpr size_t s_version_ndx = 6;
+    static constexpr size_t s_hist_type_ndx = 7;
+    static constexpr size_t s_hist_ref_ndx = 8;
+    static constexpr size_t s_hist_version_ndx = 9;
+    static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_evacuation_point_ndx = 11;
+
+    static constexpr size_t s_group_max_size = 12;
+
     virtual Replication* const* get_repl() const
     {
         return &Table::g_dummy_replication;
@@ -572,6 +587,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Evacuation point     (optional)            22
     ///
     /// </pre>
     ///
@@ -614,20 +630,6 @@ private:
     std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
 
-    static constexpr size_t s_table_name_ndx = 0;
-    static constexpr size_t s_table_refs_ndx = 1;
-    static constexpr size_t s_file_size_ndx = 2;
-    static constexpr size_t s_free_pos_ndx = 3;
-    static constexpr size_t s_free_size_ndx = 4;
-    static constexpr size_t s_free_version_ndx = 5;
-    static constexpr size_t s_version_ndx = 6;
-    static constexpr size_t s_hist_type_ndx = 7;
-    static constexpr size_t s_hist_ref_ndx = 8;
-    static constexpr size_t s_hist_version_ndx = 9;
-    static constexpr size_t s_sync_file_id_ndx = 10;
-
-    static constexpr size_t s_group_max_size = 11;
-
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
 
@@ -658,7 +660,6 @@ private:
 
     void reset_free_space_tracking();
 
-    void remap(size_t new_file_size);
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     /// Recursively update refs stored in all cached array

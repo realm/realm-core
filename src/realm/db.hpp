@@ -235,7 +235,6 @@ public:
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
-
     /// Transactions are obtained from one of the following 3 methods:
     TransactionRef start_read(VersionID = VersionID());
     TransactionRef start_frozen(VersionID = VersionID());
@@ -266,6 +265,13 @@ public:
         transact_Writing,
         transact_Frozen,
     };
+
+    enum class EvacStage { idle, evacuating, waiting, blocked };
+
+    EvacStage get_evacuation_stage() const
+    {
+        return m_evac_stage;
+    }
 
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
@@ -444,7 +450,7 @@ private:
     class ReadLockGuard;
 
     // Member variables
-    std::recursive_mutex m_mutex;
+    mutable std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
@@ -453,6 +459,7 @@ private:
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
+    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
@@ -588,6 +595,7 @@ private:
 
 inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked_space) const
 {
+    std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
     free_space = m_free_space;
     used_space = m_used_space;
     if (locked_space) {

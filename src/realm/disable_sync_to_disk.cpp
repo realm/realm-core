@@ -29,9 +29,9 @@ std::atomic<bool> g_disable_sync_to_disk(false);
 } // anonymous namespace
 
 // LCOV_EXCL_START We will sync to disc during coverage run
-void realm::disable_sync_to_disk()
+void realm::disable_sync_to_disk(bool disable)
 {
-    g_disable_sync_to_disk = true;
+    g_disable_sync_to_disk = disable;
 }
 // LCOV_EXCL_STOP
 

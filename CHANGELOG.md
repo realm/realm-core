@@ -1,6 +1,8 @@
 # NEXT MAJOR RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* The realm file will be shrunk if the larger file size is no longer needed. (PR [#5755](https://github.com/realm/realm-core/pull/5755))
 * Full text index supported. The words stored in the index will be converted to lower case and diacritics will be removed. The index will support Basic Latin and Latin-1 Supplement characters. All others will be ignored. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
 
 ### Fixed
