@@ -275,7 +275,8 @@ public:
     }
 
 private:
-    const Mixed& mixed_for_argument(size_t n) {
+    const Mixed& mixed_for_argument(size_t n)
+    {
         Arguments::verify_ndx(n);
         if (is_argument_list(n)) {
             throw std::invalid_argument(
