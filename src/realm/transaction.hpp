@@ -179,7 +179,7 @@ private:
     }
 
     template <class O>
-    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
+    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool) REQUIRES(!db->m_mutex);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept REQUIRES(!m_async_mutex);
     void initialize_replication();
@@ -189,6 +189,7 @@ private:
     void acquire_write_lock() REQUIRES(!m_async_mutex);
 
     void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit);
+    void close_read_with_lock() REQUIRES(!m_async_mutex, db->m_mutex);
 
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
