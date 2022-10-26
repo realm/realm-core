@@ -1371,7 +1371,8 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class
  * Get the parent object for the object passed as argument. Only works for embedded objects.
  * @return true, if no errors occurred.
  */
-RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t* parent);
+RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_t** parent,
+                                     realm_class_key_t* class_key);
 
 /**
  * Find an object with a particular primary key value.
@@ -2678,6 +2679,11 @@ typedef struct realm_user_identity {
     realm_auth_provider_e provider_type;
 } realm_user_identity_t;
 
+typedef void (*realm_return_apikey_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t*,
+                                           const realm_app_error_t*);
+typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count,
+                                                realm_app_error_t*);
+
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -2976,28 +2982,30 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
  * Creates a user API key that can be used to authenticate as the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
-    const realm_app_t*, const realm_user_t*, const char* name,
-    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t*, const realm_user_t*,
+                                                                 const char* name,
+                                                                 realm_return_apikey_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Fetches a user API key associated with the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
-    const realm_app_t*, const realm_user_t*, realm_object_id_t id,
-    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t*, const realm_user_t*,
+                                                                realm_object_id_t id,
+                                                                realm_return_apikey_func_t callback,
+                                                                realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 
 /**
  * Fetches the user API keys associated with the current user.
  * @return True if no error was recorded. False otherwise
  */
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
-    const realm_app_t*, const realm_user_t*,
-    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count, realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t*, const realm_user_t*,
+                                                                 realm_return_apikey_list_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Deletes a user API key associated with the current user.
@@ -3005,7 +3013,7 @@ RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
  */
 RLM_API bool realm_app_user_apikey_provider_client_delete_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
-                                                                 realm_app_void_completion_func_t,
+                                                                 realm_app_void_completion_func_t callback,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
 
@@ -3015,7 +3023,7 @@ RLM_API bool realm_app_user_apikey_provider_client_delete_apikey(const realm_app
  */
 RLM_API bool realm_app_user_apikey_provider_client_enable_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
-                                                                 realm_app_void_completion_func_t,
+                                                                 realm_app_void_completion_func_t callback,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
 
@@ -3025,7 +3033,7 @@ RLM_API bool realm_app_user_apikey_provider_client_enable_apikey(const realm_app
  */
 RLM_API bool realm_app_user_apikey_provider_client_disable_apikey(const realm_app_t*, const realm_user_t*,
                                                                   realm_object_id_t id,
-                                                                  realm_app_void_completion_func_t,
+                                                                  realm_app_void_completion_func_t callback,
                                                                   realm_userdata_t userdata,
                                                                   realm_free_userdata_func_t userdata_free);
 

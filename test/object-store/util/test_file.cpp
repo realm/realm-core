@@ -214,28 +214,37 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
+struct WaitForSessionState {
+    std::condition_variable cv;
+    std::mutex mutex;
+    bool complete = false;
+    Status status = Status::OK();
+};
+
+static Status wait_for_session(Realm& realm,
+                               void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
                                std::chrono::seconds timeout)
 {
-    std::condition_variable cv;
-    std::mutex wait_mutex;
-    bool wait_flag(false);
-    Status status = Status::OK();
+    auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([&](Status s) {
-        std::unique_lock<std::mutex> lock(wait_mutex);
-        wait_flag = true;
-        status = s;
-        cv.notify_one();
+    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
+        auto shared_state = weak_state.lock();
+        if (!shared_state) {
+            return;
+        }
+        std::lock_guard<std::mutex> lock(shared_state->mutex);
+        shared_state->complete = true;
+        shared_state->status = s;
+        shared_state->cv.notify_one();
     });
-    std::unique_lock<std::mutex> lock(wait_mutex);
-    bool completed = cv.wait_for(lock, timeout, [&]() {
-        return wait_flag == true;
+    std::unique_lock<std::mutex> lock(shared_state->mutex);
+    bool completed = shared_state->cv.wait_for(lock, timeout, [&]() {
+        return shared_state->complete == true;
     });
     if (!completed) {
         throw std::runtime_error("wait_for_session() timed out");
     }
-    return status;
+    return shared_state->status;
 }
 
 bool wait_for_upload(Realm& realm, std::chrono::seconds timeout)
@@ -324,11 +333,10 @@ TestAppSession::~TestAppSession()
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
+    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
+    , m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    if (config.transport)
-        transport = config.transport;
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
 

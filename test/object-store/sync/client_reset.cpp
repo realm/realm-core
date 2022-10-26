@@ -3165,7 +3165,6 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
     }
     SECTION("with shared initial state") {
         TopLevelContent initial;
-        initial.link_value = util::none;
         test_reset->setup([&](SharedRealm realm) {
             auto table = get_table(*realm, "TopLevel");
             REQUIRE(table);
@@ -3198,6 +3197,22 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 local.array_values.begin()->second_level->dict_values.begin());
             local.array_values.begin()->second_level->set_of_objects.clear();
             remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local ArraySet to an embedded object through a deep link->linklist element which is removed by the "
+                "remote "
+                "triggers a list copy") {
+            local.link_value->array_vals[0] = 12345;
+            remote.link_value->array_vals.erase(remote.link_value->array_vals.begin());
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local ArrayErase to an embedded object through a deep link->linklist element which is removed by "
+                "the remote "
+                "triggers a list copy") {
+            local.link_value->array_vals.erase(local.link_value->array_vals.begin());
+            remote.link_value->array_vals.clear();
             TopLevelContent expected_recovered = local;
             reset_embedded_object({local}, {remote}, expected_recovered);
         }

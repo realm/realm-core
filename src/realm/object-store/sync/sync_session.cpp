@@ -336,10 +336,18 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                 server_requests_action);
         }
     }
+
+    std::vector<char> encryption_key;
+    {
+        util::CheckedLockGuard lock(m_config_mutex);
+        encryption_key = m_config.encryption_key;
+    }
+
     DBOptions options;
-    options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
     options.enable_async_writes = false;
+    if (!encryption_key.empty())
+        options.encryption_key = encryption_key.data();
 
     std::shared_ptr<DB> db;
     auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());
@@ -777,11 +785,13 @@ void SyncSession::create_sync_session()
 
     // Configure the sync transaction callback.
     auto wrapped_callback = [weak_self](VersionID old_version, VersionID new_version) {
+        std::function<TransactionCallback> callback;
         if (auto self = weak_self.lock()) {
             util::CheckedLockGuard l(self->m_state_mutex);
-            if (self->m_sync_transact_callback) {
-                self->m_sync_transact_callback(old_version, new_version);
-            }
+            callback = self->m_sync_transact_callback;
+        }
+        if (callback) {
+            callback(old_version, new_version);
         }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
@@ -837,7 +847,7 @@ void SyncSession::create_sync_session()
         });
 }
 
-void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)
+void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback>&& callback)
 {
     util::CheckedLockGuard l(m_state_mutex);
     m_sync_transact_callback = std::move(callback);

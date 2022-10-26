@@ -533,12 +533,15 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
 
     if (it == mappings_by_file.end()) {
         mappings_by_file.reserve(mappings_by_file.size() + 1);
+        mappings_for_file f;
+        f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(encryption_key));
 
 #ifdef _WIN32
         FileDesc fd2;
         if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd2, 0, FALSE, DUPLICATE_SAME_ACCESS))
             throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
         fd = fd2;
+        f.info->fd = f.handle = fd;
 #else
         fd = dup(fd);
 
@@ -546,31 +549,16 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
             int err = errno; // Eliminate any risk of clobbering
             throw std::system_error(err, std::system_category(), "dup() failed");
         }
-#endif
-        mappings_for_file f;
-
-#ifdef _WIN32
-        f.handle = fd;
-#else
+        f.info->fd = fd;
         f.device = st.st_dev;
         f.inode = st.st_ino;
 #endif
 
-        try {
-            f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(encryption_key), fd);
-        }
-        catch (...) {
-#ifdef _WIN32
-            bool b = CloseHandle(fd);
-            REALM_ASSERT_RELEASE(b);
-#else
-            ::close(fd);
-#endif
-            throw;
-        }
-
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
+    }
+    else {
+        it->info->cryptor.check_key(reinterpret_cast<const uint8_t*>(encryption_key));
     }
 
     try {

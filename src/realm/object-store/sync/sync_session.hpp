@@ -244,8 +244,7 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
 
-        static void set_sync_transact_callback(SyncSession& session,
-                                               util::UniqueFunction<TransactionCallback> callback)
+        static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback>&& callback)
         {
             session.set_sync_transact_callback(std::move(callback));
         }
@@ -344,7 +343,7 @@ private:
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
     void handle_new_flx_sync_query(int64_t version);
 
-    void set_sync_transact_callback(util::UniqueFunction<TransactionCallback>) REQUIRES(!m_state_mutex);
+    void set_sync_transact_callback(std::function<TransactionCallback>&&) REQUIRES(!m_state_mutex);
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
 
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
@@ -363,7 +362,7 @@ private:
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
-    util::UniqueFunction<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
+    std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 
     template <typename Field>
     auto config(Field f) REQUIRES(!m_config_mutex)

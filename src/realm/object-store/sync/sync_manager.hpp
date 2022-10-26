@@ -281,7 +281,7 @@ private:
     std::vector<std::shared_ptr<SyncUser>> m_users GUARDED_BY(m_user_mutex);
     std::shared_ptr<SyncUser> m_current_user GUARDED_BY(m_user_mutex);
 
-    mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
+    mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
 

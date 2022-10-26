@@ -807,6 +807,7 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
         // there's any old ones sitting on disk waiting to be uploaded.
         scan_for_realms_to_upload();
     });
+    session->revive_if_needed();
 }
 
 std::string AuditRealmPool::prefixed_partition(std::string const& partition)
