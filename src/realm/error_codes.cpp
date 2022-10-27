@@ -118,23 +118,35 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
 
         case CustomError:
-            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::custom_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::custom_error);
 
         case HTTPError:
-            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::http_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::http_error);
 
         case ClientAppDeallocated:
         case ClientRedirectError:
         case ClientTooManyRedirects:
         case ClientUserNotFound:
         case ClientUserNotLoggedIn:
-            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::client_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::client_error);
 
         case BadBsonParse:
         case BadToken:
         case MalformedJson:
         case MissingJsonKey:
-            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::json_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::json_error);
 
         case APIKeyAlreadyExists:
         case APIKeyNotFound:
@@ -188,7 +200,10 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ValueAlreadyExists:
         case ValueDuplicateName:
         case ValueNotFound:
-            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::service_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::app_error)
+                .set(ErrorCategory::service_error);
 
         case UnknownError:
             break;
