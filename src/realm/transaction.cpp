@@ -897,9 +897,11 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #if REALM_METRICS
     REALM_ASSERT(m_metrics == db->m_metrics);
     if (m_metrics) { // null if metrics are disabled
-        size_t free_space, used_space;
+        size_t free_space;
+        size_t used_space;
         db->get_stats(free_space, used_space);
-        size_t total_size = free_space + used_space;
+        size_t total_size = used_space + free_space;
+
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
         size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
@@ -928,6 +930,104 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #endif
 
     m_transact_stage = stage;
+}
+
+class NodeTree {
+public:
+    NodeTree(size_t evac_limit, size_t& work_limit)
+        : m_evac_limit(evac_limit)
+        , m_work_limit(work_limit)
+        , m_moved(0)
+    {
+    }
+    ~NodeTree()
+    {
+        // std::cout << "Moved: " << m_moved << std::endl;
+    }
+
+    /// Function used to traverse the node tree and "copy on write" nodes
+    /// that are found above the evac_limit. The function will return
+    /// when either the whole tree has been travesed or when the work_limit
+    /// has been reached.
+    /// \param current_node - node to process.
+    /// \param level - the level at which current_node is placed in the tree
+    /// \param progress - When the traversal is initiated, this vector identifies at which
+    ///                   node the process should be resumed. It is subesequently updated
+    ///                   to point to the node we have just processed
+    bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
+    {
+        if (current_node.is_read_only()) {
+            auto byte_size = current_node.get_byte_size();
+            if ((current_node.get_ref() + byte_size) > m_evac_limit) {
+                current_node.copy_on_write();
+                m_moved++;
+                if (m_work_limit > byte_size) {
+                    m_work_limit -= byte_size;
+                }
+                else {
+                    m_work_limit = 0;
+                    return false;
+                }
+            }
+        }
+
+        if (current_node.has_refs()) {
+            auto sz = current_node.size();
+            m_work_limit -= sz;
+            if (progress.size() == level) {
+                progress.push_back(0);
+            }
+            REALM_ASSERT_EX(level < progress.size(), level, progress.size());
+            size_t ndx = progress[level];
+            while (ndx < sz) {
+                auto val = current_node.get(ndx);
+                if (val && !(val & 1)) {
+                    Array arr(current_node.get_alloc());
+                    arr.set_parent(&current_node, ndx);
+                    arr.init_from_parent();
+                    if (!trv(arr, level + 1, progress)) {
+                        return false;
+                    }
+                }
+                ndx = ++progress[level];
+            }
+            while (progress.size() > level)
+                progress.pop_back();
+        }
+        return true;
+    }
+
+private:
+    size_t m_evac_limit;
+    size_t m_work_limit;
+    size_t m_moved;
+};
+
+
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
+{
+    NodeTree node_tree(evac_limit, work_limit);
+    if (progress.empty()) {
+        progress.push_back(s_table_name_ndx);
+    }
+    if (progress[0] == s_table_name_ndx) {
+        if (!node_tree.trv(m_table_names, 1, progress))
+            return;
+        progress.back() = s_table_refs_ndx; // Handle tables next
+    }
+    if (progress[0] == s_table_refs_ndx) {
+        if (!node_tree.trv(m_tables, 1, progress))
+            return;
+        progress.back() = s_hist_ref_ndx; // Handle history next
+    }
+    if (progress[0] == s_hist_ref_ndx && m_top.get(s_hist_ref_ndx)) {
+        Array hist_arr(m_top.get_alloc());
+        hist_arr.set_parent(&m_top, s_hist_ref_ndx);
+        hist_arr.init_from_parent();
+        if (!node_tree.trv(hist_arr, 1, progress))
+            return;
+    }
+    progress.clear();
 }
 
 } // namespace realm

@@ -456,7 +456,7 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
     // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
     // we would know where list elements ended up or if they were deleted by the server.
     using namespace realm::converters;
-    std::shared_ptr<EmbeddedObjectConverter> embedded_object_tracker = std::make_shared<EmbeddedObjectConverter>();
+    EmbeddedObjectConverter embedded_object_tracker;
     for (auto& it : m_lists) {
         if (!it.second.requires_manual_copy())
             continue;
@@ -470,11 +470,11 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             Obj local_obj = local_list.get_obj();
             Obj remote_obj = remote_list.get_obj();
             InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
-                                                     embedded_object_tracker);
+                                                     &embedded_object_tracker);
             m_logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
                            local_list.size());
             value_converter.copy_value(local_obj, remote_obj, nullptr);
-            embedded_object_tracker->process_pending();
+            embedded_object_tracker.process_pending();
         });
         if (!did_translate) {
             // object no longer exists in the local state, ignore and continue
@@ -483,7 +483,7 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
                           path_str);
         }
     }
-    embedded_object_tracker->process_pending();
+    embedded_object_tracker.process_pending();
     m_lists.clear();
 }
 
@@ -521,8 +521,7 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
                 REALM_UNREACHABLE();
             }
         }
-        else {
-            REALM_ASSERT(col.is_dictionary());
+        else if (col.is_dictionary()) {
             ++it;
             REALM_ASSERT(it != path.end());
             REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
@@ -537,6 +536,15 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
             else {
                 return false;
             }
+        }
+        else { // single link to embedded object
+            // Neither embedded object sets nor Mixed(TypedLink) to embedded objects are supported.
+            REALM_ASSERT_EX(!col.is_collection(), col);
+            REALM_ASSERT_EX(col.get_type() == col_type_Link, col);
+            StringData col_name = remote_obj.get_table()->get_column_name(col);
+            remote_obj = remote_obj.get_linked_object(col);
+            local_obj = local_obj.get_linked_object(col_name);
+            ++it;
         }
     }
     return false;

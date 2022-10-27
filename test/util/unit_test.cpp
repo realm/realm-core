@@ -478,10 +478,15 @@ class TestList::ThreadContextImpl : public ThreadContext {
 public:
     IntraTestLogger intra_test_logger;
     SharedContextImpl& shared_context;
+
+    // Each instance of this type is only used on one thread spawned by the
+    // test runner, but the tests themselves may spawn additional threads that
+    // perform checks, so it still needs to be somewhat thread-safe.
     Mutex mutex;
     std::atomic<long long> num_checks;
     long long num_failed_checks;
     long num_failed_tests;
+    std::atomic<long> last_line_seen;
     bool errors_seen;
 
     ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger)
@@ -503,6 +508,7 @@ private:
         num_checks = 0;
         num_failed_checks = 0;
         num_failed_tests = 0;
+        last_line_seen = 0;
     }
 };
 
@@ -745,6 +751,7 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
     shared_context.reporter.begin(test_context);
     lock.unlock();
 
+    last_line_seen = test.details.line_number;
     errors_seen = false;
     Timer timer;
     try {
@@ -752,11 +759,11 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
     }
     catch (std::exception& ex) {
         std::string message = "Unhandled exception " + get_type_name(ex) + ": " + ex.what();
-        test_context.test_failed(message);
+        test_context.test_failed(
+            util::format("Unhandled exception after line %1 %2: %3", last_line_seen, get_type_name(ex), ex.what()));
     }
     catch (...) {
-        std::string message = "Unhandled exception of unknown type";
-        test_context.test_failed(message);
+        test_context.test_failed(util::format("Unhandled exception after line %1 of unknown type", last_line_seen));
     }
     double elapsed_time = timer.get_elapsed_time();
     if (errors_seen)
@@ -795,9 +802,10 @@ TestContext::TestContext(TestList::ThreadContextImpl& tc, const TestDetails& td,
 }
 
 
-void TestContext::check_succeeded()
+void TestContext::check_succeeded(long line)
 {
     ++m_thread_context.num_checks;
+    m_thread_context.last_line_seen.store(line, std::memory_order_relaxed);
 }
 
 
@@ -813,6 +821,7 @@ REALM_NORETURN void TestContext::abort()
 
 void TestContext::check_failed(const char* file, long line, const std::string& message)
 {
+    m_thread_context.last_line_seen = line;
     {
         LockGuard lock(m_thread_context.mutex);
         ++m_thread_context.num_checks;
@@ -908,6 +917,14 @@ void TestContext::throw_any_failed(const char* file, long line, const char* expr
     out << "CHECK_THROW_ANY(" << expr_text << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
+
+bool TestContext::check_string_contains(std::string_view a, std::string_view b, const char* file, long line,
+                                        const char* a_text, const char* b_text)
+{
+    bool cond = a.find(b) != a.npos;
+    return check_compare(cond, a, b, file, line, "CHECK_STRING_CONTAINS", a_text, b_text);
+}
+
 
 namespace {
 std::locale locale_classic = std::locale::classic();

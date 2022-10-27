@@ -174,7 +174,7 @@ public:
 
     const char* get_encryption_key() const noexcept
     {
-        return m_key;
+        return m_alloc.m_file.get_encryption_key();
     }
 
 #ifdef REALM_DEBUG
@@ -240,7 +240,6 @@ public:
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
-
     /// Transactions are obtained from one of the following 3 methods:
     TransactionRef start_read(VersionID = VersionID()) REQUIRES(!m_mutex);
     TransactionRef start_frozen(VersionID = VersionID()) REQUIRES(!m_mutex);
@@ -271,6 +270,13 @@ public:
         transact_Writing,
         transact_Frozen,
     };
+
+    enum class EvacStage { idle, evacuating, waiting, blocked };
+
+    EvacStage get_evacuation_stage() const
+    {
+        return m_evac_stage;
+    }
 
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
@@ -451,7 +457,7 @@ private:
     class ReadLockGuard;
 
     // Member variables
-    util::CheckedMutex m_mutex;
+    mutable util::CheckedMutex m_mutex;
     int m_transaction_count GUARDED_BY(m_mutex) = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
@@ -462,12 +468,12 @@ private:
     size_t m_used_space GUARDED_BY(m_mutex) = 0;
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
     std::optional<ReadLockInfo> m_last_encryption_page_reader;
+    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
-    const char* m_key;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;

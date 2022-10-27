@@ -988,7 +988,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
-            cfg.encryption_key = m_key;
+            cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -1132,7 +1132,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                                                     path);
                 }
 
-                if (m_key) {
+                if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
@@ -1261,7 +1261,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
-    if (m_key && !m_fake_read_lock_if_immutable) {
+    if (options.encryption_key && !m_fake_read_lock_if_immutable) {
         m_page_refresher = std::make_unique<PageRefresher>(*this);
     }
     m_alloc.set_read_only(true);
@@ -1357,7 +1357,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     SharedInfo* info = m_file_map.get_addr();
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
@@ -1511,7 +1511,7 @@ void DB::release_all_read_locks() noexcept
 // caller must hold DB::m_mutex
 void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 {
-    if (m_key) {
+    if (get_encryption_key()) {
         version_type from;
         {
             if (!m_last_encryption_page_reader) {
@@ -2312,6 +2312,14 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
+
+    if (auto limit = out.get_evacuation_limit()) {
+        // Get a work limit based on the size of the transaction we're about to commit
+        // Assume at least 4K on top of that for the top arrays
+        size_t work_limit = 4 * 1024 + m_alloc.get_commit_size() / 2;
+        transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
+    }
+
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2324,7 +2332,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         CheckedLockGuard lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
-        m_used_space = out.get_file_size() - m_free_space;
+        m_used_space = out.get_logical_size() - m_free_space;
+        m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
@@ -2342,7 +2351,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                 // mode the file on disk may very likely be in an invalid state.
                 break;
         }
-        size_t new_file_size = out.get_file_size();
+        size_t new_file_size = out.get_logical_size();
         // We must reset the allocators free space tracking before communicating the new
         // version through the ring buffer. If not, a reader may start updating the allocators
         // mappings while the allocator is in dirty state.
@@ -2548,8 +2557,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 }
 
 inline DB::DB(const DBOptions& options)
-    : m_key(options.encryption_key)
-    , m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);

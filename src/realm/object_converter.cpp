@@ -280,35 +280,33 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
 // If an embedded object is encountered, add it to a list of embedded objects to process.
 // This relies on the property that embedded objects only have one incoming link
 // otherwise there could be an infinite loop while discovering embedded objects.
-void EmbeddedObjectConverter::track(Obj e_src, Obj e_dst)
+void EmbeddedObjectConverter::track(const Obj& e_src, const Obj& e_dst)
 {
     embedded_pending.push_back({e_src, e_dst});
 }
 
 void EmbeddedObjectConverter::process_pending()
 {
-    // Conceptually this is a map, but doing a linear search through a vector is known
-    // to be faster for small number of elements. Since the number of tables expected
-    // to be processed here is assumed to be small < 20, use linear search instead of
-    // hashing. N is the depth to which embedded objects are connected and the upper
-    // bound is the total number of tables which is finite, and is usually small.
     util::FlatMap<TableKey, InterRealmObjectConverter> converters;
 
     while (!embedded_pending.empty()) {
         EmbeddedToCheck pending = embedded_pending.back();
         embedded_pending.pop_back();
-        TableRef src_table = pending.embedded_in_src.get_table();
+
         TableRef dst_table = pending.embedded_in_dst.get_table();
         TableKey dst_table_key = dst_table->get_key();
-        auto it_with_did_insert =
-            converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, shared_from_this()}});
-        InterRealmObjectConverter& converter = it_with_did_insert.first->second;
+        auto it = converters.find(dst_table_key);
+        if (it == converters.end()) {
+            TableRef src_table = pending.embedded_in_src.get_table();
+            it = converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, this}}).first;
+        }
+        InterRealmObjectConverter& converter = it->second;
         converter.copy(pending.embedded_in_src, pending.embedded_in_dst, nullptr);
     }
 }
 
 InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table,
-                                                   ColKey dst_col, std::shared_ptr<EmbeddedObjectConverter> ec)
+                                                   ColKey dst_col, EmbeddedObjectConverter* ec)
     : m_src_table(src_table)
     , m_dst_table(dst_table)
     , m_src_col(src_col)
@@ -329,7 +327,7 @@ InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColK
     }
 }
 
-void InterRealmValueConverter::track_new_embedded(Obj src, Obj dst)
+void InterRealmValueConverter::track_new_embedded(const Obj& src, const Obj& dst)
 {
     m_embedded_converter->track(src, dst);
 }
@@ -367,17 +365,17 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
         }
         else {
             Obj dst_link;
-            if (m_opposite_of_src->get_primary_key_column()) {
-                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+            if (m_opposite_of_dst == m_opposite_of_src) {
+                // if this is the same Realm, we can use the ObjKey
+                dst_link = m_opposite_of_dst->get_object(src_link_key);
             }
             else {
-                if (m_opposite_of_dst == m_opposite_of_src) {
-                    // if this is the same Realm, we can use the ObjKey
-                    dst_link = m_opposite_of_dst->get_object(src_link_key);
+                // in different Realms we create a new object
+                if (m_opposite_of_src->get_primary_key_column()) {
+                    Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+                    dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
                 }
                 else {
-                    // in different Realms we create a new object
                     dst_link = m_opposite_of_dst->create_object();
                 }
             }
@@ -432,22 +430,9 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
 }
 
 InterRealmObjectConverter::InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst,
-                                                     std::shared_ptr<EmbeddedObjectConverter> embedded_tracker)
+                                                     EmbeddedObjectConverter* embedded_tracker)
     : m_embedded_tracker(embedded_tracker)
 {
-    populate_columns_from_table(table_src, table_dst);
-}
-
-void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
-{
-    for (auto& column : m_columns_cache) {
-        column.copy_value(src, dst, update_out);
-    }
-}
-
-void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_src, ConstTableRef table_dst)
-{
-    m_columns_cache.clear();
     m_columns_cache.reserve(table_src->get_column_count());
     ColKey pk_col = table_src->get_primary_key_column();
     for (ColKey col_key_src : table_src->get_column_keys()) {
@@ -456,8 +441,14 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
         StringData col_name = table_src->get_column_name(col_key_src);
         ColKey col_key_dst = table_dst->get_column_key(col_name);
         REALM_ASSERT(col_key_dst);
-        m_columns_cache.emplace_back(
-            InterRealmValueConverter(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker));
+        m_columns_cache.emplace_back(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker);
+    }
+}
+
+void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
+{
+    for (auto& column : m_columns_cache) {
+        column.copy_value(src, dst, update_out);
     }
 }
 

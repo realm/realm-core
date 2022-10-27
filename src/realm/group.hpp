@@ -283,17 +283,19 @@ public:
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
-        REALM_ASSERT(table_name.begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len)));
-        return table_name.substr(g_class_name_prefix_len);
+        if (table_name.begins_with(g_class_name_prefix)) {
+            return table_name.substr(g_class_name_prefix.size());
+        }
+        return table_name;
     }
 
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
-        char* p = std::copy_n(g_class_name_prefix, g_class_name_prefix_len, buffer.data());
-        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix_len);
+        char* p = std::copy_n(g_class_name_prefix.data(), g_class_name_prefix.size(), buffer.data());
+        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix.size());
         std::copy_n(class_name.data(), len, p);
-        return StringData(buffer.data(), g_class_name_prefix_len + len);
+        return StringData(buffer.data(), g_class_name_prefix.size() + len);
     }
 
     TableRef get_table(TableKey key);
@@ -526,14 +528,28 @@ public:
 #endif
 
 protected:
+    static constexpr size_t s_table_name_ndx = 0;
+    static constexpr size_t s_table_refs_ndx = 1;
+    static constexpr size_t s_file_size_ndx = 2;
+    static constexpr size_t s_free_pos_ndx = 3;
+    static constexpr size_t s_free_size_ndx = 4;
+    static constexpr size_t s_free_version_ndx = 5;
+    static constexpr size_t s_version_ndx = 6;
+    static constexpr size_t s_hist_type_ndx = 7;
+    static constexpr size_t s_hist_ref_ndx = 8;
+    static constexpr size_t s_hist_version_ndx = 9;
+    static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_evacuation_point_ndx = 11;
+
+    static constexpr size_t s_group_max_size = 12;
+
     virtual Replication* const* get_repl() const
     {
         return &Table::g_dummy_replication;
     }
 
 private:
-    static constexpr char g_class_name_prefix[] = "class_";
-    static constexpr size_t g_class_name_prefix_len = 6;
+    static constexpr StringData g_class_name_prefix = "class_";
 
     struct ToDeleteRef {
         ToDeleteRef(TableKey tk, ObjKey k)
@@ -572,6 +588,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Evacuation point     (optional)            22
     ///
     /// </pre>
     ///
@@ -613,20 +630,6 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
-
-    static constexpr size_t s_table_name_ndx = 0;
-    static constexpr size_t s_table_refs_ndx = 1;
-    static constexpr size_t s_file_size_ndx = 2;
-    static constexpr size_t s_free_pos_ndx = 3;
-    static constexpr size_t s_free_size_ndx = 4;
-    static constexpr size_t s_free_version_ndx = 5;
-    static constexpr size_t s_version_ndx = 6;
-    static constexpr size_t s_hist_type_ndx = 7;
-    static constexpr size_t s_hist_ref_ndx = 8;
-    static constexpr size_t s_hist_version_ndx = 9;
-    static constexpr size_t s_sync_file_id_ndx = 10;
-
-    static constexpr size_t s_group_max_size = 11;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -931,7 +934,7 @@ inline StringData Group::get_table_name(TableKey key) const
 
 inline bool Group::table_is_public(TableKey key) const
 {
-    return get_table_name(key).begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len));
+    return get_table_name(key).begins_with(g_class_name_prefix);
 }
 
 inline bool Group::has_table(StringData name) const noexcept

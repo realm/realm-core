@@ -199,7 +199,7 @@ struct SyncProgress {
 
 struct CompensatingWriteErrorInfo {
     std::string object_name;
-    Mixed primary_key;
+    OwnedMixed primary_key;
     std::string reason;
 };
 

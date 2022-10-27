@@ -27,6 +27,7 @@
 
 #include <realm/alloc_slab.hpp>
 #include <realm/array.hpp>
+#include <realm/group.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
 
@@ -320,6 +321,9 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
 {
     GROUP_TEST_PATH(path);
 
+    // Write a minimal file in streaming form so that it'll try to map the footer
+    Group().write(path);
+
     SlabAlloc::Config cfg;
     SlabAlloc alloc;
 
@@ -463,7 +467,7 @@ TEST(Alloc_ToAndFromRef)
 
 TEST(Alloc_EncryptionPageRefresher)
 {
-    constexpr size_t top_array_size = 11;         // s_group_max_size
+    constexpr size_t top_array_size = 12;         // s_group_max_size
     constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
     constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
     constexpr size_t total_size = 50;

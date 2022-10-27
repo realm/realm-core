@@ -119,6 +119,12 @@ void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFile
         do_encryption_read_barrier(addr, size, header_to_size, mapping, to_modify);
 }
 
+void inline encryption_read_barrier_for_write(const void* addr, size_t size, EncryptedFileMapping* mapping)
+{
+    if (REALM_UNLIKELY(mapping))
+        do_encryption_read_barrier(addr, size, nullptr, mapping, true);
+}
+
 void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
 {
     if (REALM_UNLIKELY(mapping))
@@ -149,34 +155,38 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
 
 #else
 
-void inline set_page_reclaim_governor(PageReclaimGovernor*) {}
 
 size_t inline get_num_decrypted_pages()
 {
     return 0;
 }
 
+void inline set_page_reclaim_governor(PageReclaimGovernor*) {}
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr) {}
-
+void inline encryption_read_barrier_for_write(const void*, size_t, EncryptedFileMapping*) {}
 void inline encryption_write_barrier(const void*, size_t) {}
-
 void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*) {}
+void inline do_encryption_read_barrier(const void*, size_t, HeaderToSize, EncryptedFileMapping*, bool) {}
+void inline do_encryption_write_barrier(const void*, size_t, EncryptedFileMapping*) {}
 
 #endif
 
 // helpers for encrypted Maps
 template <typename T>
-void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1, bool to_modify = false)
+void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
-    T* addr = map.get_addr();
-    encryption_read_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping(), nullptr, to_modify);
+    if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {
+        do_encryption_read_barrier(map.get_addr() + index, sizeof(T) * num_elements, nullptr, mapping,
+                                   map.is_writeable());
+    }
 }
 
 template <typename T>
 void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
-    T* addr = map.get_addr();
-    encryption_write_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping());
+    if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {
+        do_encryption_write_barrier(map.get_addr() + index, sizeof(T) * num_elements, mapping);
+    }
 }
 void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end);
 

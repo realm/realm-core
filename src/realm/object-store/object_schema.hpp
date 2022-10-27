@@ -93,18 +93,7 @@ private:
     void set_primary_key_property() noexcept;
 };
 
-inline std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
-{
-    switch (table_type) {
-        case ObjectSchema::ObjectType::TopLevel:
-            return o << "TopLevel";
-        case ObjectSchema::ObjectType::Embedded:
-            return o << "Embedded";
-        case ObjectSchema::ObjectType::TopLevelAsymmetric:
-            return o << "TopLevelAsymmetric";
-    }
-    return o << "Invalid table type: " << uint8_t(table_type);
-}
+std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type);
 
 } // namespace realm
 

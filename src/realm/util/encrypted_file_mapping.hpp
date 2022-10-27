@@ -29,8 +29,7 @@ typedef size_t (*Header_to_size)(const char* addr);
 
 #include <vector>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 struct SharedFileInfo;
 class EncryptedFileMapping;
@@ -150,7 +149,7 @@ private:
 
     void mark_outdated(size_t local_page_ndx) noexcept;
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
-    void refresh_page(size_t local_page_ndx);
+    void refresh_page(size_t local_page_ndx, bool allow_missing);
     void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
@@ -174,15 +173,11 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
     return page_in_file >= m_first_page && page_in_file - m_first_page < m_page_state.size();
 }
 
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
 
-namespace realm {
-namespace util {
-
+namespace realm::util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
 struct DecryptionFailed : util::File::AccessError {
@@ -191,7 +186,6 @@ struct DecryptionFailed : util::File::AccessError {
     {
     }
 };
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

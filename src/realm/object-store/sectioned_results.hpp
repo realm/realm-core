@@ -172,7 +172,7 @@ private:
     SectionedResults(Results&& results, std::map<Mixed, Section>&& sections,
                      std::map<size_t, Mixed>&& current_section_index_to_key_lookup,
                      std::list<std::string>&& current_str_buffers)
-        : has_performed_initial_evalutation(true)
+        : m_has_performed_initial_evalutation(true)
         , m_results(std::move(results))
         , m_sections(std::move(sections))
         , m_current_section_index_to_key_lookup(std::move(current_section_index_to_key_lookup))
@@ -185,7 +185,7 @@ private:
     SectionedResults copy(Results&&) REQUIRES(!m_mutex);
     void calculate_sections_if_required() REQUIRES(m_mutex);
     void calculate_sections() REQUIRES(m_mutex);
-    bool has_performed_initial_evalutation = false;
+    bool m_has_performed_initial_evalutation = false;
     NotificationToken add_notification_callback_for_section(Mixed section_key,
                                                             SectionedResultsNotificatonCallback callback,
                                                             KeyPathArray key_path_array = {});

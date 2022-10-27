@@ -53,9 +53,6 @@ Initialization initialization;
 
 } // anonymous namespace
 
-constexpr char Group::g_class_name_prefix[];
-constexpr size_t Group::g_class_name_prefix_len;
-
 Group::Group()
     : m_local_alloc(new SlabAlloc)
     , m_alloc(*m_local_alloc) // Throws
@@ -485,7 +482,8 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, util::O
         case 7:
         case 9:
         case 10:
-        case 11: {
+        case 11:
+        case 12: {
             ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
             ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
@@ -1587,18 +1585,11 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
 void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
 {
     REALM_ASSERT(m_file_format_version >= 7);
-    if (m_top.size() < s_group_max_size) {
-        REALM_ASSERT(m_top.size() <= s_hist_type_ndx);
-        while (m_top.size() < s_hist_type_ndx) {
-            m_top.add(0); // Throws
-        }
-        ref_type history_ref = 0;                                    // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
-        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
-        m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
+    while (m_top.size() < s_hist_type_ndx) {
+        m_top.add(0); // Throws
     }
-    else {
+
+    if (m_top.size() > s_hist_version_ndx) {
         int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
         int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         if (stored_history_type != Replication::hist_None) {
@@ -1607,6 +1598,21 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         }
         m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
         m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    else {
+        // No history yet
+        REALM_ASSERT(m_top.size() == s_hist_type_ndx);
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
+        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+
+    if (m_top.size() > s_sync_file_id_ndx) {
+        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(file_ident));
+    }
+    else {
+        m_top.add(RefOrTagged::make_tagged(file_ident)); // Throws
     }
 }
 
@@ -1789,8 +1795,7 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
-                            m_top.size() == 11,
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() >= 10,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
         Array pos(alloc), len(alloc), ver(alloc);

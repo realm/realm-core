@@ -20,12 +20,12 @@
 #ifdef TEST_SHARED
 
 #include <condition_variable>
-#include <streambuf>
 #include <fstream>
-#include <tuple>
 #include <iostream>
-#include <fstream>
+#include <memory>
+#include <streambuf>
 #include <thread>
+#include <tuple>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -41,15 +41,15 @@
 #endif
 
 #include <realm.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/features.h>
-#include <realm/util/safe_int_ops.hpp>
-#include <memory>
-#include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm/impl/copy_replication.hpp>
+#include <realm/impl/simulated_failure.hpp>
 
 #include "fuzz_group.hpp"
 
@@ -59,7 +59,6 @@
 
 extern unsigned int unit_test_random_seed;
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -1592,7 +1591,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.get_or_add_table("alpha");
+            wt.get_or_add_table("alpha");
             _Exit(42); // Die hard with an active write transaction
         }
         else {
@@ -2199,11 +2198,8 @@ TEST(Shared_EncryptionKeyCheck)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
-    CHECK_THROW_EX(DB::create(path, false, DBOptions()), std::runtime_error,
-                   std::string(e.what()).find("Realm file initial open failed: Invalid mnemonic") !=
-                       std::string::npos);
-
-    CHECK_NOTHROW(DB::create(path, false, DBOptions(crypt_key(true))));
+    CHECK_THROW(DB::create(path, false, DBOptions()), InvalidDatabase);
+    DBRef sg3 = DB::create(path, false, DBOptions(crypt_key(true)));
 }
 
 // opposite - if opened unencrypted, attempt to share it encrypted
@@ -2212,15 +2208,13 @@ TEST(Shared_EncryptionKeyCheck_2)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions());
-
-    CHECK_THROW_EX(DB::create(path, false, DBOptions(crypt_key(true))), std::runtime_error,
-                   std::string(e.what()) == "Attempt to open unencrypted file with encryption key");
+    CHECK_THROW(DB::create(path, false, DBOptions(crypt_key(true))), InvalidDatabase);
     DBRef sg3 = DB::create(path, false, DBOptions());
     CHECK(sg3);
 }
 
 // if opened by one key, it cannot be opened by a different key
-NONCONCURRENT_TEST_IF(Shared_EncryptionKeyCheck_3, testing_supports_fork)
+TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
@@ -2228,20 +2222,8 @@ NONCONCURRENT_TEST_IF(Shared_EncryptionKeyCheck_3, testing_supports_fork)
     memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     DBRef sg = DB::create(path, false, DBOptions(first_key));
-
-    int pid = test_util::fork_and_update_mappings();
-
-    if (pid == 0) {
-        CHECK_THROW_EX(DB::create(path, false, DBOptions(second_key)), std::runtime_error,
-                       std::string(e.what()).find("Realm file initial open failed: Invalid mnemonic") !=
-                           std::string::npos);
-        DBRef sg3 = DB::create(path, false, DBOptions(first_key));
-        CHECK(sg3);
-        exit(0);
-    }
-    else {
-        test_util::waitpid_checked(pid, 0, "opening db with different key");
-    }
+    CHECK_THROW(DB::create(path, false, DBOptions(second_key)), InvalidDatabase);
+    DBRef sg3 = DB::create(path, false, DBOptions(first_key));
 }
 
 #endif // REALM_ENABLE_ENCRYPTION

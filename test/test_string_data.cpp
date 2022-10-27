@@ -261,7 +261,6 @@ TEST(StringData_Like)
     StringData empty("");
     StringData f("f");
     StringData foo("foo");
-    StringData bar("bar");
     StringData foobar("foobar");
     StringData foofoo("foofoo");
     StringData foobarfoo("foobarfoo");
@@ -319,7 +318,6 @@ TEST(StringData_Like_CaseInsensitive)
     StringData empty("");
     StringData f("f");
     StringData foo("FoO");
-    StringData bar("bAr");
     StringData foobar("FOOBAR");
     StringData foofoo("FOOfoo");
     StringData foobarfoo("FoObArFoO");

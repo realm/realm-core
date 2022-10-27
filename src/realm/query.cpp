@@ -1652,9 +1652,9 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
     return std::move(m_ordering);
 }
 
-std::string Query::get_description(const std::string& class_prefix) const
+std::string Query::get_description() const
 {
-    util::serializer::SerialisationState state(class_prefix, m_table->get_parent_group());
+    util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }
 
