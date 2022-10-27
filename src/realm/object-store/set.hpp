@@ -105,13 +105,6 @@ public:
 
     bool operator==(const Set& rhs) const noexcept;
 
-    struct InvalidEmbeddedOperationException : std::logic_error {
-        InvalidEmbeddedOperationException()
-            : std::logic_error("Cannot add an embedded object to a Set.")
-        {
-        }
-    };
-
 private:
     const char* type_name() const noexcept override
     {
