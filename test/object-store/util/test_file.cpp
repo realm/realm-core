@@ -175,7 +175,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
 #endif
 
                    sync::Server::Config config;
-                   config.logger = m_logger.get();
+                   config.logger = m_logger;
                    config.token_expiration_clock = this;
                    config.listen_address = "127.0.0.1";
                    config.disable_sync_to_disk = true;

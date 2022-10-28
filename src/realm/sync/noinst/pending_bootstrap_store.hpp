@@ -46,7 +46,7 @@ public:
     // session they occured in, this will drop/clear all data when the bootstrap store is constructed.
     //
     // Underneath this creates a table which stores each download message's changesets.
-    explicit PendingBootstrapStore(DBRef db, util::Logger* logger);
+    explicit PendingBootstrapStore(DBRef db, const std::shared_ptr<util::Logger>& logger);
 
     PendingBootstrapStore(const PendingBootstrapStore&) = delete;
     PendingBootstrapStore& operator=(const PendingBootstrapStore&) = delete;
@@ -79,7 +79,7 @@ public:
 
 private:
     DBRef m_db;
-    util::Logger* m_logger;
+    std::shared_ptr<util::Logger> m_logger;
     _impl::ClientProtocol m_client_protocol;
 
     TableKey m_cursor_table;

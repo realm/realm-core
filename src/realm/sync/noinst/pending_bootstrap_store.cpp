@@ -60,10 +60,11 @@ constexpr static std::string_view c_progress_latest_server_version_salt("latest_
 
 } // namespace
 
-PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger* logger)
+PendingBootstrapStore::PendingBootstrapStore(DBRef db, const std::shared_ptr<util::Logger>& logger)
     : m_db(std::move(db))
     , m_logger(logger)
 {
+    REALM_ASSERT(m_logger);
     std::vector<SyncMetadataTable> internal_tables{
         {&m_table,
          c_pending_bootstrap_table,

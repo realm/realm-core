@@ -191,12 +191,14 @@ private:
 class ThreadSafeLogger : private Logger::LevelThreshold, public Logger {
 public:
     explicit ThreadSafeLogger(Logger& base_logger, Level = Level::info);
+    explicit ThreadSafeLogger(const std::shared_ptr<util::Logger>& base_logger, Level = Level::info);
 
 protected:
     void do_log(Level, const std::string&) override final;
 
 private:
     const Level m_level_threshold; // Immutable for thread safety
+    std::shared_ptr<util::Logger> m_base_logger_ptr;
     Logger& m_base_logger;
     Mutex m_mutex;
     Level get() const noexcept override final;
@@ -208,6 +210,7 @@ private:
 /// thread-safe if, and only if the base logger is thread-safe.
 class PrefixLogger : public Logger {
 public:
+    PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept;
     PrefixLogger(std::string prefix, Logger& base_logger) noexcept;
 
 protected:
@@ -215,6 +218,7 @@ protected:
 
 private:
     const std::string m_prefix;
+    std::shared_ptr<Logger> m_base_logger_ptr;
     Logger& m_base_logger;
 };
 
@@ -445,6 +449,16 @@ inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger, Level threshold)
 {
 }
 
+inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<util::Logger>& base_logger, Level threshold)
+    : Logger::LevelThreshold()
+    , Logger(static_cast<Logger::LevelThreshold&>(*this))
+    , m_level_threshold(threshold)
+    , m_base_logger_ptr(base_logger)
+    , m_base_logger(*m_base_logger_ptr)
+
+{
+}
+
 inline Logger::Level ThreadSafeLogger::get() const noexcept
 {
     return m_level_threshold;
@@ -454,6 +468,14 @@ inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexc
     : Logger(base_logger.level_threshold)
     , m_prefix(std::move(prefix))
     , m_base_logger(base_logger)
+{
+}
+
+inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept
+    : Logger(base_logger->level_threshold)
+    , m_prefix(std::move(prefix))
+    , m_base_logger_ptr(base_logger)
+    , m_base_logger(*m_base_logger_ptr)
 {
 }
 

@@ -29,7 +29,7 @@ public:
     /// The specified history context will not be accessed on behalf of this
     /// cache object before the first invocation of Slot::access() on an
     /// associated file file slot.
-    ServerFileAccessCache(long max_open_files, util::Logger&, ServerHistory::Context&,
+    ServerFileAccessCache(long max_open_files, const std::shared_ptr<util::Logger>&, ServerHistory::Context&,
                           util::Optional<std::array<char, 64>> encryption_key);
 
     ~ServerFileAccessCache() noexcept;
@@ -49,7 +49,7 @@ private:
 
     const long m_max_open_files;
     const util::Optional<std::array<char, 64>> m_encryption_key;
-    util::Logger& m_logger;
+    std::shared_ptr<util::Logger> m_logger;
     ServerHistory::Context& m_history_context;
 
     void access(Slot&);
@@ -128,7 +128,7 @@ private:
 
 // Implementation
 
-inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
+inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, const std::shared_ptr<util::Logger>& logger,
                                                     ServerHistory::Context& history_context,
                                                     util::Optional<std::array<char, 64>> encryption_key)
     : m_max_open_files{max_open_files}

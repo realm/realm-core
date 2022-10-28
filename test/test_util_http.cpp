@@ -119,7 +119,6 @@ TEST(HTTP_ParseAuthorization)
 
 TEST(HTTP_RequestResponse)
 {
-    util::Logger& logger = test_context.logger;
     network::Service server;
     network::Acceptor acceptor{server};
     network::Endpoint ep;
@@ -133,7 +132,7 @@ TEST(HTTP_RequestResponse)
 
     std::thread server_thread{[&] {
         BufferedSocket c(server);
-        HTTPServer<BufferedSocket> http(c, logger);
+        HTTPServer<BufferedSocket> http(c, test_context.logger);
         acceptor.async_accept(c, [&](std::error_code ec) {
             CHECK(!ec);
             http.async_receive_request([&](HTTPRequest req, std::error_code ec) {
@@ -157,7 +156,7 @@ TEST(HTTP_RequestResponse)
     {
         network::Service client;
         BufferedSocket c(client);
-        HTTPClient<BufferedSocket> http(c, logger);
+        HTTPClient<BufferedSocket> http(c, test_context.logger);
         c.async_connect(ep, [&](std::error_code ec) {
             CHECK(!ec);
             HTTPRequest req;
@@ -265,7 +264,7 @@ TEST(HTTPParser_RequestLine)
 
 TEST(HTTPParser_ResponseLine)
 {
-    util::Logger& logger = test_context.logger;
+    auto& logger = *(test_context.logger);
     HTTPStatus s;
     struct expect_t {
         bool success;
@@ -314,7 +313,7 @@ struct FakeHTTPParser : HTTPParserBase {
     StringData body;
     std::error_code error;
 
-    FakeHTTPParser(util::Logger& logger)
+    FakeHTTPParser(const std::shared_ptr<util::Logger>& logger)
         : HTTPParserBase{logger}
     {
     }
@@ -340,8 +339,7 @@ struct FakeHTTPParser : HTTPParserBase {
 
 TEST(HTTPParser_ParseHeaderLine)
 {
-    util::Logger& logger = test_context.logger;
-    FakeHTTPParser p{logger};
+    FakeHTTPParser p{test_context.logger};
 
     struct expect {
         bool success;

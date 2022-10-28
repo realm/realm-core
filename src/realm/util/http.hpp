@@ -198,7 +198,7 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> logger;
 
     // FIXME: Generally useful?
     struct CallocDeleter {
@@ -208,7 +208,7 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& logger_2)
+    HTTPParserBase(const std::shared_ptr<util::Logger>& logger_2)
         : logger{logger_2}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
@@ -257,7 +257,7 @@ struct HTTPParserBase {
 
 template <class Socket>
 struct HTTPParser : protected HTTPParserBase {
-    explicit HTTPParser(Socket& socket, util::Logger& logger)
+    explicit HTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger)
         : HTTPParserBase(logger)
         , m_socket(socket)
     {
@@ -348,7 +348,7 @@ template <class Socket>
 struct HTTPClient : protected HTTPParser<Socket> {
     using Handler = void(HTTPResponse, std::error_code);
 
-    explicit HTTPClient(Socket& socket, util::Logger& logger)
+    explicit HTTPClient(Socket& socket, const std::shared_ptr<util::Logger>& logger)
         : HTTPParser<Socket>(socket, logger)
     {
     }
@@ -397,7 +397,7 @@ private:
     {
         HTTPStatus status;
         StringData reason;
-        if (this->parse_first_line_of_response(line, status, reason, this->logger)) {
+        if (this->parse_first_line_of_response(line, status, reason, *(this->logger))) {
             m_response.status = status;
             m_response.reason = reason;
             return std::error_code{};
@@ -431,7 +431,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
     using RequestHandler = void(HTTPRequest, std::error_code);
     using RespondHandler = void(std::error_code);
 
-    explicit HTTPServer(Socket& socket, util::Logger& logger)
+    explicit HTTPServer(Socket& socket, const std::shared_ptr<util::Logger>& logger)
         : HTTPParser<Socket>(socket, logger)
     {
     }

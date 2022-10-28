@@ -1666,12 +1666,10 @@ TEST(Sync_HTTP404NotFound)
 {
     TEST_DIR(server_dir);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -1689,7 +1687,7 @@ TEST(Sync_HTTP404NotFound)
     util::HTTPRequest request;
     request.path = "/not-found";
 
-    HTTPRequestClient client(logger, endpoint, request);
+    HTTPRequestClient client(test_context.logger, endpoint, request);
     client.fetch_response();
 
     server.stop();
@@ -1772,12 +1770,10 @@ TEST(Sync_HTTP_ContentLength)
 {
     TEST_DIR(server_dir);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);;
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -2331,9 +2327,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = test_context.logger;
-
-    logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
+    test_context.logger->info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
                 number_of_transactions);
 
     TEST_DIR(server_dir);
@@ -2381,7 +2375,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
         if (i % 1000 == 0) {
             auto duration =
                 std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
-            logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
+            test_context.logger->info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
 }
@@ -2394,9 +2388,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = test_context.logger;
-
-    logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
+    test_context.logger->info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
                 number_of_transactions);
 
     TEST_DIR(server_dir);
@@ -2446,7 +2438,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
         if (i % 1000 == 0) {
             auto duration =
                 std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
-            logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
+            test_context.logger->info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
 }
@@ -3127,10 +3119,10 @@ TEST(Sync_UploadDownloadProgress_1)
         std::mutex mutex;
         std::condition_variable cond_var;
 
-        util::Logger& logger = test_context.logger;
-        util::PrefixLogger client_logger("Client: ", logger);
+        std::shared_ptr<util::Logger> logger = test_context.logger;
+        auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", logger);
         Client::Config config;
-        config.logger = &client_logger;
+        config.logger = client_logger;
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
 
@@ -3376,14 +3368,10 @@ TEST(Sync_UploadDownloadProgress_3)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    util::PrefixLogger client_logger("Client: ", logger);
-
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);;
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -3405,7 +3393,7 @@ TEST(Sync_UploadDownloadProgress_3)
     }
 
     Client::Config client_config;
-    client_config.logger = &client_logger;
+    client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);;
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
 
@@ -3687,12 +3675,8 @@ TEST(Sync_UploadDownloadProgress_6)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    util::PrefixLogger client_logger("Client: ", logger);
-
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);;
     server_config.listen_address = "localhost";
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -3709,7 +3693,7 @@ TEST(Sync_UploadDownloadProgress_6)
     });
 
     Client::Config client_config;
-    client_config.logger = &client_logger;
+    client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     Client client(client_config);
@@ -3769,7 +3753,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
 
     TEST_CLIENT_DB(db);
     Client::Config config;
-    config.logger = &test_context.logger;
+    config.logger = test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
     Client client{config};
     Session session_1{client, db, nullptr};
@@ -5034,7 +5018,7 @@ TEST(Sync_ServerSideModify_Randomize)
 
     ReadTransaction rt_1{db_1};
     ReadTransaction rt_2{db_2};
-    CHECK(compare_groups(rt_1, rt_2, test_context.logger));
+    CHECK(compare_groups(rt_1, rt_2, *(test_context.logger)));
 }
 
 
@@ -5061,12 +5045,11 @@ TEST_IF(Sync_SSL_Certificates, false)
 
     size_t num_servers = sizeof(server_address) / sizeof(server_address[0]);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger client_logger("Client: ", logger);
+    util::PrefixLogger client_logger("Client: ", test_context.logger);
 
     for (size_t i = 0; i < num_servers; ++i) {
         Client::Config client_config;
-        client_config.logger = &client_logger;
+        client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
         client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
 
@@ -5275,8 +5258,6 @@ TEST_IF(Sync_Issue2104, false)
 {
     TEST_DIR(dir);
 
-    util::Logger& logger = test_context.logger;
-
     // Save a snapshot of the server Realm file.
     std::string realm_path = "issue_2104_server.realm";
     std::string realm_path_copy = util::File::resolve("issue_2104.realm", dir);
@@ -5461,7 +5442,7 @@ TEST_IF(Sync_Issue2104, false)
     VersionInfo version_info;
     bool backup_whole_realm;
     _impl::ServerHistory::IntegrationResult result;
-    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result, logger);
+    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result, *(test_context.logger));
 }
 
 
@@ -6375,7 +6356,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
         realm::util::SimpleNoCopyInputStream changeset_stream(unparsed_changeset);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
-        logger.info("changeset at version %1: %2", last_version, parsed_changeset);
+        logger->info("changeset at version %1: %2", last_version, parsed_changeset);
         last_version_observed = last_version;
         return parsed_changeset;
     };

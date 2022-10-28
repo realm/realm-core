@@ -328,7 +328,7 @@ public:
         /// to util::Logger::Level::info. The log level threshold selected for a
         /// specified base logger will be ignored. The specified base logger
         /// does not have to be thread safe.
-        util::Logger* logger = nullptr;
+        std::shared_ptr<util::Logger> logger;
 
         /// The log level threshold to use for the intra test loggers
         /// (TestContext::logger).
@@ -483,7 +483,7 @@ public:
     /// use inside the associated unit test. The log level of this logger is
     /// specified via TestList::Config::intra_test_log_level. See also
     /// ThreadContext::report_logger.
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> logger;
 
     bool check_cond(bool cond, const char* file, long line, const char* macro_name, const char* cond_text);
 
@@ -578,13 +578,13 @@ public:
 
     /// The thread specific logger to be used by custom reporters. See also
     /// SharedContext::report_logger and TestContext::logger.
-    util::Logger& report_logger;
+    std::shared_ptr<util::Logger> report_logger;
 
     ThreadContext(const ThreadContext&) = delete;
     ThreadContext& operator=(const ThreadContext&) = delete;
 
 protected:
-    ThreadContext(SharedContext&, int thread_index, util::Logger&);
+    ThreadContext(SharedContext&, int thread_index, const std::shared_ptr<util::Logger>&);
 };
 
 
@@ -596,13 +596,13 @@ public:
 
     /// The thread non-specific logger to be used by custom reporters. See also
     /// ThreadContext::report_logger.
-    util::Logger& report_logger;
+    std::shared_ptr<util::Logger> report_logger;
 
     SharedContext(const SharedContext&) = delete;
     SharedContext& operator=(const SharedContext&) = delete;
 
 protected:
-    SharedContext(const TestList&, int num_recurrences, int num_threads, util::Logger&);
+    SharedContext(const TestList&, int num_recurrences, int num_threads, const std::shared_ptr<util::Logger>&);
 };
 
 
@@ -911,14 +911,14 @@ inline bool TestContext::check_definitely_greater(long double a, long double b, 
     return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER", a_text, b_text, eps_text);
 }
 
-inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& rl)
+inline ThreadContext::ThreadContext(SharedContext& sc, int ti, const std::shared_ptr<util::Logger>& rl)
     : shared_context(sc)
     , thread_index(ti)
     , report_logger(rl)
 {
 }
 
-inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& rl)
+inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, const std::shared_ptr<util::Logger>& rl)
     : test_list(tl)
     , num_recurrences(nr)
     , num_threads(nt)
@@ -934,7 +934,7 @@ inline TestBase::TestBase(TestContext& context)
 template <class... Params>
 inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
+    test_context.logger->info(message, std::forward<Params>(params)...); // Throws
 }
 
 

@@ -270,21 +270,24 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) no
     m_config.logger_factory = std::move(factory);
 }
 
-std::unique_ptr<util::Logger> SyncManager::make_logger() const
+std::shared_ptr<util::Logger> SyncManager::make_logger() const
 {
     util::CheckedLockGuard lock(m_mutex);
     return do_make_logger();
 }
 
-std::unique_ptr<util::Logger> SyncManager::do_make_logger() const
+std::shared_ptr<util::Logger> SyncManager::do_make_logger() const
 {
-    if (m_config.logger_factory) {
-        return m_config.logger_factory(m_config.log_level); // Throws
-    }
+    if (!m_logger) {
+        if (m_config.logger_factory) {
+            m_logger = m_config.logger_factory(m_config.log_level); // Throws
+        }
 
-    auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-    stderr_logger->set_level_threshold(m_config.log_level);
-    return std::unique_ptr<util::Logger>(stderr_logger.release());
+        auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
+        stderr_logger->set_level_threshold(m_config.log_level);
+        m_logger = std::move(stderr_logger);
+    }
+    return m_logger;
 }
 
 void SyncManager::set_user_agent(std::string user_agent)

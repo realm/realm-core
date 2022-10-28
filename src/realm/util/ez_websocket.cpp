@@ -10,7 +10,10 @@ namespace {
 class EZSocketImpl final : public EZSocket, public websocket::Config {
 public:
     EZSocketImpl(EZConfig& config, EZObserver& observer, EZEndpoint&& endpoint)
-        : m_config(config)
+        : m_logger(config.logger)
+        , m_random(config.random)
+        , m_service(config.service)
+        , m_user_agent(config.user_agent)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
         , m_websocket(*this)
@@ -31,13 +34,13 @@ public:
 private:
     using milliseconds_type = std::int_fast64_t;
 
-    util::Logger& websocket_get_logger() noexcept override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
     {
-        return m_config.logger;
+        return m_logger;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
-        return m_config.random;
+        return m_random;
     }
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
@@ -94,10 +97,14 @@ private:
 
     util::Logger& logger() const
     {
-        return m_config.logger;
+        return *m_logger;
     }
 
-    EZConfig& m_config;
+    const std::shared_ptr<util::Logger> m_logger;
+    std::mt19937_64& m_random;
+    util::network::Service& m_service;
+    std::string m_user_agent;
+
     EZObserver& m_observer;
 
     const EZEndpoint m_endpoint;
@@ -165,7 +172,7 @@ void EZSocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_config.service);                            // Throws
+    m_resolver.emplace(m_service);                            // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
@@ -188,7 +195,7 @@ void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints,
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
-    m_socket.emplace(m_config.service); // Throws
+    m_socket.emplace(m_service); // Throws
     m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         // If the operation is aborted, the connection object may have been
         // destroyed.
@@ -248,7 +255,7 @@ void EZSocketImpl::initiate_http_tunnel()
     req.headers.emplace("Host", util::format("%1:%2", m_endpoint.address, m_endpoint.port));
     // TODO handle proxy authorization
 
-    m_proxy_client.emplace(*this, logger());
+    m_proxy_client.emplace(*this, m_logger);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
             logger().error("Failed to establish HTTP tunnel: %1", ec.message());
@@ -333,7 +340,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 void EZSocketImpl::initiate_websocket_handshake()
 {
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
-    headers["User-Agent"] = m_config.user_agent;
+    headers["User-Agent"] = m_user_agent;
 
     // Compute the value of the "Host" header.
     const std::uint_fast16_t default_port = (m_endpoint.is_ssl ? 443 : 80);

@@ -37,11 +37,11 @@ namespace realm {
 namespace _impl {
 
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config,
+    SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
                std::weak_ptr<const SyncManager> weak_sync_manager)
         : m_client([&] {
             sync::Client::Config c;
-            c.logger = logger.get();
+            c.logger = logger;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
             c.user_agent_application_info =
@@ -61,7 +61,7 @@ struct SyncClient {
 
             return c;
         }())
-        , m_logger(std::move(logger))
+        , m_logger(logger)
         , m_thread([this] {
             if (g_binding_callback_thread_observer) {
                 g_binding_callback_thread_observer->did_create_thread();
@@ -134,7 +134,7 @@ struct SyncClient {
 
 private:
     sync::Client m_client;
-    const std::unique_ptr<util::Logger> m_logger;
+    const std::shared_ptr<util::Logger> m_logger;
     std::thread m_thread;
 #if NETWORK_REACHABILITY_AVAILABLE
     NetworkReachabilityObserver m_reachability_observer;

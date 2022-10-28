@@ -183,9 +183,9 @@ public:
 
     class UploadMessageBuilder {
     public:
-        util::Logger& logger;
+        std::shared_ptr<util::Logger> logger;
 
-        UploadMessageBuilder(util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
+        UploadMessageBuilder(const std::shared_ptr<util::Logger>& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
                              util::compression::CompressMemoryArena& compress_memory_arena);
 
         void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,
@@ -202,7 +202,7 @@ public:
         util::compression::CompressMemoryArena& m_compress_memory_arena;
     };
 
-    UploadMessageBuilder make_upload_message_builder(util::Logger& logger);
+    UploadMessageBuilder make_upload_message_builder(const std::shared_ptr<util::Logger>& logger);
 
     void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
 
@@ -220,7 +220,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        util::Logger& logger = connection.logger;
+        util::Logger& logger = *(connection.m_logger);
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);
             connection.handle_protocol_error(err);
@@ -368,7 +368,7 @@ private:
     template <typename Connection>
     void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
-        util::Logger& logger = connection.logger;
+        util::Logger& logger = *(connection.m_logger);
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);
             connection.handle_protocol_error(err);
@@ -580,7 +580,7 @@ public:
             connection.receive_ping(timestamp, rtt);
         }
         catch (const ProtocolCodecException& e) {
-            connection.logger.error("Bad syntax in ping message: %1", e.what());
+            connection.m_logger->error("Bad syntax in ping message: %1", e.what());
             connection.handle_protocol_error(Error::bad_syntax);
         }
     }
@@ -600,7 +600,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        util::Logger& logger = connection.logger;
+        auto& logger = *(connection.m_logger);
 
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);

@@ -387,7 +387,7 @@ void put_time(std::ostream& out, const std::tm& tm, const char* format)
 }
 
 
-bool run_tests(util::Logger* logger)
+bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
 {
     {
         const char* str = getenv("UNITTEST_KEEP_FILES");
@@ -545,12 +545,12 @@ bool run_tests(util::Logger* logger)
 } // anonymous namespace
 
 
-int test_all(util::Logger* logger)
+int test_all(const std::shared_ptr<realm::util::Logger>& logger)
 {
     // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
     // git client will attempt to access the files when it sees that new files have been created). This may cause
     // very rare/sporadic segfaults and asserts. If the temporary directory path is outside revision control, there
-    // is no problem. Otherwise we need two things fulfilled: 1) The directory must be in .gitignore, and also 2) 
+    // is no problem. Otherwise we need two things fulfilled: 1) The directory must be in .gitignore, and also 2)
     // The directory must be newly created and not added to git.
 
     // Disable buffering on std::cout so that progress messages can be related to

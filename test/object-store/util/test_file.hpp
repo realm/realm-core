@@ -155,7 +155,7 @@ private:
     friend class TestSyncManager;
     SyncServer(const Config& config);
     std::string m_local_root_dir;
-    std::unique_ptr<realm::util::Logger> m_logger;
+    std::shared_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
     std::thread m_thread;
     std::string m_url;

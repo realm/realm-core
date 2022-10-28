@@ -25,7 +25,7 @@
 
 namespace realm::_impl {
 
-ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
+ClientResetOperation::ClientResetOperation(const std::shared_ptr<util::Logger>& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
                                            CallbackBeforeType notify_before, CallbackAfterType notify_after,
                                            bool recovery_is_allowed)
     : m_logger{logger}
@@ -38,7 +38,7 @@ ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT_RELEASE(m_mode != ClientResyncMode::Manual);
-    logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
+    m_logger->debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
                  m_mode, m_recovery_is_allowed);
 }
 
@@ -62,7 +62,7 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
     bool local_realm_exists = m_db->get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
         REALM_ASSERT_EX(m_db_fresh, m_db->get_path(), m_mode);
-        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
+        m_logger->debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
                        m_db->get_path(), local_realm_exists, m_mode);
 
         client_reset::LocalVersionIDs local_version_ids;
@@ -117,13 +117,13 @@ void ClientResetOperation::clean_up_state() noexcept
                 DB::delete_files(path, nullptr, delete_lockfile);
             });
             if (!did_lock) {
-                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
+                m_logger->warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
                               "There were %2 refs remaining.",
                               path_to_clean, use_count);
             }
         }
         catch (const std::exception& err) {
-            m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+            m_logger->warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
                           "an exception: '%2'",
                           path_to_clean, err.what());
             // ignored, this is just a best effort

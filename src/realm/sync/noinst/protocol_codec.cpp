@@ -67,7 +67,7 @@ void ClientProtocol::make_test_command_message(OutputBuffer& out, session_ident_
 }
 
 ClientProtocol::UploadMessageBuilder::UploadMessageBuilder(
-    util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
+    const std::shared_ptr<util::Logger>& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
     util::compression::CompressMemoryArena& compress_memory_arena)
     : logger{logger}
     , m_body_buffer{body_buffer}
@@ -125,7 +125,7 @@ void ClientProtocol::UploadMessageBuilder::make_upload_message(int protocol_vers
     REALM_ASSERT(!out.fail());
 }
 
-ClientProtocol::UploadMessageBuilder ClientProtocol::make_upload_message_builder(util::Logger& logger)
+ClientProtocol::UploadMessageBuilder ClientProtocol::make_upload_message_builder(const std::shared_ptr<util::Logger>& logger)
 {
     return UploadMessageBuilder{logger, m_output_buffer, m_buffer, m_compress_memory_arena};
 }

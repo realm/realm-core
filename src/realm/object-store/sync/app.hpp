@@ -370,11 +370,10 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
-    std::unique_ptr<util::Logger> m_logger;
+    std::shared_ptr<util::Logger> m_logger;
 
-    template <class... Params>
-    void log(const char* message, Params&&... params);
-    bool would_log();
+    util::Logger& logger();
+    bool would_log(util::Logger::Level level) const;
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.

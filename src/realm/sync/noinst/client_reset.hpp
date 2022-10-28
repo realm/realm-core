@@ -86,7 +86,7 @@ struct LocalVersionIDs {
 };
 
 LocalVersionIDs perform_client_reset_diff(DBRef db, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
-                                          util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
+                                          const std::shared_ptr<util::Logger>& logger, ClientResyncMode mode, bool recovery_is_allowed,
                                           bool* did_recover_out, sync::SubscriptionStore* sub_store,
                                           util::UniqueFunction<void(int64_t)> on_flx_version_complete);
 

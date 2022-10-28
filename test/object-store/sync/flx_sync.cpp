@@ -1658,8 +1658,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            util::StderrLogger logger;
-            sync::PendingBootstrapStore bootstrap_store(realm, &logger);
+            sync::PendingBootstrapStore bootstrap_store(realm, std::make_shared<util::StderrLogger>());
             REQUIRE(bootstrap_store.has_pending());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
@@ -1727,8 +1726,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            util::StderrLogger logger;
-            sync::PendingBootstrapStore bootstrap_store(realm, &logger);
+            sync::PendingBootstrapStore bootstrap_store(realm, std::make_shared<util::StderrLogger>());
             REQUIRE(bootstrap_store.has_pending());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
@@ -1806,8 +1804,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             DBOptions options;
             options.encryption_key = test_util::crypt_key();
             auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-            util::StderrLogger logger;
-            sync::PendingBootstrapStore bootstrap_store(realm, &logger);
+            sync::PendingBootstrapStore bootstrap_store(realm, std::make_shared<util::StderrLogger>());
             REQUIRE(bootstrap_store.has_pending());
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);

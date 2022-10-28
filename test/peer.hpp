@@ -72,7 +72,7 @@ public:
 
     version_type integrate_remote_changeset(file_ident_type remote_file_ident, DB& sg,
                                             const Transformer::RemoteChangeset& changeset,
-                                            util::Logger* replay_logger)
+                                            util::Logger& replay_logger)
     {
         std::size_t num_changesets = 1;
         return integrate_remote_changesets(remote_file_ident, sg, &changeset, num_changesets, replay_logger);
@@ -80,7 +80,7 @@ public:
 
     version_type integrate_remote_changesets(file_ident_type remote_file_ident, DB&,
                                              const Transformer::RemoteChangeset* incoming_changesets,
-                                             std::size_t num_changesets, util::Logger* replay_logger);
+                                             std::size_t num_changesets, util::Logger& replay_logger);
 
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {
@@ -367,7 +367,7 @@ public:
 
 protected:
     void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets, std::size_t their_size,
-                          Changeset** our_changesets, std::size_t our_size, util::Logger* logger) override final
+                          Changeset** our_changesets, std::size_t our_size, util::Logger& logger) override final
     {
         std::string directory;
         if (m_changeset_dump_dir_gen) {
@@ -396,7 +396,7 @@ protected:
 private:
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
-    void encode_changesets(Changeset* changesets, std::size_t num_changesets, util::Logger* logger)
+    void encode_changesets(Changeset* changesets, std::size_t num_changesets, util::Logger& logger)
     {
         sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
@@ -411,13 +411,13 @@ private:
             _impl::ServerProtocol::ChangesetInfo info{changesets[i].version, entry.remote_version, entry,
                                                       entry.changeset.size()};
 
-            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, *logger); // Throws
+            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, logger); // Throws
 
             encode_buffer.clear();
         }
     }
 
-    void encode_changesets(Changeset** changesets, std::size_t num_changesets, util::Logger* logger)
+    void encode_changesets(Changeset** changesets, std::size_t num_changesets, util::Logger& logger)
     {
         sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
@@ -432,19 +432,19 @@ private:
             _impl::ServerProtocol::ChangesetInfo info{changesets[i]->version, entry.remote_version, entry,
                                                       entry.changeset.size()};
 
-            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, *logger); // Throws
+            m_protocol.insert_single_changeset_download_message(m_history_entries_buffer, info, logger); // Throws
 
             encode_buffer.clear();
         }
     }
 
-    void write_changesets_to_file(const std::string& pathname, std::size_t num_changesets, util::Logger* logger)
+    void write_changesets_to_file(const std::string& pathname, std::size_t num_changesets, util::Logger& logger)
     {
         m_protocol.make_download_message(sync::get_current_protocol_version(), m_download_message_buffer,
                                          file_ident_type(0), version_type(0), version_type(0), version_type(0), 0,
                                          version_type(0), version_type(0), 0, num_changesets,
                                          m_history_entries_buffer.data(), m_history_entries_buffer.size(), 0, false,
-                                         *logger); // Throws
+                                         logger); // Throws
 
         m_history_entries_buffer.reset();
 
@@ -463,7 +463,7 @@ private:
 
 inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type remote_file_ident, DB& sg,
                                                              const Transformer::RemoteChangeset* incoming_changesets,
-                                                             size_t num_changesets, util::Logger* logger)
+                                                             size_t num_changesets, util::Logger& logger)
     -> version_type
 {
     REALM_ASSERT(num_changesets != 0);
@@ -488,7 +488,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     TransformHistoryImpl transform_hist{*this, remote_file_ident};
     auto apply = [&](const Changeset* c) -> bool {
         sync::InstructionApplier applier{*transact};
-        applier.apply(*c, logger);
+        applier.apply(*c, &logger);
 
         return true;
     };
@@ -525,7 +525,7 @@ public:
 
     file_ident_type local_file_ident;
     DBTestPathGuard path_guard;
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> m_logger;
     ShortCircuitHistory history;
     DBRef shared_group;
     TransactionRef group; // Null when no transaction is in progress
@@ -545,8 +545,7 @@ public:
         out << ".server" << path_add_on << ".realm";
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
-        util::Logger& logger = test_context.logger;
-        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, logger));
+        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
     }
 
     // FIXME: Remove the dependency on the unit_test namespace.
@@ -561,8 +560,7 @@ public:
         out << ".client_" << client_file_ident << path_add_on << ".realm";
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
-        util::Logger& logger = test_context.logger;
-        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, logger));
+        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
     }
 
     template <class F>
@@ -636,10 +634,9 @@ public:
                   << " origin_file_ident=" << changesets.get()->origin_file_ident << std::endl;
         */
         file_ident_type remote_file_ident = remote.local_file_ident;
-        util::Logger* replay_logger = &logger;
         version_type new_version =
             history.integrate_remote_changesets(remote_file_ident, *shared_group, changesets.get(), num_changesets,
-                                                replay_logger); // Throws
+                                                *m_logger); // Throws
         current_version = new_version;
         last_remote_version = changesets[num_changesets - 1].remote_version;
         return false;
@@ -660,10 +657,10 @@ public:
 
 private:
     Peer(file_ident_type file_ident, const std::string& test_path, TestDirNameGenerator* changeset_dump_dir_gen,
-         util::Logger& l)
+         const std::shared_ptr<util::Logger>& l)
         : local_file_ident(file_ident)
         , path_guard(test_path) // Throws
-        , logger(l)
+        , m_logger(l)
         , history(file_ident, changeset_dump_dir_gen)  // Throws
         , shared_group(DB::create(history, test_path)) // Throws
     {
@@ -830,7 +827,7 @@ struct Associativity {
             ReadTransaction read_server{server->shared_group};
             for (auto& client : clients) {
                 ReadTransaction read_client{client->shared_group};
-                if (!CHECK(compare_groups(read_server, read_client, test_context.logger))) {
+                if (!CHECK(compare_groups(read_server, read_client, *(test_context.logger)))) {
                     return false;
                 }
             }
@@ -875,7 +872,7 @@ struct Associativity {
             // Check that all permutations converge on the same state.
             ReadTransaction read_first{first.server->shared_group};
             ReadTransaction read_current{iter.server->shared_group};
-            if (!CHECK(compare_groups(read_first, read_current, test_context.logger))) {
+            if (!CHECK(compare_groups(read_first, read_current, *(test_context.logger)))) {
                 return false;
             }
         }

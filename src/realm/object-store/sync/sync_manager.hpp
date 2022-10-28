@@ -73,7 +73,7 @@ struct SyncClientConfig {
     MetadataMode metadata_mode = MetadataMode::Encryption;
     util::Optional<std::vector<char>> custom_encryption_key;
 
-    using LoggerFactory = std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>;
+    using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
@@ -234,7 +234,7 @@ public:
     }
 
     // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> make_logger() const REQUIRES(!m_mutex);
+    std::shared_ptr<util::Logger> make_logger() const REQUIRES(!m_mutex);
 
     SyncManager();
     SyncManager(const SyncManager&) = delete;
@@ -272,7 +272,7 @@ private:
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> do_make_logger() const REQUIRES(m_mutex);
+    std::shared_ptr<util::Logger> do_make_logger() const REQUIRES(m_mutex);
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;
@@ -284,6 +284,7 @@ private:
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
+    mutable std::shared_ptr<util::Logger> m_logger GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
     mutable util::CheckedMutex m_file_system_mutex;

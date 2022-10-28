@@ -790,7 +790,7 @@ void SessionImpl::process_pending_flx_bootstrap()
     while (bootstrap_store->has_pending()) {
         auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
         if (!pending_batch.progress) {
-            logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            m_logger->info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
             bootstrap_store->clear();
             return;
         }
@@ -806,7 +806,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
         history.integrate_server_changesets(
-            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, *m_logger,
             [&](const TransactionRef& tr, size_t count) {
                 REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, count);
@@ -818,7 +818,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                      batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
-        logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
+        m_logger->info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3. %4 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
                     pending_batch.remaining);
@@ -840,7 +840,7 @@ void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
     // check is that we have completed the IDENT message handshake and have not yet received an ERROR
     // message to call ensure_enlisted_to_send().
     if (m_state == State::Active && m_ident_message_sent && !m_error_message_received) {
-        logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+        m_logger->trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
     }
 }
@@ -1331,10 +1331,10 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
         SessionImpl& sess = *sess_2;
         if (sync_mode == SyncServerMode::FLX) {
-            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, &sess.logger);
+            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess.m_logger);
         }
 
-        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        sess.m_logger->detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
         m_sess = &sess;
         conn.activate_session(std::move(sess_2)); // Throws
 
@@ -1537,7 +1537,7 @@ void SessionWrapper::report_progress()
     // the same units.
     std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
 
-    m_sess->logger.debug("Progress handler called, downloaded = %1, "
+    m_sess->m_logger->debug("Progress handler called, downloaded = %1, "
                          "downloadable(total) = %2, uploaded = %3, "
                          "uploadable = %4, reliable_download_progress = %5, "
                          "snapshot version = %6",
@@ -1571,7 +1571,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
                                    SyncServerMode sync_mode)
-    : logger{make_logger_prefix(ident), client.logger} // Throws
+    : m_logger{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.m_logger)} // Throws
     , m_client{client}
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
@@ -1626,7 +1626,7 @@ void ClientImpl::Connection::resume_active_sessions()
 
 void ClientImpl::Connection::on_idle()
 {
-    logger.debug("Destroying connection object");
+    m_logger->debug("Destroying connection object");
     ClientImpl& client = get_client();
     client.remove_connection(*this);
     // NOTE: This connection object is now destroyed!

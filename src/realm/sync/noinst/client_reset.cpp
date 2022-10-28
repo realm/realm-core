@@ -515,13 +515,13 @@ static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode
 }
 
 LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
-                                          util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
+                                          const std::shared_ptr<util::Logger>& logger, ClientResyncMode mode, bool recovery_is_allowed,
                                           bool* did_recover_out, sync::SubscriptionStore* sub_store,
                                           util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {
     REALM_ASSERT(db_local);
     REALM_ASSERT(db_remote);
-    logger.info("Client reset, path_local = %1, "
+    logger->info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
                 "client_file_ident.salt = %3,"
                 "remote = %4, mode = %5, recovery_is_allowed = %6",
@@ -539,7 +539,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         if (on_flx_version_complete) {
             on_flx_version_complete(sub.version());
         }
-        logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
+        logger->info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
                     sub.version());
     };
 
@@ -558,12 +558,12 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
     std::vector<ClientHistory::LocalChange> local_changes;
 
-    mode = reset_precheck_guard(wt_local, mode, recovery_is_allowed, logger);
+    mode = reset_precheck_guard(wt_local, mode, recovery_is_allowed, *logger);
     bool recover_local_changes = (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard);
 
     if (recover_local_changes) {
         local_changes = history_local->get_local_changes(current_version_local);
-        logger.info("Local changesets to recover: %1", local_changes.size());
+        logger->info("Local changesets to recover: %1", local_changes.size());
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
@@ -586,7 +586,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // needs to be done before they are wiped out by remake_active_subscription()
         std::vector<SubscriptionSet> pending_subscriptions = sub_store->get_pending_subscriptions();
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, *logger);
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history.
         // Note that we do not set the new file ident yet! This is done in the last commit.
@@ -630,7 +630,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         }
 
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, *logger);
 
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history and steal the fresh Realm's ident
@@ -652,7 +652,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         *did_recover_out = recover_local_changes;
     }
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
-    logger.info("perform_client_reset_diff is done, old_version.version = %1, "
+    logger->info("perform_client_reset_diff is done, old_version.version = %1, "
                 "old_version.index = %2, new_version.version = %3, "
                 "new_version.index = %4",
                 old_version_local.version, old_version_local.index, new_version_local.version,

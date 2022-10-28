@@ -362,7 +362,7 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
-                                                             util::Logger& logger)
+                                                             const std::shared_ptr<util::Logger>& logger)
     : InstructionApplier(dest_wt)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
@@ -375,7 +375,7 @@ REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::strin
 {
     std::string full_message =
         util::format("Unable to automatically recover local changes during client reset: '%1'", message);
-    m_logger.error(full_message.c_str());
+    m_logger->error(full_message.c_str());
     throw realm::_impl::client_reset::ClientResetFailed(full_message);
 }
 
@@ -401,7 +401,7 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
             }
             auto pre_sub = pending_subscriptions[subscription_index++];
             auto post_sub = pre_sub.make_mutable_copy().commit();
-            m_logger.info("Recovering pending subscription version: %1 -> %2, snapshot: %3 -> %4", pre_sub.version(),
+            m_logger->info("Recovering pending subscription version: %1 -> %2, snapshot: %3 -> %4", pre_sub.version(),
                           post_sub.version(), pre_sub.snapshot_version(), post_sub.snapshot_version());
         }
         if (m_transaction.get_transact_stage() != DB::TransactStage::transact_Writing) {
@@ -424,7 +424,7 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
         sync::Changeset parsed_changeset;
         sync::parse_changeset(*decompressed, parsed_changeset); // Throws
 
-        InstructionApplier::begin_apply(parsed_changeset, &m_logger);
+        InstructionApplier::begin_apply(parsed_changeset, m_logger.get());
         for (auto instr : parsed_changeset) {
             if (!instr)
                 continue;
@@ -471,14 +471,14 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             Obj remote_obj = remote_list.get_obj();
             InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
                                                      &embedded_object_tracker);
-            m_logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
+            m_logger->debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
                            local_list.size());
             value_converter.copy_value(local_obj, remote_obj, nullptr);
             embedded_object_tracker.process_pending();
         });
         if (!did_translate) {
             // object no longer exists in the local state, ignore and continue
-            m_logger.warn("Discarding a list recovery made to an object which could not be resolved. "
+            m_logger->warn("Discarding a list recovery made to an object which could not be resolved. "
                           "remote_path='%1'",
                           path_str);
         }
@@ -657,7 +657,7 @@ RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint32_t 
 RecoverLocalChangesetsHandler::RecoveryResolver::Status
 RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData table_name, StringData link_name)
 {
-    m_recovery_applier->m_logger.warn(
+    m_recovery_applier->m_logger->warn(
         "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'", m_instr_name,
         table_name, link_name);
     return Status::DidNotResolve; // discard this instruction as it operates over a null link
@@ -667,7 +667,7 @@ RecoverLocalChangesetsHandler::RecoveryResolver::Status
 RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<Obj>& obj)
 {
     if (!obj) {
-        m_recovery_applier->m_logger.warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
+        m_recovery_applier->m_logger->warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
         return Status::DidNotResolve;
     }
     m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
@@ -772,7 +772,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
     if (UpdateResolver(this, instr_copy, instr_name).resolve() == RecoveryResolver::Status::Success) {
         if (!check_links_exist(instr_copy.value)) {
             if (!allows_null_links(instr_copy, instr_name)) {
-                m_logger.warn("Discarding an update which links to a deleted object");
+                m_logger->warn("Discarding an update which links to a deleted object");
                 return;
             }
             instr_copy.value = {};
@@ -870,7 +870,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
 
     static constexpr std::string_view instr_name("ArrayInsert");
     if (!check_links_exist(instr.value)) {
-        m_logger.warn("Discarding %1 which links to a deleted object", instr_name);
+        m_logger->warn("Discarding %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::ArrayInsert instr_copy = instr;
@@ -955,7 +955,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& ins
     };
     static constexpr std::string_view instr_name("SetInsert");
     if (!check_links_exist(instr.value)) {
-        m_logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+        m_logger->warn("Discarding a %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::SetInsert instr_copy = instr;
