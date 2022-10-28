@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
 
 #include <realm/object-store/sync/generic_network_transport.hpp>
@@ -86,7 +87,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     }
 
     if (http_status_code_is_fatal) {
-        return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal", "",
+        error_msg = response.body.empty() ? "http error code considered fatal" : response.body;
+        return AppError(make_custom_error_code(response.http_status_code), error_msg, "",
                         response.http_status_code);
     }
 
