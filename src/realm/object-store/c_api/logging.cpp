@@ -60,7 +60,7 @@ realm::SyncClientConfig::LoggerFactory make_logger_factory(realm_log_func_t logg
                                                            realm_free_userdata_func_t free_userdata)
 {
     return [logger, userdata = SharedUserdata{userdata, free_userdata}](Logger::Level level) {
-        return std::make_unique<CLogger>(userdata, logger, level);
+        return std::make_shared<CLogger>(userdata, logger, level);
     };
 }
 } // namespace realm::c_api
