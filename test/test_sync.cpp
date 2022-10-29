@@ -2963,10 +2963,8 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger client_logger("Client: ", logger);
     Client::Config config;
-    config.logger = &client_logger;
+    config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     config.reconnect_mode = ReconnectMode::testing;
     Client client(config);
 
@@ -2978,7 +2976,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
         StringData pem{pem_data, pem_size};
-        logger.info("server_address = %1, server_port = %2, pem =\n%3\n, "
+        test_context.logger->info("server_address = %1, server_port = %2, pem =\n%3\n, "
                     " preverify_ok = %4, depth = %5",
                     server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
