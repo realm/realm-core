@@ -2977,8 +2977,8 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
         StringData pem{pem_data, pem_size};
         test_context.logger->info("server_address = %1, server_port = %2, pem =\n%3\n, "
-                    " preverify_ok = %4, depth = %5",
-                    server_address, server_port, pem, preverify_ok, depth);
+                                  " preverify_ok = %4, depth = %5",
+                                  server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
             client.stop();
         return true;
