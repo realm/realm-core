@@ -367,7 +367,7 @@ public:
 
 protected:
     void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets, std::size_t their_size,
-                          Changeset** our_changesets, std::size_t our_size, util::Logger& logger) override final
+                          Changeset** our_changesets, std::size_t our_size, util::Logger& logger) final
     {
         std::string directory;
         if (m_changeset_dump_dir_gen) {

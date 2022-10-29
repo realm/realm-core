@@ -1125,7 +1125,7 @@ public:
         return m_remote_endpoint;
     }
 
-    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept final override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept final
     {
         return m_logger;
     }
