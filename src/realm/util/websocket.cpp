@@ -755,8 +755,8 @@ private:
         m_stopped = true;
 
         m_logger->error("Websocket: Expected HTTP response 101 Switching Protocols, "
-                       "but received:\n%1",
-                       response);
+                        "but received:\n%1",
+                        response);
 
         int status_code = int(response.status);
         std::error_code ec;
@@ -806,8 +806,8 @@ private:
         m_stopped = true;
 
         m_logger->error("Websocket: HTTP response has invalid websocket headers."
-                       "HTTP response = \n%1",
-                       response);
+                        "HTTP response = \n%1",
+                        response);
         std::error_code ec = Error::bad_response_header_protocol_violation;
         std::string_view body;
         std::string_view* body_ptr = nullptr;
@@ -831,8 +831,8 @@ private:
         m_stopped = true;
 
         m_logger->error("Websocket: HTTP request has invalid websocket headers."
-                       "HTTP request = \n%1",
-                       request);
+                        "HTTP request = \n%1",
+                        request);
         m_config.websocket_handshake_error_handler(ec, &request.headers, nullptr); // Throws
     }
 

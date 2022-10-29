@@ -806,7 +806,8 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
         history.integrate_server_changesets(
-            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, *m_logger,
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state,
+            *m_logger,
             [&](const TransactionRef& tr, size_t count) {
                 REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, count);
@@ -818,10 +819,11 @@ void SessionImpl::process_pending_flx_bootstrap()
         REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                      batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
-        m_logger->info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                    "%3. %4 changesets remaining in bootstrap",
-                    pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                    pending_batch.remaining);
+        m_logger->info(
+            "Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
+            "%3. %4 changesets remaining in bootstrap",
+            pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
+            pending_batch.remaining);
     }
     on_changesets_integrated(new_version.realm_version, progress);
 
@@ -1538,11 +1540,11 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
 
     m_sess->m_logger->debug("Progress handler called, downloaded = %1, "
-                         "downloadable(total) = %2, uploaded = %3, "
-                         "uploadable = %4, reliable_download_progress = %5, "
-                         "snapshot version = %6",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
-                         m_reliable_download_progress, snapshot_version);
+                            "downloadable(total) = %2, uploaded = %3, "
+                            "uploadable = %4, reliable_download_progress = %5, "
+                            "snapshot version = %6",
+                            downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
+                            m_reliable_download_progress, snapshot_version);
 
     // FIXME: Why is this boolean status communicated to the application as
     // a 64-bit integer? Also, the name `progress_version` is confusing.

@@ -125,7 +125,8 @@ void ClientProtocol::UploadMessageBuilder::make_upload_message(int protocol_vers
     REALM_ASSERT(!out.fail());
 }
 
-ClientProtocol::UploadMessageBuilder ClientProtocol::make_upload_message_builder(const std::shared_ptr<util::Logger>& logger)
+ClientProtocol::UploadMessageBuilder
+ClientProtocol::make_upload_message_builder(const std::shared_ptr<util::Logger>& logger)
 {
     return UploadMessageBuilder{logger, m_output_buffer, m_buffer, m_compress_memory_arena};
 }

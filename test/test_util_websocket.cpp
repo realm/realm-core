@@ -72,7 +72,7 @@ private:
     void do_read()
     {
         m_logger->trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
-                       m_reader_waiting, m_read_size);
+                        m_reader_waiting, m_read_size);
         if (!m_reader_waiting)
             return;
 

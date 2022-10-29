@@ -301,7 +301,8 @@ public:
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
+    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger, const util::network::Endpoint& endpoint,
+                      const util::HTTPRequest& request)
         : logger{"HTTP client: ", logger}
         , m_endpoint{endpoint}
         , m_http_client{*this, logger}
@@ -688,8 +689,8 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code, error->message,
-                             error->is_fatal());
+                test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code,
+                                           error->message, error->is_fatal());
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();

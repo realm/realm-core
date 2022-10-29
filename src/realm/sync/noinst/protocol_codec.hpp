@@ -185,7 +185,8 @@ public:
     public:
         std::shared_ptr<util::Logger> logger;
 
-        UploadMessageBuilder(const std::shared_ptr<util::Logger>& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
+        UploadMessageBuilder(const std::shared_ptr<util::Logger>& logger, OutputBuffer& body_buffer,
+                             std::vector<char>& compression_buffer,
                              util::compression::CompressMemoryArena& compress_memory_arena);
 
         void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,

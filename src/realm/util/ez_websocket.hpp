@@ -97,7 +97,7 @@ public:
     EZSocketFactory(EZConfig config)
         : m_config(config)
     {
-        REALM_ASSERT(m_config.logger);  // Make sure the logger is valid
+        REALM_ASSERT(m_config.logger); // Make sure the logger is valid
     }
 
     EZSocketFactory(EZSocketFactory&&) = delete;

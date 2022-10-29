@@ -463,8 +463,8 @@ public:
     int num_ended_threads = 0;
     int last_thread_to_end = -1;
 
-    SharedContextImpl(const TestList& tests, int repetitions, int threads, const std::shared_ptr<util::Logger>& l, Reporter& r, bool aof,
-                      util::Logger::Level itll)
+    SharedContextImpl(const TestList& tests, int repetitions, int threads, const std::shared_ptr<util::Logger>& l,
+                      Reporter& r, bool aof, util::Logger::Level itll)
         : SharedContext(tests, repetitions, threads, l)
         , reporter(r)
         , abort_on_failure(aof)
@@ -614,10 +614,8 @@ bool TestList::run(Config config)
                                      config.abort_on_failure, config.intra_test_log_level);
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
-    std::vector<std::shared_ptr<util::Logger>> loggers;
-    loggers.reserve(num_threads);
+    std::vector<std::shared_ptr<util::Logger>> loggers(num_threads);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
-        std::unique_ptr<util::Logger> logger;
         std::ostringstream formatter;
         formatter.imbue(std::locale::classic());
         formatter << num_threads;
@@ -627,7 +625,7 @@ bool TestList::run(Config config)
             for (int i = 0; i != num_threads; ++i) {
                 formatter.str(std::string());
                 formatter << "Thread[" << std::setw(thread_digits) << (i + 1) << "]: ";
-                loggers[i] = std::make_shared<util::PrefixLogger>(formatter.str(), shared_logger);
+                loggers[i] = std::make_unique<util::PrefixLogger>(formatter.str(), shared_logger);
             }
         }
         else {
@@ -641,7 +639,7 @@ bool TestList::run(Config config)
                 formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
                 shared_logger->info("Logging to %1", path);
-                loggers[i].reset(new util::FileLogger(path));
+                loggers[i] = std::make_unique<util::FileLogger>(path);
             }
         }
     }
@@ -652,8 +650,7 @@ bool TestList::run(Config config)
         thread_context.nonconcur_run();
     }
     else {
-        std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
-        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[ num_threads ]);
+        std::vector<std::unique_ptr<ThreadContextImpl>> thread_contexts(num_threads);
         for (int i = 0; i < num_threads; ++i)
             thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i]));
 
@@ -1049,14 +1046,15 @@ void SimpleReporter::begin(const TestContext& context)
     const TestDetails& details = context.test_details;
     auto format =
         context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: Begin %3" : "%1:%2: Begin %3#%4";
-    context.thread_context.report_logger->info(format, details.file_name, details.line_number, details.test_name, context.recurrence_index + 1);
+    context.thread_context.report_logger->info(format, details.file_name, details.line_number, details.test_name,
+                                               context.recurrence_index + 1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file, long line, const std::string& message)
 {
     const TestDetails& details = context.test_details;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: ERROR in %3: %5"
-                                                                            : "%1:%2: ERROR in %3#%4: %5";
+                                                                             : "%1:%2: ERROR in %3#%4: %5";
     auto msg = util::format(format, file, line, details.test_name, context.recurrence_index + 1, message);
     if (m_report_progress) {
         m_error_messages.push_back(msg);

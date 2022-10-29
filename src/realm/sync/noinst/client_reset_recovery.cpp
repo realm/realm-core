@@ -402,7 +402,7 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
             auto pre_sub = pending_subscriptions[subscription_index++];
             auto post_sub = pre_sub.make_mutable_copy().commit();
             m_logger->info("Recovering pending subscription version: %1 -> %2, snapshot: %3 -> %4", pre_sub.version(),
-                          post_sub.version(), pre_sub.snapshot_version(), post_sub.snapshot_version());
+                           post_sub.version(), pre_sub.snapshot_version(), post_sub.snapshot_version());
         }
         if (m_transaction.get_transact_stage() != DB::TransactStage::transact_Writing) {
             m_transaction.promote_to_write();
@@ -472,15 +472,15 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
             InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
                                                      &embedded_object_tracker);
             m_logger->debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
-                           local_list.size());
+                            local_list.size());
             value_converter.copy_value(local_obj, remote_obj, nullptr);
             embedded_object_tracker.process_pending();
         });
         if (!did_translate) {
             // object no longer exists in the local state, ignore and continue
             m_logger->warn("Discarding a list recovery made to an object which could not be resolved. "
-                          "remote_path='%1'",
-                          path_str);
+                           "remote_path='%1'",
+                           path_str);
         }
     }
     embedded_object_tracker.process_pending();

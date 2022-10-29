@@ -545,7 +545,8 @@ public:
         out << ".server" << path_add_on << ".realm";
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
-        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
+        return std::unique_ptr<Peer>(
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
     }
 
     // FIXME: Remove the dependency on the unit_test namespace.
@@ -560,7 +561,8 @@ public:
         out << ".client_" << client_file_ident << path_add_on << ".realm";
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
-        return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
+        return std::unique_ptr<Peer>(
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
     }
 
     template <class F>

@@ -155,7 +155,8 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, const std::shared_ptr<util::Logger>& logger);
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state,
+                                  const std::shared_ptr<util::Logger>& logger);
     virtual ~RecoverLocalChangesetsHandler();
     void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
                             std::vector<sync::SubscriptionSet>&& pending_subs);

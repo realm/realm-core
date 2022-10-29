@@ -2403,8 +2403,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     for (size_t i = 0; i < their_size; ++i) {
         size_t num_instructions = their_changesets[i].size();
         their_num_instructions += num_instructions;
-        logger.trace("Scanning incoming changeset [%1/%2] (%3 instructions)", i + 1, their_size,
-                        num_instructions);
+        logger.trace("Scanning incoming changeset [%1/%2] (%3 instructions)", i + 1, their_size, num_instructions);
 
         their_index.scan_changeset(their_changesets[i]);
     }
@@ -2420,14 +2419,14 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     // Build the index.
     for (size_t i = 0; i < their_size; ++i) {
         logger.trace("Indexing incoming changeset [%1/%2] (%3 instructions)", i + 1, their_size,
-                        their_changesets[i].size());
+                     their_changesets[i].size());
         their_index.add_changeset(their_changesets[i]);
     }
 
     logger.debug("Finished changeset indexing (incoming: %1 changeset(s) / %2 instructions, local: %3 "
-                    "changeset(s) / %4 instructions, conflict group(s): %5)",
-                    their_size, their_num_instructions, our_size, our_num_instructions,
-                    their_index.get_num_conflict_groups());
+                 "changeset(s) / %4 instructions, conflict group(s): %5)",
+                 their_size, their_num_instructions, our_size, our_num_instructions,
+                 their_index.get_num_conflict_groups());
 
 #if REALM_DEBUG // LCOV_EXCL_START
     if (trace) {
@@ -2471,8 +2470,8 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 
     for (size_t i = 0; i < our_size; ++i) {
         logger.trace(
-            "Transforming local changeset [%1/%2] through %3 incoming changeset(s) with %4 conflict group(s)",
-            i + 1, our_size, their_size, their_index.get_num_conflict_groups());
+            "Transforming local changeset [%1/%2] through %3 incoming changeset(s) with %4 conflict group(s)", i + 1,
+            our_size, their_size, their_index.get_num_conflict_groups());
         Changeset* our_changeset = our_changesets[i];
 
         transformer.m_major_side.set_next_changeset(our_changeset);
@@ -2482,9 +2481,9 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     }
 
     logger.debug("Finished transforming %1 local changesets through %2 incoming changesets (%3 vs %4 "
-                    "instructions, in %5 conflict groups)",
-                    our_size, their_size, our_num_instructions, their_num_instructions,
-                    their_index.get_num_conflict_groups());
+                 "instructions, in %5 conflict groups)",
+                 our_size, their_size, our_num_instructions, their_num_instructions,
+                 their_index.get_num_conflict_groups());
 
 #if REALM_DEBUG // LCOV_EXCL_START
     // Check that the index is still valid after transformation.

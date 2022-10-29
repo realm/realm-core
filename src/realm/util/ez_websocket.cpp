@@ -172,7 +172,7 @@ void EZSocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_service);                            // Throws
+    m_resolver.emplace(m_service);                                   // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 

@@ -309,8 +309,8 @@ struct FakeLocalClientReset : public TestClientReset {
             auto remote_db = TestHelper::get_db(remote_realm);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
-            perform_client_reset_diff(local_db, remote_db, fake_ident, std::make_shared<TestLogger>(), m_mode, recovery_is_allowed, nullptr,
-                                      nullptr, nullptr);
+            perform_client_reset_diff(local_db, remote_db, fake_ident, std::make_shared<TestLogger>(), m_mode,
+                                      recovery_is_allowed, nullptr, nullptr, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {

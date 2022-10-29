@@ -515,18 +515,19 @@ static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode
 }
 
 LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
-                                          const std::shared_ptr<util::Logger>& logger, ClientResyncMode mode, bool recovery_is_allowed,
-                                          bool* did_recover_out, sync::SubscriptionStore* sub_store,
+                                          const std::shared_ptr<util::Logger>& logger, ClientResyncMode mode,
+                                          bool recovery_is_allowed, bool* did_recover_out,
+                                          sync::SubscriptionStore* sub_store,
                                           util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {
     REALM_ASSERT(db_local);
     REALM_ASSERT(db_remote);
     logger->info("Client reset, path_local = %1, "
-                "client_file_ident.ident = %2, "
-                "client_file_ident.salt = %3,"
-                "remote = %4, mode = %5, recovery_is_allowed = %6",
-                db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode,
-                recovery_is_allowed);
+                 "client_file_ident.ident = %2, "
+                 "client_file_ident.salt = %3,"
+                 "remote = %4, mode = %5, recovery_is_allowed = %6",
+                 db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode,
+                 recovery_is_allowed);
 
     auto remake_active_subscription = [&]() {
         if (!sub_store) {
@@ -540,7 +541,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             on_flx_version_complete(sub.version());
         }
         logger->info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
-                    sub.version());
+                     sub.version());
     };
 
     auto frozen_pre_local_state = db_local->start_frozen();
@@ -653,10 +654,10 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger->info("perform_client_reset_diff is done, old_version.version = %1, "
-                "old_version.index = %2, new_version.version = %3, "
-                "new_version.index = %4",
-                old_version_local.version, old_version_local.index, new_version_local.version,
-                new_version_local.index);
+                 "old_version.index = %2, new_version.version = %3, "
+                 "new_version.index = %4",
+                 old_version_local.version, old_version_local.index, new_version_local.version,
+                 new_version_local.index);
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }

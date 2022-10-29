@@ -550,8 +550,8 @@ void App::attach_auth_options(BsonDocument& body)
         options["appVersion"] = *m_config.local_app_version;
     }
 
-    logger().debug("App: version info: platform: %1  version: %1 - sdk version: %3 - core version: %4", m_config.platform,
-        m_config.platform_version, m_config.sdk_version, REALM_VERSION_STRING);
+    logger().debug("App: version info: platform: %1  version: %1 - sdk version: %3 - core version: %4",
+                   m_config.platform, m_config.platform_version, m_config.sdk_version, REALM_VERSION_STRING);
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
@@ -595,8 +595,8 @@ void App::log_in_with_credentials(
                [completion = std::move(completion), credentials, linking_user,
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
-                       self->logger().error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
-                                 error->message);
+                       self->logger().error("App: log_in_with_credentials failed: %1 message: %2",
+                                            response.http_status_code, error->message);
                        return completion(nullptr, std::move(error));
                    }
 
@@ -1051,7 +1051,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                         UniqueFunction<void(Optional<Bson>&&, Optional<AppError>)>&& completion)
 {
     auto service_name2 = service_name ? *service_name : "<none>";
-    if ( would_log(util::Logger::Level::debug)) {
+    if (would_log(util::Logger::Level::debug)) {
         std::string query_stg = "[ ";
         for (auto&& item : args_bson) {
             query_stg += item.to_string() + ", ";
@@ -1063,7 +1063,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                     completion = std::move(completion)](const Response& response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             self->logger().error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                      response.http_status_code, error->message);
+                                 response.http_status_code, error->message);
             return completion(util::none, error);
         }
         util::Optional<Bson> body_as_bson;
@@ -1071,12 +1071,12 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
             body_as_bson = bson::parse(response.body);
             if (self->would_log(util::Logger::Level::debug)) {
                 self->logger().debug("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
-                          body_as_bson ? body_as_bson->to_string() : "<none>");
+                                     body_as_bson ? body_as_bson->to_string() : "<none>");
             }
         }
         catch (const std::exception& e) {
-            self->logger().error("App: call_function: %1 service_name: %2 - error parsing result: %3", name, service_name,
-                      e.what());
+            self->logger().error("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
+                                 service_name, e.what());
             return completion(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         };
         completion(std::move(body_as_bson), util::none);
