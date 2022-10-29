@@ -9,7 +9,7 @@
 * The name of one of the RLM_SYNC_BOOTSTRAPPING enum member in the C api was updated to match the naming convention of the other members in the enum.
 
 ### Breaking changes
-* None.
+* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr`
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -19,6 +19,7 @@
 ### Internals
 * Fix `BPlusTreeInner::verify()` ([#5974]( https://github.com/realm/realm-core/pull/5974)).
 * Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
+* Update logger references in classes to use `shared_ptr`
 
 ----------------------------------------------
 
