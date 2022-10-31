@@ -9,7 +9,7 @@
 * Fetching a user's profile while the user logs out would result in an assertion failure. ([PR #6017](https://github.com/realm/realm-core/issues/5571), since v11.0.3)
  
 ### Breaking changes
-* None.
+* `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
