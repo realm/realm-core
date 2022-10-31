@@ -3383,9 +3383,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         writepids[i] = fork();
         REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            multiple_trackers_writer_thread(sg);
+            {
+                std::unique_ptr<Replication> hist(make_in_realm_history());
+                DBRef sg = DB::create(*hist, path, DBOptions(key));
+                multiple_trackers_writer_thread(sg);
+            } // clean up sg before exit
             exit(0);
         }
     }
@@ -3395,10 +3397,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         readpids[i] = fork();
         REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            multiple_trackers_reader_thread(test_context, sg);
+            {
+                std::unique_ptr<Replication> hist(make_in_realm_history());
+                DBRef sg = DB::create(*hist, path, DBOptions(key));
+                multiple_trackers_reader_thread(test_context, sg);
+            } // clean up sg before exit
             exit(0);
         }
     }
