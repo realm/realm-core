@@ -407,8 +407,8 @@ TEST(Parser_invalid_queries)
 }
 
 static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                          std::vector<mpark::variant<Mixed, std::vector<Mixed>>> args,
-                          size_t num_results, query_parser::KeyPathMapping mapping = {})
+                          std::vector<mpark::variant<Mixed, std::vector<Mixed>>> args, size_t num_results,
+                          query_parser::KeyPathMapping mapping = {})
 {
     Query q = t->query(query_string, args, mapping);
 
