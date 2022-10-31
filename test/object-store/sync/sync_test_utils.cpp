@@ -377,6 +377,13 @@ struct BaasClientReset : public TestClientReset {
         partition_value = partition_value.substr(1, partition_value.size() - 2);
         Partition partition = {app_session.config.partition_key.name, partition_value};
 
+        // There is a race in PBS where if initial sync is still in-progress while you're creating the initial
+        // object below, you may end up creating it in your local realm, uploading it, have the translator process
+        // the upload, then initial sync the processed object, and then send it back to you as an erase/create
+        // object instruction.
+        //
+        // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
+        // state.
         timed_sleeping_wait_for([&] {
             return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
         });
