@@ -282,10 +282,11 @@ const std::shared_ptr<util::Logger>& SyncManager::do_make_logger() const
         if (m_config.logger_factory) {
             m_logger = m_config.logger_factory(m_config.log_level); // Throws
         }
-
-        auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-        stderr_logger->set_level_threshold(m_config.log_level);
-        m_logger = std::move(stderr_logger);
+        else {
+            auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
+            stderr_logger->set_level_threshold(m_config.log_level);
+            m_logger = std::move(stderr_logger);
+        }
     }
     return m_logger;
 }
