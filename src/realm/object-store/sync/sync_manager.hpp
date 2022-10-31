@@ -234,7 +234,7 @@ public:
     }
 
     // Create a new logger of the type which will be used by the sync client
-    std::shared_ptr<util::Logger> make_logger() const REQUIRES(!m_mutex);
+    const std::shared_ptr<util::Logger>& make_logger() const REQUIRES(!m_mutex);
 
     SyncManager();
     SyncManager(const SyncManager&) = delete;
@@ -272,7 +272,7 @@ private:
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Create a new logger of the type which will be used by the sync client
-    std::shared_ptr<util::Logger> do_make_logger() const REQUIRES(m_mutex);
+    const std::shared_ptr<util::Logger>& do_make_logger() const REQUIRES(m_mutex);
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;

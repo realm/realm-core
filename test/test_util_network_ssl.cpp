@@ -246,8 +246,8 @@ TEST(Util_Network_SSL_Handshake)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_sockets(socket_1, socket_2);
 
     auto connector = [&] {
@@ -277,8 +277,8 @@ TEST(Util_Network_SSL_AsyncHandshake)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_sockets(socket_1, socket_2);
 
     bool connect_completed = false;
@@ -309,8 +309,8 @@ TEST(Util_Network_SSL_ReadWriteShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     const char* message = "hello";
@@ -346,8 +346,8 @@ TEST(Util_Network_SSL_AsyncReadWriteShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     const char* message = "hello";
@@ -388,8 +388,8 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnHandshakeRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_sockets(socket_1, socket_2);
 
     socket_1.shutdown(network::Socket::shutdown_send);
@@ -434,8 +434,8 @@ TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_sockets(socket_1, socket_2);
 
     socket_1.close();
@@ -474,8 +474,8 @@ TEST(Util_Network_SSL_EndOfInputOnRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
     ssl_stream_2.shutdown();
     socket_2.shutdown(network::Socket::shutdown_send);
@@ -493,8 +493,8 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_2.shutdown(network::Socket::shutdown_send);
@@ -513,8 +513,8 @@ TEST(Util_Network_SSL_BrokenPipeOnWrite)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_1.close();
@@ -547,8 +547,8 @@ TEST(Util_Network_SSL_BrokenPipeOnShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_1.close();
@@ -581,8 +581,8 @@ TEST(Util_Network_SSL_ShutdownBeforeCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Shut down peer 1's writing side before it has received a shutdown alert
@@ -600,8 +600,8 @@ TEST(Util_Network_SSL_ShutdownAfterCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Make sure peer 2 gets an SSL shutdown alert.
@@ -627,8 +627,8 @@ TEST(Util_Network_SSL_WriteAfterCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Shut down peer 1's writing side, such that peer 2 gets an SSL shutdown
@@ -655,8 +655,8 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Make peer 2 Write a message.
@@ -684,8 +684,8 @@ TEST(Util_Network_SSL_StressTest)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     constexpr size_t original_size = 0x100000; // 1MiB
@@ -879,8 +879,8 @@ TEST(Util_Network_SSL_Certificate_CN_SAN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
 
     ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
 
@@ -924,8 +924,8 @@ TEST(Util_Network_SSL_Certificate_SAN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
 
     ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
 
@@ -971,8 +971,8 @@ TEST(Util_Network_SSL_Certificate_CN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
 
     ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
 
@@ -1019,8 +1019,8 @@ TEST(Util_Network_SSL_Certificate_IP)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
 
     ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
 
@@ -1070,8 +1070,8 @@ TEST(Util_Network_SSL_Certificate_Failure)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(test_context.logger.get());
-    ssl_stream_2.set_logger(test_context.logger.get());
+    ssl_stream_1.set_logger(test_context.logger);
+    ssl_stream_2.set_logger(test_context.logger);
 
     ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
 

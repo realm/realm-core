@@ -372,9 +372,6 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger;
 
-    util::Logger& logger();
-    bool would_log(util::Logger::Level level) const;
-
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
     void refresh_access_token(const std::shared_ptr<SyncUser>& user,

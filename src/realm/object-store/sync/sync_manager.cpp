@@ -270,13 +270,13 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) no
     m_config.logger_factory = std::move(factory);
 }
 
-std::shared_ptr<util::Logger> SyncManager::make_logger() const
+const std::shared_ptr<util::Logger>& SyncManager::make_logger() const
 {
     util::CheckedLockGuard lock(m_mutex);
     return do_make_logger();
 }
 
-std::shared_ptr<util::Logger> SyncManager::do_make_logger() const
+const std::shared_ptr<util::Logger>& SyncManager::do_make_logger() const
 {
     if (!m_logger) {
         if (m_config.logger_factory) {

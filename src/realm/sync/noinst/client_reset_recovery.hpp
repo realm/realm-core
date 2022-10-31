@@ -155,8 +155,7 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state,
-                                  const std::shared_ptr<util::Logger>& logger);
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
     virtual ~RecoverLocalChangesetsHandler();
     void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
                             std::vector<sync::SubscriptionSet>&& pending_subs);
@@ -207,7 +206,9 @@ protected:
 
 private:
     Transaction& m_frozen_pre_local_state;
-    std::shared_ptr<util::Logger> m_logger;
+    // Keeping the member variable reference to a logger since the lifetime of this class is
+    // only within the function that created it.
+    util::Logger& m_logger;
     InterningBuffer m_intern_keys;
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.

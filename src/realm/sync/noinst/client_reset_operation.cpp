@@ -82,7 +82,7 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
         }
         bool did_recover_out = false;
         local_version_ids = client_reset::perform_client_reset_diff(
-            m_db, m_db_fresh, m_salted_file_ident, m_logger, m_mode, m_recovery_is_allowed, &did_recover_out,
+            m_db, m_db_fresh, m_salted_file_ident, *m_logger, m_mode, m_recovery_is_allowed, &did_recover_out,
             sub_store, std::move(on_flx_version_complete)); // throws
 
         if (m_notify_after) {
