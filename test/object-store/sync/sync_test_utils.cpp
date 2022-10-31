@@ -377,6 +377,10 @@ struct BaasClientReset : public TestClientReset {
         partition_value = partition_value.substr(1, partition_value.size() - 2);
         Partition partition = {app_session.config.partition_key.name, partition_value};
 
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
+
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
         const std::string object_schema_name = "object";

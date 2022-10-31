@@ -699,6 +699,23 @@ bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
     return state_result["state"].get<std::string>().empty();
 }
 
+bool AdminAPISession::is_initial_sync_complete(const std::string &app_id) const
+{
+    auto progress_endpoint = apps()[app_id]["sync"]["progress"];
+    auto progress_result = progress_endpoint.get_json();
+    std::cerr << "progress result is " << progress_result.dump() << std::endl;
+    if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
+        for (auto& elem: *it) {
+            auto is_complete = elem["complete"];
+            if (!is_complete.is_boolean() || !is_complete.get<bool>()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 AdminAPIEndpoint AdminAPISession::apps() const
 {
     return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
