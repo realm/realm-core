@@ -1039,13 +1039,14 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_supports_fork)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r = make_in_realm_history();
-    DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+    {
+        std::unique_ptr<Replication> hist_r = make_in_realm_history();
+        DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
 
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read();
-    CHECK_EQUAL(0, rt->size());
-
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        CHECK_EQUAL(0, rt->size());
+    }
     // Create 5 columns, and make 3 of them indexed
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
@@ -1069,14 +1070,22 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     else {
         test_util::waitpid_checked(pid, 0, "init");
     }
-    rt->advance_read();
-    rt->verify();
-    ConstTableRef table = rt->get_table("t");
-    CHECK(table->has_search_index(table->get_column_key("i0")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("s1")));
-    CHECK(table->has_search_index(table->get_column_key("s2")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("i3")));
-    CHECK(table->has_search_index(table->get_column_key("i4")));
+
+    {
+        std::unique_ptr<Replication> hist_r = make_in_realm_history();
+        DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        rt->advance_read();
+        rt->verify();
+        ConstTableRef table = rt->get_table("t");
+        CHECK(table->has_search_index(table->get_column_key("i0")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("s1")));
+        CHECK(table->has_search_index(table->get_column_key("s2")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("i3")));
+        CHECK(table->has_search_index(table->get_column_key("i4")));
+    }
 
     // Remove the previous search indexes and add 2 new ones
     pid = test_util::fork_and_update_mappings();
@@ -1098,13 +1107,21 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     else {
         test_util::waitpid_checked(pid, 0, "change indexes");
     }
-    rt->advance_read();
-    rt->verify();
-    CHECK_NOT(table->has_search_index(table->get_column_key("i0")));
-    CHECK(table->has_search_index(table->get_column_key("s1")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("s2")));
-    CHECK(table->has_search_index(table->get_column_key("i3")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("i4")));
+    {
+        std::unique_ptr<Replication> hist_r = make_in_realm_history();
+        DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        ConstTableRef table = rt->get_table("t");
+        rt->advance_read();
+        rt->verify();
+        CHECK_NOT(table->has_search_index(table->get_column_key("i0")));
+        CHECK(table->has_search_index(table->get_column_key("s1")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("s2")));
+        CHECK(table->has_search_index(table->get_column_key("i3")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("i4")));
+    }
 
     // Add some searchable contents
     pid = test_util::fork_and_update_mappings();
@@ -1126,18 +1143,25 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     else {
         test_util::waitpid_checked(pid, 0, "add content");
     }
-    rt->advance_read();
-    rt->verify();
+    {
+        std::unique_ptr<Replication> hist_r = make_in_realm_history();
+        DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
 
-    CHECK_NOT(table->has_search_index(table->get_column_key("i0")));
-    CHECK(table->has_search_index(table->get_column_key("s1")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("s2")));
-    CHECK(table->has_search_index(table->get_column_key("i3")));
-    CHECK_NOT(table->has_search_index(table->get_column_key("i4")));
-    CHECK_EQUAL(ObjKey(12), table->find_first_string(table->get_column_key("s1"), "931"));
-    CHECK_EQUAL(ObjKey(4), table->find_first_int(table->get_column_key("i3"), 315));
-    CHECK_EQUAL(ObjKey(13), table->find_first_int(table->get_column_key("i3"), 508));
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        ConstTableRef table = rt->get_table("t");
+        rt->advance_read();
+        rt->verify();
 
+        CHECK_NOT(table->has_search_index(table->get_column_key("i0")));
+        CHECK(table->has_search_index(table->get_column_key("s1")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("s2")));
+        CHECK(table->has_search_index(table->get_column_key("i3")));
+        CHECK_NOT(table->has_search_index(table->get_column_key("i4")));
+        CHECK_EQUAL(ObjKey(12), table->find_first_string(table->get_column_key("s1"), "931"));
+        CHECK_EQUAL(ObjKey(4), table->find_first_int(table->get_column_key("i3"), 315));
+        CHECK_EQUAL(ObjKey(13), table->find_first_int(table->get_column_key("i3"), 508));
+    }
     // Move the indexed columns by removal
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
@@ -1153,6 +1177,13 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     else {
         test_util::waitpid_checked(pid, 0, "move/remove");
     }
+
+    std::unique_ptr<Replication> hist_r = make_in_realm_history();
+    DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+
+    // Start a read transaction (to be repeatedly advanced)
+    TransactionRef rt = sg->start_read();
+    ConstTableRef table = rt->get_table("t");
     rt->advance_read();
     rt->verify();
     CHECK(table->has_search_index(table->get_column_key("s1")));
@@ -1460,13 +1491,14 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkToNeighbour)
 NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns, testing_supports_fork)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_parent(make_in_realm_history());
-    DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
+    {
+        std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+        DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
 
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read();
-    CHECK_EQUAL(0, rt->size());
-
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        CHECK_EQUAL(0, rt->size());
+    }
     int pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -1488,16 +1520,22 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     else {
         test_util::waitpid_checked(pid, 0, "initial write");
     }
-    rt->advance_read();
-    rt->verify();
+    {
+        std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+        DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
 
-    CHECK_EQUAL(5, rt->size());
-    ConstTableRef alpha = rt->get_table("alpha");
-    ConstTableRef beta = rt->get_table("beta");
-    ConstTableRef gamma = rt->get_table("gamma");
-    ConstTableRef delta = rt->get_table("delta");
-    ConstTableRef epsilon = rt->get_table("epsilon");
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        rt->advance_read();
+        rt->verify();
 
+        CHECK_EQUAL(5, rt->size());
+        ConstTableRef alpha = rt->get_table("alpha");
+        ConstTableRef beta = rt->get_table("beta");
+        ConstTableRef gamma = rt->get_table("gamma");
+        ConstTableRef delta = rt->get_table("delta");
+        ConstTableRef epsilon = rt->get_table("epsilon");
+    }
     // Remove table with columns, but no link columns, and table is not a link
     // target.
     pid = test_util::fork_and_update_mappings();
@@ -1512,16 +1550,27 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     else {
         test_util::waitpid_checked(pid, 0, "remove alpha");
     }
-    rt->advance_read();
-    rt->verify();
+    {
+        std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+        DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
 
-    CHECK_EQUAL(4, rt->size());
-    CHECK_NOT(alpha);
-    CHECK(beta);
-    CHECK(gamma);
-    CHECK(delta);
-    CHECK(epsilon);
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        ConstTableRef alpha = rt->get_table("alpha");
+        ConstTableRef beta = rt->get_table("beta");
+        ConstTableRef gamma = rt->get_table("gamma");
+        ConstTableRef delta = rt->get_table("delta");
+        ConstTableRef epsilon = rt->get_table("epsilon");
+        rt->advance_read();
+        rt->verify();
 
+        CHECK_EQUAL(4, rt->size());
+        CHECK_NOT(alpha);
+        CHECK(beta);
+        CHECK(gamma);
+        CHECK(delta);
+        CHECK(epsilon);
+    }
     // Remove table with link column, and table is not a link target.
     pid = test_util::fork_and_update_mappings();
     if (pid == 0) {
@@ -1535,15 +1584,26 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     else {
         test_util::waitpid_checked(pid, 0, "remove beta");
     }
-    rt->advance_read();
-    rt->verify();
+    {
+        std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+        DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
 
-    CHECK_EQUAL(3, rt->size());
-    CHECK_NOT(beta);
-    CHECK(gamma);
-    CHECK(delta);
-    CHECK(epsilon);
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        rt->advance_read();
+        rt->verify();
 
+        ConstTableRef alpha = rt->get_table("alpha");
+        ConstTableRef beta = rt->get_table("beta");
+        ConstTableRef gamma = rt->get_table("gamma");
+        ConstTableRef delta = rt->get_table("delta");
+        ConstTableRef epsilon = rt->get_table("epsilon");
+        CHECK_EQUAL(3, rt->size());
+        CHECK_NOT(beta);
+        CHECK(gamma);
+        CHECK(delta);
+        CHECK(epsilon);
+    }
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
     pid = test_util::fork_and_update_mappings();
@@ -1558,14 +1618,25 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     else {
         test_util::waitpid_checked(pid, 0, "remove gamma");
     }
-    rt->advance_read();
-    rt->verify();
+    {
+        std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+        DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
 
-    CHECK_EQUAL(2, rt->size());
-    CHECK_NOT(gamma);
-    CHECK(delta);
-    CHECK(epsilon);
+        // Start a read transaction (to be repeatedly advanced)
+        TransactionRef rt = sg->start_read();
+        rt->advance_read();
+        rt->verify();
 
+        ConstTableRef alpha = rt->get_table("alpha");
+        ConstTableRef beta = rt->get_table("beta");
+        ConstTableRef gamma = rt->get_table("gamma");
+        ConstTableRef delta = rt->get_table("delta");
+        ConstTableRef epsilon = rt->get_table("epsilon");
+        CHECK_EQUAL(2, rt->size());
+        CHECK_NOT(gamma);
+        CHECK(delta);
+        CHECK(epsilon);
+    }
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     pid = test_util::fork_and_update_mappings();
@@ -1580,8 +1651,18 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     else {
         test_util::waitpid_checked(pid, 0, "remove delta");
     }
+    std::unique_ptr<Replication> hist_parent(make_in_realm_history());
+    DBRef sg = DB::create(*hist_parent, path, DBOptions(crypt_key()));
+
+    // Start a read transaction (to be repeatedly advanced)
+    TransactionRef rt = sg->start_read();
     rt->advance_read();
     rt->verify();
+    ConstTableRef alpha = rt->get_table("alpha");
+    ConstTableRef beta = rt->get_table("beta");
+    ConstTableRef gamma = rt->get_table("gamma");
+    ConstTableRef delta = rt->get_table("delta");
+    ConstTableRef epsilon = rt->get_table("epsilon");
 
     CHECK_EQUAL(2, rt->size());
     CHECK(delta);
@@ -2344,8 +2425,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -3304,9 +3384,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
         writepids[i] = fork();
         REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            multiple_trackers_writer_thread(sg);
+            {
+                std::unique_ptr<Replication> hist(make_in_realm_history());
+                DBRef sg = DB::create(*hist, path, DBOptions(key));
+                multiple_trackers_writer_thread(sg);
+            } // clean up sg before exit
             exit(0);
         }
     }
@@ -3316,10 +3398,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
         readpids[i] = fork();
         REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-
-            DBRef sg = DB::create(*hist, path, DBOptions(key));
-            multiple_trackers_reader_thread(test_context, sg);
+            {
+                std::unique_ptr<Replication> hist(make_in_realm_history());
+                DBRef sg = DB::create(*hist, path, DBOptions(key));
+                multiple_trackers_reader_thread(test_context, sg);
+            } // clean up sg before exit
             exit(0);
         }
     }
