@@ -879,7 +879,21 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.progress = progress;
     data.num_changesets = num_changesets;
     data.query_version = query_version;
-    return m_wrapper.m_debug_hook(data);
+
+    auto action = m_wrapper.m_debug_hook(data);
+    switch (action) {
+        case realm::SyncClientHookAction::SuspendWithRetryableError: {
+            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
+                                      true);
+            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+            auto err_processing_err = receive_error_message(err_info);
+            REALM_ASSERT(!err_processing_err);
+            return SyncClientHookAction::NoAction;
+        }
+        default:
+            return action;
+    }
 }
 
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
@@ -1482,11 +1496,6 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 void SessionWrapper::on_resumed()
 {
     m_suspended = false;
-    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
-        m_sess->logger.debug("Requesting download notification for query version %1 after resume",
-                             m_flx_pending_mark_version);
-        m_sess->request_download_completion_notification();
-    }
     if (m_connection_state_change_listener) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {

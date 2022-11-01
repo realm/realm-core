@@ -2277,28 +2277,27 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     SECTION("disconnect between bootstrap and mark") {
         SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
-        auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-        triggered_config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise), &bizz_obj_id,
-                                                                   &bar_obj_id](std::weak_ptr<SyncSession> weak_sess,
-                                                                                const SyncClientHookData& data) {
-            auto sess = weak_sess.lock();
-            if (!sess || data.event != SyncClientHookEvent::BootstrapProcessed || data.query_version != 1) {
+        triggered_config.sync_config->on_sync_client_event_hook =
+            [promise = util::CopyablePromiseHolder(std::move(interrupted_promise)), &bizz_obj_id,
+             &bar_obj_id](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) mutable {
+                auto sess = weak_sess.lock();
+                if (!sess || data.event != SyncClientHookEvent::BootstrapProcessed || data.query_version != 1) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                auto latest_subs = sess->get_flx_subscription_store()->get_latest();
+                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::AwaitingMark);
+                REQUIRE(data.num_changesets == 1);
+                auto db = SyncSession::OnlyForTesting::get_db(*sess);
+                auto read_tr = db->start_read();
+                auto table = read_tr->get_table("class_TopLevel");
+                REQUIRE(table->find_primary_key(bar_obj_id));
+                REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
+
+                sess->close();
+                promise.get_promise().emplace_value();
                 return SyncClientHookAction::NoAction;
-            }
-
-            auto latest_subs = sess->get_flx_subscription_store()->get_latest();
-            REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::AwaitingMark);
-            REQUIRE(data.num_changesets == 1);
-            auto db = SyncSession::OnlyForTesting::get_db(*sess);
-            auto read_tr = db->start_read();
-            auto table = read_tr->get_table("class_TopLevel");
-            REQUIRE(table->find_primary_key(bar_obj_id));
-            REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
-
-            sess->close();
-            promise->emplace_value();
-            return SyncClientHookAction::NoAction;
-        };
+            };
         auto problem_realm = Realm::get_shared_realm(triggered_config);
 
         // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
@@ -2331,6 +2330,60 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
 
         problem_realm->sync_session()->revive_if_needed();
+        sub_complete_future.get();
+        wait_for_advance(*problem_realm);
+
+        sub_set.refresh();
+        REQUIRE(sub_set.state() == sync::SubscriptionSet::State::Complete);
+        auto table = problem_realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table->find_primary_key(bar_obj_id));
+        REQUIRE(table->find_primary_key(bizz_obj_id));
+    }
+    SECTION("error/suspend between bootstrap and mark") {
+        SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+        triggered_config.sync_config->on_sync_client_event_hook =
+            [&bizz_obj_id, &bar_obj_id](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) {
+                auto sess = weak_sess.lock();
+                if (!sess || data.event != SyncClientHookEvent::BootstrapProcessed || data.query_version != 1) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                auto latest_subs = sess->get_flx_subscription_store()->get_latest();
+                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::AwaitingMark);
+                REQUIRE(data.num_changesets == 1);
+                auto db = SyncSession::OnlyForTesting::get_db(*sess);
+                auto read_tr = db->start_read();
+                auto table = read_tr->get_table("class_TopLevel");
+                REQUIRE(table->find_primary_key(bar_obj_id));
+                REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
+
+                return SyncClientHookAction::SuspendWithRetryableError;
+            };
+        auto problem_realm = Realm::get_shared_realm(triggered_config);
+
+        // Setup the problem realm by waiting for it to be fully synchronized with an empty query, so the router
+        // on the server should have no new history entries, and then pause the router so it doesn't get any of
+        // the changes we're about to create.
+        wait_for_upload(*problem_realm);
+        wait_for_download(*problem_realm);
+
+        nlohmann::json command_request = {
+            {"command", "PAUSE_ROUTER_SESSION"},
+        };
+        auto resp_body =
+            SyncSession::OnlyForTesting::send_test_command(*problem_realm->sync_session(), command_request.dump())
+                .get();
+        REQUIRE(resp_body == "{}");
+
+        // Put some data into the server, this will be the data that will be in the broker cache.
+        setup_and_poison_cache();
+
+        // Setup queries on the problem realm to bootstrap from the cached object. Bootstrapping will also resume
+        // the router, so all we need to do is wait for the subscription set to be complete and notifications to be
+        // processed.
+        auto sub_set = setup_subs(problem_realm);
+        auto sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
         sub_complete_future.get();
         wait_for_advance(*problem_realm);
 

@@ -140,6 +140,7 @@ enum class SyncClientHookEvent {
 enum class SyncClientHookAction {
     NoAction,
     EarlyReturn,
+    SuspendWithRetryableError,
 };
 
 struct SyncClientHookData {
