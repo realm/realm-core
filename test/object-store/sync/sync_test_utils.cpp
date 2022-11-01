@@ -86,7 +86,7 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::m
         if (std::chrono::steady_clock::now() - wait_start > max_ms) {
             throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
         }
-        millisleep(sleep_ms.count());
+        std::this_thread::sleep_for(sleep_ms);
     }
 }
 
