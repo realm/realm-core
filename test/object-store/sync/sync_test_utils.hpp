@@ -48,7 +48,8 @@ void timed_wait_for(util::FunctionRef<bool()> condition,
                     std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
 
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30));
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30),
+                             std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
 
 template <typename T>
 struct TimedFutureState : public util::AtomicRefCountBase {
