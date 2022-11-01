@@ -266,7 +266,7 @@ public:
 
         realm::util::UniqueFunction<void(const realm::app::Response&)>& network_callback;
     };
-    std::shared_ptr<realm::app::GenericNetworkTransport> transport = std::make_shared<Transport>(network_callback);
+    const std::shared_ptr<realm::app::GenericNetworkTransport> transport;
 
 private:
     std::shared_ptr<realm::app::App> m_app;

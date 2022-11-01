@@ -287,16 +287,20 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
-    if (realm->config().audit_config) {
 #ifdef REALM_ENABLE_SYNC
+    if (m_sync_session && m_sync_session->user()->is_logged_in())
+        m_sync_session->revive_if_needed();
+
+    if (realm->config().audit_config) {
         if (m_audit_context)
             m_audit_context->update_metadata(realm->config().audit_config->metadata);
         else
             m_audit_context = make_audit_context(m_db, realm->config());
+    }
 #else
+    if (realm->config().audit_config)
         REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
 #endif
-    }
 
     realm_lock.unlock_unchecked();
     if (schema) {
@@ -408,7 +412,6 @@ void RealmCoordinator::open_db()
         m_sync_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
         if (m_sync_session) {
             m_db = SyncSession::Internal::get_db(*m_sync_session);
-            m_sync_session->revive_if_needed();
             init_external_helpers();
             return;
         }

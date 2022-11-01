@@ -100,6 +100,7 @@ public:
             }
         }
     };
+
     std::vector<Service> get_services(const std::string& app_id) const;
     std::vector<std::string> get_errors(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;
@@ -114,6 +115,7 @@ public:
                                           ServiceConfig sync_config, bool disable) const;
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
+    bool is_initial_sync_complete(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {
