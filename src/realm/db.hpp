@@ -114,10 +114,10 @@ public:
     // calling DB::close(), but after that no new association can be established. To reopen the
     // file (or another file), a new DB object is needed. The specified Replication instance, if
     // any, must remain in existence for as long as the DB.
-    static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-    static DBRef create(Replication& repl, const std::string& file, const DBOptions options = DBOptions());
+    static DBRef create(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
+    static DBRef create(Replication& repl, const std::string& file, const DBOptions& options = DBOptions());
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
-                        const DBOptions options = DBOptions());
+                        const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
@@ -504,11 +504,11 @@ private:
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
-    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+    void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
     void open(BinaryData, bool take_ownership = true);
-    void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
+    void open(Replication&, const std::string& file, const DBOptions& options = DBOptions());
 
-    void do_open(const std::string& file, bool no_create, const DBOptions options);
+    void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
     Replication* const* get_repl() const noexcept
     {
