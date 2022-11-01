@@ -108,8 +108,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto session2 = sync_session(user, "/test1c-2", [](auto, auto) {});
         // Run the runloop many iterations to see if the sessions spuriously bind.
         spin_runloop();
-        REQUIRE(sessions_are_inactive(*session1));
-        REQUIRE(sessions_are_inactive(*session2));
+        REQUIRE(session1->state() == SyncSession::State::Inactive);
+        REQUIRE(session2->state() == SyncSession::State::Inactive);
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -137,8 +137,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         // Run the runloop many iterations to see if the sessions spuriously rebind.
         spin_runloop();
-        REQUIRE(sessions_are_inactive(*session1));
-        REQUIRE(sessions_are_inactive(*session2));
+        REQUIRE(session1->state() == SyncSession::State::Inactive);
+        REQUIRE(session2->state() == SyncSession::State::Inactive);
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
