@@ -504,7 +504,6 @@ void MutableSubscriptionSet::process_notifications()
         return mgr->m_outstanding_requests == 0;
     });
 
-
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
         if ((it->version == my_version &&
              (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
