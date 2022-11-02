@@ -25,10 +25,16 @@ namespace realm::util {
 const char* Logger::get_level_prefix(Level level) noexcept
 {
     switch (level) {
+        case Level::off:
+            [[fallthrough]];
         case Level::all:
+            [[fallthrough]];
         case Level::trace:
+            [[fallthrough]];
         case Level::debug:
+            [[fallthrough]];
         case Level::detail:
+            [[fallthrough]];
         case Level::info:
             break;
         case Level::warn:
@@ -37,21 +43,19 @@ const char* Logger::get_level_prefix(Level level) noexcept
             return "ERROR: ";
         case Level::fatal:
             return "FATAL: ";
-        case Level::off:
-            break;
     }
     return "";
 }
 
 void StderrLogger::do_log(Level level, const std::string& message)
 {
-    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
+    std::cerr << get_level_prefix(level) << message << std::endl; // Throws
     std::cerr.flush();                                       // Throws
 }
 
 void StreamLogger::do_log(Level level, const std::string& message)
 {
-    m_out << get_level_prefix(level) << message << '\n'; // Throws
+    m_out << get_level_prefix(level) << message << std::endl; // Throws
     m_out.flush();                                       // Throws
 }
 
