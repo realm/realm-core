@@ -2199,8 +2199,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -3315,6 +3314,48 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     group->verify();
 }
 
+ONLY(LangBindHelper_ScannerLoad)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(DBOptions::Durability::MemOnly));
+    auto tr = sg->start_write();
+    auto table = tr->add_table("table");
+    auto col = table->add_column(type_Binary, "col");
+    int32_t* blob = new int32_t[1250000];
+    for (int32_t v = 0; v < 1250000; ++v) {
+        blob[v] = v;
+    }
+    BinaryData bd = BinaryData((char*)blob, sizeof(int32_t) * 1250000);
+    auto start = std::chrono::steady_clock::now();
+    for (int run = 0; run < 500; ++run) { // store 120 GB
+        for (int k = 0; k < 100; ++k) {   // store 600 MB
+            if (run > 200) {
+                // remove oldest object
+                auto tbr = table->get_object(0);
+                tbr.remove();
+            }
+            auto obj = table->create_object();
+            obj.set<BinaryData>(col, bd);
+            tr->commit_and_continue_as_read();
+            tr->promote_to_write();
+        }
+        auto end = std::chrono::steady_clock::now();
+        auto took = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        std::cout << run << ":  " << took << std::endl;
+
+        if (took < 1000) {
+            auto pause = 1000 - took;
+            millisleep(pause);
+            end = std::chrono::steady_clock::now();
+        }
+        else {
+            std::cout << "           Over time limit" << std::endl;
+        }
+        start = end;
+    }
+}
 
 TEST(LangBindHelper_MemOnly)
 {
