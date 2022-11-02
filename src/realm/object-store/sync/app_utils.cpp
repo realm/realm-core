@@ -87,7 +87,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     }
 
     if (http_status_code_is_fatal) {
-        error_msg = response.body.empty() ? "http error code considered fatal" : response.body;
+        error_msg = response.body.empty() ? "http error code considered fatal"
+                                          : "http error code considered fatal: " + response.body;
         return AppError(make_http_error_code(response.http_status_code), error_msg, "", response.http_status_code);
     }
 
