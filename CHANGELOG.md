@@ -18,7 +18,7 @@
 
 ### Internals
 * Fix `BPlusTreeInner::verify()` ([#5974]( https://github.com/realm/realm-core/pull/5974)).
-* Updated install_baas stitch support libraries to 4.4.17 ([PR #]())
+* Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
 
 ----------------------------------------------
 
