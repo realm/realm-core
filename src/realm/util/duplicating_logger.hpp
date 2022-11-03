@@ -30,7 +30,8 @@ private:
 // Implementation
 
 inline DuplicatingLogger::DuplicatingLogger(Logger& base_logger, Logger& aux_logger) noexcept
-    : m_base_logger{base_logger}
+    : Logger(base_logger.get_level_threshold())
+    , m_base_logger{base_logger}
     , m_aux_logger{aux_logger}
 {
 }

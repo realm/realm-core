@@ -3123,7 +3123,6 @@ TEST(Sync_UploadDownloadProgress_1)
 
         Client::Config config;
         config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
-        ;
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
 

@@ -525,7 +525,7 @@ public:
 
     file_ident_type local_file_ident;
     DBTestPathGuard path_guard;
-    std::shared_ptr<util::Logger> m_logger;
+    util::Logger& m_logger;
     ShortCircuitHistory history;
     DBRef shared_group;
     TransactionRef group; // Null when no transaction is in progress
@@ -546,7 +546,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
     }
 
     // FIXME: Remove the dependency on the unit_test namespace.
@@ -562,7 +562,7 @@ public:
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         return std::unique_ptr<Peer>(
-            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, test_context.logger));
+            new Peer(client_file_ident, test_path, changeset_dump_dir_gen, *(test_context.logger)));
     }
 
     template <class F>
@@ -638,7 +638,7 @@ public:
         file_ident_type remote_file_ident = remote.local_file_ident;
         version_type new_version =
             history.integrate_remote_changesets(remote_file_ident, *shared_group, changesets.get(), num_changesets,
-                                                *m_logger); // Throws
+                                                m_logger); // Throws
         current_version = new_version;
         last_remote_version = changesets[num_changesets - 1].remote_version;
         return false;
@@ -659,7 +659,7 @@ public:
 
 private:
     Peer(file_ident_type file_ident, const std::string& test_path, TestDirNameGenerator* changeset_dump_dir_gen,
-         const std::shared_ptr<util::Logger>& l)
+         util::Logger& l)
         : local_file_ident(file_ident)
         , path_guard(test_path) // Throws
         , m_logger(l)

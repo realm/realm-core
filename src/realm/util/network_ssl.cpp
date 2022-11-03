@@ -655,7 +655,7 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
     Stream* stream = static_cast<Stream*>(SSL_get_ex_data(ssl, 0));
     REALM_ASSERT(stream);
 
-    util::Logger* logger = stream->m_logger);
+    util::Logger* logger = stream->m_logger;
 
     const std::string& host_name = stream->m_host_name;
     port_type server_port = stream->m_server_port;
