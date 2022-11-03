@@ -1472,7 +1472,7 @@ void SessionWrapper::on_download_completion()
 
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
         m_sess->m_logger.debug("Marking query version %1 as complete after receiving MARK message",
-                             m_flx_pending_mark_version);
+                               m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
         mutable_subs.update_state(SubscriptionSet::State::Complete);
         std::move(mutable_subs).commit();

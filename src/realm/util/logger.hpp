@@ -126,7 +126,6 @@ std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 /// to be changed over time. The initial log level threshold is
 /// Logger::Level::info.
 class RootLogger : public Logger {
-
 protected:
     RootLogger(Level level = Level::info) noexcept
         : Logger(level)
