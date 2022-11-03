@@ -117,6 +117,9 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
+    // no so sure this is actually making a difference, but if there are any pages that are not msynced, before to
+    // call unmap(), we risk to lose some data.
+    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -271,7 +274,15 @@ void GroupWriter::flush_all_mappings()
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
-        window->flush();
+        window->sync();
+        // window->flush();
+        // this seems to be the difference.
+        // Flushing the pages has no effect (unless we are using encryption).
+        // Not calling msync can be problematic, and IOS seems to be forgetting
+        // some pages once we hit the barrier.
+        // Probably other platforms are better at keeping the list of memory mapped areas
+        // and calling the equivalent of linux fsync() just suffices.
+        // On IOS does not.
     }
 }
 
@@ -291,7 +302,11 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        m_map_windows.back()->flush();
+        // same here as per the commit function comment
+        if (m_durability != Durability::Unsafe)
+            m_map_windows.back()->sync();
+        else
+            m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
@@ -926,6 +941,10 @@ void GroupWriter::commit(ref_type new_top_ref)
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
     if (!disable_sync)
         window->sync();
+
+    // here we should probably have another barrier, just in case.
+    // however this is going to be costly on all other platforms but IOS.
+    // m_alloc.get_file().barrier();
 }
 
 
