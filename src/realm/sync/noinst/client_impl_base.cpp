@@ -155,13 +155,13 @@ ClientImpl::ClientImpl(ClientConfig config)
     REALM_ASSERT(m_event_loop != nullptr);
     m_event_loop->register_event_loop_observer(util::websocket::EventLoopClient::EventLoopObserver{
         [this]() { // starting event_loop
-            m_logger.trace("EventLoop: started");
+            logger.trace("EventLoop: started");
             if (g_binding_callback_thread_observer) {
                 g_binding_callback_thread_observer->did_create_thread();
             }
         },
         [this]() { // stopping event_loop
-            m_logger.trace("EventLoop: stopped");
+            logger.trace("EventLoop: stopped");
             if (m_stop_promise) {
                 // If sync_start() is waiting, free it now...
                 m_stop_promise->emplace_value();
@@ -171,7 +171,7 @@ ClientImpl::ClientImpl(ClientConfig config)
             }
         },
         [this](std::exception const& e) { // event_loop error
-            m_logger.error("EventLoop: exception occurred: %1", e.what());
+            logger.error("EventLoop: exception occurred: %1", e.what());
             if (g_binding_callback_thread_observer) {
                 g_binding_callback_thread_observer->handle_error(e);
             }
