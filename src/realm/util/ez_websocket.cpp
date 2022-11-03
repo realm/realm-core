@@ -10,12 +10,13 @@ namespace {
 class EZSocketImpl final : public EZSocket, public websocket::Config {
 public:
     EZSocketImpl(EZConfig& config, EZObserver& observer, EZEndpoint&& endpoint)
-        : m_logger(config.logger)
-        , m_random(config.random)
-        , m_service(config.service)
-        , m_user_agent(config.user_agent)
-        , m_observer(observer)
-        , m_endpoint(std::move(endpoint))
+        : m_logger_ptr{config.logger}
+        , m_logger{*m_logger_ptr}
+        , m_random{config.random}
+        , m_service{config.service}
+        , m_user_agent{config.user_agent}
+        , m_observer{observer}
+        , m_endpoint{std::move(endpoint)}
         , m_websocket(*this)
     {
         initiate_resolve();
@@ -34,7 +35,7 @@ public:
 private:
     using milliseconds_type = std::int_fast64_t;
 
-    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
+    util::Logger& websocket_get_logger() noexcept override
     {
         return m_logger;
     }
@@ -51,12 +52,12 @@ private:
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
-        m_logger->error("Reading failed: %1", ec.message()); // Throws
+        m_logger.error("Reading failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
-        m_logger->error("Writing failed: %1", ec.message()); // Throws
+        m_logger.error("Writing failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
@@ -95,7 +96,8 @@ private:
     void initiate_pong_timeout();
     void handle_pong_timeout();
 
-    const std::shared_ptr<util::Logger> m_logger;
+    const std::shared_ptr<util::Logger> m_logger_ptr;
+    util::Logger& m_logger;
     std::mt19937_64& m_random;
     util::network::Service& m_service;
     std::string m_user_agent;
@@ -158,7 +160,7 @@ void EZSocketImpl::initiate_resolve()
         // logger.detail("Using %1 proxy", proxy->type); // Throws
     }
 
-    m_logger->detail("Resolving '%1:%2'", address, port); // Throws
+    m_logger.detail("Resolving '%1:%2'", address, port); // Throws
 
     util::network::Resolver::Query query(address, util::to_string(port)); // Throws
     auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
@@ -175,7 +177,7 @@ void EZSocketImpl::initiate_resolve()
 void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
 {
     if (ec) {
-        m_logger->error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
+        m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
         m_observer.websocket_connect_error_handler(ec);                                                     // Throws
         return;
     }
@@ -197,7 +199,7 @@ void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints,
         if (ec != util::error::operation_aborted)
             handle_tcp_connect(ec, std::move(endpoints), i); // Throws
     });
-    m_logger->detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
+    m_logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
 
@@ -206,23 +208,23 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
-        m_logger->error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
-                        ec.message()); // Throws
+        m_logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
+                       ec.message()); // Throws
         std::size_t i_2 = i + 1;
         if (i_2 < endpoints.size()) {
             initiate_tcp_connect(std::move(endpoints), i_2); // Throws
             return;
         }
         // All endpoints failed
-        m_logger->error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
+        m_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
         m_observer.websocket_connect_error_handler(ec); // Throws
         return;
     }
 
     REALM_ASSERT(m_socket);
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
-    m_logger->info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
-                   ep_2.port()); // Throws
+    m_logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
+                  ep_2.port()); // Throws
 
     // TODO: Handle HTTPS proxies
     if (m_endpoint.proxy) {
@@ -253,13 +255,13 @@ void EZSocketImpl::initiate_http_tunnel()
     m_proxy_client.emplace(*this, m_logger);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
-            m_logger->error("Failed to establish HTTP tunnel: %1", ec.message());
+            m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             m_observer.websocket_connect_error_handler(ec); // Throws
             return;
         }
 
         if (response.status != HTTPStatus::Ok) {
-            m_logger->error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
+            m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
                 util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
             m_observer.websocket_connect_error_handler(ec2);                 // Throws
@@ -289,7 +291,7 @@ void EZSocketImpl::initiate_ssl_handshake()
     }
 
     m_ssl_stream.emplace(*m_socket, *m_ssl_context, Stream::client); // Throws
-    m_ssl_stream->set_logger(m_logger);
+    m_ssl_stream->set_logger(m_logger_ptr.get());
     m_ssl_stream->set_host_name(m_endpoint.address); // Throws
     if (m_endpoint.verify_servers_ssl_certificate) {
         m_ssl_stream->set_verify_mode(VerifyMode::peer); // Throws

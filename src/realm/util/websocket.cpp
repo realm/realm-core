@@ -276,7 +276,8 @@ size_t make_frame(bool fin, int opcode, bool mask, const char* payload, size_t p
 //
 class FrameReader {
 public:
-    std::shared_ptr<util::Logger> logger;
+    // FrameReader is owned by a websocket, so a shared_ptr is not needed
+    util::Logger& m_logger;
 
     char* delivery_buffer = nullptr;
     size_t delivery_size = 0;
@@ -286,8 +287,8 @@ public:
     bool delivery_ready = false;
     websocket::Opcode delivery_opcode = websocket::Opcode::continuation;
 
-    FrameReader(const std::shared_ptr<util::Logger>& logger, bool& is_client)
-        : logger(logger)
+    FrameReader(util::Logger& logger, bool& is_client)
+        : m_logger(logger)
         , m_is_client(is_client)
     {
     }
@@ -570,13 +571,13 @@ public:
         , m_logger(config.websocket_get_logger())
         , m_frame_reader(config.websocket_get_logger(), m_is_client)
     {
-        m_logger->debug("WebSocket::Websocket()");
+        m_logger.debug("WebSocket::Websocket()");
     }
 
     void initiate_client_handshake(const std::string& request_uri, const std::string& host,
                                    const std::string& sec_websocket_protocol, HTTPHeaders headers)
     {
-        m_logger->debug("WebSocket::initiate_client_handshake()");
+        m_logger.debug("WebSocket::initiate_client_handshake()");
 
         m_stopped = false;
         m_is_client = true;
@@ -596,7 +597,7 @@ public:
         req.headers["Sec-WebSocket-Version"] = sec_websocket_version;
         req.headers["Sec-WebSocket-Protocol"] = sec_websocket_protocol;
 
-        m_logger->trace("HTTP request =\n%1", req);
+        m_logger.trace("HTTP request =\n%1", req);
 
         auto handler = [this](HTTPResponse response, std::error_code ec) {
             // If the operation is aborted, the WebSocket object may have been destroyed.
@@ -632,7 +633,7 @@ public:
 
     void initiate_server_handshake()
     {
-        m_logger->debug("WebSocket::initiate_server_handshake()");
+        m_logger.debug("WebSocket::initiate_server_handshake()");
 
         m_stopped = false;
         m_is_client = false;
@@ -724,7 +725,8 @@ public:
 
 private:
     websocket::Config& m_config;
-    std::shared_ptr<util::Logger> m_logger;
+    // Wesocket is owned by the server or websocket factory, so a shared_ptr isn't needed
+    util::Logger& m_logger;
     FrameReader m_frame_reader;
 
     bool m_stopped = false;
@@ -745,7 +747,7 @@ private:
     void error_client_malformed_response()
     {
         m_stopped = true;
-        m_logger->error("WebSocket: Received malformed HTTP response");
+        m_logger.error("WebSocket: Received malformed HTTP response");
         std::error_code ec = Error::bad_response_invalid_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
@@ -754,9 +756,9 @@ private:
     {
         m_stopped = true;
 
-        m_logger->error("Websocket: Expected HTTP response 101 Switching Protocols, "
-                        "but received:\n%1",
-                        response);
+        m_logger.error("Websocket: Expected HTTP response 101 Switching Protocols, "
+                       "but received:\n%1",
+                       response);
 
         int status_code = int(response.status);
         std::error_code ec;
@@ -805,9 +807,9 @@ private:
     {
         m_stopped = true;
 
-        m_logger->error("Websocket: HTTP response has invalid websocket headers."
-                        "HTTP response = \n%1",
-                        response);
+        m_logger.error("Websocket: HTTP response has invalid websocket headers."
+                       "HTTP response = \n%1",
+                       response);
         std::error_code ec = Error::bad_response_header_protocol_violation;
         std::string_view body;
         std::string_view* body_ptr = nullptr;
@@ -821,7 +823,7 @@ private:
     void error_server_malformed_request()
     {
         m_stopped = true;
-        m_logger->error("WebSocket: Received malformed HTTP request");
+        m_logger.error("WebSocket: Received malformed HTTP request");
         std::error_code ec = Error::bad_request_malformed_http;
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
@@ -830,9 +832,9 @@ private:
     {
         m_stopped = true;
 
-        m_logger->error("Websocket: HTTP request has invalid websocket headers."
-                        "HTTP request = \n%1",
-                        request);
+        m_logger.error("Websocket: HTTP request has invalid websocket headers."
+                       "HTTP request = \n%1",
+                       request);
         m_config.websocket_handshake_error_handler(ec, &request.headers, nullptr); // Throws
     }
 
@@ -845,8 +847,8 @@ private:
     // The client receives the HTTP response.
     void handle_http_response_received(HTTPResponse response)
     {
-        m_logger->debug("WebSocket::handle_http_response_received()");
-        m_logger->trace("HTTP response = %1", response);
+        m_logger.debug("WebSocket::handle_http_response_received()");
+        m_logger.trace("HTTP response = %1", response);
 
         if (response.status != HTTPStatus::SwitchingProtocols) {
             error_client_response_not_101(response);
@@ -870,7 +872,7 @@ private:
 
     void handle_http_request_received(HTTPRequest request)
     {
-        m_logger->trace("WebSocket::handle_http_request_received()");
+        m_logger.trace("WebSocket::handle_http_request_received()");
 
         util::Optional<std::string> sec_websocket_protocol = websocket::read_sec_websocket_protocol(request);
 

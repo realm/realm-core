@@ -372,6 +372,13 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger;
 
+    // Logger is lazily set in configure(). these helpers prevent all the
+    // checks for if(m_logger) throughout the code.
+    template <class... Params>
+    void log_debug(const char* message, Params&&... params);
+    template <class... Params>
+    void log_error(const char* message, Params&&... params);
+
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
     void refresh_access_token(const std::shared_ptr<SyncUser>& user,

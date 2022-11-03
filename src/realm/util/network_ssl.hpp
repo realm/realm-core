@@ -203,7 +203,7 @@ public:
 
     enum HandshakeType { client, server };
 
-    std::shared_ptr<util::Logger> m_logger = nullptr;
+    util::Logger* m_logger = nullptr;
 
     Stream(Socket&, Context&, HandshakeType);
     ~Stream() noexcept;
@@ -211,7 +211,7 @@ public:
     /// \brief set_logger() set a logger for the stream class. If
     /// set_logger() is not called, no logging will take place by
     /// the Stream class.
-    void set_logger(const std::shared_ptr<util::Logger>&);
+    void set_logger(util::Logger*);
 
     /// \brief Set the certificate verification mode for this SSL stream.
     ///
@@ -749,7 +749,7 @@ inline Stream::~Stream() noexcept
     ssl_destroy();
 }
 
-inline void Stream::set_logger(const std::shared_ptr<util::Logger>& logger)
+inline void Stream::set_logger(util::Logger* logger)
 {
     m_logger = logger;
 }

@@ -1687,7 +1687,7 @@ TEST(Sync_HTTP404NotFound)
     util::HTTPRequest request;
     request.path = "/not-found";
 
-    HTTPRequestClient client(test_context.logger, endpoint, request);
+    HTTPRequestClient client(*(test_context.logger), endpoint, request);
     client.fetch_response();
 
     server.stop();
@@ -1774,7 +1774,6 @@ TEST(Sync_HTTP_ContentLength)
 
     Server::Config server_config;
     server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
-    ;
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -2328,8 +2327,10 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    test_context.logger->info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
-                              number_of_transactions);
+    util::Logger& logger = *(test_context.logger);
+
+    logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
+                number_of_transactions);
 
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
@@ -2376,7 +2377,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
         if (i % 1000 == 0) {
             auto duration =
                 std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
-            test_context.logger->info("Duration of single changeset upload(%1) = %2 ms", i, duration);
+            logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
 }
@@ -2389,8 +2390,10 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    test_context.logger->info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
-                              number_of_transactions);
+    util::Logger& logger = *(test_context.logger);
+
+    logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
+                number_of_transactions);
 
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
@@ -2439,7 +2442,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
         if (i % 1000 == 0) {
             auto duration =
                 std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
-            test_context.logger->info("Duration of single changeset upload(%1) = %2 ms", i, duration);
+            logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
 }
@@ -3118,10 +3121,9 @@ TEST(Sync_UploadDownloadProgress_1)
         std::mutex mutex;
         std::condition_variable cond_var;
 
-        std::shared_ptr<util::Logger> logger = test_context.logger;
-        auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", logger);
         Client::Config config;
-        config.logger = client_logger;
+        config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+        ;
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
 
@@ -3371,7 +3373,6 @@ TEST(Sync_UploadDownloadProgress_3)
 
     Server::Config server_config;
     server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
-    ;
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -3394,7 +3395,6 @@ TEST(Sync_UploadDownloadProgress_3)
 
     Client::Config client_config;
     client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
-    ;
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
 
@@ -3678,7 +3678,6 @@ TEST(Sync_UploadDownloadProgress_6)
 
     Server::Config server_config;
     server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
-    ;
     server_config.listen_address = "localhost";
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -5047,11 +5046,11 @@ TEST_IF(Sync_SSL_Certificates, false)
 
     size_t num_servers = sizeof(server_address) / sizeof(server_address[0]);
 
-    util::PrefixLogger client_logger("Client: ", test_context.logger);
+    auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
 
     for (size_t i = 0; i < num_servers; ++i) {
         Client::Config client_config;
-        client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+        client_config.logger = client_logger;
         client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
 
@@ -5074,7 +5073,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
-                client_logger.debug(
+                client_logger->debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
                     error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
@@ -6344,7 +6343,6 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     SHARED_GROUP_TEST_PATH(path);
     ClientReplication repl;
     auto local_db = realm::DB::create(repl, path);
-    auto& logger = test_context.logger;
     auto& history = repl.get_history();
     history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
 
@@ -6359,7 +6357,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
         realm::util::SimpleNoCopyInputStream changeset_stream(unparsed_changeset);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
-        logger->info("changeset at version %1: %2", last_version, parsed_changeset);
+        test_context.logger->info("changeset at version %1: %2", last_version, parsed_changeset);
         last_version_observed = last_version;
         return parsed_changeset;
     };

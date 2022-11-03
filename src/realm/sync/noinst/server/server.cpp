@@ -698,7 +698,7 @@ inline void ServerFile::group_finalize_work_stage_2()
 // transactions, but only on subtier nodes of a star topology server cluster.
 class Worker : public ServerHistory::Context {
 public:
-    std::shared_ptr<util::Logger> m_logger;
+    util::PrefixLogger m_logger;
 
     explicit Worker(ServerImpl&);
 
@@ -751,7 +751,8 @@ public:
 
     util::Mutex last_client_accesses_mutex;
 
-    std::shared_ptr<util::Logger> m_logger;
+    std::shared_ptr<util::Logger> m_logger_ptr;
+    util::Logger& m_logger;
 
     util::network::Service& get_service() noexcept
     {
@@ -1069,13 +1070,14 @@ private:
 
 class SyncConnection : public util::websocket::Config {
 public:
-    std::shared_ptr<util::Logger> m_logger;
+    // The SyncConnection lifetime is tied to the ServerImpl, so no need for a shared_ptr
+    util::PrefixLogger m_logger;
 
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<util::network::Socket>&& socket,
                    std::unique_ptr<util::network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<util::network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint)
-        : m_logger{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.m_logger)} // Throws
+        : m_logger(make_logger_prefix(id), serv.m_logger) // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{std::move(socket)}
@@ -1125,7 +1127,7 @@ public:
         return m_remote_endpoint;
     }
 
-    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept final
+    util::Logger& websocket_get_logger() noexcept final
     {
         return m_logger;
     }
@@ -1216,7 +1218,7 @@ public:
 
     void websocket_protocol_error_handler(std::error_code ec) final override
     {
-        m_logger->error("WebSocket protocol error (%1): %2", ec, ec.message()); // Throws
+        m_logger.error("WebSocket protocol error (%1): %2", ec, ec.message()); // Throws
         close_due_to_error(ec);                                              // Throws
     }
 
@@ -1401,12 +1403,12 @@ inline void SyncConnection::read_error(std::error_code ec)
         return;
     }
     if (ec == util::MiscExtErrors::delim_not_found) {
-        m_logger->error("Input message head delimited not found"); // Throws
+        m_logger.error("Input message head delimited not found"); // Throws
         protocol_error(ProtocolError::limits_exceeded);         // Throws
         return;
     }
 
-    m_logger->error("Reading failed: %1", ec.message()); // Throws
+    m_logger.error("Reading failed: %1", ec.message()); // Throws
 
     // Suicide
     close_due_to_error(ec); // Throws
@@ -1420,7 +1422,7 @@ inline void SyncConnection::write_error(std::error_code ec)
         close_due_to_close_by_client(ec); // Throws
         return;
     }
-    m_logger->error("Writing failed: %1", ec.message()); // Throws
+    m_logger.error("Writing failed: %1", ec.message()); // Throws
 
     // Suicide
     close_due_to_error(ec); // Throws
@@ -1433,10 +1435,11 @@ std::string g_user_agent = "User-Agent";
 
 class HTTPConnection {
 public:
-    std::shared_ptr<util::Logger> m_logger;
+    // An HTTPConnection is owned by the ServerImpl so no shared_ptr neeeded
+    util::PrefixLogger m_logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : m_logger{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.m_logger)} // Throws
+        : m_logger(make_logger_prefix(id), serv.m_logger) // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{new util::network::Socket{serv.get_service()}} // Throws
@@ -1512,7 +1515,7 @@ public:
         m_last_activity_at = steady_clock_now();
         m_remote_endpoint = std::move(remote_endpoint);
 
-        m_logger->detail("Connection from %1", m_remote_endpoint); // Throws
+        m_logger.detail("Connection from %1", m_remote_endpoint); // Throws
 
         if (m_ssl_stream) {
             initiate_ssl_handshake(); // Throws
@@ -1541,7 +1544,7 @@ public:
     template <class... Params>
     void terminate(Logger::Level log_level, const char* log_message, Params... log_params)
     {
-        m_logger->log(log_level, log_message, log_params...); // Throws
+        m_logger.log(log_level, log_message, log_params...); // Throws
         m_ssl_stream.reset();
         m_socket.reset();
         m_server.remove_http_connection(m_id); // Suicide
@@ -1592,7 +1595,7 @@ private:
     void handle_ssl_handshake(std::error_code ec)
     {
         if (ec) {
-            m_logger->error("SSL handshake error (%1): %2", ec, ec.message()); // Throws
+            m_logger.error("SSL handshake error (%1): %2", ec, ec.message()); // Throws
             close_due_to_error(ec);                                         // Throws
             return;
         }
@@ -1601,18 +1604,18 @@ private:
 
     void initiate_http()
     {
-        m_logger->debug("Connection initiates HTTP receipt");
+        m_logger.debug("Connection initiates HTTP receipt");
 
         auto handler = [this](HTTPRequest request, std::error_code ec) {
             if (REALM_UNLIKELY(ec == util::error::operation_aborted))
                 return;
             if (REALM_UNLIKELY(ec == HTTPParserError::MalformedRequest)) {
-                m_logger->error("Malformed HTTP request");
+                m_logger.error("Malformed HTTP request");
                 close_due_to_error(ec); // Throws
                 return;
             }
             if (REALM_UNLIKELY(ec == HTTPParserError::BadRequest)) {
-                m_logger->error("Bad HTTP request");
+                m_logger.error("Bad HTTP request");
                 const char* body = "The HTTP request was corrupted";
                 handle_400_bad_request(body); // Throws
                 return;
@@ -1630,7 +1633,7 @@ private:
     {
         StringData path = request.path;
 
-        m_logger->debug("HTTP request received, request = %1", request);
+        m_logger.debug("HTTP request received, request = %1", request);
 
         m_is_sending = true;
         m_last_activity_at = steady_clock_now();
@@ -1651,8 +1654,8 @@ private:
     void handle_request_for_sync(const HTTPRequest& request)
     {
         if (m_server.is_sync_stopped()) {
-            m_logger->debug("Attempt to create a sync connection to a server that has been "
-                            "stopped"); // Throws
+            m_logger.debug("Attempt to create a sync connection to a server that has been "
+                           "stopped"); // Throws
             handle_503_service_unavailable(request, "The server does not accept sync "
                                                     "connections"); // Throws
             return;
@@ -1704,21 +1707,21 @@ private:
                         protocol_version_ranges.emplace_back(min, max); // Throws
                         continue;
                     }
-                    m_logger->error("Protocol version negotiation failed: Client sent malformed "
-                                    "specification of supported protocol versions: '%1'",
-                                    elem); // Throws
+                    m_logger.error("Protocol version negotiation failed: Client sent malformed "
+                                   "specification of supported protocol versions: '%1'",
+                                   elem); // Throws
                     handle_400_bad_request("Protocol version negotiation failed: Malformed "
                                            "specification of supported protocol "
                                            "versions\n"); // Throws
                     return;
                 }
-                m_logger->warn("Unrecognized protocol token in HTTP response header "
-                               "Sec-WebSocket-Protocol: '%1'",
-                               elem); // Throws
+                m_logger.warn("Unrecognized protocol token in HTTP response header "
+                              "Sec-WebSocket-Protocol: '%1'",
+                              elem); // Throws
             }
             if (protocol_version_ranges.empty()) {
-                m_logger->error("Protocol version negotiation failed: Client did not send a "
-                                "specification of supported protocol versions"); // Throws
+                m_logger.error("Protocol version negotiation failed: Client did not send a "
+                               "specification of supported protocol versions"); // Throws
                 handle_400_bad_request("Protocol version negotiation failed: Missing specification "
                                        "of supported protocol versions\n"); // Throws
                 return;
@@ -1775,9 +1778,9 @@ private:
                 };
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
-                m_logger->error("Protocol version negotiation failed: %1 "
-                                "(client supports: %2)",
-                                elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
+                m_logger.error("Protocol version negotiation failed: %1 "
+                               "(client supports: %2)",
+                               elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
                 formatter.reset();
                 formatter << "Protocol version negotiation failed: "
                              ""
@@ -1797,8 +1800,8 @@ private:
                 return;
             }
             negotiated_protocol_version = best_match;
-            m_logger->debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
-                            negotiated_protocol_version); // Throws
+            m_logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
+                           negotiated_protocol_version); // Throws
             formatter.reset();
         }
 
@@ -1816,21 +1819,21 @@ private:
 
         if (ec) {
             if (ec == websocket::Error::bad_request_header_upgrade) {
-                m_logger->error("There must be a header of the form 'Upgrade: websocket'");
+                m_logger.error("There must be a header of the form 'Upgrade: websocket'");
             }
             else if (ec == websocket::Error::bad_request_header_connection) {
-                m_logger->error("There must be a header of the form 'Connection: Upgrade'");
+                m_logger.error("There must be a header of the form 'Connection: Upgrade'");
             }
             else if (ec == websocket::Error::bad_request_header_websocket_version) {
-                m_logger->error("There must be a header of the form 'Sec-WebSocket-Version: 13'");
+                m_logger.error("There must be a header of the form 'Sec-WebSocket-Version: 13'");
             }
             else if (ec == websocket::Error::bad_request_header_websocket_key) {
-                m_logger->error("The header Sec-WebSocket-Key is missing");
+                m_logger.error("The header Sec-WebSocket-Key is missing");
             }
 
-            m_logger->error("The HTTP request with the error is:\n%1", request);
-            m_logger->error("Check the proxy configuration and make sure that the "
-                            "HTTP request is a valid Websocket request.");
+            m_logger.error("The HTTP request with the error is:\n%1", request);
+            m_logger.error("Check the proxy configuration and make sure that the "
+                           "HTTP request is a valid Websocket request.");
             close_due_to_error(ec);
             return;
         }
@@ -1893,20 +1896,20 @@ private:
 
     void handle_400_bad_request(std::string_view body)
     {
-        m_logger->detail("400 Bad Request");
+        m_logger.detail("400 Bad Request");
         handle_text_response(HTTPStatus::BadRequest, body); // Throws
     }
 
     void handle_404_not_found(const HTTPRequest&)
     {
-        m_logger->detail("404 Not Found"); // Throws
+        m_logger.detail("404 Not Found"); // Throws
         handle_text_response(HTTPStatus::NotFound,
                              "Realm sync server\n\nPage not found\n"); // Throws
     }
 
     void handle_503_service_unavailable(const HTTPRequest&, std::string_view message)
     {
-        m_logger->debug("503 Service Unavailable");                    // Throws
+        m_logger.debug("503 Service Unavailable");                     // Throws
         handle_text_response(HTTPStatus::ServiceUnavailable, message); // Throws
     }
 
@@ -1924,12 +1927,12 @@ private:
             return;
         }
         if (ec == util::MiscExtErrors::delim_not_found) {
-            m_logger->error("Input message head delimited not found"); // Throws
+            m_logger.error("Input message head delimited not found"); // Throws
             close_due_to_error(ec);                                 // Throws
             return;
         }
 
-        m_logger->error("Reading failed: %1", ec.message()); // Throws
+        m_logger.error("Reading failed: %1", ec.message()); // Throws
 
         // Suicide
         close_due_to_error(ec); // Throws
@@ -1943,7 +1946,7 @@ private:
             close_due_to_close_by_client(ec); // Throws
             return;
         }
-        m_logger->error("Writing failed: %1", ec.message()); // Throws
+        m_logger.error("Writing failed: %1", ec.message()); // Throws
 
         // Suicide
         close_due_to_error(ec); // Throws
@@ -3690,7 +3693,7 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : m_logger{std::make_shared<util::PrefixLogger>("Worker: ", server.m_logger)} // Throws
+    : m_logger("Worker: ", server.m_logger) // Throws
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, m_logger, *this, server.get_config().encryption_key}
@@ -3758,7 +3761,8 @@ void Worker::stop() noexcept
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : m_logger{config.logger ? config.logger : std::make_shared<util::StderrLogger>()}
+    : m_logger_ptr{config.logger ? config.logger : std::make_shared<util::StderrLogger>()}
+    , m_logger{*m_logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
     , m_root_dir{root_dir} // Throws
@@ -3787,12 +3791,12 @@ ServerImpl::~ServerImpl() noexcept
 
 void ServerImpl::start()
 {
-    m_logger->info("Realm sync server started (%1)", REALM_VER_CHUNK); // Throws
-    m_logger->info("Supported protocol versions: %1-%2 (%3-%4 configured)",
-                   ServerImplBase::get_oldest_supported_protocol_version(), get_current_protocol_version(),
-                   m_protocol_version_range.first,
-                   m_protocol_version_range.second); // Throws
-    m_logger->info("Platform: %1", util::get_platform_info());
+    m_logger.info("Realm sync server started (%1)", REALM_VER_CHUNK); // Throws
+    m_logger.info("Supported protocol versions: %1-%2 (%3-%4 configured)",
+                  ServerImplBase::get_oldest_supported_protocol_version(), get_current_protocol_version(),
+                  m_protocol_version_range.first,
+                  m_protocol_version_range.second); // Throws
+    m_logger.info("Platform: %1", util::get_platform_info());
     bool is_debug_build = false;
 #if REALM_DEBUG
     is_debug_build = true;
@@ -3800,53 +3804,53 @@ void ServerImpl::start()
     {
         const char* lead_text = "Build mode";
         if (is_debug_build) {
-            m_logger->info("%1: Debug", lead_text); // Throws
+            m_logger.info("%1: Debug", lead_text); // Throws
         }
         else {
-            m_logger->info("%1: Release", lead_text); // Throws
+            m_logger.info("%1: Release", lead_text); // Throws
         }
     }
     if (is_debug_build) {
-        m_logger->warn("Build mode is Debug! CAN SEVERELY IMPACT PERFORMANCE - "
-                       "NOT RECOMMENDED FOR PRODUCTION"); // Throws
+        m_logger.warn("Build mode is Debug! CAN SEVERELY IMPACT PERFORMANCE - "
+                      "NOT RECOMMENDED FOR PRODUCTION"); // Throws
     }
-    m_logger->info("Directory holding persistent state: %1", m_root_dir);        // Throws
-    m_logger->info("Maximum number of open files: %1", m_config.max_open_files); // Throws
+    m_logger.info("Directory holding persistent state: %1", m_root_dir);        // Throws
+    m_logger.info("Maximum number of open files: %1", m_config.max_open_files); // Throws
     {
         const char* lead_text = "Encryption";
         if (m_config.encryption_key) {
-            m_logger->info("%1: Yes", lead_text); // Throws
+            m_logger.info("%1: Yes", lead_text); // Throws
         }
         else {
-            m_logger->info("%1: No", lead_text); // Throws
+            m_logger.info("%1: No", lead_text); // Throws
         }
     }
-    m_logger->info("Log level: %1", m_logger->level_threshold.get()); // Throws
+    m_logger.info("Log level: %1", m_logger.get_level_threshold()); // Throws
     {
         const char* lead_text = "Disable sync to disk";
         if (m_config.disable_sync_to_disk) {
-            m_logger->info("%1: All files", lead_text); // Throws
+            m_logger.info("%1: All files", lead_text); // Throws
         }
         else {
-            m_logger->info("%1: No", lead_text); // Throws
+            m_logger.info("%1: No", lead_text); // Throws
         }
     }
     if (m_config.disable_sync_to_disk) {
-        m_logger->warn("Testing/debugging feature 'disable sync to disk' enabled - "
-                       "never do this in production!"); // Throws
+        m_logger.warn("Testing/debugging feature 'disable sync to disk' enabled - "
+                      "never do this in production!"); // Throws
     }
-    m_logger->info("Download compaction: %1",
-                   (m_config.disable_download_compaction ? "No" : "Yes")); // Throws
-    m_logger->info("Download bootstrap caching: %1",
-                   (m_config.enable_download_bootstrap_cache ? "Yes" : "No"));                // Throws
-    m_logger->info("Max download size: %1 bytes", m_config.max_download_size);                // Throws
-    m_logger->info("Max upload backlog: %1 bytes", m_max_upload_backlog);                     // Throws
-    m_logger->info("HTTP request timeout: %1 ms", m_config.http_request_timeout);             // Throws
-    m_logger->info("HTTP response timeout: %1 ms", m_config.http_response_timeout);           // Throws
-    m_logger->info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
-    m_logger->info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
-    m_logger->info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
-    m_logger->debug("Authorization header name: %1", m_config.authorization_header_name);     // Throws
+    m_logger.info("Download compaction: %1",
+                  (m_config.disable_download_compaction ? "No" : "Yes")); // Throws
+    m_logger.info("Download bootstrap caching: %1",
+                  (m_config.enable_download_bootstrap_cache ? "Yes" : "No"));                // Throws
+    m_logger.info("Max download size: %1 bytes", m_config.max_download_size);                // Throws
+    m_logger.info("Max upload backlog: %1 bytes", m_max_upload_backlog);                     // Throws
+    m_logger.info("HTTP request timeout: %1 ms", m_config.http_request_timeout);             // Throws
+    m_logger.info("HTTP response timeout: %1 ms", m_config.http_response_timeout);           // Throws
+    m_logger.info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
+    m_logger.info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
+    m_logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
+    m_logger.debug("Authorization header name: %1", m_config.authorization_header_name);     // Throws
 
     m_transformer = make_transformer(); // Throws
 
@@ -3878,7 +3882,7 @@ void ServerImpl::run()
         worker_thread.stop_and_rethrow(); // Throws
     }
 
-    m_logger->info("Realm sync server stopped");
+    m_logger.info("Realm sync server stopped");
 }
 
 
@@ -3896,10 +3900,10 @@ void ServerImpl::stop() noexcept
 void ServerImpl::inc_byte_size_for_pending_downstream_changesets(std::size_t byte_size)
 {
     m_pending_changesets_from_downstream_byte_size += byte_size;
-    m_logger->debug("Byte size for pending downstream changesets incremented by "
-                    "%1 to reach a total of %2",
-                    byte_size,
-                    m_pending_changesets_from_downstream_byte_size); // Throws
+    m_logger.debug("Byte size for pending downstream changesets incremented by "
+                   "%1 to reach a total of %2",
+                   byte_size,
+                   m_pending_changesets_from_downstream_byte_size); // Throws
 }
 
 
@@ -3907,10 +3911,10 @@ void ServerImpl::dec_byte_size_for_pending_downstream_changesets(std::size_t byt
 {
     REALM_ASSERT(byte_size <= m_pending_changesets_from_downstream_byte_size);
     m_pending_changesets_from_downstream_byte_size -= byte_size;
-    m_logger->debug("Byte size for pending downstream changesets decremented by "
-                    "%1 to reach a total of %2",
-                    byte_size,
-                    m_pending_changesets_from_downstream_byte_size); // Throws
+    m_logger.debug("Byte size for pending downstream changesets decremented by "
+                   "%1 to reach a total of %2",
+                   byte_size,
+                   m_pending_changesets_from_downstream_byte_size); // Throws
 }
 
 
@@ -3959,11 +3963,11 @@ void ServerImpl::listen()
             for (auto i2 = endpoints.begin(); i2 != i; ++i2) {
                 // FIXME: We don't have the error code for previous attempts, so
                 // can't print a nice message.
-                m_logger->error("Failed to bind to %1:%2", i2->address(),
-                                i2->port()); // Throws
+                m_logger.error("Failed to bind to %1:%2", i2->address(),
+                               i2->port()); // Throws
             }
-            m_logger->error("Failed to bind to %1:%2: %3", i->address(), i->port(),
-                            ec.message()); // Throws
+            m_logger.error("Failed to bind to %1:%2: %3", i->address(), i->port(),
+                           ec.message()); // Throws
             throw std::runtime_error("Could not create a listening socket: All endpoints failed");
         }
     }
@@ -3972,8 +3976,8 @@ void ServerImpl::listen()
 
     util::network::Endpoint local_endpoint = m_acceptor.local_endpoint();
     const char* ssl_mode = (m_ssl_context ? "TLS" : "non-TLS");
-    m_logger->info("Listening on %1:%2 (max backlog is %3, %4)", local_endpoint.address(), local_endpoint.port(),
-                   m_config.listen_backlog, ssl_mode); // Throws
+    m_logger.info("Listening on %1:%2 (max backlog is %3, %4)", local_endpoint.address(), local_endpoint.port(),
+                  m_config.listen_backlog, ssl_mode); // Throws
 
     initiate_accept();
 }
@@ -4006,15 +4010,15 @@ void ServerImpl::handle_accept(std::error_code ec)
             // specially, and not cause the server to "crash".
 
             if (ec == make_basic_system_error_code(EMFILE)) {
-                m_logger->error("Failed to accept a connection due to the file descriptor limit, "
-                                "consider increasing the limit in your system config"); // Throws
+                m_logger.error("Failed to accept a connection due to the file descriptor limit, "
+                               "consider increasing the limit in your system config"); // Throws
                 throw OutOfFilesError(ec);
             }
             else {
                 throw std::system_error(ec);
             }
         }
-        m_logger->debug("Skipping aborted connection"); // Throws
+        m_logger.debug("Skipping aborted connection"); // Throws
     }
     else {
         HTTPConnection& conn = *m_next_http_conn;
@@ -4086,9 +4090,9 @@ void ServerImpl::recognize_external_change(const std::string& virt_path)
 void ServerImpl::stop_sync_and_wait_for_backup_completion(
     util::UniqueFunction<void(bool did_backup)> completion_handler, milliseconds_type timeout)
 {
-    m_logger->info("stop_sync_and_wait_for_backup_completion() called with "
-                   "timeout = %1",
-                   timeout); // Throws
+    m_logger.info("stop_sync_and_wait_for_backup_completion() called with "
+                  "timeout = %1",
+                  timeout); // Throws
 
     auto handler = [this, completion_handler = std::move(completion_handler), timeout]() mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
@@ -4114,7 +4118,7 @@ void ServerImpl::initiate_connection_reaper_timer(milliseconds_type timeout)
 
 void ServerImpl::reap_connections()
 {
-    m_logger->debug("Discarding dead connections"); // Throws
+    m_logger.debug("Discarding dead connections"); // Throws
     SteadyTimePoint now = steady_clock_now();
     {
         auto end = m_http_connections.end();
@@ -4183,7 +4187,7 @@ SyncConnection::~SyncConnection() noexcept
 void SyncConnection::initiate()
 {
     m_last_activity_at = steady_clock_now();
-    m_logger->debug("Sync Connection initiated");
+    m_logger.debug("Sync Connection initiated");
     m_websocket.initiate_server_websocket_after_handshake();
 }
 
@@ -4192,7 +4196,7 @@ template <class... Params>
 void SyncConnection::terminate(Logger::Level log_level, const char* log_message, Params... log_params)
 {
     terminate_sessions();                              // Throws
-    m_logger->log(log_level, log_message, log_params...); // Throws
+    m_logger.log(log_level, log_message, log_params...); // Throws
     m_websocket.stop();
     m_ssl_stream.reset();
     m_socket.reset();
@@ -4263,8 +4267,8 @@ void SyncConnection::receive_bind_message(session_ident_type session_ident, std:
     auto p = m_sessions.emplace(session_ident, nullptr); // Throws
     bool was_inserted = p.second;
     if (REALM_UNLIKELY(!was_inserted)) {
-        m_logger->error("Overlapping reuse of session identifier %1 in BIND message",
-                        session_ident);                        // Throws
+        m_logger.error("Overlapping reuse of session identifier %1 in BIND message",
+                       session_ident);                         // Throws
         protocol_error(ProtocolError::reuse_of_session_ident); // Throws
         return;
     }
@@ -4308,12 +4312,12 @@ void SyncConnection::receive_ident_message(session_ident_type session_ident, fil
         return;
     }
     if (REALM_UNLIKELY(sess.must_send_ident_message())) {
-        m_logger->error("Received IDENT message before IDENT message was sent"); // Throws
+        m_logger.error("Received IDENT message before IDENT message was sent"); // Throws
         protocol_error(ProtocolError::bad_message_order);                     // Throws
         return;
     }
     if (REALM_UNLIKELY(sess.ident_message_received())) {
-        m_logger->error("Received second IDENT message for session"); // Throws
+        m_logger.error("Received second IDENT message for session"); // Throws
         protocol_error(ProtocolError::bad_message_order);          // Throws
         return;
     }
@@ -4407,7 +4411,7 @@ void SyncConnection::receive_unbind_message(session_ident_type session_ident)
 
 void SyncConnection::receive_ping(milliseconds_type timestamp, milliseconds_type rtt)
 {
-    m_logger->debug("Received: PING(timestamp=%1, rtt=%2)", timestamp, rtt); // Throws
+    m_logger.debug("Received: PING(timestamp=%1, rtt=%2)", timestamp, rtt); // Throws
     m_send_pong = true;
     m_last_ping_timestamp = timestamp;
     if (!m_is_sending)
@@ -4418,9 +4422,8 @@ void SyncConnection::receive_ping(milliseconds_type timestamp, milliseconds_type
 void SyncConnection::receive_error_message(session_ident_type session_ident, int error_code,
                                            std::string_view error_body)
 {
-    m_logger->debug("Received: ERROR(error_code=%1, message_size=%2, session_ident=%3)", error_code,
-                    error_body.size(),
-                    session_ident); // Throws
+    m_logger.debug("Received: ERROR(error_code=%1, message_size=%2, session_ident=%3)", error_code, error_body.size(),
+                   session_ident); // Throws
     auto i = m_sessions.find(session_ident);
     if (REALM_UNLIKELY(i == m_sessions.end())) {
         bad_session_ident("ERROR", session_ident);
@@ -4438,24 +4441,24 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
 
 void SyncConnection::bad_session_ident(const char* message_type, session_ident_type session_ident)
 {
-    m_logger->error("Bad session identifier in %1 message, session_ident = %2", message_type,
-                    session_ident);                                                                        // Throws
+    m_logger.error("Bad session identifier in %1 message, session_ident = %2", message_type,
+                   session_ident);                                                                         // Throws
     protocol_error(ProtocolError::bad_session_ident);                                                      // Throws
 }
 
 
 void SyncConnection::message_after_unbind(const char* message_type, session_ident_type session_ident)
 {
-    m_logger->error("Received %1 message after UNBIND message, session_ident = %2", message_type,
-                    session_ident);                   // Throws
+    m_logger.error("Received %1 message after UNBIND message, session_ident = %2", message_type,
+                   session_ident);                    // Throws
     protocol_error(ProtocolError::bad_message_order); // Throws
 }
 
 
 void SyncConnection::message_before_ident(const char* message_type, session_ident_type session_ident)
 {
-    m_logger->error("Received %1 message before IDENT message, session_ident = %2", message_type,
-                    session_ident);                   // Throws
+    m_logger.error("Received %1 message before IDENT message, session_ident = %2", message_type,
+                   session_ident);                    // Throws
     protocol_error(ProtocolError::bad_message_order); // Throws
 }
 
@@ -4544,7 +4547,7 @@ void SyncConnection::send_pong(milliseconds_type timestamp)
     REALM_ASSERT(m_send_pong);
     REALM_ASSERT(!m_sending_pong);
     m_send_pong = false;
-    m_logger->debug("Sending: PONG(timestamp=%1)", timestamp); // Throws
+    m_logger.debug("Sending: PONG(timestamp=%1)", timestamp); // Throws
 
     OutputBuffer& out = get_output_buffer();
     get_server_protocol().make_pong(out, timestamp); // Throws
@@ -4578,8 +4581,8 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     std::size_t message_size = std::strlen(message);
     bool try_again = determine_try_again(error_code);
 
-    m_logger->detail("Sending: ERROR(error_code=%1, message_size=%2, try_again=%3, session_ident=%4)",
-                     int(error_code), message_size, try_again, session_ident); // Throws
+    m_logger.detail("Sending: ERROR(error_code=%1, message_size=%2, try_again=%3, session_ident=%4)", int(error_code),
+                    message_size, try_again, session_ident); // Throws
 
     OutputBuffer& out = get_output_buffer();
     int protocol_version = get_client_protocol_version();
@@ -4625,10 +4628,10 @@ void SyncConnection::protocol_error(ProtocolError error_code, Session* sess)
     bool session_level = is_session_level_error(error_code);
     REALM_ASSERT(!session_level || sess);
     REALM_ASSERT(!sess || m_sessions.count(sess->get_session_ident()) == 1);
-    if (m_logger->would_log(util::Logger::Level::debug)) {
+    if (m_logger.would_log(util::Logger::Level::debug)) {
         const char* message = get_protocol_error_message(int(error_code));
-        auto& logger_2 = (session_level ? sess->m_logger : *m_logger);
-        logger_2.debug("Protocol error: %1 (error_code=%2)", message, int(error_code)); // Throws
+        auto& logger = (session_level ? sess->m_logger : m_logger);
+        logger.debug("Protocol error: %1 (error_code=%2)", message, int(error_code)); // Throws
     }
     session_ident_type session_ident = (session_level ? sess->get_session_ident() : 0);
     if (session_level) {

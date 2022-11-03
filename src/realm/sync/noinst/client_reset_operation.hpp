@@ -37,7 +37,7 @@ public:
     using CallbackBeforeType = util::UniqueFunction<void(std::string)>;
     using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID, bool)>;
 
-    ClientResetOperation(const std::shared_ptr<util::Logger>& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
+    ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
                          CallbackBeforeType notify_before, CallbackAfterType notify_after, bool recovery_is_allowed);
 
     // When the client has received the salted file ident from the server, it
@@ -54,7 +54,8 @@ public:
 private:
     void clean_up_state() noexcept;
 
-    std::shared_ptr<util::Logger> m_logger;
+    // The lifetime of this class is within a Session, so no need for a shared_ptr
+    util::Logger& m_logger;
     DBRef m_db;
     DBRef m_db_fresh;
     ClientResyncMode m_mode;

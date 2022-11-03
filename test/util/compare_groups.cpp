@@ -25,7 +25,7 @@ public:
 class TableCompareLogger : public util::Logger {
 public:
     TableCompareLogger(StringData table_name, util::Logger& base_logger) noexcept
-        : util::Logger{base_logger.level_threshold}
+        : util::Logger(base_logger.get_level_threshold())
         , m_table_name{table_name}
         , m_base_logger{base_logger}
     {
@@ -54,7 +54,7 @@ private:
 class ObjectCompareLogger : public util::Logger {
 public:
     ObjectCompareLogger(sync::PrimaryKey oid, util::Logger& base_logger) noexcept
-        : util::Logger{base_logger.level_threshold}
+        : util::Logger(base_logger.get_level_threshold())
         , m_oid{oid}
         , m_base_logger{base_logger}
     {

@@ -299,11 +299,10 @@ public:
     using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
     using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 
-    util::PrefixLogger logger;
+    util::PrefixLogger m_logger;
 
-    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger, const util::network::Endpoint& endpoint,
-                      const util::HTTPRequest& request)
-        : logger{"HTTP client: ", logger}
+    HTTPRequestClient(util::Logger& logger, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
+        : m_logger{"HTTP client: ", logger}
         , m_endpoint{endpoint}
         , m_http_client{*this, logger}
         , m_request{request}
@@ -356,20 +355,20 @@ private:
                 handle_tcp_connect(ec);
         };
         m_socket.async_connect(m_endpoint, std::move(handler));
-        logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
+        m_logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
     }
 
     void handle_tcp_connect(std::error_code ec)
     {
         if (ec) {
-            logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(), m_endpoint.port(),
-                         ec.message());
+            m_logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(), m_endpoint.port(),
+                           ec.message());
             stop();
             return;
         }
 
         m_socket.set_option(util::network::SocketBase::no_delay(true));
-        logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
+        m_logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
 
 
         initiate_http_request();
@@ -380,7 +379,7 @@ private:
         auto handler = [this](util::HTTPResponse response, std::error_code ec) {
             if (ec != util::error::operation_aborted) {
                 if (ec) {
-                    logger.debug("HTTP response error, ec = %1", ec.message());
+                    m_logger.debug("HTTP response error, ec = %1", ec.message());
                     stop();
                     return;
                 }
@@ -392,7 +391,7 @@ private:
 
     void handle_http_response(const util::HTTPResponse response)
     {
-        logger.debug("HTTP response received, status = %1", int(response.status));
+        m_logger.debug("HTTP response received, status = %1", int(response.status));
         m_response = response;
         stop();
     }

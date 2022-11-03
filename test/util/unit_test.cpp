@@ -410,13 +410,11 @@ private:
 };
 
 
-class IntraTestLogger : private Logger::LevelThreshold, public util::Logger {
+class IntraTestLogger : public util::Logger {
 public:
     IntraTestLogger(const std::shared_ptr<util::Logger>& base_logger, Level threshold)
-        : util::Logger::LevelThreshold()
-        , util::Logger(static_cast<util::Logger::LevelThreshold&>(*this))
+        : util::Logger(threshold)
         , m_base_logger(base_logger)
-        , m_level_threshold(threshold)
     {
     }
 
@@ -427,12 +425,6 @@ public:
 
 private:
     std::shared_ptr<util::Logger> m_base_logger;
-    const Level m_level_threshold;
-
-    Level get() const noexcept override final
-    {
-        return m_level_threshold;
-    }
 };
 
 

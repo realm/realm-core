@@ -61,7 +61,8 @@ struct SyncClient {
 
             return c;
         }())
-        , m_logger(logger)
+        , m_logger_ptr(logger)
+        , m_logger(*m_logger_ptr)
         , m_thread([this] {
             if (g_binding_callback_thread_observer) {
                 g_binding_callback_thread_observer->did_create_thread();
@@ -89,7 +90,7 @@ struct SyncClient {
         })
     {
         if (!m_reachability_observer.start_observing())
-            m_logger->error("Failed to set up network reachability observer");
+            m_logger.error("Failed to set up network reachability observer");
     }
 #else
     {
@@ -134,7 +135,8 @@ struct SyncClient {
 
 private:
     sync::Client m_client;
-    const std::shared_ptr<util::Logger> m_logger;
+    const std::shared_ptr<util::Logger> m_logger_ptr;
+    util::Logger& m_logger;
     std::thread m_thread;
 #if NETWORK_REACHABILITY_AVAILABLE
     NetworkReachabilityObserver m_reachability_observer;

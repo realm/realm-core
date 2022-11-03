@@ -198,7 +198,8 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    std::shared_ptr<util::Logger> logger;
+    // An HTTPParserBase is tied to
+    util::Logger& m_logger;
 
     // FIXME: Generally useful?
     struct CallocDeleter {
@@ -208,8 +209,8 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(const std::shared_ptr<util::Logger>& logger_2)
-        : logger{logger_2}
+    HTTPParserBase(util::Logger& logger)
+        : m_logger{logger}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.
@@ -257,7 +258,7 @@ struct HTTPParserBase {
 
 template <class Socket>
 struct HTTPParser : protected HTTPParserBase {
-    explicit HTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger)
+    explicit HTTPParser(Socket& socket, util::Logger& logger)
         : HTTPParserBase(logger)
         , m_socket(socket)
     {
@@ -348,7 +349,7 @@ template <class Socket>
 struct HTTPClient : protected HTTPParser<Socket> {
     using Handler = void(HTTPResponse, std::error_code);
 
-    explicit HTTPClient(Socket& socket, const std::shared_ptr<util::Logger>& logger)
+    explicit HTTPClient(Socket& socket, util::Logger& logger)
         : HTTPParser<Socket>(socket, logger)
     {
     }
@@ -397,7 +398,7 @@ private:
     {
         HTTPStatus status;
         StringData reason;
-        if (this->parse_first_line_of_response(line, status, reason, *(this->logger))) {
+        if (this->parse_first_line_of_response(line, status, reason, this->m_logger)) {
             m_response.status = status;
             m_response.reason = reason;
             return std::error_code{};
@@ -431,7 +432,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
     using RequestHandler = void(HTTPRequest, std::error_code);
     using RespondHandler = void(std::error_code);
 
-    explicit HTTPServer(Socket& socket, const std::shared_ptr<util::Logger>& logger)
+    explicit HTTPServer(Socket& socket, util::Logger& logger)
         : HTTPParser<Socket>(socket, logger)
     {
     }
