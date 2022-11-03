@@ -854,6 +854,31 @@ void Transaction::do_end_read() noexcept
     db.reset();
 }
 
+// This is the same as do_end_read() above, but with the requirement that
+// 1) This is called with the db->mutex locked already
+// 2) No async commits outstanding
+void Transaction::close_read_with_lock()
+{
+    REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+    {
+        util::CheckedLockGuard lck(m_async_mutex);
+        REALM_ASSERT_EX(m_async_stage == AsyncState::Idle, size_t(m_async_stage));
+    }
+
+    detach();
+    REALM_ASSERT_EX(!m_oldest_version_not_persisted, m_oldest_version_not_persisted->m_type,
+                    m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_top_ref,
+                    m_oldest_version_not_persisted->m_file_size);
+    db->do_release_read_lock(m_read_lock);
+
+    m_alloc.note_reader_end(this);
+    set_transact_stage(DB::transact_Ready);
+    // reset the std::shared_ptr to allow the DB object to release resources
+    // as early as possible.
+    db.reset();
+}
+
+
 void Transaction::initialize_replication()
 {
     if (m_transact_stage == DB::transact_Writing) {
