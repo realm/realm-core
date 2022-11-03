@@ -3314,30 +3314,75 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     group->verify();
 }
 
+void reader_thread(DBRef db)
+{
+    auto tr = db->start_read();
+    auto table = tr->get_table("table");
+    auto col_blob = table->get_column_key("blob");
+    auto col_id = table->get_column_key("id");
+    int last_seen_id = -1;
+    int sum = 0;
+    while (table->size() == 0) {
+        db->wait_for_change(tr);
+        tr->advance_read();
+    }
+    while (table->size() < 210 * 60) {
+        int last_stored_id = table->get_object(table->size() - 1).get<Int>(col_id);
+        while (last_seen_id < last_stored_id) {
+            ++last_seen_id;
+            auto obj = table->get_object(table->find_first_int(col_id, last_seen_id));
+            auto blob = obj.get<BinaryData>(col_blob);
+            for (unsigned k = 0; k < blob.size(); ++k) {
+                sum += blob[k];
+            }
+            // std::cout << "             " << last_seen_id << std::endl;
+        }
+        db->wait_for_change(tr);
+        // std::cout << "did not hang";
+        tr->advance_read();
+    }
+    volatile int fake = sum;
+    std::cout << "reader terminating" << std::endl;
+}
+
 ONLY(LangBindHelper_ScannerLoad)
 {
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
-    DBRef sg = DB::create(*hist, path, DBOptions(DBOptions::Durability::MemOnly));
+    DBRef sg = DB::create(*hist, path, DBOptions(/* DBOptions::Durability::MemOnly */));
     auto tr = sg->start_write();
     auto table = tr->add_table("table");
-    auto col = table->add_column(type_Binary, "col");
-    int32_t* blob = new int32_t[1250000];
-    for (int32_t v = 0; v < 1250000; ++v) {
+    auto col_id = table->add_column(type_Int, "id");
+    auto col_blob = table->add_column(type_Binary, "blob");
+    auto col_time = table->add_column(type_Timestamp, "time");
+    tr->commit_and_continue_as_read();
+    int32_t* blob = new int32_t[2500000];
+    for (int32_t v = 0; v < 2500000; ++v) {
         blob[v] = v;
     }
-    BinaryData bd = BinaryData((char*)blob, sizeof(int32_t) * 1250000);
+    BinaryData bd = BinaryData((char*)blob, sizeof(int32_t) * 2500000);
+    Thread readers[15];
+    for (int nt = 0; nt < 15; ++nt)
+        readers[nt].start([&] {
+            reader_thread(sg);
+        });
+    tr->promote_to_write();
     auto start = std::chrono::steady_clock::now();
+    int id = 0;
     for (int run = 0; run < 500; ++run) { // store 120 GB
-        for (int k = 0; k < 100; ++k) {   // store 600 MB
-            if (run > 200) {
-                // remove oldest object
-                auto tbr = table->get_object(0);
-                tbr.remove();
-            }
-            auto obj = table->create_object();
-            obj.set<BinaryData>(col, bd);
+        for (int k = 0; k < 10; ++k) {
+            for (int w = 0; w < 6; ++w) {
+                if (run > 200 && run < 480) {
+                    // remove oldest object
+                    auto tbr = table->get_object(0);
+                    tbr.remove();
+                }
+                auto obj = table->create_object();
+
+                obj.set<BinaryData>(col_blob, bd);
+                obj.set<int>(col_id, id++);
+            } // store 600 MB
             tr->commit_and_continue_as_read();
             tr->promote_to_write();
         }
@@ -3355,6 +3400,8 @@ ONLY(LangBindHelper_ScannerLoad)
         }
         start = end;
     }
+    for (auto& e : readers)
+        e.join();
 }
 
 TEST(LangBindHelper_MemOnly)
