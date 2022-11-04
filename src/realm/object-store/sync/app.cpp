@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "external/json/json.hpp"
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/base64.hpp>
@@ -26,6 +27,7 @@
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 
+#include <sstream>
 #include <string>
 
 using namespace realm;
@@ -1049,51 +1051,67 @@ std::string App::function_call_url_path() const
     return util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
 }
 
+void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
+                        const Optional<std::string>& service_name_opt,
+                        UniqueFunction<void(const std::string&, Optional<AppError>)>&& completion)
+{
+    auto service_name = service_name_opt ? *service_name_opt : "<none>";
+    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
+        log_debug("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name, args_ejson);
+    }
+
+    auto args = util::format("{\"arguments\":%1,\"name\":%2%3}", args_ejson, nlohmann::json(name).dump(),
+                             service_name_opt ? (",\"service\":" + nlohmann::json(service_name).dump()) : "");
+
+    do_authenticated_request(
+        Request{HttpMethod::post, function_call_url_path(), m_request_timeout_ms, {}, std::move(args), false}, user,
+        [self = shared_from_this(), name = name, service_name = std::move(service_name),
+         completion = std::move(completion)](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_debug("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
+                          response.http_status_code, error->message);
+                return completion({}, error);
+            }
+            completion(response.body, util::none);
+        });
+}
+
 void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, const BsonArray& args_bson,
                         const Optional<std::string>& service_name,
                         UniqueFunction<void(Optional<Bson>&&, Optional<AppError>)>&& completion)
 {
     auto service_name2 = service_name ? *service_name : "<none>";
-    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
-        std::string query_stg = "[ ";
-        for (auto&& item : args_bson) {
-            query_stg += item.to_string() + ", ";
-        }
-        query_stg += "]";
-        log_debug("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name2, query_stg);
+    std::stringstream args_ejson;
+    args_ejson << "[";
+    for (auto&& arg : args_bson) {
+        if (&arg != &args_bson.front())
+            args_ejson << ',';
+        args_ejson << arg.toJson();
     }
-    auto handler = [self = shared_from_this(), name = name, service_name = service_name2,
-                    completion = std::move(completion)](const Response& response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                            response.http_status_code, error->message);
-            return completion(util::none, error);
-        }
-        util::Optional<Bson> body_as_bson;
-        try {
-            body_as_bson = bson::parse(response.body);
-            if (self->m_logger && self->m_logger->would_log(util::Logger::Level::debug)) {
-                self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
-                                body_as_bson ? body_as_bson->to_string() : "<none>");
-            }
-        }
-        catch (const std::exception& e) {
-            self->log_error("App: call_function: %1 service_name: %2 - error parsing result: %3", name, service_name,
-                            e.what());
-            return completion(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
-        };
-        completion(std::move(body_as_bson), util::none);
-    };
+    args_ejson << "]";
 
-    BsonDocument args{{"arguments", args_bson}, {"name", name}};
-
-    if (service_name) {
-        args["service"] = *service_name;
-    }
-
-    do_authenticated_request(
-        Request{HttpMethod::post, function_call_url_path(), m_request_timeout_ms, {}, Bson(args).toJson(), false},
-        user, std::move(handler));
+    call_function(user, name, std::move(args_ejson).str(), service_name,
+                  [self = shared_from_this(), name, service_name = std::move(service_name2),
+                   completion = std::move(completion)](const std::string& response, util::Optional<AppError>&& err) {
+                      if (err) {
+                          return completion({}, err);
+                      }
+                      util::Optional<Bson> body_as_bson;
+                      try {
+                          body_as_bson = bson::parse(response);
+                          if (self->m_logger && self->m_logger->would_log(util::Logger::Level::debug)) {
+                              self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
+                                        body_as_bson ? body_as_bson->to_string() : "<none>");
+                          }
+                      }
+                      catch (const std::exception& e) {
+                          self->log_debug("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
+                                    service_name, e.what());
+                          return completion(util::none,
+                                            AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+                      };
+                      completion(std::move(body_as_bson), util::none);
+                  });
 }
 
 void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, const BsonArray& args_bson,

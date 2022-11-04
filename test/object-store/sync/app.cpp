@@ -3759,7 +3759,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 404);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Client Error: 404");
         CHECK(error.link_to_server_logs.empty());
     }
@@ -3771,7 +3771,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 500);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Server Error: 500");
         CHECK(error.link_to_server_logs.empty());
     }
