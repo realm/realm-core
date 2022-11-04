@@ -118,7 +118,7 @@ public:
     const std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
 
-    ClientImpl(ClientConfig);
+    ClientImpl(ClientConfig&&);
     ~ClientImpl();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
