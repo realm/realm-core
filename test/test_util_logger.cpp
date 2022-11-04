@@ -194,6 +194,7 @@ TEST(Util_Logger_ThreadSafe)
 {
     struct BalloonLogger : public util::Logger {
         std::vector<std::string> messages;
+
     protected:
         void do_log(util::Logger::Level, const std::string& message) override
         {

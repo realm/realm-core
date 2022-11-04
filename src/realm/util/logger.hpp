@@ -239,15 +239,11 @@ public:
         return Level::off;
     }
 
-    void set_level_threshold(Level) noexcept override
-    {
-    }
+    void set_level_threshold(Level) noexcept override {}
 
 protected:
     // Since we don't want to log anything, do_log() does nothing and the level is off
-    void do_log(Level, const std::string&) override
-    {
-    }
+    void do_log(Level, const std::string&) override {}
 };
 
 
