@@ -156,9 +156,8 @@ void GroupWriter::MapWindow::sync()
 void GroupWriter::MapWindow::unmap()
 {
     encryption_flush_private_cache();
-#if REALM_PLATFORM_APPLE
     sync();
-#endif
+    m_map.unmap();
 }
 
 char* GroupWriter::MapWindow::translate(ref_type ref)
