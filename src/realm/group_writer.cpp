@@ -155,8 +155,6 @@ void GroupWriter::MapWindow::sync()
 
 void GroupWriter::MapWindow::unmap()
 {
-    encryption_flush_private_cache();
-    sync();
     m_map.unmap();
 }
 
@@ -311,8 +309,9 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        // destruction of the window will trigger flush and sync as required for the platform
-        // through MapWindow::~MapWindow().
+        auto& e = m_map_windows.back();
+        e->encryption_flush_private_cache();
+        e->sync();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
