@@ -196,6 +196,7 @@ void PendingBootstrapStore::clear()
     auto tr = m_db->start_write();
     auto bootstrap_table = tr->get_table(m_table);
     bootstrap_table->clear();
+    m_has_pending = false;
     tr->commit();
 }
 
@@ -252,6 +253,7 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
         parsed_changeset.last_integrated_local_version =
             cur_changeset.get<int64_t>(m_changeset_last_integrated_client_version);
         parsed_changeset.data = BinaryData(uncompressed_buffer.data(), uncompressed_buffer.size());
+        bytes_so_far += parsed_changeset.data.size();
         ret.changesets.push_back(std::move(parsed_changeset));
     }
     ret.remaining = changeset_list.size() - ret.changesets.size();
