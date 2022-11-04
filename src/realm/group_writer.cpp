@@ -135,7 +135,11 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
+#if REALM_PLATFORM_APPLE
+    m_map.sync();
+#else
     m_map.flush();
+#endif
     m_map.unmap();
 }
 
@@ -274,15 +278,15 @@ void GroupWriter::flush_all_mappings()
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
+#if REALM_PLATFORM_APPLE
+        // we need to both flush any encrypted pages to the buffer cache
+        // and msync(), for the iOS/MacOS barrier operation to include the
+        // modified pages.
         window->sync();
-        // window->flush();
-        // this seems to be the difference.
-        // Flushing the pages has no effect (unless we are using encryption).
-        // Not calling msync can be problematic, and IOS seems to be forgetting
-        // some pages once we hit the barrier.
-        // Probably other platforms are better at keeping the list of memory mapped areas
-        // and calling the equivalent of linux fsync() just suffices.
-        // On IOS does not.
+#else
+        // on other platforms the sync is not needed
+        window->flush();
+#endif
     }
 }
 
@@ -939,12 +943,13 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
-    if (!disable_sync)
+    if (!disable_sync) {
+#if REALM_PLATFORM_APPLE
+        m_alloc.get_file().barrier();
+#else
         window->sync();
-
-    // here we should probably have another barrier, just in case.
-    // however this is going to be costly on all other platforms but IOS.
-    // m_alloc.get_file().barrier();
+#endif
+    }
 }
 
 
