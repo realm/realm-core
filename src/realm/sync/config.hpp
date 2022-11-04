@@ -134,11 +134,13 @@ enum class SyncClientHookEvent {
     DownloadMessageReceived,
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
+    BootstrapProcessed,
 };
 
 enum class SyncClientHookAction {
     NoAction,
     EarlyReturn,
+    SuspendWithRetryableError,
 };
 
 struct SyncClientHookData {

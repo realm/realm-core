@@ -1630,7 +1630,17 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
         auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(c, "mixed_array"));
         for (size_t idx = 0; idx < list.size(); ++idx) {
             Mixed mixed = list.get_any(idx);
-            CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
+            if (idx == 3) {
+                CHECK(mixed.is_type(type_TypedLink));
+                auto link = mixed.get<ObjLink>();
+                auto link_table = realm->read_group().get_table(link.get_table_key());
+                CHECK(link_table->get_name() == "class_Target");
+                auto link_obj = link_table->get_object(link.get_obj_key());
+                CHECK(link_obj.get_primary_key() == target_id);
+            }
+            else {
+                CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
+            }
         }
     }
 }
@@ -3760,7 +3770,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 404);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Client Error: 404");
         CHECK(error.link_to_server_logs.empty());
     }
@@ -3772,7 +3782,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 500);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Server Error: 500");
         CHECK(error.link_to_server_logs.empty());
     }

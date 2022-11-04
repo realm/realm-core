@@ -26,6 +26,7 @@
 #include "realm/util/future.hpp"
 #include "realm/util/functional.hpp"
 #include "realm/util/optional.hpp"
+#include "realm/util/tagged_bool.hpp"
 
 #include <list>
 #include <set>
@@ -90,16 +91,16 @@ public:
     /*
      * State diagram:
      *
-     *                    ┌───────────┬─────────►Error─────────┐
-     *                    │           │                        │
-     *                    │           │                        ▼
-     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superseded
-     *                    │                                    ▲
-     *                    │                                    │
-     *                    └────────────────────────────────────┘
+     *                    ┌───────────┬─────────►Error──────────────────────────┐
+     *                    │           │                                         │
+     *                    │           │                                         ▼
+     *   Uncommitted──►Pending──►Bootstrapping──►AwaitingMark──►Complete───►Superseded
+     *                    │                            ▲
+     *                    │                            │
+     *                    └────────────────────────────┘
      *
      */
-    enum class State : int64_t {
+    enum class State {
         // This subscription set has not been persisted and has not been sent to the server. This state is only valid
         // for MutableSubscriptionSets
         Uncommitted = 0,
@@ -114,7 +115,12 @@ public:
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
         Superseded,
+        // The last bootstrap message containing the initial state for this subscription set has been received. The
+        // client is awaiting a mark message to mark this subscription as fully caught up to history.
+        AwaitingMark,
     };
+
+    static constexpr int64_t EmptyVersion = int64_t(-1);
 
     // Used in tests.
     inline friend std::ostream& operator<<(std::ostream& o, State state)
@@ -128,6 +134,9 @@ public:
                 break;
             case State::Bootstrapping:
                 o << "Bootstrapping";
+                break;
+            case State::AwaitingMark:
+                o << "AwaitingMark";
                 break;
             case State::Complete:
                 o << "Complete";
@@ -193,11 +202,13 @@ protected:
     friend class SubscriptionStore;
     struct SupersededTag {
     };
+    using MakingMutableCopy = util::TaggedBool<class MakingMutableCopyTag>;
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
+                             MakingMutableCopy making_mutable_copy = MakingMutableCopy(false));
 
-    void load_from_database(const Transaction& tr, Obj obj);
+    void load_from_database(Obj obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -268,7 +279,8 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
+                           MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});
 
     void insert_sub(const Subscription& sub);
 
@@ -312,9 +324,14 @@ public:
     // zero.
     SubscriptionSet get_active() const;
 
+    struct VersionInfo {
+        int64_t latest;
+        int64_t active;
+        int64_t pending_mark;
+    };
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
-    std::pair<int64_t, int64_t> get_active_and_latest_versions() const;
+    VersionInfo get_version_info() const;
 
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
