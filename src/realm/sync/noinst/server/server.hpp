@@ -87,7 +87,7 @@ public:
         std::shared_ptr<util::Logger> logger;
 
         /// A unique id of this server. Used in the backup protocol to tell
-        /// slaves apart.'
+        /// slaves apart.
         std::string id = "unknown";
 
         /// The address at which the listening socket is bound.

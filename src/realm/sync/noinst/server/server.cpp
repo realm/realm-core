@@ -3761,7 +3761,7 @@ void Worker::stop() noexcept
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : m_logger_ptr{config.logger ? config.logger : std::make_shared<util::StderrLogger>()}
+    : m_logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
     , m_logger{*m_logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}

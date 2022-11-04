@@ -126,24 +126,6 @@ std::uniform_int_distribution<T> make_distr(T min, T max)
 }
 
 
-class ThresholdOverrideLogger : public util::RootLogger {
-public:
-    ThresholdOverrideLogger(util::Logger& base_logger)
-        : util::RootLogger{}
-        , m_base_logger{base_logger}
-    {
-    }
-
-    void do_log(Logger::Level level, std::string message) override final
-    {
-        util::Logger::do_log(m_base_logger, level, message);
-    }
-
-private:
-    util::Logger& m_base_logger;
-};
-
-
 class MainEventLoop {
 public:
     MainEventLoop(sync::Client&, bool interactive);
@@ -281,9 +263,9 @@ int main(int argc, char* argv[])
     bool ensure_blob_class = false;
     bool download_first = false;
     // Client reset options are also used for async open.
-    std::string client_reset_metadata_dir = "";
-    bool disable_client_reset_recover_local_changes = false;
-    bool disable_client_reset_require_recent_state_realm = false;
+    // std::string client_reset_metadata_dir = "";
+    // bool disable_client_reset_recover_local_changes = false;
+    // bool disable_client_reset_require_recent_state_realm = false;
     int num_download_waits = 1;
     bool follow = false;
     bool interactive = false;
@@ -308,7 +290,7 @@ int main(int argc, char* argv[])
     milliseconds_type pong_timeout = 120000;          //  2 minutes
     milliseconds_type connect_timeout = 120000;       //  2 minutes
     milliseconds_type connection_linger_time = 30000; // 30 seconds
-    bool tcp_no_delay = false;
+    // bool tcp_no_delay = false;
     bool verify_ssl_cert = false;
     std::string ssl_trust_cert = "";
     std::string metrics_prefix = "realm";
@@ -512,15 +494,21 @@ int main(int argc, char* argv[])
                 continue;
             }
             else if (std::strcmp(arg, "--client-reset-metadata-dir") == 0) {
-                if (get_string_value(client_reset_metadata_dir))
-                    continue;
+                std::cerr << "--client-reset-metadata-dir is no longer supported"
+                          << "\n";
+                // if (get_string_value(client_reset_metadata_dir))
+                continue;
             }
             else if (std::strcmp(arg, "--disable-client-reset-recover-local-changes") == 0) {
-                disable_client_reset_recover_local_changes = true;
+                std::cerr << "--disable-client-reset-recover-local-changes is no longer supported"
+                          << "\n";
+                // disable_client_reset_recover_local_changes = true;
                 continue;
             }
             else if (std::strcmp(arg, "--disable-client-reset-require-recent-state-realm") == 0) {
-                disable_client_reset_require_recent_state_realm = true;
+                std::cerr << "--disable-client-reset-require-recent-state-realm is no longer supported"
+                          << "\n";
+                // disable_client_reset_require_recent_state_realm = true;
                 continue;
             }
             else if (std::strcmp(arg, "-W") == 0 || std::strcmp(arg, "--num-download-waits") == 0) {
@@ -643,7 +631,9 @@ int main(int argc, char* argv[])
                     continue;
             }
             else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--tcp-no-delay") == 0) {
-                tcp_no_delay = true;
+                std::cerr << "--tcp-no-delay is no longer supported"
+                          << "\n";
+                // tcp_no_delay = true;
                 continue;
             }
             else if (std::strcmp(arg, "-V") == 0 || std::strcmp(arg, "--verify-ssl-cert") == 0) {
@@ -973,7 +963,7 @@ int main(int argc, char* argv[])
                          "                       open after all sessions have been abandoned or\n"
                          "                       suspended by errors. The default is 30'000 (30 seconds).\n"
                          "  -o, --tcp-no-delay   Set the `TCP_NODELAY` option on all TCP/IP sockets.\n"
-                         "                       This disables the Nagle algorithm.\n"
+                         "                       This disables the Nagle algorithm. No longer supported.\n"
                          "  -V, --verify-ssl-cert  Verify the servers SSL certificate.\n"
                          "  -T, --ssl-trust-cert  Path of a trust certificate used for verification.\n"
                          "  -M, --metrics-prefix  Prefix for metrics labels (`realm` by default). The\n"
@@ -1019,6 +1009,8 @@ int main(int argc, char* argv[])
     }
 
     util::Optional<sync::Session::Config::ClientReset> client_reset_config;
+    // These options are no longer supported in the ClientReset config structure
+#if 0
     if (client_reset_metadata_dir != "") {
         sync::Session::Config::ClientReset client_reset_config_2;
         client_reset_config_2.metadata_dir = client_reset_metadata_dir;
@@ -1026,6 +1018,7 @@ int main(int argc, char* argv[])
         client_reset_config_2.require_recent_state_realm = !disable_client_reset_require_recent_state_realm;
         client_reset_config = client_reset_config_2;
     }
+#endif
 
     if (halt_on_crash) {
 #ifndef _WIN32
@@ -1079,12 +1072,12 @@ int main(int argc, char* argv[])
         util::TimestampStderrLogger::Config config;
         config.precision = util::TimestampStderrLogger::Precision::milliseconds;
         config.format = "%FT%T";
-        root_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config));
+        root_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config), log_level);
     }
     else {
-        root_logger = std::make_unique<util::StderrLogger>();
+        root_logger = std::make_unique<util::StderrLogger>(log_level);
     }
-    util::ThreadSafeLogger logger{*root_logger, log_level};
+    util::ThreadSafeLogger logger{*root_logger};
     logger.info("Test client started");
 
     Metrics metrics{metrics_prefix, statsd_address, statsd_port};
@@ -1094,19 +1087,17 @@ int main(int argc, char* argv[])
 
     Peer::Context* context_ptr = nullptr;
 
-    ThresholdOverrideLogger sync_base_logger{logger};
-    sync_base_logger.set_level_threshold(sync_log_level);
-    util::PrefixLogger sync_logger{"Sync: ", sync_base_logger};
     sync::Client::Config config;
     config.user_agent_application_info = "TestClient/" REALM_VERSION_STRING;
-    config.logger = &sync_logger;
+    config.logger = std::make_shared<util::PrefixLogger>("Sync: ", logger);
+    config.logger->set_level_threshold(sync_log_level); // Overrides the default local level of the prefix logger
     config.one_connection_per_session = connection_per_session;
     config.dry_run = dry_run;
     config.ping_keepalive_period = time_between_pings;
     config.pong_keepalive_timeout = pong_timeout;
     config.connect_timeout = connect_timeout;
     config.connection_linger_time = connection_linger_time;
-    config.tcp_no_delay = tcp_no_delay;
+    // config.tcp_no_delay = tcp_no_delay;  // No longer supported
     config.disable_sync_to_disk = disable_sync_to_disk;
     config.disable_upload_compaction = disable_upload_compaction;
     if (report_roundtrip_times) {
@@ -1139,9 +1130,8 @@ int main(int argc, char* argv[])
             auth_ssl = true;
             break;
     }
-    util::PrefixLogger auth_logger{"Auth: ", sync_base_logger};
     sync::auth::Client::Config auth_config;
-    auth_config.logger = &auth_logger;
+    auth_config.logger = std::make_unique<util::PrefixLogger>("Auth: ", logger);
     auth_config.request_base_path = request_base_path;
     sync::auth::Client auth{auth_ssl, server_address, server_port, app_id, std::move(auth_config)};
 

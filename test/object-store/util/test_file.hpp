@@ -108,15 +108,6 @@ void on_change_but_no_notify(realm::Realm& realm);
 #endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
 
 
-struct TestLogger : realm::util::Logger {
-    void do_log(realm::util::Logger::Level, std::string const&) override {}
-
-    TestLogger()
-        : Logger(Logger::Level::off)
-    {
-    }
-};
-
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {

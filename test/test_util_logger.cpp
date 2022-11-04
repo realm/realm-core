@@ -192,9 +192,10 @@ TEST(Util_Logger_Prefix)
 
 TEST(Util_Logger_ThreadSafe)
 {
-    struct BalloonLogger : public util::RootLogger {
+    struct BalloonLogger : public util::Logger {
         std::vector<std::string> messages;
-        void do_log(util::Logger::Level, std::string const& message) override
+    protected:
+        void do_log(util::Logger::Level, const std::string& message) override
         {
             messages.push_back(std::move(message));
         }

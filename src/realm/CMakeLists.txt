@@ -94,7 +94,6 @@ set(UTIL_SOURCES
     util/thread.cpp
     util/to_string.cpp
     util/demangle.cpp
-    util/duplicating_logger.cpp
     util/enum.cpp
     util/http.cpp
     util/json_parser.cpp
@@ -273,7 +272,6 @@ set(REALM_NOINST_HEADERS
     util/circular_buffer.hpp
     util/cli_args.hpp
     util/demangle.hpp
-    util/duplicating_logger.hpp
     util/enum.hpp
     util/ez_websocket.hpp
     util/from_chars.hpp
@@ -316,7 +314,7 @@ add_library(Storage STATIC
 )
 add_library(Realm::Storage ALIAS Storage)
 
-set_target_properties(Storage PROPERTIES 
+set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 

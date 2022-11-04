@@ -96,7 +96,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : m_logger_ptr{config.logger ? config.logger : std::make_shared<util::StderrLogger>()}
+    : m_logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
     , m_logger{*m_logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
