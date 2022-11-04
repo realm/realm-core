@@ -56,7 +56,7 @@ public:
     // on mac/ios it appears to be needed to mark pages for a later
     // write barrier. (this design is a mystery)
     void sync();
-    // safely unmap the memory - includes platform specific flushing/syncing
+    // unmap memory - this does not flush or sync any changes
     void unmap();
     // return true if the specified range is fully visible through
     // the MapWindow
