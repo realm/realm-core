@@ -192,7 +192,6 @@ private:
 /// value to achieve thread safety.
 class ThreadSafeLogger : public Logger {
 public:
-    explicit ThreadSafeLogger(Logger& base_logger) noexcept;
     explicit ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept;
 
     Level get_level_threshold() noexcept override;
@@ -203,7 +202,6 @@ protected:
 
 private:
     std::shared_ptr<util::Logger> m_base_logger_ptr; // bind for the lifetime of this logger
-    Logger& m_base_logger;
     Mutex m_mutex;
 };
 
@@ -438,16 +436,9 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
 {
 }
 
-inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger) noexcept
-    : Logger(base_logger.get_level_threshold())
-    , m_base_logger{base_logger}
-{
-}
-
 inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept
     : Logger(base_logger->get_level_threshold())
     , m_base_logger_ptr(base_logger)
-    , m_base_logger{*m_base_logger_ptr}
 {
 }
 

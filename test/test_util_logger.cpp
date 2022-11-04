@@ -201,7 +201,7 @@ TEST(Util_Logger_ThreadSafe)
             messages.push_back(std::move(message));
         }
     };
-    BalloonLogger root_logger;
+    auto root_logger = std::make_shared<BalloonLogger>();
     util::ThreadSafeLogger logger(root_logger);
 
     const long num_iterations = 10000;
@@ -217,7 +217,7 @@ TEST(Util_Logger_ThreadSafe)
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 
-    std::vector<std::string> messages_1(std::move(root_logger.messages)), messages_2;
+    std::vector<std::string> messages_1(std::move(root_logger->messages)), messages_2;
     for (int i = 0; i < num_threads; ++i) {
         for (long j = 0; j < num_iterations; ++j) {
             std::ostringstream out;

@@ -1067,17 +1067,17 @@ int main(int argc, char* argv[])
         util::set_soft_rlimit(util::Resource::core_dump_size, -1);
 
     util::Thread::set_name("main");
-    std::unique_ptr<util::Logger> root_logger;
+    std::shared_ptr<util::Logger> root_logger;
     if (log_timestamps) {
         util::TimestampStderrLogger::Config config;
         config.precision = util::TimestampStderrLogger::Precision::milliseconds;
         config.format = "%FT%T";
-        root_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config), log_level);
+        root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config), log_level);
     }
     else {
-        root_logger = std::make_unique<util::StderrLogger>(log_level);
+        root_logger = std::make_shared<util::StderrLogger>(log_level);
     }
-    util::ThreadSafeLogger logger{*root_logger};
+    util::ThreadSafeLogger logger{root_logger};
     logger.info("Test client started");
 
     Metrics metrics{metrics_prefix, statsd_address, statsd_port};

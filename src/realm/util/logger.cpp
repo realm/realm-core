@@ -49,7 +49,8 @@ const char* Logger::get_level_prefix(Level level) noexcept
 
 void StderrLogger::do_log(Level level, const std::string& message)
 {
-    std::cerr << get_level_prefix(level) << message << std::endl; // Throws
+    // std::cerr is unbuffered, so no need to flush
+    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
 }
 
 void StreamLogger::do_log(Level level, const std::string& message)
@@ -60,7 +61,7 @@ void StreamLogger::do_log(Level level, const std::string& message)
 void ThreadSafeLogger::do_log(Level level, const std::string& message)
 {
     LockGuard l(m_mutex);
-    Logger::do_log(m_base_logger, level, message); // Throws
+    Logger::do_log(*m_base_logger_ptr, level, message); // Throws
 }
 
 Logger::Level ThreadSafeLogger::get_level_threshold() noexcept
