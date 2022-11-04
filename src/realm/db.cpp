@@ -2272,7 +2272,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                     out.commit(new_top_ref); // Throws
                 }
                 else {
-                    out.flush_all_mappings();
+                    out.encryption_flush_all_private_caches();
                 }
                 break;
             case Durability::MemOnly:

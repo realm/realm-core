@@ -48,8 +48,16 @@ public:
     char* translate(ref_type ref);
     void encryption_read_barrier(void* start_addr, size_t size);
     void encryption_write_barrier(void* start_addr, size_t size);
-    void flush();
+    // flush any intermediate decrypted storage into shared memory,
+    // making it visible to other processes
+    void encryption_flush_private_cache();
+    // trigger the msync system call (or similar on windows).
+    // on linux this will actually sync pages to disk.
+    // on mac/ios it appears to be needed to mark pages for a later
+    // write barrier. (this design is a mystery)
     void sync();
+    // safely unmap the memory - includes platform specific flushing/syncing
+    void unmap();
     // return true if the specified range is fully visible through
     // the MapWindow
     bool matches(ref_type start_ref, size_t size);
@@ -117,10 +125,7 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
-    // no so sure this is actually making a difference, but if there are any pages that are not msynced, before to
-    // call unmap(), we risk to lose some data.
-    m_map.sync();
-    m_map.unmap();
+    unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
 }
@@ -135,23 +140,25 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-#if REALM_PLATFORM_APPLE
-    m_map.sync();
-#else
-    m_map.flush();
-#endif
-    m_map.unmap();
+    unmap();
 }
 
-void GroupWriter::MapWindow::flush()
+void GroupWriter::MapWindow::encryption_flush_private_cache()
 {
     m_map.flush();
 }
 
 void GroupWriter::MapWindow::sync()
 {
-    flush();
     m_map.sync();
+}
+
+void GroupWriter::MapWindow::unmap()
+{
+    encryption_flush_private_cache();
+#if REALM_PLATFORM_APPLE
+    sync();
+#endif
 }
 
 char* GroupWriter::MapWindow::translate(ref_type ref)
@@ -273,20 +280,19 @@ size_t GroupWriter::get_file_size() const noexcept
     return sz;
 }
 
-void GroupWriter::flush_all_mappings()
+void GroupWriter::encryption_flush_all_private_caches()
+{
+    for (const auto& window : m_map_windows) {
+        window->encryption_flush_private_cache();
+    }
+}
+
+void GroupWriter::sync_all_mappings()
 {
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
-#if REALM_PLATFORM_APPLE
-        // we need to both flush any encrypted pages to the buffer cache
-        // and msync(), for the iOS/MacOS barrier operation to include the
-        // modified pages.
         window->sync();
-#else
-        // on other platforms the sync is not needed
-        window->flush();
-#endif
     }
 }
 
@@ -306,11 +312,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        // same here as per the commit function comment
-        if (m_durability != Durability::Unsafe)
-            m_map_windows.back()->sync();
-        else
-            m_map_windows.back()->flush();
+        // destruction of the window will trigger flush and sync as required for the platform
+        // through MapWindow::~MapWindow().
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
@@ -934,20 +937,25 @@ void GroupWriter::commit(ref_type new_top_ref)
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
-    flush_all_mappings();
-    if (!disable_sync)
+    encryption_flush_all_private_caches();
+    if (!disable_sync) {
+        sync_all_mappings();
+#if REALM_PLATFORM_APPLE
         m_alloc.get_file().barrier();
+#endif
+    }
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
+    window->encryption_flush_private_cache();
     if (!disable_sync) {
+        window->sync();
 #if REALM_PLATFORM_APPLE
         m_alloc.get_file().barrier();
 #else
-        window->sync();
 #endif
     }
 }

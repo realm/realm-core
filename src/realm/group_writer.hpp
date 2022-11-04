@@ -85,8 +85,10 @@ public:
         return m_locked_space_size;
     }
 
-    // Flush all cached memory mappings
-    void flush_all_mappings();
+    // Flush all cached memory mappings to shared memory
+    void encryption_flush_all_private_caches();
+    // call msync or similar for all mappings
+    void sync_all_mappings();
 
 private:
     class MapWindow;
