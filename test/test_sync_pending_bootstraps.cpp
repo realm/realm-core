@@ -56,9 +56,14 @@ TEST(Sync_PendingBootstrapStoreBatching)
         sync::PendingBootstrapStore store(db, &test_context.logger);
         CHECK(store.has_pending());
 
+        auto stats = store.pending_stats();
+        CHECK_EQUAL(stats.pending_changeset_bytes, 1024 * 5);
+        CHECK_EQUAL(stats.pending_changesets, 5);
+        CHECK_EQUAL(stats.query_version, 1);
+
         auto pending_batch = store.peek_pending((1024 * 3) - 1);
         CHECK_EQUAL(pending_batch.changesets.size(), 3);
-        CHECK_EQUAL(pending_batch.remaining, 2);
+        CHECK_EQUAL(pending_batch.remaining_changesets, 2);
         CHECK_EQUAL(pending_batch.query_version, 1);
         CHECK(pending_batch.progress);
 
@@ -88,7 +93,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
 
         pending_batch = store.peek_pending(1024 * 2);
         CHECK_EQUAL(pending_batch.changesets.size(), 2);
-        CHECK_EQUAL(pending_batch.remaining, 0);
+        CHECK_EQUAL(pending_batch.remaining_changesets, 0);
         CHECK_EQUAL(pending_batch.query_version, 1);
         CHECK(pending_batch.progress);
         validate_changeset(0, 4, 9, 'd', 4, 2);
@@ -128,7 +133,7 @@ TEST(Sync_PendingBootstrapStoreClear)
     CHECK(store.has_pending());
 
     auto pending_batch = store.peek_pending(1025);
-    CHECK_EQUAL(pending_batch.remaining, 0);
+    CHECK_EQUAL(pending_batch.remaining_changesets, 0);
     CHECK_EQUAL(pending_batch.query_version, 2);
     CHECK(pending_batch.progress);
     CHECK_EQUAL(pending_batch.changesets.size(), 2);
@@ -139,7 +144,7 @@ TEST(Sync_PendingBootstrapStoreClear)
     pending_batch = store.peek_pending(1024);
     CHECK_EQUAL(pending_batch.changesets.size(), 0);
     CHECK_EQUAL(pending_batch.query_version, 0);
-    CHECK_EQUAL(pending_batch.remaining, 0);
+    CHECK_EQUAL(pending_batch.remaining_changesets, 0);
     CHECK_NOT(pending_batch.progress);
 }
 
