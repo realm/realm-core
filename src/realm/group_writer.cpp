@@ -125,6 +125,11 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
+    encryption_flush_private_cache();
+    // This can be optimized if/when we get a good implementation of remap
+    // at the encryption layer. Currently we have to replace the mapping.
+    sync(); // likely not needed on Linux, where a later sync on a mapping hitting
+    // the same physical pages should cover the need for syncing. But to be sure...
     unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
