@@ -192,26 +192,26 @@ public:
     T export_to_type() const noexcept;
 
     // These functions are kept to be backwards compatible
-    int64_t get_int() const;
-    bool get_bool() const;
-    float get_float() const;
-    double get_double() const;
-    StringData get_string() const;
-    BinaryData get_binary() const;
-    Timestamp get_timestamp() const;
-    Decimal128 get_decimal() const;
-    ObjectId get_object_id() const;
-    UUID get_uuid() const;
-    ObjLink get_link() const;
+    int64_t get_int() const noexcept;
+    bool get_bool() const noexcept;
+    float get_float() const noexcept;
+    double get_double() const noexcept;
+    StringData get_string() const noexcept;
+    BinaryData get_binary() const noexcept;
+    Timestamp get_timestamp() const noexcept;
+    Decimal128 get_decimal() const noexcept;
+    ObjectId get_object_id() const noexcept;
+    UUID get_uuid() const noexcept;
+    ObjLink get_link() const noexcept;
 
-    bool is_null() const;
-    bool accumulate_numeric_to(Decimal128& destination) const;
-    bool is_unresolved_link() const;
-    bool is_same_type(const Mixed& b) const;
+    bool is_null() const noexcept;
+    bool accumulate_numeric_to(Decimal128& destination) const noexcept;
+    bool is_unresolved_link() const noexcept;
+    bool is_same_type(const Mixed& b) const noexcept;
     // Will use utf8_compare for strings
     int compare(const Mixed& b) const noexcept;
     // Will compare strings as arrays of signed chars
-    int compare_signed(const Mixed& b) const;
+    int compare_signed(const Mixed& b) const noexcept;
     friend bool operator==(const Mixed& a, const Mixed& b) noexcept
     {
         return a.compare(b) == 0;
@@ -237,14 +237,14 @@ public:
         return a.compare(b) >= 0;
     }
 
-    Mixed operator+(const Mixed&) const;
-    Mixed operator-(const Mixed&) const;
-    Mixed operator*(const Mixed&) const;
-    Mixed operator/(const Mixed&) const;
+    Mixed operator+(const Mixed&) const noexcept;
+    Mixed operator-(const Mixed&) const noexcept;
+    Mixed operator*(const Mixed&) const noexcept;
+    Mixed operator/(const Mixed&) const noexcept;
 
     size_t hash() const;
-    StringData get_index_data(std::array<char, 16>&) const;
-    void use_buffer(std::string& buf);
+    StringData get_index_data(std::array<char, 16>&) const noexcept;
+    void use_buffer(std::string& buf) noexcept;
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -544,7 +544,7 @@ inline int Mixed::get<int>() const noexcept
     return int(int_val);
 }
 
-inline int64_t Mixed::get_int() const
+inline int64_t Mixed::get_int() const noexcept
 {
     return get<int64_t>();
 }
@@ -556,7 +556,7 @@ inline bool Mixed::get<bool>() const noexcept
     return bool_val;
 }
 
-inline bool Mixed::get_bool() const
+inline bool Mixed::get_bool() const noexcept
 {
     return get<bool>();
 }
@@ -568,7 +568,7 @@ inline float Mixed::get<float>() const noexcept
     return float_val;
 }
 
-inline float Mixed::get_float() const
+inline float Mixed::get_float() const noexcept
 {
     return get<float>();
 }
@@ -580,7 +580,7 @@ inline double Mixed::get<double>() const noexcept
     return double_val;
 }
 
-inline double Mixed::get_double() const
+inline double Mixed::get_double() const noexcept
 {
     return get<double>();
 }
@@ -594,7 +594,7 @@ inline StringData Mixed::get<StringData>() const noexcept
     return string_val;
 }
 
-inline StringData Mixed::get_string() const
+inline StringData Mixed::get_string() const noexcept
 {
     return get<StringData>();
 }
@@ -611,7 +611,7 @@ inline BinaryData Mixed::get<BinaryData>() const noexcept
     return BinaryData(string_val.data(), string_val.size());
 }
 
-inline BinaryData Mixed::get_binary() const
+inline BinaryData Mixed::get_binary() const noexcept
 {
     return get<BinaryData>();
 }
@@ -623,7 +623,7 @@ inline Timestamp Mixed::get<Timestamp>() const noexcept
     return date_val;
 }
 
-inline Timestamp Mixed::get_timestamp() const
+inline Timestamp Mixed::get_timestamp() const noexcept
 {
     return get<Timestamp>();
 }
@@ -635,7 +635,7 @@ inline Decimal128 Mixed::get<Decimal128>() const noexcept
     return decimal_val;
 }
 
-inline Decimal128 Mixed::get_decimal() const
+inline Decimal128 Mixed::get_decimal() const noexcept
 {
     return get<Decimal128>();
 }
@@ -647,7 +647,7 @@ inline ObjectId Mixed::get<ObjectId>() const noexcept
     return id_val;
 }
 
-inline ObjectId Mixed::get_object_id() const
+inline ObjectId Mixed::get_object_id() const noexcept
 {
     return get<ObjectId>();
 }
@@ -659,7 +659,7 @@ inline UUID Mixed::get<UUID>() const noexcept
     return uuid_val;
 }
 
-inline UUID Mixed::get_uuid() const
+inline UUID Mixed::get_uuid() const noexcept
 {
     return get<UUID>();
 }
@@ -686,22 +686,22 @@ inline Mixed Mixed::get<Mixed>() const noexcept
     return *this;
 }
 
-inline ObjLink Mixed::get_link() const
+inline ObjLink Mixed::get_link() const noexcept
 {
     return get<ObjLink>();
 }
 
-inline bool Mixed::is_null() const
+inline bool Mixed::is_null() const noexcept
 {
     return (m_type == 0);
 }
 
-inline bool Mixed::is_same_type(const Mixed& b) const
+inline bool Mixed::is_same_type(const Mixed& b) const noexcept
 {
     return (m_type == b.m_type);
 }
 
-inline bool Mixed::is_unresolved_link() const
+inline bool Mixed::is_unresolved_link() const noexcept
 {
     if (is_null()) {
         return false;
