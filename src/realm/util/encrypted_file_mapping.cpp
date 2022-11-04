@@ -209,21 +209,22 @@ void AESCryptor::set_file_size(off_t new_size)
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
+iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode) noexcept
 {
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
     size_t idx = data_pos_casted / block_size;
-    // FIXME: this has disabled all caching of the iv tables
-    //    if (idx < m_iv_buffer.size())
-    //        return m_iv_buffer[idx];
+    if (mode == IVLookupMode::UseCache && idx < m_iv_buffer.size())
+        return m_iv_buffer[idx];
 
-    size_t old_size = m_iv_buffer.size();
-    size_t new_block_count = 1 + idx / blocks_per_metadata_block;
-    REALM_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
-    m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
+    size_t block_start = std::min(m_iv_buffer.size(), (idx / blocks_per_metadata_block) * blocks_per_metadata_block);
+    size_t block_end = 1 + idx / blocks_per_metadata_block;
+    REALM_ASSERT(block_end * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
+    if (block_end * blocks_per_metadata_block > m_iv_buffer.size()) {
+        m_iv_buffer.resize(block_end * blocks_per_metadata_block);
+    }
 
-    for (size_t i = 0 /*old_size*/; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
+    for (size_t i = block_start; i < block_end * blocks_per_metadata_block; i += blocks_per_metadata_block) {
         off_t iv_pos = iv_table_pos(off_t(i * block_size));
         size_t bytes = check_read(fd, iv_pos, &m_iv_buffer[i], block_size);
         if (bytes < block_size)
@@ -247,17 +248,48 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
 
 bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
-    REALM_ASSERT(size % block_size == 0);
-    // FIXME: we need to throw DecryptionFailed if the key is incorrect, but not in a reader starvation scenario
-    size_t retries_left = 50;
+    REALM_ASSERT_EX(size % block_size == 0, size, block_size);
+    // We need to throw DecryptionFailed if the key is incorrect or there has been a corruption in the data but
+    // not in a reader starvation scenario where a different process is writing pages and ivs faster than we can read
+    // them. The following combination of 100 retries of 23 ms produces a max wait time of 1.1 seconds if all retries
+    // fail.
+    size_t retry_count = 0;
+    auto retry_start_time = std::chrono::steady_clock::now();
+    auto retry = [&](const char* debug_from) {
+        // don't wait too long because we hold the DB lock here, but we want to wait long enough
+        // for a new page to be written to disk by another process before we retry reading it.
+        constexpr size_t millis_to_sleep_before_retry = 23;
+        constexpr auto max_retry_period = std::chrono::seconds(20);
+        auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
+        if (elapsed > max_retry_period) {
+            auto str = util::format("Reader starvation detected after %1 seconds (retry_count=%2, from=%3, size=%4)",
+                                    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
+                                    debug_from, size);
+            std::cout << str << std::endl;
+            throw DecryptionFailed(str);
+        }
+        else {
+            // don't wait on the first retry as we want to optimize the case where the first read
+            // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
+            if (retry_count != 0) {
+                millisleep(millis_to_sleep_before_retry);
+            }
+            ++retry_count;
+        }
+    };
+
     while (size > 0) {
         ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         if (bytes_read == 0)
             return false;
 
-        iv_table& iv = get_iv_table(fd, pos);
+        iv_table& iv = get_iv_table(fd, pos, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch);
         if (iv.iv1 == 0) {
+            if (retry_count < 10) {
+                retry("iv1 == 0");
+                continue;
+            }
             // This block has never been written to, so we've just read pre-allocated
             // space. No memset() since the code using this doesn't rely on
             // pre-allocated space being zeroed.
@@ -268,6 +300,10 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
+                if (retry_count < 10) {
+                    retry("iv2 == 0");
+                    continue;
+                }
                 // Very first write was interrupted
                 return false;
             }
@@ -290,13 +326,8 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 }
                 if (i != bytes_read) {
                     // at least one byte wasn't zero
-                    if (--retries_left == 0) {
-                        throw DecryptionFailed();
-                    }
-                    else {
-                        millisleep(47); // a small prime
-                        continue;       // re-read the data and retry all checks
-                    }
+                    retry("i != bytes_read");
+                    continue;
                 }
             }
         }
@@ -320,6 +351,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
         pos += block_size;
         dst += block_size;
         size -= block_size;
+        retry_count = 0;
     }
     return true;
 }
@@ -334,7 +366,7 @@ void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
         return;
     }
 
-    iv_table& iv = get_iv_table(fd, pos);
+    iv_table& iv = get_iv_table(fd, pos, IVLookupMode::Refetch);
     if (iv.iv1 == 0) {
         std::cerr << "Block never written: 0x" << std::hex << pos << std::endl;
         memset(dst, 0xAA, block_size);
@@ -363,7 +395,7 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noe
     while (size > 0) {
         iv_table& iv = get_iv_table(fd, pos);
 
-        memcpy(&iv.iv2, &iv.iv1, 32);
+        memcpy(&iv.iv2, &iv.iv1, 32); // this is also copying the hmac
         do {
             ++iv.iv1;
             // 0 is reserved for never-been-used, so bump if we just wrapped around
@@ -833,7 +865,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
     // propagate changes to first page (update may be partial, may also be to last page)
     if (first_accessed_local_page < pages_size) {
-        REALM_ASSERT(is(m_page_state[first_accessed_local_page], UpToDate));
+        REALM_ASSERT_EX(is(m_page_state[first_accessed_local_page], UpToDate),
+                        m_page_state[first_accessed_local_page]);
         if (first_accessed_local_page == last_accessed_local_page) {
             size_t last_offset = last_accessed_address - page_addr(first_accessed_local_page);
             write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);

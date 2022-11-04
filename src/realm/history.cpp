@@ -137,8 +137,8 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
                                     BinaryIterator* buffer) const noexcept
 {
-    REALM_ASSERT_EX(begin_version <= end_version, begin_version, end_version);
-    REALM_ASSERT_EX(begin_version >= m_base_version, begin_version, m_base_version);
+    REALM_ASSERT_EX(begin_version <= end_version, begin_version, end_version, m_base_version);
+    REALM_ASSERT_EX(begin_version >= m_base_version, begin_version, end_version, m_base_version);
     REALM_ASSERT_EX(end_version <= m_base_version + m_size, end_version, m_base_version, m_size);
     version_type n_version_type = end_version - begin_version;
     version_type offset_version_type = begin_version - m_base_version;

@@ -185,6 +185,10 @@ struct DecryptionFailed : util::File::AccessError {
         : util::File::AccessError("Decryption failed", std::string())
     {
     }
+    DecryptionFailed(const std::string& msg)
+        : util::File::AccessError(util::format("Decryption failed: '%1'", msg), std::string())
+    {
+    }
 };
 } // namespace realm::util
 

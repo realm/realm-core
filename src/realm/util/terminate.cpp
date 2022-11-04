@@ -61,7 +61,6 @@
 #define REALM_VERSION_SUFFIX_CONCAT                                                                                  \
     REALM_MACRO_CONCAT(REALM_EVALUATE(REALM_VERSION_MAJOR),                                                          \
                        REALM_MACRO_CONCAT(REALM_EVALUATE(REALM_VERSION_MINOR), REALM_EVALUATE(REALM_VERSION_PATCH)))
-
 REALM_DEFINE_TERMINATE_VERSIONED(REALM_VERSION_SUFFIX_CONCAT)
 
 #define REALM_TERMINATE_VERSIONED_(x) please_report_this_issue_in_github_realm_realm_core_v##x()

@@ -812,9 +812,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             expected_size = round_up_to_page_size(logical_size);
         }
     }
-    catch (const DecryptionFailed&) {
+    catch (const DecryptionFailed& e) {
         note_reader_end(this);
-        throw InvalidDatabase("Realm file decryption failed", path);
+        throw InvalidDatabase(util::format("Realm file decryption failed (%1)", e.message()), path);
     }
     catch (const std::exception& e) {
         note_reader_end(this);

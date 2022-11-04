@@ -602,7 +602,7 @@ TEST(Shared_ReadOverRead2)
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
-    // This requires a "non-encrypted database size" (not physical file sise) which is non-divisible
+    // This requires a "non-encrypted database size" (not physical file size) which is non-divisible
     // by page_size() *and* is bigger than current allocated section. Following row count and payload
     // seems to work on both Windows+Linux
     const int64_t rows = 12;
@@ -2224,6 +2224,47 @@ TEST(Shared_EncryptionKeyCheck_3)
     DBRef sg = DB::create(path, false, DBOptions(first_key));
     CHECK_THROW(DB::create(path, false, DBOptions(second_key)), InvalidDatabase);
     DBRef sg3 = DB::create(path, false, DBOptions(first_key));
+}
+
+TEST(Shared_EncryptionPageReadFailure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    constexpr size_t num_objects = 4096;
+    {
+        DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_group().add_table_with_primary_key("foo", type_ObjectId, "pk");
+        auto str_col = table->add_column(type_String, "string");
+        for (size_t i = 0; i < num_objects; ++i) {
+            auto obj = table->create_object_with_primary_key(ObjectId::gen());
+            obj.set<String>(str_col, "C");
+        }
+        wt.commit();
+    }
+    {
+        // make a corruption in the first data page
+        util::File f(path, File::Mode::mode_Update);
+        CHECK_GREATER(f.get_size(), 12288); // 4k iv page, then at least 2 pages
+        f.seek(5000);                       // somewhere on the first data page
+        constexpr std::string_view data = "an external corruption in the encrypted page";
+        f.write(data.data(), data.size());
+        f.sync();
+        f.close();
+    }
+    {
+        bool did_throw = false;
+        try {
+            DBRef sg = DB::create(path, false, DBOptions(crypt_key(true)));
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_group().get_table("foo");
+            CHECK_EQUAL(table->size(), num_objects);
+        }
+        catch (const InvalidDatabase& e) {
+            CHECK_STRING_CONTAINS(e.message(), "decryption failed");
+            did_throw = true;
+        }
+        CHECK(did_throw);
+    }
 }
 
 #endif // REALM_ENABLE_ENCRYPTION

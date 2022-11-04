@@ -69,6 +69,8 @@ private:
 #endif
     };
 
+    enum class IVLookupMode { UseCache, Refetch };
+
 #if REALM_PLATFORM_APPLE
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
@@ -87,7 +89,7 @@ private:
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
-    iv_table& get_iv_table(FileDesc fd, off_t data_pos) noexcept;
+    iv_table& get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode = IVLookupMode::UseCache) noexcept;
     void handle_error();
 };
 
