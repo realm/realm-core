@@ -689,10 +689,9 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
     });
 }
 
-RLM_API bool realm_app_call_function(
-    const realm_app_t* app, const realm_user_t* user, const char* function_name, const char* serialized_ejson_payload,
-    realm_return_string_func_t callback,
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
+                                     const char* serialized_ejson_payload, realm_return_string_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
