@@ -924,8 +924,9 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
+    window->flush();
     if (!disable_sync)
-        window->sync();
+        m_alloc.get_file().barrier();
 }
 
 
