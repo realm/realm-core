@@ -1069,7 +1069,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
          completion = std::move(completion)](const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
                 self->log_debug("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                          response.http_status_code, error->message);
+                                response.http_status_code, error->message);
                 return completion({}, error);
             }
             completion(response.body, util::none);
@@ -1100,13 +1100,13 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                       try {
                           body_as_bson = bson::parse(response);
                           if (self->m_logger && self->m_logger->would_log(util::Logger::Level::debug)) {
-                              self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name, service_name,
-                                        body_as_bson ? body_as_bson->to_string() : "<none>");
+                              self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name,
+                                              service_name, body_as_bson ? body_as_bson->to_string() : "<none>");
                           }
                       }
                       catch (const std::exception& e) {
                           self->log_debug("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
-                                    service_name, e.what());
+                                          service_name, e.what());
                           return completion(util::none,
                                             AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
                       };
