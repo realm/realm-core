@@ -2839,6 +2839,7 @@ typedef void (*realm_return_apikey_func_t)(realm_userdata_t userdata, realm_app_
 typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count,
                                                 realm_app_error_t*);
 
+typedef void (*realm_return_string_func_t)(realm_userdata_t userdata, const char* serialized_ejson_response, const realm_app_error_t*);
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -3219,8 +3220,7 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
                                      const char* serialized_ejson_args,
-                                     void (*)(realm_userdata_t userdata, const char* serialized_ejson_response,
-                                              const realm_app_error_t*),
+                                     realm_return_string_func_t callback,
                                      realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
