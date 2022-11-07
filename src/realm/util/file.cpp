@@ -1653,6 +1653,36 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 #endif
 }
 
+std::string File::parent_dir(const std::string& path)
+{
+#if HAVE_STD_FILESYSTEM
+    namespace fs = std::filesystem;
+    return fs::path(path).parent_path().string(); // Throws
+#else
+    auto is_sep = [](char c) -> bool {
+        return c == '/' || c == '\\';
+    };
+    // Find end of last directory separator sequence
+    auto begin = path.begin();
+    auto i = path.end();
+    while (i != begin) {
+        auto j = i;
+        --i;
+        if (is_sep(*i)) {
+            // Find beginning of last directory separator sequence
+            while (i != begin) {
+                auto k = i - 1;
+                if (is_sep(*k))
+                    return {begin, i}; // Throws
+                i = k;
+            }
+            return {begin, j}; // Throws
+        }
+    }
+    return {"."};
+#endif
+}
+
 
 bool File::for_each(const std::string& dir_path, ForEachHandler handler)
 {
