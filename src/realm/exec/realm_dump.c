@@ -256,13 +256,13 @@ void dump_index(FILE* fp, int64_t ref, const char* arr)
 
 void usage()
 {
-    printf("Usage: realm-dump <file> [<ref>]\n");
+    printf("Usage: realm-dump <file> [?][<ref>] [<array>]\n");
     exit(1);
 }
 
 int main(int argc, const char* argv[])
 {
-    if (argc < 2 || argc > 3) {
+    if (argc < 2) {
         usage();
     }
 
@@ -276,13 +276,13 @@ int main(int argc, const char* argv[])
     int64_t ref = 0;
     int64_t find_ref = 0;
     const char* array_str = NULL;
-    if (argc == 3) {
-        if (*argv[2] == '[') {
-            array_str = argv[2] + 1;
+    for (size_t arg = 2; arg < argc; arg++) {
+        if (*argv[arg] == '[') {
+            array_str = argv[arg] + 1;
         }
-        else if (*argv[2] == '?') {
+        else if (*argv[arg] == '?') {
             char* end;
-            find_ref = strtoll(argv[2] + 1, &end, 0);
+            find_ref = strtoll(argv[arg] + 1, &end, 0);
             if (*end != '\0') {
                 printf("'%s' is not a number\n", argv[2]);
                 exit(1);
@@ -290,7 +290,7 @@ int main(int argc, const char* argv[])
         }
         else {
             char* end;
-            ref = strtoll(argv[2], &end, 0);
+            ref = strtoll(argv[arg], &end, 0);
             if (*end != '\0') {
                 printf("'%s' is not a number\n", argv[2]);
                 exit(1);
@@ -298,7 +298,12 @@ int main(int argc, const char* argv[])
         }
     }
 
-    if (ref) {
+    if (array_str) {
+        if (!ref)
+            ref = get_top_ref(fp);
+        dump_index(fp, ref, array_str);
+    }
+    else if (ref) {
         size_t sz = dump_header(fp, ref);
         dump(fp, ref + 8, sz);
     }
@@ -306,10 +311,6 @@ int main(int argc, const char* argv[])
         int stack[128];
         ref = get_top_ref(fp);
         search_ref(fp, ref, find_ref, 0, stack);
-    }
-    else if (array_str) {
-        ref = get_top_ref(fp);
-        dump_index(fp, ref, array_str);
     }
     else {
         dump_file_header(fp);

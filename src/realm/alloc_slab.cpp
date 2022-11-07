@@ -775,10 +775,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 
-        // Make sure the database is not on streaming format. If we did not do this,
-        // a later commit would have to do it. That would require coordination with
-        // anybody concurrently joining the session, so it seems easier to do it at
-        // session initialization, even if it means writing the database during open.
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
             // Also don't compare reserved fields.
@@ -796,22 +792,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
             REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
                             get_file_path_for_assertions());
-            {
-                File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-                Header& writable_header = *writable_map.get_addr();
-                realm::util::encryption_read_barrier(writable_map, 0);
-                writable_header.m_top_ref[1] = footer->m_top_ref;
-                writable_header.m_file_format[1] = writable_header.m_file_format[0];
-                realm::util::encryption_write_barrier(writable_map, 0);
-                writable_map.sync();
-                realm::util::encryption_read_barrier(writable_map, 0);
-                writable_header.m_flags |= flags_SelectBit;
-                realm::util::encryption_write_barrier(writable_map, 0);
-                writable_map.sync();
-
-                realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
-            }
         }
+
         if (top_ref) {
             // Get the expected file size by looking up logical file size stored in top array
             constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
@@ -903,6 +885,33 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     m_realm_file_info = util::get_file_info_for_file(m_file);
 #endif
     return top_ref;
+}
+
+void SlabAlloc::convert_from_streaming_form(ref_type top_ref)
+{
+    auto header = reinterpret_cast<const Header*>(m_data);
+    if (!is_file_on_streaming_form(*header))
+        return;
+
+    // Make sure the database is not on streaming format. If we did not do this,
+    // a later commit would have to do it. That would require coordination with
+    // anybody concurrently joining the session, so it seems easier to do it at
+    // session initialization, even if it means writing the database during open.
+    {
+        File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+        Header& writable_header = *writable_map.get_addr();
+        realm::util::encryption_read_barrier(writable_map, 0);
+        writable_header.m_top_ref[1] = top_ref;
+        writable_header.m_file_format[1] = writable_header.m_file_format[0];
+        realm::util::encryption_write_barrier(writable_map, 0);
+        writable_map.sync();
+        realm::util::encryption_read_barrier(writable_map, 0);
+        writable_header.m_flags |= flags_SelectBit;
+        realm::util::encryption_write_barrier(writable_map, 0);
+        writable_map.sync();
+
+        realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
+    }
 }
 
 void SlabAlloc::note_reader_start(const void* reader_id)
