@@ -484,6 +484,9 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
+    for (auto& e : m_page_state) {
+        REALM_ASSERT(is_not(e, Dirty));
+    }
     if (m_access == File::access_ReadWrite) {
         flush();
         sync();

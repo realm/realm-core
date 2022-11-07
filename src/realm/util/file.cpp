@@ -657,6 +657,8 @@ void File::write(const char* data, size_t size)
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
+        write_map.flush();
+        write_map.sync();
         uint64_t cur = get_file_pos(m_fd);
         seek(cur + size);
         return;
