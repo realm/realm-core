@@ -1277,6 +1277,74 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
         default_schema.schema);
 }
 
+// This is a test case for the server's fix for RCORE-969
+TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_coq_divergence");
+
+    // first we create an object on the server and upload it.
+    auto foo_obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "created as initial data seed"s}}));
+    });
+
+    // Now create another realm and wait for it to be fully synchronized with bootstrap version zero. i.e.
+    // our progress counters should be past the history entry containing the object created above.
+    auto test_file_config = harness.make_test_file();
+    auto realm = Realm::get_shared_realm(test_file_config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto queryable_str_field = table->get_column_key("queryable_str_field");
+
+    realm->get_latest_subscription_set().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    // Now disconnect the sync session
+    realm->sync_session()->close();
+
+    // And move the "foo" object created above into view and create a different diverging copy of it locally.
+    auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+    auto subs = std::move(mut_subs).commit();
+
+    realm->begin_transaction();
+    CppContext c(realm);
+    Object::create(c, realm, "TopLevel",
+                   std::any(AnyDict{{"_id", foo_obj_id},
+                                    {"queryable_str_field", "foo"s},
+                                    {"queryable_int_field", static_cast<int64_t>(10)},
+                                    {"non_queryable_field", "created locally"s}}));
+    realm->commit_transaction();
+
+    // Reconnect the sync session and wait for the subscription that moved "foo" into view to be fully synchronized.
+    realm->sync_session()->revive_if_needed();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+    wait_for_advance(*realm);
+
+    // The bootstrap should have erase/re-created our object and we should have the version from the server
+    // locally.
+    auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{foo_obj_id});
+    REQUIRE(obj.obj().get<int64_t>("queryable_int_field") == 5);
+    REQUIRE(obj.obj().get<StringData>("non_queryable_field") == "created as initial data seed");
+
+    // Likewise, if we create a new realm and download all the objects, we should see the initial server version
+    // in the new realm rather than the "created locally" one.
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{foo_obj_id});
+        REQUIRE(obj.obj().get<int64_t>("queryable_int_field") == 5);
+        REQUIRE(obj.obj().get<StringData>("non_queryable_field") == "created as initial data seed");
+    });
+}
+
 TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 

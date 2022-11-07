@@ -26,7 +26,6 @@
 namespace realm {
 
 struct DBOptions {
-
     /// The persistence level of the DB.
     /// uint16_t is the type of DB::SharedInfo::durability
     enum class Durability : uint16_t {
@@ -35,43 +34,19 @@ struct DBOptions {
         Unsafe // If you use this, you loose ACID property
     };
 
-    using version_list_t = BackupHandler::version_list_t;
-    using version_time_list_t = BackupHandler::version_time_list_t;
-
-    explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr, bool allow_upgrade = true,
-                       std::function<void(int, int)> file_upgrade_callback = nullptr,
-                       std::string temp_directory = sys_tmp_dir, bool track_metrics = false,
-                       size_t metrics_history_size = 10000, bool backup_at_file_format_change = true,
-                       bool enable_async = false)
+    explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr)
         : durability(level)
         , encryption_key(key)
-        , allow_file_format_upgrade(allow_upgrade)
-        , upgrade_callback(file_upgrade_callback)
-        , temp_dir(temp_directory)
-        , enable_metrics(track_metrics)
-        , metrics_buffer_size(metrics_history_size)
-        , backup_at_file_format_change(backup_at_file_format_change)
-        , accepted_versions(BackupHandler::accepted_versions_)
-        , to_be_deleted(BackupHandler::delete_versions_)
-        , enable_async_writes(enable_async)
     {
     }
 
     explicit DBOptions(const char* key)
-        : durability(Durability::Full)
-        , encryption_key(key)
-        , allow_file_format_upgrade(true)
-        , temp_dir(sys_tmp_dir)
-        , enable_metrics(false)
-        , metrics_buffer_size(10000)
-        , backup_at_file_format_change(true)
-        , accepted_versions(BackupHandler::accepted_versions_)
-        , to_be_deleted(BackupHandler::delete_versions_)
+        : encryption_key(key)
     {
     }
 
     /// The persistence level of the Realm file. See Durability.
-    Durability durability;
+    Durability durability = Durability::Full;
 
     /// The key to encrypt and decrypt the Realm file with, or nullptr to
     /// indicate that encryption should not be used.
@@ -89,7 +64,7 @@ struct DBOptions {
     ///
     /// - the specified Realm file uses a deprecated file format, resulting a
     ///   the throwing of FileFormatUpgradeRequired.
-    bool allow_file_format_upgrade;
+    bool allow_file_format_upgrade = true;
 
     /// Optionally allows a custom function to be called immediately after the
     /// Realm file is upgraded. The two parameters in the function are the
@@ -100,15 +75,15 @@ struct DBOptions {
 
     /// A path to a directory where Realm can write temporary files or pipes to.
     /// This string should include a trailing slash '/'.
-    std::string temp_dir;
+    std::string temp_dir = sys_tmp_dir;
 
     /// Controls the feature of collecting various metrics to the DB.
     /// A prerequisite is compiling with REALM_METRICS=ON.
-    bool enable_metrics;
+    bool enable_metrics = false;
 
     /// The maximum number of entries stored by the metrics (if enabled). If this number
     /// is exceeded without being consumed, only the most recent entries will be stored.
-    size_t metrics_buffer_size;
+    size_t metrics_buffer_size = 10000;
 
     /// is_immutable should be set to true if run from a read-only file system.
     /// this will prevent the DB from making any writes, also disabling the creation
@@ -116,13 +91,13 @@ struct DBOptions {
     bool is_immutable = false;
 
     /// Disable automatic backup at file format upgrade by setting to false
-    bool backup_at_file_format_change;
+    bool backup_at_file_format_change = true;
 
     /// List of versions we can upgrade from
-    BackupHandler::version_list_t accepted_versions;
+    BackupHandler::VersionList accepted_versions = BackupHandler::accepted_versions_;
 
     /// List of versions for which backup files are automatically removed at specified age.
-    BackupHandler::version_time_list_t to_be_deleted;
+    BackupHandler::VersionTimeList to_be_deleted = BackupHandler::delete_versions_;
 
     /// Must be set for the async writes feature to be used. On some platforms
     /// this will make *all* writes async and then wait on the result, which has

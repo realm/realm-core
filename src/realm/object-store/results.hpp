@@ -146,11 +146,14 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const REQUIRES(!m_mutex);
+    // Create a new Results by sorting this Result.
     Results sort(SortDescriptor&& sort) const REQUIRES(!m_mutex);
+    // Create a new Results by sorting this Result based on the specified key paths.
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const REQUIRES(!m_mutex);
 
-    // Create a new Results by removing duplicates
+    // Create a new Results by removing duplicates.
     Results distinct(DistinctDescriptor&& uniqueness) const REQUIRES(!m_mutex);
+    // Create a new Results by removing duplicates based on the specified key paths.
     Results distinct(std::vector<std::string> const& keypaths) const REQUIRES(!m_mutex);
 
     // Create a new Results with only the first `max_count` entries
