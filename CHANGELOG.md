@@ -12,6 +12,7 @@
 * The name of one of the RLM_SYNC_BOOTSTRAPPING enum member in the C api was updated to match the naming convention of the other members in the enum.
 * Fix `Results.distinct(keypaths)` and `Results.sort(keypaths)` not correctly handling keypaths names for properties that have a public/private(column) property name ([PR #5952](https://github.com/realm/realm-core/pull/5952).
 * Bootstraps will not be applied in a single write transaction - they will be applied 1MB of changesets at a time, or as configured by the SDK ([#5999](https://github.com/realm/realm-core/pull/5999), since v12.0.0).
+* Creating a very large number of temporary Transactions resulted in a cache growing to a large size and never shrinking ([PR #6007](https://github.com/realm/realm-core/pull/6007)).
 
 ### Breaking changes
 * None.

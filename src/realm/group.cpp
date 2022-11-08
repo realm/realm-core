@@ -113,9 +113,8 @@ Group::Group(BinaryData buffer, bool take_ownership)
 }
 
 Group::Group(SlabAlloc* alloc) noexcept
-    : m_alloc(*alloc)
-    , // Throws
-    m_top(m_alloc)
+    : m_alloc(*alloc) // Throws
+    , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_total_rows(0)
@@ -124,23 +123,12 @@ Group::Group(SlabAlloc* alloc) noexcept
 }
 
 namespace {
-
-class TableRecycler : public std::vector<Table*> {
-public:
-    ~TableRecycler()
-    {
-        REALM_UNREACHABLE();
-        // if ever enabled, remember to release Tables:
-        // for (auto t : *this) {
-        //    delete t;
-        //}
-    }
-};
+using TableRecycler = std::vector<std::unique_ptr<Table>>;
 
 // We use the classic approach to construct a FIFO from two LIFO's,
 // insertion is done into recycler_1, removal is done from recycler_2,
 // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
-// this i O(1) for each entry.
+// this is amortized O(1) for each entry.
 auto& g_table_recycler_1 = *new TableRecycler;
 auto& g_table_recycler_2 = *new TableRecycler;
 // number of tables held back before being recycled. We hold back recycling
@@ -764,42 +752,41 @@ Table* Group::create_table_accessor(size_t table_ndx)
     if (ref == 0) {
         throw NoSuchTable();
     }
-    Table* table = 0;
+    std::unique_ptr<Table> table;
     {
         std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
         if (g_table_recycler_2.empty()) {
             while (!g_table_recycler_1.empty()) {
-                auto t = g_table_recycler_1.back();
+                g_table_recycler_2.push_back(std::move(g_table_recycler_1.back()));
                 g_table_recycler_1.pop_back();
-                g_table_recycler_2.push_back(t);
             }
         }
         if (g_table_recycler_2.size() + g_table_recycler_1.size() > g_table_recycling_delay) {
-            table = g_table_recycler_2.back();
+            table = std::move(g_table_recycler_2.back());
             table->fully_detach();
             g_table_recycler_2.pop_back();
         }
     }
     if (table) {
         table->revive(get_repl(), m_alloc, m_is_writable);
-        table->init(ref, this, table_ndx, m_is_writable, is_frozen());
     }
     else {
-        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));  // Throws
-        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen()); // Throws
-        table = new_table.release();
+        table.reset(new Table(get_repl(), m_alloc)); // Throws
     }
+    table->init(ref, this, table_ndx, m_is_writable, is_frozen()); // Throws
     table->refresh_index_accessors();
     // must be atomic to allow concurrent probing of the m_table_accessors vector.
-    store_atomic(m_table_accessors[table_ndx], table, std::memory_order_release);
-    return table;
+    store_atomic(m_table_accessors[table_ndx], table.get(), std::memory_order_release);
+    return table.release(); // now owned by m_table_accessors
 }
 
 
 void Group::recycle_table_accessor(Table* to_be_recycled)
 {
+    std::unique_ptr<Table> table(to_be_recycled);
     std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
-    g_table_recycler_1.push_back(to_be_recycled);
+    if (g_table_recycler_1.size() < g_table_recycling_delay * 2)
+        g_table_recycler_1.push_back(std::move(table));
 }
 
 void Group::remove_table(StringData name)
