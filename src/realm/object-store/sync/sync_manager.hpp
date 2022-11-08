@@ -233,8 +233,8 @@ public:
         return m_config;
     }
 
-    // Create a new logger of the type which will be used by the sync client
-    const std::shared_ptr<util::Logger>& make_logger() const REQUIRES(!m_mutex);
+    // Return the cached logger
+    const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
 
     SyncManager();
     SyncManager(const SyncManager&) = delete;
@@ -270,9 +270,6 @@ private:
 
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
-
-    // Create a new logger of the type which will be used by the sync client
-    const std::shared_ptr<util::Logger>& do_make_logger() const REQUIRES(m_mutex);
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;

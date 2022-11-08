@@ -294,14 +294,9 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
     }
 }
 
-const std::shared_ptr<util::Logger>& SyncManager::make_logger() const
+const std::shared_ptr<util::Logger>& SyncManager::get_logger() const REQUIRES(!m_mutex)
 {
     util::CheckedLockGuard lock(m_mutex);
-    return do_make_logger();
-}
-
-const std::shared_ptr<util::Logger>& SyncManager::do_make_logger() const
-{
     return m_logger_ptr;
 }
 
@@ -762,7 +757,7 @@ SyncClient& SyncManager::get_sync_client() const
 
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
-    return std::make_unique<SyncClient>(do_make_logger(), m_config, weak_from_this());
+    return std::make_unique<SyncClient>(m_logger_ptr, m_config, weak_from_this());
 }
 
 util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
