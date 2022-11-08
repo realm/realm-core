@@ -915,9 +915,10 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
 }
 
 RLM_API uint64_t realm_sync_session_register_progress_notifier(realm_sync_session_t* session,
-                                                               realm_sync_progress_func_t notifier,
                                                                realm_sync_progress_direction_e direction,
-                                                               bool is_streaming, realm_userdata_t userdata,
+                                                               bool is_streaming,
+                                                               realm_sync_progress_func_t notifier,
+                                                               realm_userdata_t userdata,
                                                                realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =

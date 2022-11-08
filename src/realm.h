@@ -3949,8 +3949,10 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
  *                     when the notifier was registered.
  * @return A token value that can be used to unregiser the notifier.
  */
+
 RLM_API uint64_t realm_sync_session_register_progress_notifier(
-    realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
+    realm_sync_session_t*, realm_sync_progress_direction_e, bool is_streaming,
+    realm_sync_progress_func_t,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 
