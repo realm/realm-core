@@ -4916,7 +4916,9 @@ TEST(LangBindHelper_RollbackToInitialState2)
     trans->rollback();
 }
 
-TEST(LangBindHelper_Compact)
+// non-concurrent because we test the filesystem which may
+// be used by other tests at the same time otherwise
+NONCONCURRENT_TEST(LangBindHelper_Compact)
 {
     SHARED_GROUP_TEST_PATH(path);
     size_t N = 100;
