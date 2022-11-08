@@ -304,7 +304,7 @@ public:
 
     void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
                        const util::Optional<std::string>& service_name,
-                       util::UniqueFunction<void(const std::string&, util::Optional<AppError>)>&& completion) final;
+                       util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::shared_ptr<SyncUser>& user, const std::string& name, const bson::BsonArray& args_bson,

@@ -1065,7 +1065,7 @@ std::string App::function_call_url_path() const
 
 void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
                         const Optional<std::string>& service_name_opt,
-                        UniqueFunction<void(const std::string&, Optional<AppError>)>&& completion)
+                        UniqueFunction<void(const std::string*, Optional<AppError>)>&& completion)
 {
     auto service_name = service_name_opt ? *service_name_opt : "<none>";
     if (would_log(util::Logger::Level::debug)) {
@@ -1082,9 +1082,9 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
             if (auto error = AppUtils::check_for_errors(response)) {
                 self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
                                 response.http_status_code, error->message);
-                return completion({}, error);
+                return completion(nullptr, error);
             }
-            completion(response.body, util::none);
+            completion(&response.body, util::none);
         });
 }
 
@@ -1104,20 +1104,20 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
 
     call_function(user, name, std::move(args_ejson).str(), service_name,
                   [self = shared_from_this(), name, service_name = std::move(service_name2),
-                   completion = std::move(completion)](const std::string& response, util::Optional<AppError>&& err) {
+                   completion = std::move(completion)](const std::string* response, util::Optional<AppError>&& err) {
                       if (err) {
                           return completion({}, err);
                       }
                       util::Optional<Bson> body_as_bson;
                       try {
-                          body_as_bson = bson::parse(response);
+                          body_as_bson = bson::parse(*response);
                           if (self->would_log(util::Logger::Level::debug)) {
                               self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name,
                                               service_name, body_as_bson ? body_as_bson->to_string() : "<none>");
                           }
                       }
                       catch (const std::exception& e) {
-                          self->log_debug("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
+                          self->log_error("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
                                           service_name, e.what());
                           return completion(util::none,
                                             AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
