@@ -42,6 +42,7 @@
 #endif
 
 #include <realm/exceptions.hpp>
+#include <realm/unicode.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -1655,31 +1656,37 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 
 std::string File::parent_dir(const std::string& path)
 {
-#if HAVE_STD_FILESYSTEM
+#if REALM_HAVE_STD_FILESYSTEM
     namespace fs = std::filesystem;
     return fs::path(path).parent_path().string(); // Throws
 #else
     auto is_sep = [](char c) -> bool {
         return c == '/' || c == '\\';
     };
-    // Find end of last directory separator sequence
-    auto begin = path.begin();
-    auto i = path.end();
-    while (i != begin) {
-        auto j = i;
-        --i;
-        if (is_sep(*i)) {
-            // Find beginning of last directory separator sequence
-            while (i != begin) {
-                auto k = i - 1;
-                if (is_sep(*k))
-                    return {begin, i}; // Throws
-                i = k;
-            }
-            return {begin, j}; // Throws
+    std::vector<size_t> sep_indices;
+    for (size_t i = 0; i < path.size();) {
+        size_t seq_len = sequence_length(path[i]);
+        if (seq_len == 1 && is_sep(path[i])) {
+            sep_indices.push_back(i);
         }
+        i += seq_len;
     }
-    return {"."};
+    if (sep_indices.empty()) {
+        return "";
+    }
+    if (sep_indices.size() == 1) {
+        return path.substr(0, sep_indices[0]);
+    }
+    // remove consecutive trailing separators
+    auto it = sep_indices.rbegin();
+    size_t last = *it;
+    while (++it != sep_indices.rend()) {
+        if (last != *it + 1) {
+            return path.substr(0, last);
+        }
+        last = *it;
+    }
+    return path.substr(0, last);
 #endif
 }
 

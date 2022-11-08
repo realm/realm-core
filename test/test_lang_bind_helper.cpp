@@ -4921,6 +4921,7 @@ TEST(LangBindHelper_Compact)
     SHARED_GROUP_TEST_PATH(path);
     size_t N = 100;
     std::string dir_path = File::parent_dir(path);
+    dir_path = dir_path.empty() ? "." : dir_path;
     auto dir_has_tmp_compaction = [&dir_path]() -> size_t {
         DirScanner dir(dir_path);
         std::string name;
