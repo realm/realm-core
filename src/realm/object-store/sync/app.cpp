@@ -257,26 +257,38 @@ void App::configure(const SyncClientConfig& sync_client_config)
 {
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
-    // Logger isn't initialized until here...
-    m_logger = m_sync_manager->make_logger();
     if (auto metadata = m_sync_manager->app_metadata()) {
         update_hostname(metadata);
     }
 }
 
+void App::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
+{
+    std::lock_guard<std::mutex> lock(*m_logger_mutex);
+    m_logger_ptr = logger;
+}
+
+bool App::would_log(util::Logger::Level level)
+{
+    std::lock_guard<std::mutex> lock(*m_logger_mutex);
+    return m_logger_ptr && m_logger_ptr->would_log(level);
+}
+
 template <class... Params>
 void App::log_debug(const char* message, Params&&... params)
 {
-    if (m_logger) {
-        m_logger->log(util::Logger::Level::debug, message, std::forward<Params>(params)...);
+    std::lock_guard<std::mutex> lock(*m_logger_mutex);
+    if (m_logger_ptr) {
+        m_logger_ptr->log(util::Logger::Level::debug, message, std::forward<Params>(params)...);
     }
 }
 
 template <class... Params>
 void App::log_error(const char* message, Params&&... params)
 {
-    if (m_logger) {
-        m_logger->log(util::Logger::Level::error, message, std::forward<Params>(params)...);
+    std::lock_guard<std::mutex> lock(*m_logger_mutex);
+    if (m_logger_ptr) {
+        m_logger_ptr->log(util::Logger::Level::error, message, std::forward<Params>(params)...);
     }
 }
 
@@ -570,7 +582,7 @@ void App::log_in_with_credentials(
     const AppCredentials& credentials, const std::shared_ptr<SyncUser>& linking_user,
     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
-    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
+    if (would_log(util::Logger::Level::debug)) {
         auto app_info = util::format("app_id: %1", m_config.app_id);
         if (m_config.local_app_version) {
             app_info += util::format(" - app_version: %1", *m_config.local_app_version);
@@ -1056,7 +1068,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                         UniqueFunction<void(const std::string&, Optional<AppError>)>&& completion)
 {
     auto service_name = service_name_opt ? *service_name_opt : "<none>";
-    if (m_logger && m_logger->would_log(util::Logger::Level::debug)) {
+    if (would_log(util::Logger::Level::debug)) {
         log_debug("App: call_function: %1 service_name: %2 args_bson: %3", name, service_name, args_ejson);
     }
 
@@ -1068,7 +1080,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
         [self = shared_from_this(), name = name, service_name = std::move(service_name),
          completion = std::move(completion)](const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
-                self->log_debug("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
+                self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
                                 response.http_status_code, error->message);
                 return completion({}, error);
             }
@@ -1099,7 +1111,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                       util::Optional<Bson> body_as_bson;
                       try {
                           body_as_bson = bson::parse(response);
-                          if (self->m_logger && self->m_logger->would_log(util::Logger::Level::debug)) {
+                          if (self->would_log(util::Logger::Level::debug)) {
                               self->log_debug("App: call_function: %1 service_name: %2 - results: %3", name,
                                               service_name, body_as_bson ? body_as_bson->to_string() : "<none>");
                           }

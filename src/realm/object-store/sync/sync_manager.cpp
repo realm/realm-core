@@ -74,6 +74,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
         else {
             m_logger_ptr = std::make_shared<util::StderrLogger>(m_config.log_level);
         }
+        app->set_logger(m_logger_ptr);
 
         {
             util::CheckedLockGuard lock(m_file_system_mutex);
@@ -287,6 +288,9 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
     // Replace the already created logger with the new one
     if (m_config.logger_factory) {
         m_logger_ptr = m_config.logger_factory(m_config.log_level); // Throws
+        if (auto app = m_app.lock(); app) {
+            app->set_logger(m_logger_ptr);
+        }
     }
 }
 

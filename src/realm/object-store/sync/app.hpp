@@ -362,6 +362,9 @@ public:
     // reloads an app (#5411).
     static void close_all_sync_sessions();
 
+    // Allows the SyncManager to update the logger owned by App
+    void set_logger(const std::shared_ptr<util::Logger>&) noexcept;
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
@@ -374,10 +377,12 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
-    std::shared_ptr<util::Logger> m_logger;
+    std::unique_ptr<std::mutex> m_logger_mutex = std::make_unique<std::mutex>();
+    std::shared_ptr<util::Logger> m_logger_ptr;
 
     // Logger is lazily set in configure(). these helpers prevent all the
     // checks for if(m_logger) throughout the code.
+    bool would_log(util::Logger::Level level);
     template <class... Params>
     void log_debug(const char* message, Params&&... params);
     template <class... Params>
