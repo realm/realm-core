@@ -66,6 +66,15 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
         if (m_sync_client)
             return;
 
+        // Create the logger now - if the logger_factory is updated later, a new logger will
+        // be created at that time.
+        if (m_config.logger_factory) {
+            m_logger_ptr = m_config.logger_factory(m_config.log_level);
+        }
+        else {
+            m_logger_ptr = std::make_shared<util::StderrLogger>(m_config.log_level);
+        }
+
         {
             util::CheckedLockGuard lock(m_file_system_mutex);
 
@@ -243,7 +252,7 @@ void SyncManager::reset_for_testing()
     {
         util::CheckedLockGuard lock(m_mutex);
         // Destroy the client now that we have no remaining sessions.
-        m_sync_client = nullptr;
+        m_sync_client.reset();
 
         // Reset even more state.
         m_config = {};
@@ -262,12 +271,23 @@ void SyncManager::set_log_level(util::Logger::Level level) noexcept
 {
     util::CheckedLockGuard lock(m_mutex);
     m_config.log_level = level;
+    // Update the level threshold in the already created logger
+    if (m_logger_ptr) {
+        m_logger_ptr->set_level_threshold(level);
+    }
 }
 
-void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) noexcept
+void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
 {
     util::CheckedLockGuard lock(m_mutex);
+    if (m_sync_client)
+        throw std::logic_error("Cannot set the logger_factory after creating the sync client");
+
     m_config.logger_factory = std::move(factory);
+    // Replace the already created logger with the new one
+    if (m_config.logger_factory) {
+        m_logger_ptr = m_config.logger_factory(m_config.log_level); // Throws
+    }
 }
 
 const std::shared_ptr<util::Logger>& SyncManager::make_logger() const
@@ -278,15 +298,7 @@ const std::shared_ptr<util::Logger>& SyncManager::make_logger() const
 
 const std::shared_ptr<util::Logger>& SyncManager::do_make_logger() const
 {
-    if (!m_logger) {
-        if (m_config.logger_factory) {
-            m_logger = m_config.logger_factory(m_config.log_level); // Throws
-        }
-        else {
-            m_logger = std::make_shared<util::StderrLogger>(m_config.log_level);
-        }
-    }
-    return m_logger;
+    return m_logger_ptr;
 }
 
 void SyncManager::set_user_agent(std::string user_agent)

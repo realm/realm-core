@@ -203,7 +203,7 @@ public:
 
     enum HandshakeType { client, server };
 
-    util::Logger* m_logger = nullptr;
+    util::Logger* logger = nullptr;
 
     Stream(Socket&, Context&, HandshakeType);
     ~Stream() noexcept;
@@ -749,9 +749,9 @@ inline Stream::~Stream() noexcept
     ssl_destroy();
 }
 
-inline void Stream::set_logger(util::Logger* logger)
+inline void Stream::set_logger(util::Logger* l)
 {
-    m_logger = logger;
+    logger = l;
 }
 
 inline void Stream::set_verify_mode(VerifyMode mode)

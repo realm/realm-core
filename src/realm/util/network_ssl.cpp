@@ -655,7 +655,7 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
     Stream* stream = static_cast<Stream*>(SSL_get_ex_data(ssl, 0));
     REALM_ASSERT(stream);
 
-    util::Logger* logger = stream->m_logger;
+    util::Logger* logger = stream->logger;
 
     const std::string& host_name = stream->m_host_name;
     port_type server_port = stream->m_server_port;
@@ -1238,9 +1238,9 @@ OSStatus Stream::verify_peer() noexcept
                 CFErrorRef cfErrorRef;
                 if (!SecTrustEvaluateWithError(peerTrust.get(), &cfErrorRef)) {
                     auto cfError = util::adoptCF(cfErrorRef);
-                    if (m_logger) {
+                    if (logger) {
                         auto errorStr = util::adoptCF(CFErrorCopyDescription(cfErrorRef));
-                        m_logger->debug("SSL peer verification failed: %1", cfstring_to_std_string(errorStr.get()));
+                        logger->debug("SSL peer verification failed: %1", cfstring_to_std_string(errorStr.get()));
                     }
                     return errSSLXCertChainInvalid;
                 }

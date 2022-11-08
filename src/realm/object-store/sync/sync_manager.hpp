@@ -115,7 +115,7 @@ public:
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.
     void set_log_level(util::Logger::Level) noexcept REQUIRES(!m_mutex);
-    void set_logger_factory(SyncClientConfig::LoggerFactory) noexcept REQUIRES(!m_mutex);
+    void set_logger_factory(SyncClientConfig::LoggerFactory) REQUIRES(!m_mutex);
 
     // Sets the application level user agent string.
     // This should have the format specified here:
@@ -284,7 +284,7 @@ private:
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
-    mutable std::shared_ptr<util::Logger> m_logger GUARDED_BY(m_mutex);
+    mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
     mutable util::CheckedMutex m_file_system_mutex;

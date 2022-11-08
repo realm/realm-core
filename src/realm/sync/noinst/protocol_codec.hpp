@@ -218,7 +218,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        util::Logger& logger = connection.m_logger;
+        util::Logger& logger = connection.logger;
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);
             connection.handle_protocol_error(err);
@@ -366,7 +366,7 @@ private:
     template <typename Connection>
     void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
-        util::Logger& logger = connection.m_logger;
+        util::Logger& logger = connection.logger;
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);
             connection.handle_protocol_error(err);
@@ -578,7 +578,7 @@ public:
             connection.receive_ping(timestamp, rtt);
         }
         catch (const ProtocolCodecException& e) {
-            connection.m_logger.error("Bad syntax in ping message: %1", e.what());
+            connection.logger.error("Bad syntax in ping message: %1", e.what());
             connection.handle_protocol_error(Error::bad_syntax);
         }
     }
@@ -598,7 +598,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        auto& logger = connection.m_logger;
+        auto& logger = connection.logger;
 
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);

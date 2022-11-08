@@ -790,7 +790,7 @@ void SessionImpl::process_pending_flx_bootstrap()
     while (bootstrap_store->has_pending()) {
         auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
         if (!pending_batch.progress) {
-            m_logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
             bootstrap_store->clear();
             return;
         }
@@ -806,8 +806,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
         history.integrate_server_changesets(
-            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state,
-            m_logger,
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
             [&](const TransactionRef& tr, size_t count) {
                 REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, count);
@@ -819,11 +818,10 @@ void SessionImpl::process_pending_flx_bootstrap()
         REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                      batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
-        m_logger.info(
-            "Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-            "%3. %4 changesets remaining in bootstrap",
-            pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-            pending_batch.remaining);
+        logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
+                    "%3. %4 changesets remaining in bootstrap",
+                    pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
+                    pending_batch.remaining);
     }
     on_changesets_integrated(new_version.realm_version, progress);
 
@@ -842,7 +840,7 @@ void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
     // check is that we have completed the IDENT message handshake and have not yet received an ERROR
     // message to call ensure_enlisted_to_send().
     if (m_state == State::Active && m_ident_message_sent && !m_error_message_received) {
-        m_logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+        logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
     }
 }
@@ -1329,16 +1327,15 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);      // Throws
-        std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
-        SessionImpl& sess = *sess_2;
+        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
+        std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
         if (sync_mode == SyncServerMode::FLX) {
-            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess.m_logger);
+            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
 
-        sess.m_logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
-        m_sess = &sess;
-        conn.activate_session(std::move(sess_2)); // Throws
+        sess->logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        m_sess = sess.get();
+        conn.activate_session(std::move(sess)); // Throws
 
         m_actualized = true;
     }
@@ -1374,7 +1371,8 @@ void SessionWrapper::finalize()
     ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
 
-    m_flx_pending_bootstrap_store = nullptr;
+    // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+    m_flx_pending_bootstrap_store.reset();
     m_sess = nullptr;
 
     // The Realm file can be closed now, as no access to the Realm file is
@@ -1471,8 +1469,8 @@ void SessionWrapper::on_download_completion()
     }
 
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
-        m_sess->m_logger.debug("Marking query version %1 as complete after receiving MARK message",
-                               m_flx_pending_mark_version);
+        m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
+                             m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
         mutable_subs.update_state(SubscriptionSet::State::Complete);
         std::move(mutable_subs).commit();
@@ -1540,12 +1538,12 @@ void SessionWrapper::report_progress()
     // the same units.
     std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
 
-    m_sess->m_logger.debug("Progress handler called, downloaded = %1, "
-                           "downloadable(total) = %2, uploaded = %3, "
-                           "uploadable = %4, reliable_download_progress = %5, "
-                           "snapshot version = %6",
-                           downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
-                           m_reliable_download_progress, snapshot_version);
+    m_sess->logger.debug("Progress handler called, downloaded = %1, "
+                         "downloadable(total) = %2, uploaded = %3, "
+                         "uploadable = %4, reliable_download_progress = %5, "
+                         "snapshot version = %6",
+                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
+                         m_reliable_download_progress, snapshot_version);
 
     // FIXME: Why is this boolean status communicated to the application as
     // a 64-bit integer? Also, the name `progress_version` is confusing.
@@ -1574,8 +1572,8 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
                                    SyncServerMode sync_mode)
-    : m_logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.m_logger_ptr)} // Throws
-    , m_logger{*m_logger_ptr}
+    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.logger_ptr)} // Throws
+    , logger{*logger_ptr}
     , m_client{client}
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
@@ -1630,7 +1628,7 @@ void ClientImpl::Connection::resume_active_sessions()
 
 void ClientImpl::Connection::on_idle()
 {
-    m_logger.debug("Destroying connection object");
+    logger.debug("Destroying connection object");
     ClientImpl& client = get_client();
     client.remove_connection(*this);
     // NOTE: This connection object is now destroyed!
