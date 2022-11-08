@@ -32,7 +32,7 @@ case $(uname -s) in
             export GOARCH=amd64
             STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-4.4.17-rc1-2-g85de0cc.tgz"
             STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.3.darwin-amd64.tar.gz"
+            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.darwin-amd64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
         fi
 
@@ -40,7 +40,7 @@ case $(uname -s) in
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.3.linux-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.linux-amd64.tar.gz"
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
         NODE_URL="https://nodejs.org/dist/v14.17.0/node-v14.17.0-linux-x64.tar.gz"
 
@@ -60,14 +60,14 @@ case $(uname -s) in
         case $DISTRO_NAME in
             ubuntu | linuxmint)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
-                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_df9a68d900d7faddcee16bf0f532437da815a1c3_22_09_16_14_59_45/libmongo-ubuntu2004-x86_64.so"
+                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo-ubuntu2004-x86_64.so"
                 STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-ubuntu2004-4.4.17-rc1-2-g85de0cc.tgz"
             ;;
             rhel)
                 case $DISTRO_VERSION_MAJOR in
                     7)
                         MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-5.0.3.tgz"
-                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/libmongo.so"
+                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo.so"
                         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-rhel70-4.4.17-rc1-2-g85de0cc.tgz"
                     ;;
                     *)
