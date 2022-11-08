@@ -1801,7 +1801,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(!pending_batch.progress);
-            REQUIRE(pending_batch.remaining == 0);
+            REQUIRE(pending_batch.remaining_changesets == 0);
             REQUIRE(pending_batch.changesets.size() == 1);
 
             check_interrupted_state(realm);
@@ -1880,7 +1880,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             auto pending_batch = bootstrap_store.peek_pending(1024 * 1024 * 16);
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(static_cast<bool>(pending_batch.progress));
-            REQUIRE(pending_batch.remaining == 0);
+            REQUIRE(pending_batch.remaining_changesets == 0);
             REQUIRE(pending_batch.changesets.size() == 3);
 
             check_interrupted_state(realm);

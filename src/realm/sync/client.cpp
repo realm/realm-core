@@ -228,6 +228,7 @@ private:
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
+    const size_t m_flx_bootstrap_batch_size_bytes;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -774,7 +775,6 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
 void SessionImpl::process_pending_flx_bootstrap()
 {
-    constexpr size_t batch_size_in_bytes = 1024 * 1024;
     if (!m_is_flx_sync_session) {
         return;
     }
@@ -782,13 +782,21 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!bootstrap_store->has_pending()) {
         return;
     }
+
+    auto pending_batch_stats = bootstrap_store->pending_stats();
+    logger.info("Begin processing pending FLX bootstrap for query version %1. (changesets: %2, original total "
+                "changeset size: %3)",
+                pending_batch_stats.query_version, pending_batch_stats.pending_changesets,
+                pending_batch_stats.pending_changeset_bytes);
     auto& history = access_realm().get_history();
     VersionInfo new_version;
     SyncProgress progress;
     int64_t query_version = -1;
     size_t changesets_processed = 0;
+
     while (bootstrap_store->has_pending()) {
-        auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
+        auto start_time = std::chrono::steady_clock::now();
+        auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
             bootstrap_store->clear();
@@ -796,7 +804,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
         auto batch_state =
-            pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
+            pending_batch.remaining_changesets > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
         uint64_t downloadable_bytes = 0;
         query_version = pending_batch.query_version;
         bool simulate_integration_error =
@@ -814,14 +822,16 @@ void SessionImpl::process_pending_flx_bootstrap()
             get_transact_reporter());
         progress = *pending_batch.progress;
         changesets_processed += pending_batch.changesets.size();
+        auto duration = std::chrono::steady_clock::now() - start_time;
 
         REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                      batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                    "%3. %4 changesets remaining in bootstrap",
+                    "%3 in %4 ms. %5 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                    pending_batch.remaining);
+                    std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
+                    pending_batch.remaining_changesets);
     }
     on_changesets_integrated(new_version.realm_version, progress);
 
@@ -957,6 +967,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_simulate_integration_error{config.simulate_integration_error}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
+    , m_flx_bootstrap_batch_size_bytes(config.flx_bootstrap_batch_size_bytes)
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
