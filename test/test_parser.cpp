@@ -3864,6 +3864,7 @@ TEST(Parser_OperatorIN)
     }
 
     // RHS is a constant list
+    verify_query(test_context, t, "customer_id IN {}", 0);
     verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
     verify_query(test_context, t, "NOT customer_id IN {0}", 2);
     verify_query(test_context, t, "customer_id != {0}", 2);
@@ -3893,6 +3894,7 @@ TEST(Parser_OperatorIN)
 
     // RHS is a param
     using Vec = std::vector<Mixed>;
+    verify_query(test_context, t, "customer_id IN $0", {Vec{}}, 0);
     verify_query(test_context, t, "customer_id IN $0", {Vec{0, 1, 2}}, 3);
     verify_query(test_context, t, "NOT customer_id IN $0", {Vec{0}}, 2);
     verify_query(test_context, t, "customer_id != $0", {Vec{0}}, 2);
