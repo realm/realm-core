@@ -48,16 +48,8 @@ public:
     char* translate(ref_type ref);
     void encryption_read_barrier(void* start_addr, size_t size);
     void encryption_write_barrier(void* start_addr, size_t size);
-    // flush any intermediate decrypted storage into shared memory,
-    // making it visible to other processes
-    void encryption_flush_private_cache();
-    // trigger the msync system call (or similar on windows).
-    // on linux this will actually sync pages to disk.
-    // on mac/ios it appears to be needed to mark pages for a later
-    // write barrier. (this design is a mystery)
+    void flush();
     void sync();
-    // unmap memory - this does not flush or sync any changes
-    void unmap();
     // return true if the specified range is fully visible through
     // the MapWindow
     bool matches(ref_type start_ref, size_t size);
@@ -145,19 +137,15 @@ GroupWriter::MapWindow::~MapWindow()
     m_map.unmap();
 }
 
-void GroupWriter::MapWindow::encryption_flush_private_cache()
+void GroupWriter::MapWindow::flush()
 {
     m_map.flush();
 }
 
 void GroupWriter::MapWindow::sync()
 {
+    flush();
     m_map.sync();
-}
-
-void GroupWriter::MapWindow::unmap()
-{
-    m_map.unmap();
 }
 
 char* GroupWriter::MapWindow::translate(ref_type ref)
@@ -279,14 +267,7 @@ size_t GroupWriter::get_file_size() const noexcept
     return sz;
 }
 
-void GroupWriter::encryption_flush_all_private_caches()
-{
-    for (const auto& window : m_map_windows) {
-        window->encryption_flush_private_cache();
-    }
-}
-
-void GroupWriter::sync_all_mappings()
+void GroupWriter::flush_all_mappings()
 {
     for (const auto& window : m_map_windows) {
         window->flush();
@@ -318,9 +299,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        auto& e = m_map_windows.back();
-        e->encryption_flush_private_cache();
-        e->sync();
+        m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
