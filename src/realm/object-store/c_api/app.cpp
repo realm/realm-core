@@ -695,13 +695,13 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      const std::string& reply, util::Optional<AppError> error) {
+                      const std::string* reply, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
                 callback(userdata.get(), nullptr, &c_error);
             }
             else {
-                callback(userdata.get(), reply.c_str(), nullptr);
+                callback(userdata.get(), reply->c_str(), nullptr);
             }
         };
         (*app)->call_function(*user, function_name, serialized_ejson_payload, /*service_name=*/std::nullopt,

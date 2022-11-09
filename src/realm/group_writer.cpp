@@ -125,12 +125,8 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
-    encryption_flush_private_cache();
-    // This can be optimized if/when we get a good implementation of remap
-    // at the encryption layer. Currently we have to replace the mapping.
-    sync(); // likely not needed on Linux, where a later sync on a mapping hitting
-    // the same physical pages should cover the need for syncing. But to be sure...
-    unmap();
+    m_map.sync();
+    m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
 }
@@ -145,7 +141,8 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-    unmap();
+    m_map.sync();
+    m_map.unmap();
 }
 
 void GroupWriter::MapWindow::encryption_flush_private_cache()
@@ -286,6 +283,13 @@ void GroupWriter::encryption_flush_all_private_caches()
 {
     for (const auto& window : m_map_windows) {
         window->encryption_flush_private_cache();
+    }
+}
+
+void GroupWriter::sync_all_mappings()
+{
+    for (const auto& window : m_map_windows) {
+        window->flush();
     }
 }
 
@@ -940,12 +944,10 @@ void GroupWriter::commit(ref_type new_top_ref)
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
-    encryption_flush_all_private_caches();
+    flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
-#if REALM_PLATFORM_APPLE
         m_alloc.get_file().barrier();
-#endif
     }
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
@@ -953,13 +955,10 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
-    window->encryption_flush_private_cache();
+    window->flush();
     if (!disable_sync) {
         window->sync();
-#if REALM_PLATFORM_APPLE
         m_alloc.get_file().barrier();
-#else
-#endif
     }
 }
 

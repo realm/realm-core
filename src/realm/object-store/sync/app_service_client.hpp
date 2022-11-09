@@ -42,11 +42,13 @@ public:
     /// @param args_ejson The arguments array to be provided to the function encoded as an ejson string.
     /// @param service_name The name of the service, this is optional.
     /// @param completion Returns the result from the intended call, will return an Optional AppError is an
-    /// error is thrown and ejson-encoded reply if successful
+    ///        error is thrown and ejson-encoded reply if successful. The reply string will be a null pointer only in
+    ///        the case of error. Using a string* rather than optional<string> to avoid copying a potentially large
+    ///        string.
     virtual void
     call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
                   const util::Optional<std::string>& service_name,
-                  util::UniqueFunction<void(const std::string&, util::Optional<AppError>)>&& completion) = 0;
+                  util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) = 0;
 
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param user The sync user to perform this request.
