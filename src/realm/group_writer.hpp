@@ -143,6 +143,9 @@ public:
 
 
     // Flush all cached memory mappings
+    // Sync all cached memory mappings to disk - includes flush if needed
+    void sync_all_mappings();
+    // Flush all cached memory mappings from private to shared cache.
     void flush_all_mappings();
 
 private:

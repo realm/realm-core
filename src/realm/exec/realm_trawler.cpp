@@ -25,6 +25,7 @@
 #include <realm/column_type.hpp>
 #include <realm/data_type.hpp>
 #include <realm/table.hpp>
+#include <realm/impl/transact_log.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -150,6 +151,10 @@ public:
     {
         return 8 + length();
     }
+    char* data()
+    {
+        return realm::Array::get_data_from_header(m_header);
+    }
 
 protected:
     uint64_t m_ref = 0;
@@ -195,7 +200,7 @@ public:
     void init(realm::Allocator& alloc, uint64_t ref)
     {
         Node::init(alloc, ref);
-        m_data = realm::Array::get_data_from_header(m_header);
+        m_data = data();
         m_has_refs = has_refs();
     }
     int64_t get_val(size_t ndx) const
@@ -245,6 +250,7 @@ private:
 class Group;
 class Table : public Array {
 public:
+    Table() = default;
     Table(realm::Allocator& alloc, uint64_t ref)
         : Array(alloc, ref)
     {
@@ -277,6 +283,10 @@ public:
                 m_table_type = static_cast<realm::Table::Type>(flags & 0x3);
             }
         }
+    }
+    std::string get_column_name(size_t i) const
+    {
+        return m_column_names.get_string(i);
     }
     void print_columns(const Group&) const;
     size_t get_size(realm::Allocator& alloc) const
@@ -346,6 +356,9 @@ public:
                 m_free_list_sizes.init(alloc, get_ref(4));
                 m_free_list_versions.init(alloc, get_ref(5));
             }
+            if (size() > 8) {
+                m_history.init(alloc, get_ref(8));
+            }
             if (size() > 11) {
                 auto ref = get_ref(11);
                 if (ref)
@@ -385,6 +398,18 @@ public:
         }
         return "Unknown";
     }
+    std::vector<realm::BinaryData> get_changesets()
+    {
+        std::vector<realm::BinaryData> ret;
+        if (int(get_val(7)) == 2) {
+            for (size_t n = 0; n < m_history.size(); n++) {
+                auto ref = m_history.get_ref(n);
+                Node node(m_alloc, ref);
+                ret.emplace_back(node.data(), node.size());
+            }
+        }
+        return ret;
+    }
     int get_history_schema_version() const
     {
         return int(get_val(9));
@@ -419,6 +444,10 @@ public:
     {
         return m_table_names.get_string(i);
     }
+    Table get_table(size_t i) const
+    {
+        return Table(m_alloc, m_tables.get_ref(i));
+    }
     std::vector<Entry> get_allocated_nodes() const;
     std::vector<FreeListEntry> get_free_list() const;
     void print_schema() const;
@@ -433,6 +462,7 @@ private:
     Array m_free_list_sizes;
     Array m_free_list_versions;
     Array m_evacuation_info;
+    Array m_history;
 };
 
 class RealmFile {
@@ -443,6 +473,7 @@ public:
     void schema_info();
     void memory_leaks();
     void free_list_info() const;
+    void changes() const;
 
 private:
     uint64_t m_top_ref;
@@ -560,7 +591,7 @@ void Group::print_schema() const
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            Table table(m_alloc, m_tables.get_ref(i));
+            Table table = get_table(i);
             std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table.get_size(m_alloc)
                       << std::endl;
             table.print_columns(*this);
@@ -665,8 +696,16 @@ std::vector<FreeListEntry> Group::get_free_list() const
     std::vector<FreeListEntry> list;
     if (valid()) {
         unsigned sz = m_free_list_positions.size();
-        REALM_ASSERT(sz == m_free_list_sizes.size());
-        REALM_ASSERT(sz == m_free_list_versions.size());
+        if (sz != m_free_list_sizes.size()) {
+            std::cout << "FreeList positions size: " << sz << " FreeList sizes size: " << m_free_list_sizes.size()
+                      << std::endl;
+            return list;
+        }
+        if (sz != m_free_list_versions.size()) {
+            std::cout << "FreeList positions size: " << sz
+                      << " FreeList versions size: " << m_free_list_versions.size() << std::endl;
+            return list;
+        }
         for (unsigned i = 0; i < sz; i++) {
             int64_t pos = m_free_list_positions.get_val(i);
             int64_t size = m_free_list_sizes.get_val(i);
@@ -826,6 +865,172 @@ void RealmFile::free_list_info() const
     std::cout << "Pinned free space size: " << pinned_free_list_size << std::endl;
 }
 
+class HistoryLogger {
+public:
+    HistoryLogger(Group* g)
+        : m_group(g)
+    {
+    }
+    bool select_table(realm::TableKey key)
+    {
+        std::cout << "Select table: " << m_group->get_table_name(key.value) << std::endl;
+        m_table = m_group->get_table(key.value);
+        return true;
+    }
+
+    bool insert_group_level_table(realm::TableKey key)
+    {
+        std::cout << "Create table: " << m_group->get_table_name(key.value) << std::endl;
+        return true;
+    }
+
+    bool erase_class(realm::TableKey)
+    {
+        return true;
+    }
+
+    bool rename_class(realm::TableKey)
+    {
+        return true;
+    }
+
+    bool create_object(realm::ObjKey key)
+    {
+        std::cout << "Create object: " << key << std::endl;
+        return true;
+    }
+
+    bool remove_object(realm::ObjKey key)
+    {
+        std::cout << "Remove object: " << key << std::endl;
+        return true;
+    }
+
+    bool modify_object(realm::ColKey col_key, realm::ObjKey key)
+    {
+        std::cout << "Modify object: " << m_table.get_column_name(col_key.get_index().val) << " on " << key
+                  << std::endl;
+        return true;
+    }
+
+    bool list_set(size_t ndx)
+    {
+        std::cout << "List set at " << ndx << std::endl;
+        return true;
+    }
+
+    bool list_insert(size_t ndx)
+    {
+        std::cout << "List insert at " << ndx << std::endl;
+        return true;
+    }
+
+    bool dictionary_insert(size_t, realm::Mixed key)
+    {
+        std::cout << "Dictionary insert at " << key << std::endl;
+        return true;
+    }
+
+    bool dictionary_set(size_t, realm::Mixed key)
+    {
+        std::cout << "Dictionary set at " << key << std::endl;
+        return true;
+    }
+
+    bool dictionary_erase(size_t, realm::Mixed key)
+    {
+        std::cout << "Dictionary erase at " << key << std::endl;
+        return true;
+    }
+
+    bool set_link_type(realm::ColKey)
+    {
+        return true;
+    }
+
+    bool insert_column(realm::ColKey col_key)
+    {
+        std::cout << "Add column: " << m_table.get_column_name(col_key.get_index().val) << std::endl;
+        return true;
+    }
+
+    bool erase_column(realm::ColKey)
+    {
+        return true;
+    }
+
+    bool rename_column(realm::ColKey)
+    {
+        return true;
+    }
+
+    bool select_collection(realm::ColKey col_key, realm::ObjKey key)
+    {
+        std::cout << "Select collection: " << m_table.get_column_name(col_key.get_index().val) << " on " << key
+                  << std::endl;
+        return true;
+    }
+
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx)
+    {
+        std::cout << "List move from " << from_link_ndx << " to " << to_link_ndx << std::endl;
+        return true;
+    }
+
+    bool list_erase(size_t ndx)
+    {
+        std::cout << "List erase at " << ndx << std::endl;
+        return true;
+    }
+
+    bool list_clear(size_t old_list_size)
+    {
+        std::cout << "List clear. Old size: " << old_list_size << std::endl;
+        return true;
+    }
+
+    bool set_insert(size_t ndx)
+    {
+        std::cout << "Set insert at " << ndx << std::endl;
+        return true;
+    }
+
+    bool set_erase(size_t ndx)
+    {
+        std::cout << "Set erase at " << ndx << std::endl;
+        return true;
+    }
+
+    bool set_clear(size_t old_set_size)
+    {
+        std::cout << "Set clear. Old size: " << old_set_size << std::endl;
+        return true;
+    }
+
+    bool typed_link_change(realm::ColKey, realm::TableKey)
+    {
+        return true;
+    }
+
+private:
+    Group* m_group;
+    Table m_table;
+};
+
+void RealmFile::changes() const
+{
+    realm::_impl::TransactLogParser parser;
+    HistoryLogger logger(m_group.get());
+
+    auto changesets = m_group->get_changesets();
+
+    for (auto c : changesets) {
+        realm::util::SimpleNoCopyInputStream stream(c);
+        parser.parse(stream, logger);
+        std::cout << "--------------------------------------------" << std::endl;
+    }
+}
+
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {
@@ -834,6 +1039,7 @@ int main(int argc, const char* argv[])
             bool memory_leaks = false;
             bool schema_info = false;
             bool node_scan = false;
+            bool changes = false;
             uint64_t alternate_top = 0;
             const char* key_ptr = nullptr;
             char key[64];
@@ -856,6 +1062,9 @@ int main(int argc, const char* argv[])
                 else if (argv[curr_arg][0] == '-') {
                     for (const char* command = argv[curr_arg] + 1; *command != '\0'; command++) {
                         switch (*command) {
+                            case 'c':
+                                changes = true;
+                                break;
                             case 'f':
                                 free_list_info = true;
                                 break;
@@ -885,6 +1094,9 @@ int main(int argc, const char* argv[])
                     }
                     if (node_scan) {
                         rf.node_scan();
+                    }
+                    if (changes) {
+                        rf.changes();
                     }
                     std::cout << std::endl;
                 }

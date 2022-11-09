@@ -212,6 +212,21 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) 
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
+
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
+              RLM_SYNC_SUBSCRIPTION_PENDING);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Bootstrapping) ==
+              RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::AwaitingMark) ==
+              RLM_SYNC_SUBSCRIPTION_AWAITING_MARK);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Complete) ==
+              RLM_SYNC_SUBSCRIPTION_COMPLETE);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Error) == RLM_SYNC_SUBSCRIPTION_ERROR);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Superseded) ==
+              RLM_SYNC_SUBSCRIPTION_SUPERSEDED);
+static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
+              RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
+
 } // namespace
 
 static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
@@ -569,8 +584,8 @@ realm_sync_on_subscription_set_state_change_wait(const realm_flx_sync_subscripti
 {
     REALM_ASSERT(subscription_set != nullptr);
     SubscriptionSet::State state =
-        subscription_set->get_state_change_notification(SubscriptionSet::State{notify_when}).get();
-    return realm_flx_sync_subscription_set_state_e(static_cast<int>(state));
+        subscription_set->get_state_change_notification(static_cast<SubscriptionSet::State>(notify_when)).get();
+    return static_cast<realm_flx_sync_subscription_set_state_e>(state);
 }
 
 RLM_API bool
@@ -581,13 +596,13 @@ realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscript
 {
     REALM_ASSERT(subscription_set != nullptr && callback != nullptr);
     return wrap_err([&]() {
-        auto future_state = subscription_set->get_state_change_notification(SubscriptionSet::State{notify_when});
+        auto future_state =
+            subscription_set->get_state_change_notification(static_cast<SubscriptionSet::State>(notify_when));
         std::move(future_state)
             .get_async([callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                            const StatusWith<SubscriptionSet::State>& state) -> void {
                 if (state.is_ok())
-                    callback(userdata.get(),
-                             realm_flx_sync_subscription_set_state_e(static_cast<int>(state.get_value())));
+                    callback(userdata.get(), static_cast<realm_flx_sync_subscription_set_state_e>(state.get_value()));
                 else
                     callback(userdata.get(), realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_ERROR);
             });
