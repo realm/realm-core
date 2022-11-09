@@ -48,7 +48,9 @@ public:
     char* translate(ref_type ref);
     void encryption_read_barrier(void* start_addr, size_t size);
     void encryption_write_barrier(void* start_addr, size_t size);
+    // flush from private to shared cache
     void flush();
+    // sync to disk (including flush as needed)
     void sync();
     // return true if the specified range is fully visible through
     // the MapWindow
