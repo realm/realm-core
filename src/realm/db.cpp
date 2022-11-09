@@ -2281,7 +2281,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                     out.commit(new_top_ref); // Throws
                 }
                 else {
-                    out.flush_all_mappings();
+                    out.sync_all_mappings();
                 }
                 break;
             case Durability::MemOnly:

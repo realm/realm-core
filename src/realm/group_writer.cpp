@@ -266,12 +266,12 @@ size_t GroupWriter::get_file_size() const noexcept
     return sz;
 }
 
-void GroupWriter::flush_all_mappings()
+void GroupWriter::sync_all_mappings()
 {
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
-        window->flush();
+        window->sync();
     }
 }
 
@@ -915,7 +915,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
-    flush_all_mappings();
+    sync_all_mappings();
     if (!disable_sync)
         m_alloc.get_file().barrier();
     // Flip the slot selector bit.
@@ -924,8 +924,10 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
-    if (!disable_sync)
+    if (!disable_sync) {
         window->sync();
+        m_alloc.get_file().barrier();
+    }
 }
 
 

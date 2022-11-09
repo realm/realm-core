@@ -86,7 +86,7 @@ public:
     }
 
     // Flush all cached memory mappings
-    void flush_all_mappings();
+    void sync_all_mappings();
 
 private:
     class MapWindow;
