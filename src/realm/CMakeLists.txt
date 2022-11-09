@@ -248,6 +248,7 @@ set(REALM_INSTALL_HEADERS
     util/serializer.hpp
     util/sha_crypto.hpp
     util/span.hpp
+    util/tagged_bool.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp

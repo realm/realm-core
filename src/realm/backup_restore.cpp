@@ -30,16 +30,16 @@ namespace realm {
  * as new versions are released or if rollback is ever done.
  */
 
-using version_list_t = BackupHandler::version_list_t;
-using version_time_list_t = BackupHandler::version_time_list_t;
+using VersionList = BackupHandler::VersionList;
+using VersionTimeList = BackupHandler::VersionTimeList;
 
 // Note: accepted versions should have new versions added at front
-version_list_t BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
+const VersionList BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
 static constexpr int three_months = 3 * 31 * 24 * 60 * 60;
-version_time_list_t BackupHandler::delete_versions_{
+const VersionTimeList BackupHandler::delete_versions_{
     {22, three_months}, {21, three_months}, {20, three_months}, {11, three_months}, {10, three_months},
     {9, three_months},  {8, three_months},  {7, three_months},  {6, three_months},  {5, three_months}};
 
@@ -72,8 +72,8 @@ std::string BackupHandler::get_prefix_from_path(const std::string& path)
     return path + ".";
 }
 
-BackupHandler::BackupHandler(const std::string& path, const version_list_t& accepted,
-                             const version_time_list_t& to_be_deleted)
+BackupHandler::BackupHandler(const std::string& path, const VersionList& accepted,
+                             const VersionTimeList& to_be_deleted)
 {
     m_path = path;
     m_prefix = get_prefix_from_path(path);
@@ -81,7 +81,7 @@ BackupHandler::BackupHandler(const std::string& path, const version_list_t& acce
     m_delete_versions = to_be_deleted;
 }
 
-bool BackupHandler::must_restore_from_backup(int current_file_format_version)
+bool BackupHandler::must_restore_from_backup(int current_file_format_version) const
 {
     if (current_file_format_version == 0)
         return false;
@@ -94,7 +94,7 @@ bool BackupHandler::must_restore_from_backup(int current_file_format_version)
     return false;
 }
 
-bool BackupHandler::is_accepted_file_format(int version)
+bool BackupHandler::is_accepted_file_format(int version) const noexcept
 {
     for (auto v : m_accepted_versions) {
         if (v == version)

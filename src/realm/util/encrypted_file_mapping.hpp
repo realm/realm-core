@@ -44,11 +44,11 @@ public:
     EncryptedFileMapping(const EncryptedFileMapping&) = delete;
     EncryptedFileMapping& operator=(const EncryptedFileMapping&) = delete;
 
-    // Write all dirty pages to disk and mark them read-only
+    // Encrypt all dirty pages, push them to shared cache and mark them read-only
     // Does not call fsync
     void flush() noexcept;
 
-    // Sync this file to disk
+    // Sync the image of this file in shared cache to disk. Does not imply flush.
     void sync() noexcept;
 
     // Make sure that memory in the specified range is synchronized with any

@@ -47,7 +47,9 @@ public:
     char* translate(ref_type ref);
     void encryption_read_barrier(void* start_addr, size_t size);
     void encryption_write_barrier(void* start_addr, size_t size);
+    // flush from private to shared cache
     void flush();
+    // sync to disk (including flush as needed)
     void sync();
     // return true if the specified range is fully visible through
     // the MapWindow
@@ -116,6 +118,7 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
+    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -131,7 +134,7 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-    m_map.flush();
+    m_map.sync();
     m_map.unmap();
 }
 
@@ -289,10 +292,17 @@ size_t GroupWriter::get_file_size() const noexcept
 
 void GroupWriter::flush_all_mappings()
 {
+    for (const auto& window : m_map_windows) {
+        window->flush();
+    }
+}
+
+void GroupWriter::sync_all_mappings()
+{
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
-        window->flush();
+        window->sync();
     }
 }
 
@@ -1292,8 +1302,10 @@ void GroupWriter::commit(ref_type new_top_ref)
     //                                 sizeof(file_header.m_top_ref[slot_selector]));
     window->encryption_write_barrier(&file_header, sizeof file_header);
     flush_all_mappings();
-    if (!disable_sync)
+    if (!disable_sync) {
+        sync_all_mappings();
         m_alloc.get_file().barrier();
+    }
     // Flip the slot selector bit.
     window->encryption_read_barrier(&file_header, sizeof file_header);
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
@@ -1301,8 +1313,11 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
-    if (!disable_sync)
+    window->flush();
+    if (!disable_sync) {
         window->sync();
+        m_alloc.get_file().barrier();
+    }
 }
 
 
