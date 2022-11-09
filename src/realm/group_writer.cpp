@@ -132,7 +132,7 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-    m_map.flush();
+    m_map.flush(); // <--- not needed, triggered by unmap() below
     m_map.unmap();
 }
 
@@ -264,6 +264,13 @@ size_t GroupWriter::get_file_size() const noexcept
 {
     auto sz = to_size_t(m_alloc.get_file().get_size());
     return sz;
+}
+
+void GroupWriter::flush_all_mappings()
+{
+    for (const auto& window : m_map_windows) {
+        window->flush();
+    }
 }
 
 void GroupWriter::sync_all_mappings()
@@ -915,15 +922,18 @@ void GroupWriter::commit(ref_type new_top_ref)
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
-    sync_all_mappings();
-    if (!disable_sync)
+    flush_all_mappings();
+    if (!disable_sync) {
+        sync_all_mappings();
         m_alloc.get_file().barrier();
+    }
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
+    window->flush();
     if (!disable_sync) {
         window->sync();
         m_alloc.get_file().barrier();
