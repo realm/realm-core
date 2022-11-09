@@ -1359,12 +1359,12 @@ struct Merge<A, B,
 ///
 ///  GET READY!
 ///
-///  Realm supports 12 instructions at the time of this writing. Each
+///  Realm supports 14 instructions at the time of this writing. Each
 ///  instruction type needs one rule for each other instruction type. We only
 ///  define one rule to handle each combination (A vs B and B vs A are handle by
 ///  a single rule).
 ///
-///  This gives (19 * (19 + 1)) / 2 = 78 merge rules below.
+///  This gives (14 * (14 + 1)) / 2 = 105 merge rules below.
 ///
 ///  Merge rules are ordered such that the second instruction type is always of
 ///  a lower enum value than the first.
@@ -1391,9 +1391,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_pk_name != right_pk_name) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "' on one side,"
-                          "but primary key '"
-                       << right_pk_name << "' on the other.";
+                       << "' on one side, but primary key '" << right_pk_name << "' on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1408,7 +1406,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 if (left_spec->pk_nullable != right_spec->pk_nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is nullable on one side, but not the other";
+                       << "', which is nullable on one side, but not the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
@@ -1427,7 +1425,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
                 std::stringstream ss;
-                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other";
+                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other.";
                 throw SchemaMismatchError(ss.str());
             }
         }
@@ -2521,19 +2519,22 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 }
 
-void TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                  version_type current_local_version, Changeset* parsed_changesets,
-                                                  std::size_t num_changesets, util::Logger* logger)
+size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
+                                                    version_type current_local_version,
+                                                    util::Span<Changeset> parsed_changesets,
+                                                    util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                                    util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
     std::vector<Changeset*> our_changesets;
 
+    // p points to the beginning of a range of changesets that share the same
+    // "base", i.e. are based on the same local version.
+    auto p = parsed_changesets.begin();
+    auto parsed_changesets_end = parsed_changesets.end();
+
     try {
-        // p points to the beginning of a range of changesets that share the same
-        // "base", i.e. are based on the same local version.
-        auto p = parsed_changesets;
-        auto parsed_changesets_end = parsed_changesets + num_changesets;
         while (p != parsed_changesets_end) {
             // Find the range of incoming changesets that share the same
             // last_integrated_local_version, which means we can merge them in one go.
@@ -2556,12 +2557,29 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
                 begin_version = version;
             }
 
+            bool must_apply_all = false;
+
             if (!our_changesets.empty()) {
                 merge_changesets(local_file_ident, &*p, same_base_range_end - p, our_changesets.data(),
                                  our_changesets.size(), logger); // Throws
+                // We need to apply all transformed changesets if at least one reciprocal changeset was modified
+                // during OT.
+                must_apply_all = std::any_of(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
+                    return c->is_dirty();
+                });
             }
 
-            p = same_base_range_end;
+            auto continue_applying = true;
+            for (; p != same_base_range_end && continue_applying; ++p) {
+                // It is safe to stop applying the changesets if:
+                //      1. There are no reciprocal changesets
+                //      2. No reciprocal changeset was modified
+                continue_applying = changeset_applier(p) || must_apply_all;
+            }
+            if (!continue_applying) {
+                break;
+            }
+
             our_changesets.clear(); // deliberately not releasing memory
         }
     }
@@ -2580,20 +2598,19 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
     // NOTE: Any exception thrown during flushing *MUST* lead to rollback of
     // the current transaction.
     flush_reciprocal_transform_cache(history); // Throws
+
+    return p - parsed_changesets.begin();
 }
 
 
 Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
                                                      version_type version, const HistoryEntry& history_entry)
 {
-    auto p = m_reciprocal_transform_cache.emplace(version, nullptr); // Throws
-    auto i = p.first;
-    if (p.second) {
-        i->second = std::make_unique<Changeset>(); // Throws
+    auto& changeset = m_reciprocal_transform_cache[version]; // Throws
+    if (changeset.empty()) {
         bool is_compressed = false;
         ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
-        Changeset& changeset = *i->second;
         if (is_compressed) {
             size_t total_size;
             auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
@@ -2612,28 +2629,22 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
             origin_file_ident = local_file_ident;
         changeset.origin_file_ident = origin_file_ident;
     }
-    return *i->second;
+    return changeset;
 }
 
 
 void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history)
 {
-    try {
-        ChangesetEncoder::Buffer output_buffer;
-        for (const auto& entry : m_reciprocal_transform_cache) {
-            if (entry.second->is_dirty()) {
-                encode_changeset(*entry.second, output_buffer); // Throws
-                version_type version = entry.first;
-                BinaryData data{output_buffer.data(), output_buffer.size()};
-                history.set_reciprocal_transform(version, data); // Throws
-                output_buffer.clear();
-            }
+    auto changesets = std::move(m_reciprocal_transform_cache);
+    m_reciprocal_transform_cache.clear();
+    ChangesetEncoder::Buffer output_buffer;
+    for (const auto& [version, changeset] : changesets) {
+        if (changeset.is_dirty()) {
+            encode_changeset(changeset, output_buffer); // Throws
+            BinaryData data{output_buffer.data(), output_buffer.size()};
+            history.set_reciprocal_transform(version, data); // Throws
+            output_buffer.clear();
         }
-        m_reciprocal_transform_cache.clear();
-    }
-    catch (...) {
-        m_reciprocal_transform_cache.clear();
-        throw;
     }
 }
 
@@ -2654,16 +2665,13 @@ void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset
     REALM_ASSERT(remote_changeset.remote_version != 0);
 
     ChunkedBinaryInputStream remote_in{remote_changeset.data};
-    try {
-        parse_changeset(remote_in, parsed_changeset); // Throws
-    }
-    catch (sync::BadChangesetError& e) {
-        throw TransformError(e.what());
-    }
+    parse_changeset(remote_in, parsed_changeset); // Throws
+
     parsed_changeset.version = remote_changeset.remote_version;
     parsed_changeset.last_integrated_remote_version = remote_changeset.last_integrated_local_version;
     parsed_changeset.origin_timestamp = remote_changeset.origin_timestamp;
     parsed_changeset.origin_file_ident = remote_changeset.origin_file_ident;
+    parsed_changeset.original_changeset_size = remote_changeset.original_changeset_size;
 }
 
 } // namespace sync

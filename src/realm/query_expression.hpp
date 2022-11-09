@@ -727,6 +727,11 @@ public:
         return {};
     }
 
+    virtual ConstTableRef get_target_table() const
+    {
+        return {};
+    }
+
     virtual DataType get_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1217,14 +1222,36 @@ public:
     {
     }
 
-    std::string value_to_string(size_t ndx) const
+    std::string value_to_string(size_t ndx, util::serializer::SerialisationState& state) const
     {
         auto val = get(ndx);
         if (val.is_null())
             return "NULL";
         else {
+            static_cast<void>(state);
             if constexpr (std::is_same_v<T, TypeOfValue>) {
                 return util::serializer::print_value(val.get_type_of_value());
+            }
+            else if constexpr (std::is_same_v<T, ObjKey>) {
+                ObjKey obj_key = val.template get<ObjKey>();
+                if (state.target_table) {
+                    ObjLink link(state.target_table->get_key(), obj_key);
+                    return util::serializer::print_value(link, state.group);
+                }
+                else {
+                    return util::serializer::print_value(obj_key);
+                }
+            }
+            else if constexpr (std::is_same_v<T, ObjLink>) {
+                return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+            }
+            else if constexpr (std::is_same_v<T, Mixed>) {
+                if (val.is_type(type_TypedLink)) {
+                    return util::serializer::print_value(val.template get<ObjLink>(), state.group);
+                }
+                else {
+                    return util::serializer::print_value(val);
+                }
             }
             else {
                 return util::serializer::print_value(val.template get<T>());
@@ -1241,13 +1268,13 @@ public:
                 if (i != 0) {
                     desc += ", ";
                 }
-                desc += value_to_string(i);
+                desc += value_to_string(i, state);
             }
             desc += "}";
             return desc;
         }
         else if (sz == 1) {
-            return value_to_string(0);
+            return value_to_string(0, state);
         }
         return "";
     }
@@ -1622,6 +1649,8 @@ public:
     {
         return !m_link_column_keys.empty();
     }
+
+    static ref_type get_ref(const ArrayPayload* array_payload, ColumnType type, size_t ndx);
 
 private:
     void map_links(size_t column, ObjKey key, LinkMapFunction& lm) const;
@@ -2587,6 +2616,11 @@ public:
         return type_Link;
     }
 
+    ConstTableRef get_target_table() const override
+    {
+        return link_map().get_target_table();
+    }
+
     bool has_multiple_values() const override
     {
         return m_is_list || !m_link_map.only_unary_links();
@@ -2733,6 +2767,10 @@ public:
     ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
+    }
+    ConstTableRef get_target_table() const override
+    {
+        return m_link_map.get_target_table()->get_opposite_table(m_column_key);
     }
 
     Allocator& get_alloc() const
@@ -3447,8 +3485,13 @@ Query compare(const Subexpr2<Link>& left, null)
 
 template <class T>
 class Columns : public ObjPropertyExpr<T> {
+    constexpr static bool requires_null_column = realm::is_any_v<T, int64_t, bool>;
+
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using NullableLeafType =
+        std::conditional_t<requires_null_column, typename ColumnTypeTraits<util::Optional<T>>::cluster_leaf_type,
+                           LeafType>;
     using ObjPropertyExpr<T>::links_exist;
     using ObjPropertyBase::is_nullable;
 
@@ -3469,6 +3512,12 @@ public:
         m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
+        }
+        else if (requires_null_column && is_nullable()) {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) NullableLeafType(this->get_base_table()->get_alloc()));
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
         }
         else {
             // Create new Leaf
@@ -3555,11 +3604,8 @@ public:
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
-            evaluate_internal<ArrayIntNull>(index, destination);
-        }
-        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
-            evaluate_internal<ArrayBoolNull>(index, destination);
+        if (is_nullable()) {
+            evaluate_internal<NullableLeafType>(index, destination);
         }
         else {
             evaluate_internal<LeafType>(index, destination);
@@ -3571,11 +3617,8 @@ public:
         destination.init(false, 1);
         auto table = m_link_map.get_target_table();
         auto obj = table.unchecked_ptr()->get_object(key);
-        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
-            destination.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
-        }
-        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
-            destination.set(0, obj.template get<util::Optional<bool>>(m_column_key));
+        if (requires_null_column && is_nullable()) {
+            destination.set(0, obj.template get<util::Optional<T>>(m_column_key));
         }
         else {
             destination.set(0, obj.template get<T>(m_column_key));
@@ -3587,7 +3630,8 @@ private:
     using ObjPropertyExpr<T>::m_column_key;
 
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafCacheStorage =
+        typename std::aligned_storage<std::max(sizeof(LeafType), sizeof(NullableLeafType)), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
@@ -3778,7 +3822,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state(state.class_prefix);
+        util::serializer::SerialisationState empty_state(state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4193,8 +4237,11 @@ public:
                                                  m_left->description(state));
         }
         else {
-            return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
-                                                 m_right->description(state));
+            state.target_table = m_right->get_target_table();
+            std::string ret = m_left->description(state) + " " + TCond::description() + " ";
+            state.target_table = m_left->get_target_table();
+            ret += m_right->description(state);
+            return ret;
         }
     }
 

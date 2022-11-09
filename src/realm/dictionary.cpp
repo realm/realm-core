@@ -197,8 +197,7 @@ void DictionaryClusterTree::do_accumulate(size_t* return_ndx, AggregateType& agg
             }
         }
         start_ndx += e;
-        // Continue
-        return false;
+        return IteratorControl::AdvanceToNext;
     });
 
     if (return_ndx)
@@ -375,12 +374,11 @@ size_t Dictionary::find_any(Mixed value) const
             for (size_t i = 0; i < e; i++) {
                 if (leaf.get(i) == value) {
                     ret = start_ndx + i;
-                    return true;
+                    return IteratorControl::Stop;
                 }
             }
             start_ndx += e;
-            // Continue
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 
@@ -395,28 +393,67 @@ size_t Dictionary::find_any_key(Mixed key) const noexcept
     return m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
 }
 
+namespace {
+bool can_minmax(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+        case type_Timestamp:
+            return true;
+        default:
+            return false;
+    }
+}
+bool can_sum(DataType type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Float:
+        case type_Double:
+        case type_Decimal:
+        case type_Mixed:
+            return true;
+        default:
+            return false;
+    }
+}
+} // anonymous namespace
+
 util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->min(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
 {
+    if (!can_minmax(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->max(return_ndx);
     }
     if (return_ndx)
-        *return_ndx = realm::npos;
+        *return_ndx = realm::not_found;
     return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->sum(return_cnt, get_value_data_type());
     }
@@ -427,6 +464,9 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 
 util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
 {
+    if (!can_sum(get_value_data_type())) {
+        return std::nullopt;
+    }
     if (update()) {
         return m_clusters->avg(return_cnt, get_value_data_type());
     }
@@ -451,27 +491,49 @@ void Dictionary::align_indices(std::vector<size_t>& indices) const
     }
 }
 
+namespace {
+std::vector<Mixed> get_keys(const Dictionary& dict)
+{
+    std::vector<Mixed> values;
+    values.reserve(dict.size());
+    for (auto it = dict.begin(), end = dict.end(); it != end; ++it)
+        values.push_back(it.key());
+    return values;
+}
+
+std::vector<Mixed> get_values(const Dictionary& dict)
+{
+    std::vector<Mixed> values;
+    values.reserve(dict.size());
+    for (auto it = dict.begin(), end = dict.end(); it != end; ++it)
+        values.push_back(it.value());
+    return values;
+}
+
+void do_sort(std::vector<size_t>& indices, bool ascending, const std::vector<Mixed>& values)
+{
+    auto b = indices.begin();
+    auto e = indices.end();
+    std::sort(b, e, [ascending, &values](size_t i1, size_t i2) {
+        return ascending ? values[i1] < values[i2] : values[i2] < values[i1];
+    });
+}
+} // anonymous namespace
+
 void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 {
     align_indices(indices);
-    auto b = indices.begin();
-    auto e = indices.end();
-    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
-        auto v1 = get_any(i1);
-        auto v2 = get_any(i2);
-        return ascending ? v1 < v2 : v2 < v1;
-    });
+    do_sort(indices, ascending, get_values(*this));
 }
 
 void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
 {
     align_indices(indices);
-
-    bool sort_ascending = ascending ? *ascending : true;
-    sort(indices, sort_ascending);
+    auto values = get_values(*this);
+    do_sort(indices, ascending.value_or(true), values);
     indices.erase(std::unique(indices.begin(), indices.end(),
-                              [this](size_t i1, size_t i2) {
-                                  return get_any(i1) == get_any(i2);
+                              [&values](size_t i1, size_t i2) {
+                                  return values[i1] == values[i2];
                               }),
                   indices.end());
 
@@ -484,13 +546,7 @@ void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> asc
 void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
 {
     align_indices(indices);
-    auto b = indices.begin();
-    auto e = indices.end();
-    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
-        auto k1 = get_key(i1);
-        auto k2 = get_key(i2);
-        return ascending ? k1 < k2 : k2 < k1;
-    });
+    do_sort(indices, ascending, get_keys(*this));
 }
 
 void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
@@ -1072,34 +1128,38 @@ Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
 {
 }
 
-auto Dictionary::Iterator::operator*() const -> value_type
+Mixed Dictionary::Iterator::key() const
 {
-    update();
-    Mixed key;
     switch (m_key_type) {
         case type_String: {
             ArrayString keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+            return Mixed(keys.get(m_state.m_current_index));
         }
         case type_Int: {
             ArrayInteger keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
-            key = Mixed(keys.get(m_state.m_current_index));
-            break;
+            return Mixed(keys.get(m_state.m_current_index));
         }
         default:
             throw std::runtime_error("Not implemented");
-            break;
     }
+}
+
+Mixed Dictionary::Iterator::value() const
+{
     ArrayMixed values(m_tree.get_alloc());
     ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
     values.init_from_ref(ref);
+    return values.get(m_state.m_current_index);
+}
 
-    return std::make_pair(key, values.get(m_state.m_current_index));
+auto Dictionary::Iterator::operator*() const -> value_type
+{
+    update();
+    return std::make_pair(key(), value());
 }
 
 
@@ -1124,14 +1184,6 @@ ObjKey DictionaryLinkValues::get_key(size_t ndx) const
         return val.get<ObjKey>();
     }
     return {};
-}
-
-// In contrast to a link list and a link set, a dictionary can contain null links.
-// This is because the corresponding key may contain useful information by itself.
-bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
-{
-    Mixed val = m_source.get_any(ndx);
-    return val.is_type(type_TypedLink);
 }
 
 Obj DictionaryLinkValues::get_object(size_t row_ndx) const

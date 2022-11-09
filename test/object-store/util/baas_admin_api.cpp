@@ -274,7 +274,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
 
 } // namespace
 
-app::Response do_http_request(app::Request&& request)
+app::Response do_http_request(const app::Request& request)
 {
     CurlGlobalGuard curl_global_guard;
     auto curl = curl_easy_init();
@@ -289,7 +289,7 @@ app::Response do_http_request(app::Request&& request)
     });
 
     std::string response;
-    std::map<std::string, std::string> response_headers;
+    app::HttpHeaders response_headers;
 
     /* First set the URL that is about to receive our POST. This URL can
      just as well be a https:// URL if that is what should receive the
@@ -352,18 +352,39 @@ AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
-    request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+    if (request.url.find('?') == std::string::npos) {
+        request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+    }
+    else {
+        request.url = util::format("%1&bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+    }
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
     request.headers["Authorization"] = util::format("Bearer %1", m_access_token);
     return do_http_request(std::move(request));
 }
 
-app::Response AdminAPIEndpoint::get() const
+app::Response AdminAPIEndpoint::get(const std::vector<std::pair<std::string, std::string>>& params) const
 {
     app::Request req;
     req.method = app::HttpMethod::get;
-    req.url = m_url;
+    std::stringstream ss;
+    bool needs_and = false;
+    ss << m_url;
+    if (!params.empty() && m_url.find('?') != std::string::npos) {
+        needs_and = true;
+    }
+    for (const auto& param : params) {
+        if (needs_and) {
+            ss << "&";
+        }
+        else {
+            ss << "?";
+        }
+        needs_and = true;
+        ss << param.first << "=" << param.second;
+    }
+    req.url = ss.str();
     return do_request(std::move(req));
 }
 
@@ -375,9 +396,9 @@ app::Response AdminAPIEndpoint::del() const
     return do_request(std::move(req));
 }
 
-nlohmann::json AdminAPIEndpoint::get_json() const
+nlohmann::json AdminAPIEndpoint::get_json(const std::vector<std::pair<std::string, std::string>>& params) const
 {
-    auto resp = get();
+    auto resp = get(params);
     REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
                     util::format("url: %1, reply: %2", m_url, resp.body));
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
@@ -537,6 +558,19 @@ std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::s
 }
 
 
+std::vector<std::string> AdminAPISession::get_errors(const std::string& app_id) const
+{
+    auto endpoint = apps()[app_id]["logs"];
+    auto response = endpoint.get_json({{"errors_only", "true"}});
+    std::vector<std::string> errors;
+    const auto& logs = response["logs"];
+    std::transform(logs.begin(), logs.end(), std::back_inserter(errors), [](const auto& err) {
+        return err["error"];
+    });
+    return errors;
+}
+
+
 AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& app_id) const
 {
     auto services = get_services(app_id);
@@ -652,6 +686,35 @@ bool AdminAPISession::is_sync_enabled(const std::string& app_id) const
     return config.state == "enabled";
 }
 
+bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
+{
+    auto sync_service = get_sync_service(app_id);
+    auto config = get_config(app_id, sync_service);
+    if (config.state == "enabled") {
+        return false;
+    }
+    auto state_endpoint = apps()[app_id]["sync"]["state"];
+    auto state_result = state_endpoint.get_json(
+        {{"sync_type", config.mode == ServiceConfig::SyncMode::Flexible ? "flexible" : "partition"}});
+    return state_result["state"].get<std::string>().empty();
+}
+
+bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
+{
+    auto progress_endpoint = apps()[app_id]["sync"]["progress"];
+    auto progress_result = progress_endpoint.get_json();
+    if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
+        for (auto& elem : *it) {
+            auto is_complete = elem["complete"];
+            if (!is_complete.is_boolean() || !is_complete.get<bool>()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 AdminAPIEndpoint AdminAPISession::apps() const
 {
     return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
@@ -724,6 +787,11 @@ AppCreateConfig default_app_config(const std::string& base_url)
                              realm::Property("breed", PropertyType::String | PropertyType::Nullable),
                              realm::Property("name", PropertyType::String),
                              realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto cat_schema =
+        ObjectSchema("Cat", {realm::Property("_id", PropertyType::String | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
     const auto person_schema =
         ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
                                 realm::Property("age", PropertyType::Int),
@@ -731,7 +799,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
                                 realm::Property("firstName", PropertyType::String),
                                 realm::Property("lastName", PropertyType::String),
                                 realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-    realm::Schema default_schema({dog_schema, person_schema});
+    realm::Schema default_schema({dog_schema, cat_schema, person_schema});
 
     Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
@@ -912,31 +980,21 @@ AppSession create_app(const AppCreateConfig& config)
             std::transform(config.flx_sync_config->default_roles.begin(), config.flx_sync_config->default_roles.end(),
                            std::back_inserter(default_roles), [](const AppCreateConfig::FLXSyncRole& role_def) {
                                nlohmann::json ret{{"name", role_def.name}, {"applyWhen", role_def.apply_when}};
-                               if (auto read_bool_ptr = mpark::get_if<bool>(&role_def.read)) {
-                                   ret["read"] = *read_bool_ptr;
-                               }
-                               else {
-                                   ret["read"] = mpark::get<nlohmann::json>(role_def.read);
-                               }
-                               if (auto write_bool_ptr = mpark::get_if<bool>(&role_def.write)) {
-                                   ret["write"] = *write_bool_ptr;
-                               }
-                               else {
-                                   ret["write"] = mpark::get<nlohmann::json>(role_def.write);
-                               }
+                               ret["read"] = role_def.read;
+                               ret["write"] = role_def.write;
                                return ret;
                            });
         }
-        mongo_service_def["config"]["flexible_sync"] = nlohmann::json{{"state", "enabled"},
-                                                                      {"database_name", config.mongo_dbname},
-                                                                      {"queryable_fields_names", queryable_fields},
-                                                                      {"asymmetric_tables", asymmetric_tables},
-                                                                      {"permissions",
-                                                                       {{"rules", nlohmann::json::object()},
-                                                                        {
-                                                                            "defaultRoles",
-                                                                            default_roles,
-                                                                        }}}};
+        mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
+                                                        {"database_name", config.mongo_dbname},
+                                                        {"queryable_fields_names", queryable_fields},
+                                                        {"asymmetric_tables", asymmetric_tables},
+                                                        {"permissions",
+                                                         {{"rules", nlohmann::json::object()},
+                                                          {
+                                                              "defaultRoles",
+                                                              default_roles,
+                                                          }}}};
     }
     else {
         sync_config = nlohmann::json{

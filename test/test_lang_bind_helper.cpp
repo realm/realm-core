@@ -1699,7 +1699,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get_object(0), realm::KeyNotFound);
+    CHECK_NOT(tv.get_object(0).is_valid());
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -3107,7 +3107,8 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
+                      !running_with_asan && !running_with_tsan && !running_with_valgrind)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3135,6 +3136,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
 
+    clear_mappings_before_test_forks();
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
@@ -5039,8 +5041,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     // Verify that an aggregate on the view with detached refs gives the expected result.
     CHECK_EQUAL(false, view.is_in_sync());
     ObjKey res;
-    double min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 
     // Sync the view to discard the detached refs.
@@ -5048,8 +5049,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
     // Verify that an aggregate on the view still gives the expected result.
     res = ObjKey();
-    min = view.minimum_double(col, &res);
-    CHECK_EQUAL(0, min);
+    CHECK(view.min(col, &res)->is_null());
     CHECK_EQUAL(ObjKey(), res);
 }
 
@@ -5753,14 +5753,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
     {
         const char* key = crypt_key(true);
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history());
-        bool is_okay = false;
-        try {
-            DBRef sg_encrypt = DB::create(*hist_encrypt, path, DBOptions(key));
-        }
-        catch (std::runtime_error&) {
-            is_okay = true;
-        }
-        CHECK(is_okay);
+        CHECK_THROW(DB::create(*hist_encrypt, path, DBOptions(key)), InvalidDatabase);
     }
 }
 #endif

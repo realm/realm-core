@@ -103,6 +103,7 @@ using namespace realm::query_parser;
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
 %token <std::string> IN "in"
+%token <std::string> OBJ "obj"
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
 %token <std::string> LIMIT "limit"
@@ -113,7 +114,7 @@ using namespace realm::query_parser;
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop
-%type  <ConstantNode*> constant
+%type  <ConstantNode*> constant primary_key
 %type  <ListNode*> list list_content
 %type  <PropertyNode*> prop
 %type  <PostOpNode*> post_op
@@ -232,16 +233,12 @@ list_content
     | list_content ',' constant { $1->add_element($3); $$ = $1; } 
 
 constant
-    : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
+    : primary_key               { $$ = $1; }
     | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
     | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
     | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
     | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
     | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
-    | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
-    | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
     | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
     | TYPED_LINK                { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
     | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
@@ -249,7 +246,19 @@ constant
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
     | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
     | comp_type ARG             { $$ = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType($1), $2); }
+    | OBJ '(' STRING ',' primary_key ')'
+                                { 
+                                    auto tmp = $5;
+                                    tmp->add_table($3);
+                                    $$ = tmp;
+                                }
 
+primary_key
+    : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
+    | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
+    | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
+    | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
+    | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
 
 boolexpr
     : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }

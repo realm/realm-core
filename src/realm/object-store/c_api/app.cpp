@@ -303,7 +303,7 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
 {
     auto* config = new realm_app_config_t;
     config->app_id = app_id;
-    config->transport = *http_transport; // realm_http_transport_t is a shard_ptr
+    config->transport = *http_transport; // realm_http_transport_t is a shared_ptr
     return config;
 }
 
@@ -571,10 +571,11 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
     });
 }
 
-RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
-    const realm_app_t* app, const realm_user_t* user, const char* name,
-    void (*callback)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t* app, const realm_user_t* user,
+                                                                 const char* name,
+                                                                 realm_return_apikey_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         (*app)->provider_client<App::UserAPIKeyProviderClient>().create_api_key(
@@ -583,10 +584,11 @@ RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
     });
 }
 
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
-    const realm_app_t* app, const realm_user_t* user, realm_object_id_t id,
-    void (*callback)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t* app, const realm_user_t* user,
+                                                                realm_object_id_t id,
+                                                                realm_return_apikey_func_t callback,
+                                                                realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         (*app)->provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(
@@ -595,10 +597,10 @@ RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
     });
 }
 
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
-    const realm_app_t* app, const realm_user_t* user,
-    void (*callback)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count, realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t* app, const realm_user_t* user,
+                                                                 realm_return_apikey_list_func_t callback,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
@@ -687,23 +689,23 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
     });
 }
 
-RLM_API bool realm_app_call_function(
-    const realm_app_t* app, const realm_user_t* user, const char* function_name, const char* serialized_ejson_payload,
-    void (*callback)(realm_userdata_t userdata, const char* serialized_ejson_response, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
+                                     const char* serialized_ejson_payload, realm_return_string_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      util::Optional<bson::Bson>&& bson, util::Optional<AppError> error) {
+                      const std::string* reply, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
                 callback(userdata.get(), nullptr, &c_error);
             }
             else {
-                callback(userdata.get(), bson->toJson().c_str(), nullptr);
+                callback(userdata.get(), reply->c_str(), nullptr);
             }
         };
-        (*app)->call_function(*user, function_name, parse_ejson_array(serialized_ejson_payload), std::move(cb));
+        (*app)->call_function(*user, function_name, serialized_ejson_payload, /*service_name=*/std::nullopt,
+                              std::move(cb));
         return true;
     });
 }

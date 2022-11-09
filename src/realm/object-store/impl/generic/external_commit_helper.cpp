@@ -26,10 +26,9 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
     : m_parent(parent)
-    , m_history(realm::make_in_realm_history())
-    , m_sg(DB::create(*m_history, parent.get_path(),
+    , m_sg(DB::create(realm::make_in_realm_history(), config.path,
                       DBOptions(parent.is_in_memory() ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full,
                                 parent.get_encryption_key().data())))
     , m_thread(std::async(std::launch::async, [=] {

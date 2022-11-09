@@ -605,7 +605,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type), false);
         }
         void operator()(AddProperty op)
         {
@@ -762,23 +762,28 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 }
 
 enum class DidRereadSchema { Yes, No };
+enum class HandleBackLinksAutomatically { Yes, No };
 
 static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes,
-                                         Schema const& initial_schema, DidRereadSchema did_reread_schema)
+                                         Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                                         HandleBackLinksAutomatically handle_backlinks_automatically)
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema)
+        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema,
+                HandleBackLinksAutomatically handle_backlinks_automatically)
             : group{group}
             , initial_schema(initial_schema)
             , table(group)
             , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
+            , handle_backlinks_automatically(handle_backlinks_automatically == HandleBackLinksAutomatically::Yes)
         {
         }
         Group& group;
         Schema const& initial_schema;
         TableHelper table;
         bool did_reread_schema;
+        bool handle_backlinks_automatically;
 
         void operator()(RemoveProperty op)
         {
@@ -821,14 +826,15 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type),
+                                            handle_backlinks_automatically);
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
         void operator()(AddProperty) {}
-    } applier{group, initial_schema, did_reread_schema};
+    } applier{group, initial_schema, did_reread_schema, handle_backlinks_automatically};
 
     for (auto& change : changes) {
         change.visit(applier);
@@ -838,7 +844,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                        uint64_t target_schema_version, SchemaMode mode,
-                                       std::vector<SchemaChange> const& changes,
+                                       std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
@@ -888,17 +894,20 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 
     auto old_schema = schema_from_group(group);
     apply_pre_migration_changes(group, changes);
+    HandleBackLinksAutomatically handle_backlinks =
+        handle_automatically_backlinks ? HandleBackLinksAutomatically::Yes : HandleBackLinksAutomatically::No;
     if (migration_function) {
         set_schema_keys(group, target_schema);
         migration_function();
 
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
-        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes);
+        apply_post_migration_changes(group, schema.compare(target_schema, mode), old_schema, DidRereadSchema::Yes,
+                                     handle_backlinks);
         group.validate_primary_columns();
     }
     else {
-        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
+        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No, handle_backlinks);
     }
 
     set_schema_version(group, target_schema_version);
@@ -1019,9 +1028,11 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 }
 
-InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
-    : logic_error(
-          util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
+InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version,
+                                                             bool must_exactly_equal)
+    : logic_error(util::format(must_exactly_equal ? "Provided schema version %1 does not equal last set version %2."
+                                                  : "Provided schema version %1 is less than last set version %2.",
+                               new_version, old_version))
     , m_old_version(old_version)
     , m_new_version(new_version)
 {

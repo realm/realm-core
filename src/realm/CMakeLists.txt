@@ -41,10 +41,12 @@ set(REALM_SOURCES
     impl/simulated_failure.cpp
     impl/transact_log.cpp
     index_string.cpp
+    link_translator.cpp
     list.cpp
     node.cpp
     mixed.cpp
     obj.cpp
+    object_converter.cpp
     global_key.cpp
     query_engine.cpp
     query_expression.cpp
@@ -91,11 +93,9 @@ set(UTIL_SOURCES
     util/timestamp_logger.cpp
     util/thread.cpp
     util/to_string.cpp
-    util/copy_dir_recursive.cpp
     util/demangle.cpp
     util/duplicating_logger.cpp
     util/enum.cpp
-    util/file_is_regular.cpp
     util/http.cpp
     util/json_parser.cpp
     util/load_file.cpp
@@ -231,6 +231,7 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
+    util/http.hpp
     util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
@@ -249,6 +250,7 @@ set(REALM_INSTALL_HEADERS
     util/serializer.hpp
     util/sha_crypto.hpp
     util/span.hpp
+    util/tagged_bool.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
@@ -262,6 +264,37 @@ set(REALM_INSTALL_HEADERS
     metrics/query_info.hpp
     metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
+
+set(REALM_NOINST_HEADERS
+    link_translator.hpp
+    object_converter.hpp
+    query_conditions_tpl.hpp
+    util/cf_str.hpp
+    util/circular_buffer.hpp
+    util/cli_args.hpp
+    util/demangle.hpp
+    util/duplicating_logger.hpp
+    util/enum.hpp
+    util/ez_websocket.hpp
+    util/from_chars.hpp
+    util/get_file_size.hpp
+    util/json_parser.hpp
+    util/load_file.hpp
+    util/network_ssl.hpp
+    util/parent_dir.hpp
+    util/platform_info.hpp
+    util/quote.hpp
+    util/random.hpp
+    util/resource_limits.hpp
+    util/scratch_allocator.hpp
+    util/signal_blocker.hpp
+    util/substitute.hpp
+    util/thread_exec_guard.hpp
+    util/time.hpp
+    util/timestamp_formatter.hpp
+    util/timestamp_logger.hpp
+    util/value_reset_guard.hpp
+) # REALM_NOINST_HEADERS
 
 list(APPEND REALM_SOURCES
     metrics/metrics.cpp
@@ -277,6 +310,7 @@ add_library(Storage STATIC
     ${REALM_SOURCES}
     ${UTIL_SOURCES}
     ${REALM_INSTALL_HEADERS}
+    ${REALM_NOINST_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )

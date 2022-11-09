@@ -212,6 +212,8 @@ public:
 
     void on_new_flx_subscription_set(int64_t new_version);
 
+    util::Future<std::string> send_test_command(std::string body);
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -226,6 +228,7 @@ private:
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
+    const size_t m_flx_bootstrap_batch_size_bytes;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -244,13 +247,13 @@ private:
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
-    std::function<void(const SyncProgress&, int64_t, DownloadBatchState)> m_on_download_message_received_hook;
-    std::function<bool(const SyncProgress&, int64_t, DownloadBatchState)> m_on_bootstrap_message_processed_hook;
+    std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
+    int64_t m_flx_pending_mark_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
 
     bool m_initiated = false;
@@ -676,7 +679,7 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
 }
 
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
-                                                const ReceivedChangesets& changesets)
+                                                const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
@@ -687,7 +690,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
+            integrate_changesets(repl, progress, downloadable_bytes, changesets, version_info,
                                  batch_state); // Throws
             client_version = version_info.realm_version;
         }
@@ -695,10 +698,10 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             // Fake it for "dry run" mode
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(client_version, m_progress.download, batch_state); // Throws
+        on_changesets_integrated(client_version, progress); // Throws
     }
     catch (const IntegrationException& e) {
-        on_integration_failure(e, batch_state);
+        on_integration_failure(e);
     }
     m_wrapper.on_sync_progress(); // Throws
 }
@@ -731,12 +734,7 @@ void SessionImpl::on_resumed()
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
 {
-    if (!m_is_flx_sync_session) {
-        return false;
-    }
-
-    // If this is a steady state DOWNLOAD, no need for special handling.
-    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
+    if (is_steady_state_download_message(batch_state, query_version)) {
         return false;
     }
 
@@ -755,8 +753,8 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
-    if (m_wrapper.m_on_bootstrap_message_processed_hook &&
-        !m_wrapper.m_on_bootstrap_message_processed_hook(progress, query_version, batch_state)) {
+    if (call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version, batch_state,
+                        received_changesets.size()) == SyncClientHookAction::EarlyReturn) {
         return true;
     }
 
@@ -768,7 +766,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         process_pending_flx_bootstrap();
     }
     catch (const IntegrationException& e) {
-        on_integration_failure(e, batch_state);
+        on_integration_failure(e);
     }
 
     return true;
@@ -777,7 +775,6 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
 void SessionImpl::process_pending_flx_bootstrap()
 {
-    constexpr size_t batch_size_in_bytes = 1024 * 1024;
     if (!m_is_flx_sync_session) {
         return;
     }
@@ -785,12 +782,21 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!bootstrap_store->has_pending()) {
         return;
     }
+
+    auto pending_batch_stats = bootstrap_store->pending_stats();
+    logger.info("Begin processing pending FLX bootstrap for query version %1. (changesets: %2, original total "
+                "changeset size: %3)",
+                pending_batch_stats.query_version, pending_batch_stats.pending_changesets,
+                pending_batch_stats.pending_changeset_bytes);
     auto& history = access_realm().get_history();
     VersionInfo new_version;
-    DownloadCursor download_cursor;
+    SyncProgress progress;
     int64_t query_version = -1;
+    size_t changesets_processed = 0;
+
     while (bootstrap_store->has_pending()) {
-        auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
+        auto start_time = std::chrono::steady_clock::now();
+        auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
             bootstrap_store->clear();
@@ -798,7 +804,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         }
 
         auto batch_state =
-            pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
+            pending_batch.remaining_changesets > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
         uint64_t downloadable_bytes = 0;
         query_version = pending_batch.query_version;
         bool simulate_integration_error =
@@ -807,30 +813,35 @@ void SessionImpl::process_pending_flx_bootstrap()
             throw IntegrationException(ClientError::bad_changeset, "simulated failure");
         }
 
-
-        if (batch_state == DownloadBatchState::LastInBatch) {
-            update_progress(*pending_batch.progress);
-        }
-
         history.integrate_server_changesets(
-            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-            pending_batch.changesets.size(), new_version, batch_state, logger,
-            [&](const TransactionRef& tr) {
-                bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
+            *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
+            [&](const TransactionRef& tr, size_t count) {
+                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, count);
             },
             get_transact_reporter());
-        download_cursor = pending_batch.progress->download;
+        progress = *pending_batch.progress;
+        changesets_processed += pending_batch.changesets.size();
+        auto duration = std::chrono::steady_clock::now() - start_time;
+
+        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                    "%3. %4 changesets remaining in bootstrap",
+                    "%3 in %4 ms. %5 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                    pending_batch.remaining);
+                    std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
+                    pending_batch.remaining_changesets);
     }
-    on_changesets_integrated(new_version.realm_version, download_cursor, DownloadBatchState::LastInBatch);
+    on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
+
+    auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
+                                  DownloadBatchState::LastInBatch, changesets_processed);
+    REALM_ASSERT(action == SyncClientHookAction::NoAction);
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
@@ -864,13 +875,80 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
     m_wrapper.on_flx_sync_version_complete(version);
 }
 
-void SessionImpl::receive_download_message_hook(const SyncProgress& progress, int64_t query_version,
-                                                DownloadBatchState batch_state)
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const SyncProgress& progress,
+                                                  int64_t query_version, DownloadBatchState batch_state,
+                                                  size_t num_changesets)
 {
-    if (REALM_LIKELY(!m_wrapper.m_on_download_message_received_hook)) {
-        return;
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
     }
-    m_wrapper.m_on_download_message_received_hook(progress, query_version, batch_state);
+
+    SyncClientHookData data;
+    data.event = event;
+    data.batch_state = batch_state;
+    data.progress = progress;
+    data.num_changesets = num_changesets;
+    data.query_version = query_version;
+
+    auto action = m_wrapper.m_debug_hook(data);
+    switch (action) {
+        case realm::SyncClientHookAction::SuspendWithRetryableError: {
+            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
+                                      true);
+            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+            auto err_processing_err = receive_error_message(err_info);
+            REALM_ASSERT(!err_processing_err);
+            return SyncClientHookAction::NoAction;
+        }
+        default:
+            return action;
+    }
+}
+
+bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
+{
+    if (batch_state == DownloadBatchState::SteadyState) {
+        return true;
+    }
+
+    if (!m_is_flx_sync_session) {
+        return true;
+    }
+
+    // If this is a steady state DOWNLOAD, no need for special handling.
+    if (batch_state == DownloadBatchState::LastInBatch && query_version == m_wrapper.m_flx_active_version) {
+        return true;
+    }
+
+    return false;
+}
+
+util::Future<std::string> SessionImpl::send_test_command(std::string body)
+{
+    try {
+        auto json_body = nlohmann::json::parse(body.begin(), body.end());
+        if (auto it = json_body.find("command"); it == json_body.end() || !it->is_string()) {
+            return Status{ErrorCodes::LogicError,
+                          "Must supply command name in \"command\" field of test command json object"};
+        }
+        if (json_body.size() > 1 && json_body.find("args") == json_body.end()) {
+            return Status{ErrorCodes::LogicError, "Only valid fields in a test command are \"command\" and \"args\""};
+        }
+    }
+    catch (const nlohmann::json::parse_error& e) {
+        return Status{ErrorCodes::LogicError, util::format("Invalid json input to send_test_command: %1", e.what())};
+    }
+
+    auto pf = util::make_promise_future<std::string>();
+
+    get_client().get_service().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
+        auto id = ++m_last_pending_test_command_ident;
+        m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
+        ensure_enlisted_to_send();
+    });
+
+    return std::move(pf.future);
 }
 
 // ################ SessionWrapper ################
@@ -889,13 +967,13 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_simulate_integration_error{config.simulate_integration_error}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
+    , m_flx_bootstrap_batch_size_bytes(config.flx_bootstrap_batch_size_bytes)
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
-    , m_on_download_message_received_hook(std::move(config.on_download_message_received_hook))
-    , m_on_bootstrap_message_processed_hook(config.on_bootstrap_message_processed_hook)
+    , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);
@@ -903,8 +981,10 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
     if (m_flx_subscription_store) {
-        std::tie(m_flx_active_version, m_flx_latest_version) =
-            m_flx_subscription_store->get_active_and_latest_versions();
+        auto versions_info = m_flx_subscription_store->get_version_info();
+        m_flx_active_version = versions_info.active;
+        m_flx_latest_version = versions_info.latest;
+        m_flx_pending_mark_version = versions_info.pending_mark;
     }
 }
 
@@ -972,16 +1052,26 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     }
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
+    REALM_ASSERT(batch_state != DownloadBatchState::SteadyState);
 
     SubscriptionSet::State new_state = SubscriptionSet::State::Uncommitted; // Initialize to make compiler happy
 
     switch (batch_state) {
+        case DownloadBatchState::SteadyState:
+            // Cannot be called with this value.
+            REALM_UNREACHABLE();
         case DownloadBatchState::LastInBatch:
             if (m_flx_active_version == new_version) {
                 return;
             }
             on_flx_sync_version_complete(new_version);
-            new_state = SubscriptionSet::State::Complete;
+            if (new_version == 0) {
+                new_state = SubscriptionSet::State::Complete;
+            }
+            else {
+                new_state = SubscriptionSet::State::AwaitingMark;
+                m_flx_pending_mark_version = new_version;
+            }
             break;
         case DownloadBatchState::MoreToCome:
             if (m_flx_last_seen_version == new_version) {
@@ -1387,6 +1477,16 @@ void SessionWrapper::on_download_completion()
         m_upload_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
+
+    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
+                             m_flx_pending_mark_version);
+        auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
+        mutable_subs.update_state(SubscriptionSet::State::Complete);
+        std::move(mutable_subs).commit();
+        m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
+    }
+
     util::LockGuard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
@@ -1460,6 +1560,16 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
     m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
                        snapshot_version);
+}
+
+util::Future<std::string> SessionWrapper::send_test_command(std::string body)
+{
+    if (!m_sess) {
+        return util::Future<std::string>::make_ready(
+            Status{ErrorCodes::RuntimeError, "session must be activated to send a test command"});
+    }
+
+    return m_sess->send_test_command(std::move(body));
 }
 
 // ################ ClientImpl::Connection ################
@@ -1721,6 +1831,11 @@ void Session::abandon() noexcept
 void Session::on_new_flx_sync_subscription(int64_t new_version)
 {
     m_impl->on_new_flx_subscription_set(new_version);
+}
+
+util::Future<std::string> Session::send_test_command(std::string body)
+{
+    return m_impl->send_test_command(std::move(body));
 }
 
 const std::error_category& client_error_category() noexcept

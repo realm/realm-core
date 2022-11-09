@@ -118,6 +118,13 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
     }
 }
 
+ref_type LinkMap::get_ref(const ArrayPayload* array_payload, ColumnType type, size_t row)
+{
+    if (type == col_type_LinkList)
+        return static_cast<const ArrayList*>(array_payload)->get(row);
+    return static_cast<const ArrayKey*>(array_payload)->get_as_ref(row);
+}
+
 void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
 {
     REALM_ASSERT(m_leaf_ptr != nullptr);
@@ -153,8 +160,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                             }
                         }
                     }
-                    // Continue
-                    return false;
+                    return IteratorControl::AdvanceToNext;
                 });
             }
         }
@@ -170,9 +176,8 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
             }
         }
     }
-    // Note: Link lists and link sets have compatible storage.
     else if (type == col_type_LinkList || (type == col_type_Link && column_key.is_set())) {
-        if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
+        if (ref_type ref = get_ref(m_leaf_ptr, type, row)) {
             BPlusTree<ObjKey> links(get_base_table()->get_alloc());
             links.init_from_ref(ref);
             size_t sz = links.size();
@@ -338,8 +343,7 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
                     destination.set(n, leaf.get(i));
                     n++;
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
         }
     }
@@ -476,8 +480,7 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
                     destination.set(n, leaf.get(i));
                     n++;
                 }
-                // Continue
-                return false;
+                return IteratorControl::AdvanceToNext;
             });
         }
     }

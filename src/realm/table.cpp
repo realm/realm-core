@@ -16,33 +16,34 @@
  *
  **************************************************************************/
 
+#include <realm/table.hpp>
+
+#include <realm/alloc_slab.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_fixed_bytes.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
+#include <realm/db.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/exceptions.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions_tpl.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/features.h>
+#include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
+
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
 #include <iostream>
 #include <iomanip>
 #endif
-
-#include <realm/util/features.h>
-#include <realm/util/miscellaneous.hpp>
-#include <realm/util/serializer.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/exceptions.hpp>
-#include <realm/table.hpp>
-#include <realm/alloc_slab.hpp>
-#include <realm/index_string.hpp>
-#include <realm/db.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query_engine.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_timestamp.hpp>
-#include <realm/array_decimal128.hpp>
-#include <realm/array_fixed_bytes.hpp>
-#include <realm/table_tpl.hpp>
-#include <realm/dictionary.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -315,6 +316,19 @@ const char* get_data_type_name(DataType type) noexcept
     }
     return "unknown";
 }
+
+std::ostream& operator<<(std::ostream& o, Table::Type table_type)
+{
+    switch (table_type) {
+        case Table::Type::TopLevel:
+            return o << "TopLevel";
+        case Table::Type::Embedded:
+            return o << "Embedded";
+        case Table::Type::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
 } // namespace realm
 
 void LinkChain::add(ColKey ck)
@@ -327,12 +341,12 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not an object reference property",
-                                              m_current_table->get_name(), m_current_table->get_column_name(ck)));
+        throw std::runtime_error(util::format("Property '%1.%2' is not an object reference",
+                                              m_current_table->get_class_name(),
+                                              m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
 }
-
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -1069,7 +1083,7 @@ Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
     return Query(m_own_ref, dictionary_of_links);
 }
 
-void Table::set_table_type(Type table_type)
+void Table::set_table_type(Type table_type, bool handle_backlinks)
 {
     if (table_type == m_table_type) {
         return;
@@ -1080,17 +1094,11 @@ void Table::set_table_type(Type table_type)
     }
 
     REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);
-    set_embedded(table_type == Type::Embedded);
+    set_embedded(table_type == Type::Embedded, handle_backlinks);
 }
 
-void Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded, bool handle_backlinks)
 {
-    if (Replication* repl = get_repl()) {
-        if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error(util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
-        }
-    }
-
     if (embedded == false) {
         do_set_table_type(Type::TopLevel);
         return;
@@ -1098,33 +1106,102 @@ void Table::set_embedded(bool embedded)
 
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
-        throw std::logic_error(util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
+        throw std::logic_error(
+            util::format("Cannot change '%1' to embedded when using a primary key.", get_class_name()));
     }
 
-    // `has_backlink_columns` indicates if the table is embedded in any other table.
-    bool has_backlink_columns = false;
-    for_each_backlink_column([&has_backlink_columns](ColKey) {
-        has_backlink_columns = true;
-        return true;
-    });
-    if (!has_backlink_columns) {
-        throw std::logic_error(
-            util::format("Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
-                         "at least one other class.",
-                         get_name()));
+    if (size() == 0) {
+        do_set_table_type(Type::Embedded);
+        return;
     }
-    else if (size() > 0) {
-        for (auto object : *this) {
-            size_t backlink_count = object.get_backlink_count();
-            if (backlink_count == 0) {
-                throw std::logic_error(util::format(
-                    "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
+
+    // Check all of the objects for invalid incoming links. Each embedded object
+    // must have exactly one incoming link, and it must be from a non-Mixed property.
+    // Objects with no incoming links are either deleted or an error (depending
+    // on `handle_backlinks`), and objects with multiple incoming links are either
+    // cloned for each of the incoming links or an error (again depending on `handle_backlinks`).
+    // Incoming links from a Mixed property are always an error, as those can't
+    // link to embedded objects
+    ArrayInteger leaf(get_alloc());
+    enum class LinkCount : int8_t { None, One, Multiple };
+    std::vector<LinkCount> incoming_link_count;
+    std::vector<ObjKey> orphans;
+    std::vector<ObjKey> multiple_incoming_links;
+    traverse_clusters([&](const Cluster* cluster) {
+        size_t size = cluster->node_size();
+        incoming_link_count.assign(size, LinkCount::None);
+
+        for_each_backlink_column([&](ColKey col) {
+            cluster->init_leaf(col, &leaf);
+            // Width zero means all the values are zero and there can't be any backlinks
+            if (leaf.get_width() == 0) {
+                return IteratorControl::AdvanceToNext;
             }
-            else if (backlink_count > 1) {
-                throw std::logic_error(
-                    util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
+
+            for (size_t i = 0, size = leaf.size(); i < size; ++i) {
+                auto value = leaf.get_as_ref_or_tagged(i);
+                if (value.is_ref() && value.get_as_ref() == 0) {
+                    // ref of zero means there's no backlinks
+                    continue;
+                }
+
+                if (value.is_ref()) {
+                    // Any other ref indicates an array of backlinks, which will
+                    // always have more than one entry
+                    incoming_link_count[i] = LinkCount::Multiple;
+                }
+                else {
+                    // Otherwise it's a tagged ref to the single linking object
+                    if (incoming_link_count[i] == LinkCount::None) {
+                        incoming_link_count[i] = LinkCount::One;
+                    }
+                    else if (incoming_link_count[i] == LinkCount::One) {
+                        incoming_link_count[i] = LinkCount::Multiple;
+                    }
+                }
+
+                auto source_col = get_opposite_column(col);
+                if (source_col.get_type() == col_type_Mixed) {
+                    auto source_table = get_opposite_table(col);
+                    throw std::logic_error(util::format(
+                        "Cannot convert '%1' to embedded: there is an incoming link from the Mixed property '%2.%3', "
+                        "which does not support linking to embedded objects.",
+                        get_class_name(), source_table->get_class_name(), source_table->get_column_name(source_col)));
+                }
+            }
+            return IteratorControl::AdvanceToNext;
+        });
+
+        for (size_t i = 0; i < size; ++i) {
+            if (incoming_link_count[i] == LinkCount::None) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format("Cannot convert '%1' to embedded: at least one object has no "
+                                                        "incoming links and would be deleted.",
+                                                        get_class_name()));
+                }
+                orphans.push_back(cluster->get_real_key(i));
+            }
+            else if (incoming_link_count[i] == LinkCount::Multiple) {
+                if (!handle_backlinks) {
+                    throw std::logic_error(util::format(
+                        "Cannot convert '%1' to embedded: at least one object has more than one incoming link.",
+                        get_class_name()));
+                }
+                multiple_incoming_links.push_back(cluster->get_real_key(i));
             }
         }
+
+        return IteratorControl::AdvanceToNext;
+    });
+
+    // orphans and multiple_incoming_links will always be empty if `handle_backlinks = false`
+    for (auto key : orphans) {
+        remove_object(key);
+    }
+    for (auto key : multiple_incoming_links) {
+        auto obj = get_object(key);
+        obj.handle_multiple_backlinks_during_schema_migration();
+        obj.remove();
     }
 
     do_set_table_type(Type::Embedded);
@@ -1536,7 +1613,7 @@ void Table::create_columns()
     size_t cnt;
     auto get_column_cnt = [&cnt](const Cluster* cluster) {
         cnt = cluster->nb_columns();
-        return true;
+        return IteratorControl::Stop;
     };
     traverse_clusters(get_column_cnt);
 
@@ -1876,6 +1953,11 @@ StringData Table::get_name() const noexcept
     return static_cast<Group*>(parent)->get_table_name(get_key());
 }
 
+StringData Table::get_class_name() const noexcept
+{
+    return Group::table_name_to_class_name(get_name());
+}
+
 const char* Table::get_state() const noexcept
 {
     switch (m_cookie) {
@@ -1990,7 +2072,7 @@ void Table::ensure_graveyard()
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
 }
@@ -2123,7 +2205,7 @@ size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
                 cnt++;
             }
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
@@ -2138,243 +2220,58 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     return where().equal(col_key, value).count();
 }
 
-// sum ----------------------------------------------
+template <typename T>
+void Table::aggregate(QueryStateBase& st, ColKey column_key) const
+{
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType leaf(get_alloc());
 
-
-int64_t Table::sum_int(ColKey col_key) const
-{
-    QueryStateSum<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    return st.result_sum();
-}
-double Table::sum_float(ColKey col_key) const
-{
-    QueryStateSum<float> st;
-    aggregate<float>(st, col_key);
-    return st.result_sum();
-}
-double Table::sum_double(ColKey col_key) const
-{
-    QueryStateSum<double> st;
-    aggregate<double>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_decimal(ColKey col_key) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    return st.result_sum();
-}
-Decimal128 Table::sum_mixed(ColKey col_key) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    return st.result_sum();
-}
-
-// average ----------------------------------------------
-
-double Table::average_int(ColKey col_key, size_t* value_count) const
-{
-    if (is_nullable(col_key)) {
-        return average<util::Optional<int64_t>>(col_key, value_count);
-    }
-    return average<int64_t>(col_key, value_count);
-}
-double Table::average_float(ColKey col_key, size_t* value_count) const
-{
-    return average<float>(col_key, value_count);
-}
-double Table::average_double(ColKey col_key, size_t* value_count) const
-{
-    return average<double>(col_key, value_count);
-}
-Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-Decimal128 Table::average_mixed(ColKey col_key, size_t* value_count) const
-{
-    QueryStateSum<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    auto sum = st.result_sum();
-    Decimal128 avg(0);
-    size_t items_counted = st.result_count();
-    if (items_counted != 0)
-        avg = sum / items_counted;
-    if (value_count)
-        *value_count = items_counted;
-    return avg;
-}
-
-// minimum ----------------------------------------------
-
-#define USE_COLUMN_AGGREGATE 1
-
-int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Decimal128> st;
-    aggregate<Decimal128>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-Mixed Table::minimum_mixed(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMin<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_min();
-}
-
-
-// maximum ----------------------------------------------
-
-int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<int64_t> st;
-    if (is_nullable(col_key)) {
-        aggregate<util::Optional<int64_t>>(st, col_key);
-    }
-    else {
-        aggregate<int64_t>(st, col_key);
-    }
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<float> st;
-    aggregate<float>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
-{
-    QueryStateMax<double> st;
-    aggregate<double>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
-}
-
-Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
-{
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 max("-Inf");
-    ObjKey ret_key;
-    auto f = [&max, &ret_key, &leaf, col_key](const Cluster* cluster) {
+    auto f = [&leaf, column_key, &st](const Cluster* cluster) {
         // direct aggregate on the leaf
-        cluster->init_leaf(col_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto val = leaf.get(i);
-            if (!val.is_null() && val > max) {
-                max = val;
-                ret_key = cluster->get_real_key(i);
-            }
+        cluster->init_leaf(column_key, &leaf);
+        st.m_key_offset = cluster->get_offset();
+        st.m_key_values = cluster->get_key_array();
+
+        bool cont = true;
+        size_t sz = leaf.size();
+        for (size_t local_index = 0; cont && local_index < sz; local_index++) {
+            auto v = leaf.get(local_index);
+            cont = st.match(local_index, v);
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
-    if (return_ndx) {
-        *return_ndx = ObjKey(ret_key);
-    }
-    return max;
 }
 
-Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
+// This template is also used by the query engine
+template void Table::aggregate<int64_t>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<std::optional<int64_t>>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<float>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<double>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Decimal128>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Mixed>(QueryStateBase&, ColKey) const;
+template void Table::aggregate<Timestamp>(QueryStateBase&, ColKey) const;
+
+std::optional<Mixed> Table::sum(ColKey col_key) const
 {
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::sum(*this, *this, col_key);
 }
 
-Mixed Table::maximum_mixed(ColKey col_key, ObjKey* return_ndx) const
+std::optional<Mixed> Table::avg(ColKey col_key, size_t* value_count) const
 {
-    QueryStateMax<Mixed> st;
-    aggregate<Mixed>(st, col_key);
-    if (return_ndx) {
-        *return_ndx = ObjKey(st.m_minmax_key);
-    }
-    return st.get_max();
+    return AggregateHelper<Table>::avg(*this, *this, col_key, value_count);
 }
 
+std::optional<Mixed> Table::min(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::min(*this, *this, col_key, return_ndx);
+}
+
+std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
+{
+    return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
+}
 
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
@@ -2403,9 +2300,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = cluster->get_real_key(row);
-            return true;
+            return IteratorControl::Stop;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
 
     traverse_clusters(f);
@@ -2898,7 +2795,9 @@ bool Table::is_cross_table_link_target() const noexcept
     auto is_cross_link = [this](ColKey col_key) {
         auto t = col_key.get_type();
         // look for a backlink with a different target than ourselves
-        return (t == col_type_BackLink && get_opposite_table_key(col_key) != get_key());
+        return (t == col_type_BackLink && get_opposite_table_key(col_key) != get_key())
+                   ? IteratorControl::Stop
+                   : IteratorControl::AdvanceToNext;
     };
     return for_each_backlink_column(is_cross_link);
 }
@@ -3164,7 +3063,6 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
-
     return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 
@@ -3535,9 +3433,9 @@ Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
         if (origin_table->get_name() == origin_table_name &&
             origin_table->get_column_name(origin_link_col) == origin_col_name) {
             ret = BacklinkOrigin{{origin_table, origin_link_col}};
-            return true;
+            return IteratorControl::Stop;
         }
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     this->for_each_backlink_column(f);
     return ret;
@@ -3572,7 +3470,7 @@ std::vector<std::pair<TableKey, ColKey>> Table::get_incoming_link_columns() cons
         auto origin_table_key = get_opposite_table_key(backlink_col_key);
         auto origin_link_col = get_opposite_column(backlink_col_key);
         origins.emplace_back(origin_table_key, origin_link_col);
-        return false;
+        return IteratorControl::AdvanceToNext;
     };
     this->for_each_backlink_column(f);
     return origins;
@@ -3647,7 +3545,7 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        throw DuplicatePrimaryKeyValueException(get_class_name(), get_column_name(col));
     }
 }
 
@@ -3956,10 +3854,10 @@ bool Table::has_any_embedded_objects()
                 auto target_table = get_parent_group()->get_table(target_table_key);
                 if (target_table->is_embedded()) {
                     m_has_any_embedded_objects = true;
-                    return true; // early out
+                    return IteratorControl::Stop; // early out
                 }
             }
-            return false;
+            return IteratorControl::AdvanceToNext;
         });
     }
     return *m_has_any_embedded_objects;

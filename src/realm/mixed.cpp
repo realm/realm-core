@@ -190,7 +190,7 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     return false;
 }
 
-bool Mixed::accumulate_numeric_to(Decimal128& destination) const
+bool Mixed::accumulate_numeric_to(Decimal128& destination) const noexcept
 {
     bool did_accumulate = false;
     if (!is_null()) {
@@ -222,7 +222,7 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const
     return did_accumulate;
 }
 
-int Mixed::compare(const Mixed& b) const
+int Mixed::compare(const Mixed& b) const noexcept
 {
     // Observe! Changing this function breaks the file format for Set<Mixed>
 
@@ -346,7 +346,7 @@ int Mixed::compare(const Mixed& b) const
     // Observe! Changing this function breaks the file format for Set<Mixed>
 }
 
-int Mixed::compare_signed(const Mixed& b) const
+int Mixed::compare_signed(const Mixed& b) const noexcept
 {
     if (is_type(type_String) && b.is_type(type_String)) {
         auto a_val = get_string();
@@ -474,14 +474,14 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
     return get<UUID>();
 }
 
-static DataType get_common_type(DataType t1, DataType t2)
+static DataType get_common_type(DataType t1, DataType t2) noexcept
 {
     // It might be by accident that this works, but it finds the most advanced type
     DataType common = std::max(t1, t2);
     return common;
 }
 
-Mixed Mixed::operator+(const Mixed& rhs) const
+Mixed Mixed::operator+(const Mixed& rhs) const noexcept
 {
     if (!is_null() && !rhs.is_null()) {
         auto common_type = get_common_type(get_type(), rhs.get_type());
@@ -501,7 +501,7 @@ Mixed Mixed::operator+(const Mixed& rhs) const
     return {};
 }
 
-Mixed Mixed::operator-(const Mixed& rhs) const
+Mixed Mixed::operator-(const Mixed& rhs) const noexcept
 {
     if (!is_null() && !rhs.is_null()) {
         auto common_type = get_common_type(get_type(), rhs.get_type());
@@ -521,7 +521,7 @@ Mixed Mixed::operator-(const Mixed& rhs) const
     return {};
 }
 
-Mixed Mixed::operator*(const Mixed& rhs) const
+Mixed Mixed::operator*(const Mixed& rhs) const noexcept
 {
     if (!is_null() && !rhs.is_null()) {
         auto common_type = get_common_type(get_type(), rhs.get_type());
@@ -541,7 +541,7 @@ Mixed Mixed::operator*(const Mixed& rhs) const
     return {};
 }
 
-Mixed Mixed::operator/(const Mixed& rhs) const
+Mixed Mixed::operator/(const Mixed& rhs) const noexcept
 {
     if (!is_null() && !rhs.is_null()) {
         auto common_type = get_common_type(get_type(), rhs.get_type());
@@ -628,7 +628,7 @@ size_t Mixed::hash() const
     return hash;
 }
 
-StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
+StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
 {
     if (is_null()) {
         return {};
@@ -721,7 +721,7 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
     return {};
 }
 
-void Mixed::use_buffer(std::string& buf)
+void Mixed::use_buffer(std::string& buf) noexcept
 {
     if (is_null()) {
         return;

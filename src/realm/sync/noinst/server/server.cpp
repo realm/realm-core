@@ -12,7 +12,6 @@
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
-#include <realm/sync/noinst/server/vacuum.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -85,11 +84,8 @@ using ExtendedIntegrationError = ServerHistory::ExtendedIntegrationError;
 using ClientType = ServerHistory::ClientType;
 using FileIdentAllocSlot = ServerHistory::FileIdentAllocSlot;
 using FileIdentAllocSlots = ServerHistory::FileIdentAllocSlots;
-using CompactionControl = ServerHistory::CompactionControl;
 
 using UploadChangeset = ServerProtocol::UploadChangeset;
-using LastClientAccessesEntry = CompactionControl::LastClientAccessesEntry;
-using LastClientAccessesRange = CompactionControl::LastClientAccessesRange;
 // clang-format on
 
 
@@ -425,7 +421,7 @@ private:
 
 // ============================ ServerFile ============================
 
-class ServerFile : public util::RefCountBase, private CompactionControl {
+class ServerFile : public util::RefCountBase {
 public:
     util::PrefixLogger logger;
 
@@ -647,20 +643,6 @@ private:
     // before the destruction of the server object itself.
     ServerFileAccessCache::Slot m_worker_file;
 
-    struct LastClientAccess {
-        std::time_t last_seen_timestamp;
-    };
-
-    // FIXME: Use a more memory efficient map implementation here. For instance,
-    // a compact (single allocation) hash map. Unfortunately, std::unordered_map
-    // is generally less memory efficient than std::map.
-    //
-    // Protected by `m_server.last_client_accesses_mutex`
-    std::map<file_ident_type, LastClientAccess> m_last_client_accesses;
-
-    // Protected by `m_server.last_client_accesses_mutex`
-    std::vector<LastClientAccessesEntry> m_last_client_accesses_buffer;
-
     std::vector<std::int_fast64_t> m_deleting_connections;
 
     DownloadCache m_download_cache;
@@ -687,10 +669,6 @@ private:
     void group_finalize_work_stage_2();
     void finalize_work_stage_1();
     void finalize_work_stage_2();
-
-    // Overriding member functions in CompactionControl
-    LastClientAccessesRange get_last_client_accesses() override final;
-    version_type get_max_compactable_server_version() override final;
 };
 
 
@@ -732,8 +710,6 @@ public:
 
     // Overriding members of ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
-    Clock::time_point get_compaction_clock_now() const noexcept override final;
     sync::Transformer& get_transformer() override final;
     util::Buffer<char>& get_transform_buffer() override final;
 
@@ -932,9 +908,9 @@ public:
         return file;
     }
 
-    std::unique_ptr<ServerHistory> make_history_for_path(CompactionControl& cc)
+    std::unique_ptr<ServerHistory> make_history_for_path()
     {
-        return std::make_unique<ServerHistory>(*this, cc);
+        return std::make_unique<ServerHistory>(*this);
     }
 
     util::bind_ptr<ServerFile> get_file(const std::string& virt_path) noexcept
@@ -995,8 +971,6 @@ public:
 
     // Overriding member functions in _impl::ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
-    bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
-    Clock::time_point get_compaction_clock_now() const noexcept override final;
     Transformer& get_transformer() noexcept override final;
     util::Buffer<char>& get_transform_buffer() noexcept override final;
 
@@ -1311,6 +1285,8 @@ public:
     void receive_unbind_message(session_ident_type);
 
     void receive_ping(milliseconds_type timestamp, milliseconds_type rtt);
+
+    void receive_error_message(session_ident_type, int error_code, std::string_view error_body);
 
     void protocol_error(ProtocolError, Session* = nullptr);
 
@@ -2730,6 +2706,13 @@ public:
         ensure_enlisted_to_send();
     }
 
+    void receive_error_message(session_ident_type, int, std::string_view)
+    {
+        REALM_ASSERT(!m_unbind_message_received);
+
+        logger.detail("Received: ERROR"); // Throws
+    }
+
 private:
     SyncConnection& m_connection;
 
@@ -3175,9 +3158,8 @@ ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const s
     : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
-    , m_file{cache, real_path, virt_path, *this, false, disable_sync_to_disk} // Throws
-    , m_worker_file{
-          server.get_worker().get_file_access_cache(), real_path, virt_path, *this, true, disable_sync_to_disk}
+    , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
+    , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, true, disable_sync_to_disk}
 {
 }
 
@@ -3209,16 +3191,7 @@ void ServerFile::activate() {}
 // This function must be called only after a completed invocation of
 // initialize(). Both functinos must only ever be called by the network event
 // loop thread.
-void ServerFile::register_client_access(file_ident_type client_file_ident)
-{
-    const Server::Config& config = m_server.get_config();
-    if (!config.disable_history_compaction) {
-        Clock::time_point now = m_server.get_worker().get_compaction_clock_now();
-        std::time_t now_2 = Clock::clock::to_time_t(now);
-        util::LockGuard lock{m_server.last_client_accesses_mutex};
-        m_last_client_accesses[client_file_ident] = {now_2}; // Throws
-    }
-}
+void ServerFile::register_client_access(file_ident_type) {}
 
 
 auto ServerFile::request_file_ident(FileIdentReceiver& receiver, file_ident_type proxy_file, ClientType client_type)
@@ -3581,7 +3554,7 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
     if (state.use_file_cache)
         return worker_access().history; // Throws
     const std::string& path = m_worker_file.realm_path;
-    hist_ptr = m_server.make_history_for_path(*this);              // Throws
+    hist_ptr = m_server.make_history_for_path();                   // Throws
     DBOptions options = m_worker_file.make_shared_group_options(); // Throws
     sg_ptr = DB::create(*hist_ptr, path, options);                 // Throws
     sg_ptr->claim_sync_agent();                                    // Throws
@@ -3716,28 +3689,6 @@ void ServerFile::finalize_work_stage_2()
     }
 }
 
-auto ServerFile::get_last_client_accesses() -> LastClientAccessesRange
-{
-    m_last_client_accesses_buffer.clear();
-    util::LockGuard lock{m_server.last_client_accesses_mutex};
-    for (const auto& entry_1 : m_last_client_accesses) {
-        file_ident_type client_file_ident = entry_1.first;
-        LastClientAccessesEntry entry_2 = {client_file_ident, entry_1.second.last_seen_timestamp};
-        m_last_client_accesses_buffer.push_back(entry_2); // Throws
-    }
-    m_last_client_accesses.clear();
-    auto begin = m_last_client_accesses_buffer.data();
-    auto end = begin + m_last_client_accesses_buffer.size();
-    return {begin, end};
-}
-
-
-version_type ServerFile::get_max_compactable_server_version()
-{
-    return std::numeric_limits<version_type>::max();
-}
-
-
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
@@ -3761,29 +3712,6 @@ void Worker::enqueue(ServerFile* file)
 std::mt19937_64& Worker::server_history_get_random() noexcept
 {
     return m_random;
-}
-
-
-bool Worker::get_compaction_params(bool& ignore_clients, std::chrono::seconds& time_to_live,
-                                   std::chrono::seconds& compaction_interval) noexcept
-{
-    const Server::Config& config = m_server.get_config();
-    if (!config.disable_history_compaction) {
-        ignore_clients = config.history_compaction_ignore_clients;
-        time_to_live = config.history_ttl;
-        compaction_interval = config.history_compaction_interval;
-        return true;
-    }
-    return false;
-}
-
-
-Clock::time_point Worker::get_compaction_clock_now() const noexcept
-{
-    const Server::Config& config = m_server.get_config();
-    if (REALM_LIKELY(!config.history_compaction_clock))
-        return Clock::clock::now();
-    return config.history_compaction_clock->now();
 }
 
 
@@ -3920,25 +3848,6 @@ void ServerImpl::start()
     logger.info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
     logger.info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
     logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
-    {
-        const char* lead_text = "In-place history compaction";
-        if (m_config.disable_history_compaction) {
-            logger.info("%1: Disabled", lead_text); // Throws
-        }
-        else {
-            std::chrono::seconds interval = m_config.history_compaction_interval;
-            std::chrono::seconds time_to_live = m_config.history_ttl;
-            bool ignore_clients = m_config.history_compaction_ignore_clients;
-            logger.info("%1: Enabled (interval=%2s, time_to_live=%3s, ignore_clients=%4)", lead_text,
-                        interval.count(), time_to_live.count(),
-                        (ignore_clients ? "yes" : "no")); // Throws
-            if (ignore_clients) {
-                logger.warn("In-place history compaction option 'ignore clients' enabled. Do not "
-                            "enable this unless you know that you have to!"); // Throws
-            }
-        }
-    }
-
     logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
 
     m_transformer = make_transformer(); // Throws
@@ -3946,24 +3855,6 @@ void ServerImpl::start()
     m_realm_names = _impl::find_realm_files(m_root_dir); // Throws
 
     initiate_connection_reaper_timer(m_config.connection_reaper_interval); // Throws
-
-
-    if (!m_config.disable_history_compaction) {
-        if (m_config.history_ttl.count() == 0)
-            throw std::runtime_error("History TTL is zero. All clients will immediately expire, "
-                                     "and this is very likely a configuration error.");
-        if (m_config.history_ttl != std::chrono::seconds::max()) {
-            // std::chrono::days is only defined since C++20.
-            using days_t = std::chrono::duration<int64_t, std::ratio<86400>>;
-            auto days = std::chrono::duration_cast<days_t>(m_config.history_ttl);
-            logger.info("History compaction with expiration enabled. Clients offline for longer "
-                        "than %1 days (%2 seconds) may lose local modifications.",
-                        days.count(), m_config.history_ttl.count());
-        }
-        if (m_config.history_ttl < std::chrono::hours{1}) {
-            logger.warn("History TTL is very low (< 1 hour). Clients will expire very often.");
-        }
-    }
 
     listen(); // Throws
 }
@@ -4028,27 +3919,6 @@ void ServerImpl::dec_byte_size_for_pending_downstream_changesets(std::size_t byt
 std::mt19937_64& ServerImpl::server_history_get_random() noexcept
 {
     return get_random();
-}
-
-
-bool ServerImpl::get_compaction_params(bool& ignore_clients, std::chrono::seconds& time_to_live,
-                                       std::chrono::seconds& compaction_interval) noexcept
-{
-    if (!m_config.disable_history_compaction) {
-        ignore_clients = m_config.history_compaction_ignore_clients;
-        time_to_live = m_config.history_ttl;
-        compaction_interval = m_config.history_compaction_interval;
-        return true;
-    }
-    return false;
-}
-
-
-Clock::time_point ServerImpl::get_compaction_clock_now() const noexcept
-{
-    if (REALM_LIKELY(!m_config.history_compaction_clock))
-        return Clock::clock::now();
-    return m_config.history_compaction_clock->now();
 }
 
 
@@ -4544,6 +4414,26 @@ void SyncConnection::receive_ping(milliseconds_type timestamp, milliseconds_type
     m_last_ping_timestamp = timestamp;
     if (!m_is_sending)
         send_next_message();
+}
+
+
+void SyncConnection::receive_error_message(session_ident_type session_ident, int error_code,
+                                           std::string_view error_body)
+{
+    logger.debug("Received: ERROR(error_code=%1, message_size=%2, session_ident=%3)", error_code, error_body.size(),
+                 session_ident); // Throws
+    auto i = m_sessions.find(session_ident);
+    if (REALM_UNLIKELY(i == m_sessions.end())) {
+        bad_session_ident("ERROR", session_ident);
+        return;
+    }
+    Session& sess = *i->second;
+    if (REALM_UNLIKELY(sess.unbind_message_received())) {
+        message_after_unbind("ERROR", session_ident); // Throws
+        return;
+    }
+
+    sess.receive_error_message(session_ident, error_code, error_body); // Throws
 }
 
 

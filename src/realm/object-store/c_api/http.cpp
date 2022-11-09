@@ -30,8 +30,6 @@ static_assert(realm_http_request_method_e(HttpMethod::put) == RLM_HTTP_REQUEST_M
 static_assert(realm_http_request_method_e(HttpMethod::del) == RLM_HTTP_REQUEST_METHOD_DELETE);
 
 class CNetworkTransport final : public GenericNetworkTransport {
-    using Completion = realm::util::UniqueFunction<void(const Response&)>;
-
 public:
     CNetworkTransport(UserdataPtr userdata, realm_http_request_func_t request_executor)
         : m_userdata(std::move(userdata))
@@ -39,11 +37,12 @@ public:
     {
     }
 
-    static void on_response_completed(void* completion_data, const realm_http_response_t* response) noexcept
+    static void on_response_completed(void* request_context, const realm_http_response_t* response) noexcept
     {
-        std::unique_ptr<Completion> completion(reinterpret_cast<Completion*>(completion_data));
+        std::unique_ptr<util::UniqueFunction<void(const Response&)>> completion(
+            static_cast<util::UniqueFunction<void(const Response&)>*>(request_context));
 
-        std::map<std::string, std::string> headers;
+        HttpHeaders headers;
         for (size_t i = 0; i < response->num_headers; i++) {
             headers.emplace(response->headers[i].name, response->headers[i].value);
         }
@@ -53,13 +52,15 @@ public:
     }
 
 private:
-    void send_request_to_server(Request&& request, Completion&& completion_block) final
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion_block) final
     {
-        auto completion_data = std::make_unique<Completion>(std::move(completion_block));
+        auto completion_data =
+            std::make_unique<util::UniqueFunction<void(const Response&)>>(std::move(completion_block));
 
         std::vector<realm_http_header_t> c_headers;
         c_headers.reserve(request.headers.size());
-        for (auto& header : request.headers) {
+        for (auto&& header : request.headers) {
             c_headers.push_back({header.first.c_str(), header.second.c_str()});
         }
 

@@ -124,6 +124,11 @@ public:
         return m_test_session;
     }
 
+    SyncTestFile make_test_file() const
+    {
+        return SyncTestFile(app()->current_user(), schema(), realm::SyncConfig::FLXSyncEnabled{});
+    }
+
 private:
     TestAppSession m_test_session;
     Schema m_schema;

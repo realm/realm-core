@@ -239,7 +239,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
              !(is_array(prop.type) || is_set(prop.type))) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
-    else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type) && !is_collection(prop.type)) {
+    else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'Mixed' must be nullable.", object_name, prop.name);
     }
 
@@ -329,7 +329,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
 }
 
 void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
-                            bool for_sync) const
+                            SchemaValidationMode validation_mode) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -416,6 +416,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
 
+    auto for_sync =
+        (validation_mode & SchemaValidationMode::SyncPBS) || (validation_mode & SchemaValidationMode::SyncFLX);
     if (for_sync && table_type != ObjectSchema::ObjectType::Embedded) {
         if (primary_key.empty()) {
             exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized "
@@ -432,6 +434,12 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     if (!for_sync && table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
         exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in a local Realm", name));
     }
+
+    auto pbs_sync =
+        (validation_mode & SchemaValidationMode::SyncPBS) && !(validation_mode & SchemaValidationMode::SyncFLX);
+    if (pbs_sync && table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
+        exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in partition based sync", name));
+    }
 }
 
 namespace realm {
@@ -439,5 +447,18 @@ bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
     return std::tie(a.name, a.table_type, a.primary_key, a.persisted_properties, a.computed_properties) ==
            std::tie(b.name, b.table_type, b.primary_key, b.persisted_properties, b.computed_properties);
+}
+
+std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
+{
+    switch (table_type) {
+        case ObjectSchema::ObjectType::TopLevel:
+            return o << "TopLevel";
+        case ObjectSchema::ObjectType::Embedded:
+            return o << "Embedded";
+        case ObjectSchema::ObjectType::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
 }
 } // namespace realm

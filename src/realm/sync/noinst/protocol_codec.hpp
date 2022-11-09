@@ -30,7 +30,6 @@ struct ProtocolCodecException : public std::runtime_error {
 };
 class HeaderLineParser {
 public:
-    HeaderLineParser() = default;
     explicit HeaderLineParser(std::string_view line)
         : m_sv(line)
     {
@@ -177,6 +176,11 @@ public:
 
     void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
 
+    void make_json_error_message(OutputBuffer&, session_ident_type, int error_code, std::string_view error_body);
+
+    void make_test_command_message(OutputBuffer&, session_ident_type session, request_ident_type request_ident,
+                                   std::string_view body);
+
     class UploadMessageBuilder {
     public:
         util::Logger& logger;
@@ -273,6 +277,7 @@ public:
                     info.message = json["message"];
                     info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+                    info.server_requests_action = string_to_action(json["action"]); // Throws
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
                         info.resumption_delay_interval.emplace();
@@ -338,6 +343,14 @@ public:
                 client_file_ident.salt = msg.read_next<salt_type>('\n');
 
                 connection.receive_ident_message(session_ident, client_file_ident); // Throws
+            }
+            else if (message_type == "test_command") {
+                session_ident_type session_ident = msg.read_next<session_ident_type>();
+                request_ident_type request_ident = msg.read_next<request_ident_type>();
+                auto body_size = msg.read_next<size_t>('\n');
+                auto body = msg.read_sized_data<std::string_view>(body_size);
+
+                connection.receive_test_command_response(session_ident, request_ident, body);
             }
             else {
                 return report_error(Error::unknown_message, "Unknown input message type '%1'", msg_data);
@@ -457,6 +470,25 @@ private:
             last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
         connection.receive_download_message(session_ident, progress, downloadable_bytes, query_version, batch_state,
                                             received_changesets); // Throws
+    }
+
+    static sync::ProtocolErrorInfo::Action string_to_action(const std::string& action_string)
+    {
+        using action = sync::ProtocolErrorInfo::Action;
+        static const std::unordered_map<std::string, action> mapping{
+            {"ProtocolViolation", action::ProtocolViolation},
+            {"ApplicationBug", action::ApplicationBug},
+            {"Warning", action::Warning},
+            {"Transient", action::Transient},
+            {"DeleteRealm", action::DeleteRealm},
+            {"ClientReset", action::ClientReset},
+            {"ClientResetNoRecovery", action::ClientResetNoRecovery},
+        };
+
+        if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
+            return action_it->second;
+        }
+        return action::ApplicationBug;
     }
 
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
@@ -721,6 +753,14 @@ public:
                 auto session_ident = msg.read_next<session_ident_type>('\n');
 
                 connection.receive_unbind_message(session_ident); // Throws
+            }
+            else if (message_type == "json_error") {
+                auto error_code = msg.read_next<int>();
+                auto message_size = msg.read_next<size_t>();
+                auto session_ident = msg.read_next<session_ident_type>('\n');
+                auto json_raw = msg.read_sized_data<std::string_view>(message_size);
+
+                connection.receive_error_message(session_ident, error_code, json_raw);
             }
             else {
                 return report_error(Error::unknown_message, "unknown message type %1", message_type);

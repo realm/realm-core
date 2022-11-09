@@ -34,8 +34,7 @@
 #include <mutex>
 #include <unordered_set>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 // A `NotificationCallback` is added to a collection when observing it.
 // It contains all information necessary in case we need to notify about changes
@@ -136,10 +135,6 @@ public:
     // Returns whether or not it has anything to deliver.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
     bool package_for_delivery() REQUIRES(!m_callback_mutex);
-
-    // Pass the given error to all registered callbacks, then remove them
-    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
-    void deliver_error(std::exception_ptr) REQUIRES(!m_callback_mutex);
 
     // Call each of the given callbacks with the changesets prepared by package_for_delivery()
     // precondition: RealmCoordinator::m_notifier_mutex is unlocked
@@ -248,7 +243,6 @@ private:
     std::shared_ptr<Transaction> m_sg;
 
     bool m_has_run = false;
-    bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
 
     // Cached check for if callbacks have keypath filters which can be used
@@ -334,8 +328,11 @@ public:
 class NotifierPackage {
 public:
     NotifierPackage() = default;
-    NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
-                    RealmCoordinator* coordinator);
+
+    // Create a package which contains notifiers which have already been pacakged for delivery
+    NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers, std::optional<VersionID> version);
+    // Create a package which can have package_and_wait() called on it later
+    NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers, RealmCoordinator* coordinator);
 
     explicit operator bool() const noexcept
     {
@@ -349,11 +346,10 @@ public:
         return m_version;
     }
 
-    // If a version is given, block until notifications are ready for that
-    // version, and then regardless of whether or not a version was given filter
-    // the notifiers to just the ones which have anything to deliver.
+    // Block until notifications are ready for the given version, and then filter
+    // out any notifiers which don't have anything to deliver.
     // No-op if called multiple times
-    void package_and_wait(util::Optional<VersionID::version_type> target_version);
+    void package_and_wait(VersionID::version_type target_version);
 
     // Send the before-change notifications
     void before_advance();
@@ -365,12 +361,9 @@ public:
 private:
     util::Optional<VersionID> m_version;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
-
     RealmCoordinator* m_coordinator = nullptr;
-    std::exception_ptr m_error;
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif /* REALM_BACKGROUND_COLLECTION_HPP */

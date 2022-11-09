@@ -35,15 +35,11 @@ class Mixed;
 
 class QueryStateBase {
 public:
-    int64_t m_minmax_key; // used only for min/max, to save index of current min/max value
-    uint64_t m_key_offset;
-    const ClusterKeyArray* m_key_values;
-    QueryStateBase(size_t limit)
-        : m_minmax_key(-1)
-        , m_key_offset(0)
-        , m_key_values(nullptr)
-        , m_match_count(0)
-        , m_limit(limit)
+    int64_t m_minmax_key = -1; // used only for min/max, to save index of current min/max value
+    uint64_t m_key_offset = 0;
+    const ClusterKeyArray* m_key_values = nullptr;
+    QueryStateBase(size_t limit = -1)
+        : m_limit(limit)
     {
     }
     virtual ~QueryStateBase() {}
@@ -68,7 +64,7 @@ public:
     }
 
 protected:
-    size_t m_match_count;
+    size_t m_match_count = 0;
     size_t m_limit;
 
 private:

@@ -99,6 +99,11 @@ else()
         add_cxx_flag_if_supported(-Wno-deprecated-declarations)
     endif()
 
+    # By default GCC warns that it changed how it passes bitfields by value as
+    # function arguments on arm64 every time this happens. This warning is just
+    # an FYI and not pointing out a problem, so just disable it.
+    add_cxx_flag_if_supported(-Wno-psabi)
+
     add_cxx_flag_if_supported(-Wpartial-availability)
 
     # This warning is too agressive. It warns about moves that are not redundant on older
@@ -327,6 +332,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
 elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
 endif()
+set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
 
 add_subdirectory(external/catch EXCLUDE_FROM_ALL)
 

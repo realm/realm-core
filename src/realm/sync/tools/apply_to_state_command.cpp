@@ -109,23 +109,23 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
                  ret.progress.upload.last_integrated_server_version, ret.progress.upload.client_version,
                  ret.latest_server_version.version);
 
-    HeaderLineParser body;
+    std::string_view body_str;
     if (is_body_compressed) {
         ret.uncompressed_body_buffer.set_size(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-        std::error_code ec = util::compression::decompress(
-            compressed_body, {ret.uncompressed_body_buffer.data(), uncompressed_body_size});
+        std::error_code ec = util::compression::decompress(compressed_body, ret.uncompressed_body_buffer);
 
         if (ec) {
             throw ProtocolCodecException("error decompressing download message");
         }
 
-        body = HeaderLineParser(std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size));
+        body_str = std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size);
     }
     else {
-        body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
+        body_str = msg.read_sized_data<std::string_view>(uncompressed_body_size);
     }
 
+    HeaderLineParser body(body_str);
     while (!body.at_end()) {
         realm::sync::Transformer::RemoteChangeset cur_changeset;
         cur_changeset.remote_version = body.read_next<sync::version_type>();
@@ -161,25 +161,24 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
     ret.upload_progress.last_integrated_server_version = msg.read_next<sync::version_type>();
     ret.locked_server_version = msg.read_next<sync::version_type>('\n');
 
-    HeaderLineParser body;
     // if is_body_compressed == true, we must decompress the received body.
+    std::string_view body_str;
     if (is_body_compressed) {
         ret.uncompressed_body_buffer.set_size(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-
-        std::error_code ec = util::compression::decompress(
-            compressed_body, {ret.uncompressed_body_buffer.data(), uncompressed_body_size});
+        std::error_code ec = util::compression::decompress(compressed_body, ret.uncompressed_body_buffer);
 
         if (ec) {
             throw ProtocolCodecException("error decompressing upload message");
         }
 
-        body = HeaderLineParser(std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size));
+        body_str = std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size);
     }
     else {
-        body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
+        body_str = msg.read_sized_data<std::string_view>(uncompressed_body_size);
     }
 
+    HeaderLineParser body(body_str);
     while (!body.at_end()) {
         realm::sync::Changeset cur_changeset;
         cur_changeset.version = body.read_next<sync::version_type>();
@@ -292,10 +291,10 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
-                             history.integrate_server_changesets(
-                                 download_message.progress, &download_message.downloadable_bytes,
-                                 download_message.changesets.data(), download_message.changesets.size(), version_info,
-                                 download_message.batch_state, *logger, nullptr);
+                             history.integrate_server_changesets(download_message.progress,
+                                                                 &download_message.downloadable_bytes,
+                                                                 download_message.changesets, version_info,
+                                                                 download_message.batch_state, *logger, nullptr);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {

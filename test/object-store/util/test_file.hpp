@@ -20,7 +20,7 @@
 #define REALM_TEST_UTIL_TEST_FILE_HPP
 
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/util/tagged_bool.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
@@ -250,22 +250,23 @@ public:
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
     realm::util::UniqueFunction<void(const realm::app::Response&)> network_callback;
+
     struct Transport : realm::app::GenericNetworkTransport {
-        Transport(realm::util::UniqueFunction<void(const realm::app::Response&)>* network_callback)
+        Transport(realm::util::UniqueFunction<void(const realm::app::Response&)>& network_callback)
             : network_callback(network_callback)
         {
         }
 
-        void send_request_to_server(
-            realm::app::Request&&,
-            realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion_block) override
+        void
+        send_request_to_server(const realm::app::Request&,
+                               realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
         {
-            *network_callback = std::move(completion_block);
+            network_callback = std::move(completion);
         }
 
-        realm::util::UniqueFunction<void(const realm::app::Response&)>* network_callback;
+        realm::util::UniqueFunction<void(const realm::app::Response&)>& network_callback;
     };
-    std::shared_ptr<realm::app::GenericNetworkTransport> transport = std::make_shared<Transport>(&network_callback);
+    const std::shared_ptr<realm::app::GenericNetworkTransport> transport;
 
 private:
     std::shared_ptr<realm::app::App> m_app;

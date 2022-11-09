@@ -130,7 +130,7 @@ class BadServerUrl; // Exception
 /// their bound state), as long as they are associated with the same client
 /// object, or with two different client objects that do not overlap in
 /// time. This means, in particular, that it is an error to create two bound
-/// session objects for the same local Realm file, it they are associated with
+/// session objects for the same local Realm file, if they are associated with
 /// two different client objects that overlap in time, even if the session
 /// objects do not overlap in time (in their bound state). It is the
 /// responsibility of the application to ensure that these rules are adhered
@@ -307,21 +307,17 @@ public:
 
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
 
+        /// When integrating a flexible sync bootstrap, process this many bytes of
+        /// changeset data in a single integration attempt.
+        size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
+
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
         ///
         /// This feature exists exclusively for testing purposes at this time.
         bool simulate_integration_error = false;
 
-        // Will be called after a download message is received and validated by
-        // the client but befefore it's been transformed or applied. To be used in
-        // testing only.
-        std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-            on_download_message_received_hook;
-        // Will be called after each bootstrap message is added to the pending bootstrap store,
-        // but before processing a finalized bootstrap. For testing only.
-        std::function<bool(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-            on_bootstrap_message_processed_hook;
+        std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
@@ -467,7 +463,6 @@ public:
     /// the session object is destroyed. Please see "Callback semantics" section
     /// under Session for more on this.
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
-
 
     using ConnectionStateChangeListener = void(ConnectionState, util::Optional<SessionErrorInfo>);
 
@@ -719,6 +714,8 @@ public:
     void cancel_reconnect_delay();
 
     void on_new_flx_sync_subscription(int64_t new_version);
+
+    util::Future<std::string> send_test_command(std::string command_body);
 
 private:
     SessionWrapper* m_impl = nullptr;

@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <random>
+#include <list>
 
 #include <realm/binary_data.hpp>
 #include <realm/util/optional.hpp>
@@ -153,6 +154,7 @@ private:
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
+    const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
     util::network::Service m_service;
@@ -447,9 +449,9 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
     void read_or_write_error(std::error_code);
-    void close_due_to_protocol_error(std::error_code);
+    void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_missing_protocol_feature();
-    void close_due_to_client_side_error(std::error_code, bool is_fatal);
+    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
     void involuntary_disconnect(const SessionErrorInfo& info);
@@ -465,6 +467,7 @@ private:
                                   int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
+    void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
     void handle_protocol_error(ClientProtocol::Error);
 
     // These are only called from Session class.
@@ -734,10 +737,9 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
-                                  DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, const SyncProgress& progress);
 
-    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
+    void on_integration_failure(const IntegrationException& e);
 
     void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
 
@@ -751,9 +753,17 @@ public:
     Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
+    util::Future<std::string> send_test_command(std::string body);
+
 private:
     using SyncTransactReporter = ClientHistory::SyncTransactReporter;
 
+    struct PendingTestCommand {
+        request_ident_type id;
+        std::string body;
+        util::Promise<std::string> promise;
+        bool pending = true;
+    };
 
     /// Fetch a reference to the remote virtual path of the Realm associated
     /// with this session.
@@ -831,7 +841,7 @@ private:
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
     void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
-                                       const ReceivedChangesets&);
+                                       const SyncProgress& progress, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
     ///
@@ -896,8 +906,6 @@ private:
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
 
-    DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
-
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
     // download completion is reached again.
@@ -906,6 +914,8 @@ private:
     bool m_upload_completion_notification_requested = false;
 
     bool m_is_flx_sync_session = false;
+
+    bool m_fix_up_object_ids = false;
 
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
@@ -916,10 +926,14 @@ private:
     bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
     bool m_error_message_received;   // Session specific ERROR message received
     bool m_unbound_message_received; // UNBOUND message received
+    bool m_error_to_send;
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
+
+    util::Optional<IntegrationException> m_client_error;
+    bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1021,6 +1035,9 @@ private:
 
     SessionWrapper& m_wrapper;
 
+    request_ident_type m_last_pending_test_command_ident = 0;
+    std::list<PendingTestCommand> m_pending_test_commands;
+
     static std::string make_logger_prefix(session_ident_type);
 
     Session(SessionWrapper& wrapper, Connection&, session_ident_type);
@@ -1047,6 +1064,7 @@ private:
     void complete_deactivation();
     void connection_established(bool fast_reconnect);
     void connection_lost();
+    void close_connection();
     void send_message();
     void message_sent();
     void send_bind_message();
@@ -1056,6 +1074,8 @@ private:
     void send_alloc_message();
     void send_unbind_message();
     void send_query_change_message();
+    void send_json_error_message();
+    void send_test_command_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
@@ -1063,17 +1083,21 @@ private:
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(const ProtocolErrorInfo& info);
     std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    std::error_code receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;
     void ensure_enlisted_to_send();
     void enlist_to_send();
-    void update_progress(const SyncProgress&);
     bool check_received_sync_progress(const SyncProgress&) noexcept;
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
-    void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
+
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
+                                         size_t);
+
+    bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
     friend class Connection;
 };
@@ -1306,6 +1330,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_conn{conn}
     , m_ident{ident}
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
+    , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
@@ -1426,6 +1451,8 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
+    m_connection_to_close                 = false;
+    m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
@@ -1435,7 +1462,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_last_download_mark_sent          = m_last_download_mark_received;
-    m_download_batch_state = DownloadBatchState::LastInBatch;
     // clang-format on
 }
 

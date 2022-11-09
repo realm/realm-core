@@ -596,7 +596,6 @@ TEST(Transform_MergeInsertSetAndErase)
     });
 
     client_2->transaction([](Peer& client_2) {
-        TableRef t;
         client_2.table("class_t")->remove_object(client_2.table("class_t")->begin());
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -972,8 +971,8 @@ TEST(Transform_EraseSelectedLinkView)
     }
 }
 
-
-TEST(Transform_Randomized)
+// this test can take upwards of an hour if sync to disk is enabled
+TEST_IF(Transform_Randomized, get_disable_sync_to_disk())
 {
     const char* trace_p = ::getenv("UNITTEST_RANDOMIZED_TRACE");
     bool trace = trace_p && (StringData{trace_p} != "no");

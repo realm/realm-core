@@ -108,8 +108,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto session2 = sync_session(user, "/test1c-2", [](auto, auto) {});
         // Run the runloop many iterations to see if the sessions spuriously bind.
         spin_runloop();
-        REQUIRE(sessions_are_inactive(*session1));
-        REQUIRE(sessions_are_inactive(*session2));
+        REQUIRE(session1->state() == SyncSession::State::Inactive);
+        REQUIRE(session2->state() == SyncSession::State::Inactive);
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -137,8 +137,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         // Run the runloop many iterations to see if the sessions spuriously rebind.
         spin_runloop();
-        REQUIRE(sessions_are_inactive(*session1));
-        REQUIRE(sessions_are_inactive(*session2));
+        REQUIRE(session1->state() == SyncSession::State::Inactive);
+        REQUIRE(session2->state() == SyncSession::State::Inactive);
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -248,6 +248,13 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
         session->close();
         REQUIRE(sessions_are_inactive(*session));
     }
+
+    SECTION("Close session after it was detached from the SyncManager") {
+        auto session = sync_session(
+            user, "/test-close-after-detach", [](auto, auto) {}, SyncSessionStopPolicy::Immediately);
+        session->detach_from_sync_manager();
+        REQUIRE_NOTHROW(session->close());
+    }
 }
 
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
@@ -314,10 +321,13 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
+    using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     // Create a valid session.
-    std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) {};
+    std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, SyncError err) {
+        REQUIRE(err.server_requests_action == ProtocolErrorInfo::Action::Transient);
+    };
     const std::string user_id = "user1d";
     std::string on_disk_path;
     auto user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -336,7 +346,9 @@ TEST_CASE("sync: error handling", "[sync]") {
 
     SECTION("Doesn't treat unknown system errors as being fatal") {
         std::error_code code = std::error_code{EBADF, std::generic_category()};
-        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+        SyncError err{code, "Not a real error message", false};
+        err.server_requests_action = ProtocolErrorInfo::Action::Transient;
+        SyncSession::OnlyForTesting::handle_error(*session, err);
         CHECK(!sessions_are_inactive(*session));
     }
 
@@ -365,6 +377,7 @@ TEST_CASE("sync: error handling", "[sync]") {
 
         SyncError initial_error{std::error_code{code, realm::sync::protocol_error_category()},
                                 "Something bad happened", false};
+        initial_error.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
         REQUIRE(session->state() == SyncSession::State::Inactive);
@@ -374,6 +387,7 @@ TEST_CASE("sync: error handling", "[sync]") {
         // At this point final_error should be populated.
         CHECK(bool(final_error));
         CHECK(final_error->is_client_reset_requested());
+        CHECK(final_error->server_requests_action == ProtocolErrorInfo::Action::ClientReset);
         // The original file path should be present.
         CHECK(final_error->user_info[SyncError::c_original_file_path_key] == on_disk_path);
         // The path to the recovery file should be present, and should contain all necessary components.
@@ -484,7 +498,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         SECTION("transitions to Inactive if a fatal error occurs") {
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
+            SyncError err{code, "Not a real error message", true};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             CHECK(sessions_are_inactive(*session));
             // The session shouldn't report fatal errors when in the dying state.
             CHECK(!error_handler_invoked);
@@ -494,7 +510,9 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             // Fire a simulated *non-fatal* error.
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
-            SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+            SyncError err{code, "Not a real error message", false};
+            err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
+            SyncSession::OnlyForTesting::handle_error(*session, err);
             REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);
         }

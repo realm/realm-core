@@ -228,13 +228,13 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
 
 std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(uint64_t token)
 {
-    REALM_ASSERT(m_error || m_callbacks.size() > 0);
+    REALM_ASSERT(m_callbacks.size() > 0);
 
     auto it = std::find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
         return c.token == token;
     });
     // We should only fail to find the callback if it was removed due to an error
-    REALM_ASSERT(m_error || it != end(m_callbacks));
+    REALM_ASSERT(it != end(m_callbacks));
     return it;
 }
 
@@ -328,31 +328,6 @@ void CollectionNotifier::after_advance()
     });
 }
 
-void CollectionNotifier::deliver_error(std::exception_ptr error)
-{
-    // Don't complain about double-unregistering callbacks if we sent an error
-    // because we're going to remove all the callbacks immediately.
-    m_error = true;
-
-    {
-        // In the non-error codepath this is done as part of package_for_delivery()
-        // but that's skipped for errors
-        util::CheckedLockGuard lock(m_callback_mutex);
-        m_callback_count = m_callbacks.size();
-    }
-    for_each_callback([this, &error](auto& lock, auto& callback) {
-        // acquire a local reference to the callback so that removing the
-        // callback from within it can't result in a dangling pointer
-        auto cb = std::move(callback.fn);
-        auto token = callback.token;
-        lock.unlock_unchecked();
-        cb.error(error);
-
-        // We never want to call the callback again after this, so just remove it
-        this->remove_callback(token);
-    });
-}
-
 bool CollectionNotifier::is_for_realm(Realm& realm) const noexcept
 {
     std::lock_guard<std::mutex> lock(m_realm_mutex);
@@ -380,6 +355,7 @@ template <typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     util::CheckedUniqueLock callback_lock(m_callback_mutex);
+    // If this fails then package_for_delivery() was not called or returned false
     REALM_ASSERT_DEBUG(m_callback_count <= m_callbacks.size());
     for (m_callback_index = 0; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
@@ -430,62 +406,38 @@ void CollectionNotifier::add_changes(CollectionChangeBuilder change)
     }
 }
 
-NotifierPackage::NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                                  RealmCoordinator* coordinator)
     : m_notifiers(std::move(notifiers))
     , m_coordinator(coordinator)
-    , m_error(std::move(error))
 {
 }
 
-// Clang TSE seems to not like returning a unique_lock from a function
-void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
-    NO_THREAD_SAFETY_ANALYSIS
+NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+                                 std::optional<VersionID> version)
+    : m_version(version)
+    , m_notifiers(std::move(notifiers))
 {
-    if (!m_coordinator || m_error || !*this)
+}
+
+void NotifierPackage::package_and_wait(VersionID::version_type target_version)
+{
+    if (!m_coordinator || !*this)
         return;
 
-    auto lock = m_coordinator->wait_for_notifiers([&] {
-        if (!target_version)
-            return true;
-        return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
-            return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
-        });
-    });
-
-    // Package the notifiers for delivery and remove any which don't have anything to deliver
-    auto package = [&](auto& notifier) {
-        if (notifier->has_run() && notifier->package_for_delivery()) {
-            m_version = notifier->version();
-            return false;
-        }
-        return true;
-    };
-    m_notifiers.erase(std::remove_if(begin(m_notifiers), end(m_notifiers), package), end(m_notifiers));
-    if (m_version && target_version && m_version->version < *target_version) {
-        m_notifiers.clear();
+    m_version = m_coordinator->package_notifiers(m_notifiers, target_version);
+    if (m_version && m_version->version < target_version)
         m_version = util::none;
-    }
-    REALM_ASSERT(m_version || m_notifiers.empty());
-
-    m_coordinator = nullptr;
 }
 
 void NotifierPackage::before_advance()
 {
-    if (m_error)
-        return;
     for (auto& notifier : m_notifiers)
         notifier->before_advance();
 }
 
 void NotifierPackage::after_advance()
 {
-    if (m_error) {
-        for (auto& notifier : m_notifiers)
-            notifier->deliver_error(m_error);
-        return;
-    }
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
 }

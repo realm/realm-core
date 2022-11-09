@@ -58,7 +58,7 @@ RLM_API uint64_t realm_get_schema_version(const realm_t* realm)
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {
-        schema->ptr->validate(validation_mode);
+        schema->ptr->validate(static_cast<SchemaValidationMode>(validation_mode));
         return true;
     });
 }
@@ -176,14 +176,28 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
     });
 }
 
+RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, size_t prop_index,
+                                               realm_value_t* out_value)
+{
+    return wrap_err([&] {
+        object->verify_attached();
+        auto& peristed_properties = object->get_object_schema().persisted_properties;
+        REALM_ASSERT(prop_index < peristed_properties.size());
+        auto col_key = peristed_properties[prop_index].column_key;
+        auto o = object->obj();
+        auto val = o.get_any(col_key);
+        auto converted = objkey_to_typed_link(val, col_key, *o.get_table());
+        *out_value = to_capi(converted);
+        return true;
+    });
+}
+
 RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_key, realm_property_key_t key,
                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(class_key));
         auto col_key = ColKey(key);
-
-        // FIXME: We can do better than linear search.
 
         for (auto& prop : os.persisted_properties) {
             if (prop.column_key == col_key) {

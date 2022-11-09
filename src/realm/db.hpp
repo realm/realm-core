@@ -114,10 +114,10 @@ public:
     // calling DB::close(), but after that no new association can be established. To reopen the
     // file (or another file), a new DB object is needed. The specified Replication instance, if
     // any, must remain in existence for as long as the DB.
-    static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-    static DBRef create(Replication& repl, const std::string& file, const DBOptions options = DBOptions());
+    static DBRef create(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
+    static DBRef create(Replication& repl, const std::string& file, const DBOptions& options = DBOptions());
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
-                        const DBOptions options = DBOptions());
+                        const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
@@ -172,7 +172,7 @@ public:
 
     const char* get_encryption_key() const noexcept
     {
-        return m_key;
+        return m_alloc.m_file.get_encryption_key();
     }
 
 #ifdef REALM_DEBUG
@@ -408,6 +408,10 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+    /// Returns true if there are threads waiting to acquire the write lock, false otherwise.
+    /// To be used only when already holding the lock.
+    bool other_writers_waiting_for_lock() const;
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
@@ -457,7 +461,6 @@ private:
     std::string m_lockfile_prefix;
     std::string m_db_path;
     std::string m_coordination_dir;
-    const char* m_key;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
@@ -501,11 +504,11 @@ private:
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
-    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+    void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
     void open(BinaryData, bool take_ownership = true);
-    void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
+    void open(Replication&, const std::string& file, const DBOptions& options = DBOptions());
 
-    void do_open(const std::string& file, bool no_create, const DBOptions options);
+    void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
     Replication* const* get_repl() const noexcept
     {

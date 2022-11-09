@@ -115,6 +115,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
+    , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
@@ -333,7 +334,7 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
     }
     m_reconnect_info.m_reason = ConnectionTerminationReason::bad_headers_in_http_response;
     bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, is_fatal); // Throws
+    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -384,15 +385,15 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
         }
     }
 
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
 void Connection::websocket_protocol_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    bool is_fatal = true;                                       // A WebSocket protocol violation is a fatal error
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -415,8 +416,25 @@ bool Connection::websocket_close_message_received(std::error_code error_code, St
     if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
         error_code.value() != 1000) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+
         constexpr bool try_again = true;
-        involuntary_disconnect(SessionErrorInfo{error_code, message, try_again});
+        SessionErrorInfo error_info{error_code, message, try_again};
+
+        // If the server sends a websocket close message with code 1009, then it's because we've sent an
+        // UPLOAD message that is too large for the server to process. Simply disconnecting/reconnecting will not
+        // be sufficient because when we re-connect we'll just try to send the same bad upload message.
+        //
+        // Since the handling of this error happens at a layer below the standard `ERROR` message handling
+        // we need to synthesize an `ERROR` message-like error info here to client reset when this error
+        // is received.
+        if (error_code.value() == 1009) {
+            error_info.error_code = make_error_code(ProtocolError::limits_exceeded);
+            error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
+            error_info.message = util::format(
+                "Sync websocket closed because the server received a message that was too large: %1", message);
+        }
+
+        involuntary_disconnect(std::move(error_info));
     }
 
     return bool(m_websocket);
@@ -435,7 +453,7 @@ void Connection::initiate_reconnect_wait()
     constexpr milliseconds_type min_delay = 1000;   // 1 second (barring deductions)
     constexpr milliseconds_type max_delay = 300000; // 5 minutes
 
-    // Delay must increase when scaled by a facter grater than 1.
+    // Delay must increase when scaled by a factor greater than 1.
     static_assert(min_delay > 0, "");
     static_assert(max_delay >= min_delay, "");
 
@@ -823,7 +841,7 @@ void Connection::handle_pong_timeout()
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
     m_reconnect_info.m_reason = ConnectionTerminationReason::pong_timeout;
-    close_due_to_client_side_error(ClientError::pong_timeout, false);
+    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
 }
 
 
@@ -1004,7 +1022,7 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
         ec2 = ec;
         is_fatal = false;
     }
-    close_due_to_client_side_error(ec2, is_fatal); // Throws
+    close_due_to_client_side_error(ec2, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -1012,15 +1030,15 @@ void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
-void Connection::close_due_to_protocol_error(std::error_code ec)
+void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                         // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    bool is_fatal = true;                              // A sync protocol violation is a fatal error
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
@@ -1028,17 +1046,23 @@ void Connection::close_due_to_missing_protocol_feature()
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
     std::error_code ec = ClientError::missing_protocol_feature;
-    bool is_fatal = true;                         // A missing protocol feature is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    bool is_fatal = true;                                       // A missing protocol feature is a fatal error
+    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
 // Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal)
+void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
+                                                bool is_fatal)
 {
     logger.info("Connection closed due to error"); // Throws
     const bool try_again = !is_fatal;
-    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
+    std::string message = ec.message();
+    if (msg) {
+        message += ": ";
+        message += *msg;
+    }
+    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
 }
 
 
@@ -1189,8 +1213,9 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
-                info.raw_error_code, info.try_again, session_ident); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4, error_action=%5)",
+                info.message, info.raw_error_code, info.try_again, session_ident,
+                info.server_requests_action); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
@@ -1304,6 +1329,23 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
 }
 
 
+void Connection::receive_test_command_response(session_ident_type session_ident, request_ident_type request_ident,
+                                               std::string_view body)
+{
+    Session* sess = get_session(session_ident);
+    if (REALM_UNLIKELY(!sess)) {
+        logger.error("Bad session identifier in TEST_COMMAND response message, session_ident = %1",
+                     session_ident);                                 // Throws
+        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
+        return;
+    }
+
+    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
+        close_due_to_protocol_error(ec);
+    }
+}
+
+
 void Connection::handle_protocol_error(ClientProtocol::Error error)
 {
     switch (error) {
@@ -1379,48 +1421,60 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
-        if (download_batch_state != DownloadBatchState::LastInBatch) {
+        if (download_batch_state == DownloadBatchState::MoreToCome) {
             throw IntegrationException(ClientError::bad_progress,
                                        "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    const Transformer::RemoteChangeset* changesets = received_changesets.data();
-    std::size_t num_changesets = received_changesets.size();
-    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
                                         download_batch_state, logger, {}, get_transact_reporter()); // Throws
-    if (num_changesets == 1) {
+    if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
     }
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
-                     version_info.sync_version.version, num_changesets); // Throws
+                     version_info.sync_version.version, received_changesets.size()); // Throws
     }
 }
 
 
-void Session::on_integration_failure(const IntegrationException& error, DownloadBatchState batch_state)
+void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT(m_state == Active);
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        m_progress.download = m_download_progress;
-    }
+    REALM_ASSERT(!m_client_error && !m_error_to_send);
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    m_conn.close_due_to_protocol_error(error.code());
+
+    m_client_error = util::make_optional<IntegrationException>(error);
+    m_error_to_send = true;
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
-void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
-                                       DownloadBatchState batch_state)
+void Session::on_changesets_integrated(version_type client_version, const SyncProgress& progress)
 {
     REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
-    m_download_batch_state = batch_state;
-    if (m_download_batch_state != DownloadBatchState::LastInBatch) {
-        return;
+    REALM_ASSERT(progress.download.server_version >= m_download_progress.server_version);
+    m_download_progress = progress.download;
+    bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
+    m_progress = progress;
+    if (upload_progressed) {
+        if (progress.upload.client_version > m_last_version_selected_for_upload) {
+            if (progress.upload.client_version > m_upload_progress.client_version)
+                m_upload_progress = progress.upload;
+            m_last_version_selected_for_upload = progress.upload.client_version;
+        }
+
+        check_for_upload_completion();
     }
-    m_download_progress = download_progress;
+
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
@@ -1596,6 +1650,20 @@ void Session::send_message()
         return;
     }
 
+    const auto has_pending_test_command = std::any_of(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                                                      [](const PendingTestCommand& command) {
+                                                          return command.pending;
+                                                      });
+    if (has_pending_test_command) {
+        return send_test_command_message();
+    }
+
+    if (m_error_to_send)
+        return send_json_error_message(); // Throws
+
+    if (m_connection_to_close)
+        return close_connection(); // Throws
+
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
@@ -1624,8 +1692,7 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
-        (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1728,7 +1795,7 @@ void Session::send_query_change_message()
 
     m_last_sent_flx_query_version = latest_sub_set.version();
 
-    enlist_to_send(); // throws
+    request_download_completion_notification();
 }
 
 void Session::send_upload_message()
@@ -1763,8 +1830,7 @@ void Session::send_upload_message()
 
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
-        if (m_upload_completion_notification_requested)
-            check_for_upload_completion(); // Throws
+        check_for_upload_completion(); // Throws
     }
     else {
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
@@ -1899,6 +1965,75 @@ void Session::send_unbind_message()
 }
 
 
+void Session::send_json_error_message()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_error_to_send);
+    REALM_ASSERT(m_client_error);
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    session_ident_type session_ident = get_ident();
+    std::error_code ec = m_client_error->code();
+    auto message = m_client_error->what();
+
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+                session_ident); // Throws
+
+    nlohmann::json error_body_json;
+    error_body_json["message"] = message;
+    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
+
+    m_conn.initiate_write_message(out, this); // Throws
+
+    m_error_to_send = false;
+    m_connection_to_close = true;
+
+    // Connection is waiting to be closed
+    enlist_to_send(); // Throws
+}
+
+
+void Session::send_test_command_message()
+{
+    REALM_ASSERT(m_state == Active);
+
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [](const PendingTestCommand& command) {
+                               return command.pending;
+                           });
+    REALM_ASSERT(it != m_pending_test_commands.end());
+
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    OutputBuffer& out = m_conn.get_output_buffer();
+    auto session_ident = get_ident();
+
+    logger.info("Sending: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", it->body, session_ident, it->id);
+    protocol.make_test_command_message(out, session_ident, it->id, it->body);
+
+    m_conn.initiate_write_message(out, this); // Throws;
+    it->pending = false;
+
+    enlist_to_send();
+}
+
+
+void Session::close_connection()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_connection_to_close);
+    REALM_ASSERT(m_client_error);
+
+    m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
+    m_connection_to_close = false;
+    m_client_error = util::none;
+}
+
+
 std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident)
 {
     logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2)", client_file_ident.ident,
@@ -1997,8 +2132,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return make_error_code(sync::ClientError::auto_client_reset_failure);
     }
     if (!did_client_reset) {
-        constexpr bool fix_up_object_ids = true;
-        repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
         this->m_last_version_selected_for_upload = 0;
@@ -2013,6 +2147,10 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    if (is_steady_state_download_message(batch_state, query_version)) {
+        batch_state = DownloadBatchState::SteadyState;
+    }
+
     logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
                  "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
@@ -2020,7 +2158,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state == DownloadBatchState::LastInBatch, query_version, received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2080,15 +2218,20 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook(progress, query_version, batch_state);
+    auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
+                                       batch_state, received_changesets.size());
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();
         return;
     }
 
-    update_progress(progress);                                                           // Throws
-    initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
+
+    hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                  batch_state, received_changesets.size());
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
@@ -2167,8 +2310,12 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 // deactivated upon return.
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
-                info.raw_error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
+                info.raw_error_code, info.try_again, info.server_requests_action); // Throws
+
+    // Ignore the error because the connection is going to be closed.
+    if (m_connection_to_close)
+        return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2228,6 +2375,24 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
 
+    return std::error_code{}; // Success;
+}
+
+std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)
+{
+    logger.info("Received: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", body, m_ident, ident);
+    auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
+                           [&](const PendingTestCommand& command) {
+                               return command.id == ident;
+                           });
+    if (it == m_pending_test_commands.end()) {
+        logger.error("No matching pending test command for id %1", ident);
+        return ClientError::bad_request_ident;
+    }
+
+    it->promise.emplace_value(std::string{body});
+    m_pending_test_commands.erase(it);
+
     return {};
 }
 
@@ -2270,26 +2435,6 @@ void Session::clear_resumption_delay_state()
         m_current_try_again_delay_interval = util::none;
     }
 }
-
-void Session::update_progress(const SyncProgress& progress)
-{
-    REALM_ASSERT(check_received_sync_progress(progress));
-
-    bool upload_progressed = (progress.upload.client_version > m_progress.upload.client_version);
-
-    m_progress = progress;
-
-    if (upload_progressed) {
-        if (progress.upload.client_version > m_last_version_selected_for_upload) {
-            if (progress.upload.client_version > m_upload_progress.client_version)
-                m_upload_progress = progress.upload;
-            m_last_version_selected_for_upload = progress.upload.client_version;
-        }
-        if (m_upload_completion_notification_requested)
-            check_for_upload_completion(); // Throws
-    }
-}
-
 
 bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
@@ -2344,7 +2489,9 @@ bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progr
 void Session::check_for_upload_completion()
 {
     REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_upload_completion_notification_requested);
+    if (!m_upload_completion_notification_requested) {
+        return;
+    }
 
     // during an ongoing client reset operation, we never upload anything
     if (m_client_reset_operation)

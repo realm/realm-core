@@ -138,18 +138,6 @@ public:
     void wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
         REQUIRES(!m_state_mutex);
 
-    // Block until upload completion occurs. Prefer the async version of this
-    // which takes a callback outside of test code.
-    // Returns true if upload completion actually occurred, and false if the
-    // session does not exist or the client was stopped.
-    bool wait_for_upload_completion() REQUIRES(!m_state_mutex);
-
-    // Block until download completion occurs. Prefer the async version of this
-    // which takes a callback outside of test code.
-    // Returns true if download completion actually occurred, and false if the
-    // session does not exist or the client was stopped.
-    bool wait_for_download_completion() REQUIRES(!m_state_mutex);
-
     // Register a notifier that updates the app regarding progress.
     //
     // If `m_current_progress` is populated when this method is called, the notifier
@@ -203,6 +191,9 @@ public:
     // longer be open on behalf of it.
     void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
+    // DO NOT CALL OUTSIDE OF TESTING CODE.
+    void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
     void update_access_token(const std::string& signed_token) REQUIRES(!m_state_mutex, !m_config_mutex);
@@ -254,8 +245,7 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
 
-        static void set_sync_transact_callback(SyncSession& session,
-                                               util::UniqueFunction<TransactionCallback> callback)
+        static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback>&& callback)
         {
             session.set_sync_transact_callback(std::move(callback));
         }
@@ -284,6 +274,11 @@ public:
         static std::shared_ptr<DB> get_db(SyncSession& session)
         {
             return session.m_db;
+        }
+
+        static util::Future<std::string> send_test_command(SyncSession& session, std::string request)
+        {
+            return session.send_test_command(std::move(request));
         }
     };
 
@@ -336,10 +331,10 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
-    void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+    void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
     void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
-                                       util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+                                       sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
@@ -350,13 +345,12 @@ private:
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
     void handle_new_flx_sync_query(int64_t version);
 
-    void set_sync_transact_callback(util::UniqueFunction<TransactionCallback>) REQUIRES(!m_state_mutex);
+    void set_sync_transact_callback(std::function<TransactionCallback>&&) REQUIRES(!m_state_mutex);
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
 
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
     void did_drop_external_reference()
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
-    void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
     void close(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
@@ -368,7 +362,9 @@ private:
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
 
-    util::UniqueFunction<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
+    util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
+
+    std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
 
     template <typename Field>
     auto config(Field f) REQUIRES(!m_config_mutex)
@@ -394,7 +390,8 @@ private:
     RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
-    util::Optional<SyncError::ClientResetModeAllowed> m_force_client_reset GUARDED_BY(m_state_mutex) = util::none;
+    sync::ProtocolErrorInfo::Action
+        m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;

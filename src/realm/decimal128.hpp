@@ -45,78 +45,78 @@ public:
     struct Bid128 {
         uint64_t w[2];
     };
-    Decimal128();
-    explicit Decimal128(int64_t);
-    explicit Decimal128(uint64_t);
-    explicit Decimal128(int);
-    explicit Decimal128(double, RoundTo = RoundTo::Digits15);
-    explicit Decimal128(float val)
+    Decimal128() noexcept;
+    explicit Decimal128(int64_t) noexcept;
+    explicit Decimal128(uint64_t) noexcept;
+    explicit Decimal128(int) noexcept;
+    explicit Decimal128(double, RoundTo = RoundTo::Digits15) noexcept;
+    explicit Decimal128(float val) noexcept
         : Decimal128(double(val), RoundTo::Digits7)
     {
     }
-    Decimal128(Bid128 coefficient, int exponent, bool sign);
-    explicit Decimal128(Bid64);
-    explicit Decimal128(StringData);
-    explicit Decimal128(Bid128 val)
+    Decimal128(Bid128 coefficient, int exponent, bool sign) noexcept;
+    explicit Decimal128(Bid64) noexcept;
+    explicit Decimal128(StringData) noexcept;
+    explicit Decimal128(Bid128 val) noexcept
     {
         m_value = val;
     }
     Decimal128(null) noexcept;
-    static Decimal128 nan(const char*);
+    static Decimal128 nan(const char*) noexcept;
     static bool is_valid_str(StringData) noexcept;
 
-    bool is_null() const;
-    bool is_nan() const;
+    bool is_null() const noexcept;
+    bool is_nan() const noexcept;
 
-    bool to_int(int64_t& i) const;
+    bool to_int(int64_t& i) const noexcept;
 
-    bool operator==(const Decimal128& rhs) const;
-    bool operator!=(const Decimal128& rhs) const;
-    bool operator<(const Decimal128& rhs) const;
-    bool operator>(const Decimal128& rhs) const;
-    bool operator<=(const Decimal128& rhs) const;
-    bool operator>=(const Decimal128& rhs) const;
+    bool operator==(const Decimal128& rhs) const noexcept;
+    bool operator!=(const Decimal128& rhs) const noexcept;
+    bool operator<(const Decimal128& rhs) const noexcept;
+    bool operator>(const Decimal128& rhs) const noexcept;
+    bool operator<=(const Decimal128& rhs) const noexcept;
+    bool operator>=(const Decimal128& rhs) const noexcept;
 
-    int compare(const Decimal128& rhs) const;
+    int compare(const Decimal128& rhs) const noexcept;
 
-    Decimal128 operator*(int64_t mul) const;
-    Decimal128 operator*(size_t mul) const;
-    Decimal128 operator*(int mul) const;
-    Decimal128 operator*(Decimal128 mul) const;
-    Decimal128& operator*=(Decimal128 mul)
+    Decimal128 operator*(int64_t mul) const noexcept;
+    Decimal128 operator*(size_t mul) const noexcept;
+    Decimal128 operator*(int mul) const noexcept;
+    Decimal128 operator*(Decimal128 mul) const noexcept;
+    Decimal128& operator*=(Decimal128 mul) noexcept
     {
         return *this = *this * mul;
     }
-    Decimal128 operator/(int64_t div) const;
-    Decimal128 operator/(size_t div) const;
-    Decimal128 operator/(int div) const;
-    Decimal128 operator/(Decimal128 div) const;
-    Decimal128& operator/=(Decimal128 div)
+    Decimal128 operator/(int64_t div) const noexcept;
+    Decimal128 operator/(size_t div) const noexcept;
+    Decimal128 operator/(int div) const noexcept;
+    Decimal128 operator/(Decimal128 div) const noexcept;
+    Decimal128& operator/=(Decimal128 div) noexcept
     {
         return *this = *this / div;
     }
-    Decimal128& operator+=(Decimal128);
-    Decimal128 operator+(Decimal128 rhs) const
+    Decimal128& operator+=(Decimal128) noexcept;
+    Decimal128 operator+(Decimal128 rhs) const noexcept
     {
         auto ret(*this);
         ret += rhs;
         return ret;
     }
-    Decimal128& operator-=(Decimal128);
-    Decimal128 operator-(Decimal128 rhs) const
+    Decimal128& operator-=(Decimal128) noexcept;
+    Decimal128 operator-(Decimal128 rhs) const noexcept
     {
         auto ret(*this);
         ret -= rhs;
         return ret;
     }
 
-    std::string to_string() const;
+    std::string to_string() const noexcept;
     Bid64 to_bid64() const;
-    const Bid128* raw() const
+    const Bid128* raw() const noexcept
     {
         return &m_value;
     }
-    Bid128* raw()
+    Bid128* raw() noexcept
     {
         return &m_value;
     }
@@ -133,7 +133,6 @@ private:
 
     Bid128 m_value;
 
-    void from_int64_t(int64_t val);
     uint64_t get_coefficient_high() const noexcept
     {
         return m_value.w[1] & MASK_COEFF;

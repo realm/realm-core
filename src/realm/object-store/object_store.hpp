@@ -84,7 +84,7 @@ public:
     // NOTE: must be performed within a write transaction
     static void apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                      uint64_t target_schema_version, SchemaMode mode,
-                                     std::vector<SchemaChange> const& changes,
+                                     std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
                                      std::function<void()> migration_function = {});
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
@@ -117,7 +117,7 @@ private:
 
 class InvalidSchemaVersionException : public std::logic_error {
 public:
-    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version);
+    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version, bool must_exactly_equal);
     uint64_t old_version() const
     {
         return m_old_version;

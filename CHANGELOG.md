@@ -2,12 +2,18 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
+* App::call_function now supports taking and receiving ejson strings, bypassing parsing/serialization in core. ([#4182](https://github.com/realm/realm-core/issues/4182))
+* Flexible sync will now wait for the server to have sent all pending history after a bootstrap before marking a subscription as Complete. ([#5795](https://github.com/realm/realm-core/pull/5795))
+* Add typedef for realm_app_call_function callbacks. ([#5996](https://github.com/realm/realm-core/pull/5996))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed undefined behaviour on queries involving a constant and an indexed column on some property types like UUID and Timestamp. ([#5753](https://github.com/realm/realm-core/issues/5753), since 12.5.0)
- 
+* Fix a race condition which could result in "operation cancelled" errors being delivered to async open callbacks rather than the actual sync error which caused things to fail ([PR #5968](https://github.com/realm/realm-core/pull/5968), since the introduction of async open).
+* The name of one of the RLM_SYNC_BOOTSTRAPPING enum member in the C api was updated to match the naming convention of the other members in the enum.
+* Fix `Results.distinct(keypaths)` and `Results.sort(keypaths)` not correctly handling keypaths names for properties that have a public/private(column) property name ([PR #5952](https://github.com/realm/realm-core/pull/5952).
+* Bootstraps will not be applied in a single write transaction - they will be applied 1MB of changesets at a time, or as configured by the SDK ([#5999](https://github.com/realm/realm-core/pull/5999), since v12.0.0).
+* Fix database corruption and encryption issues on apple platforms, reported in several bugs listed in the PR. ([PR #5993](https://github.com/realm/realm-core/pull/5993), since v11.8.0)
+
 ### Breaking changes
 * None.
 
@@ -17,7 +23,193 @@
 -----------
 
 ### Internals
+* Fix `BPlusTreeInner::verify()` ([#5974](https://github.com/realm/realm-core/pull/5974)).
+* Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
+* Defer converting Realm files from streaming form until after we've validated the version ([PR #5987](https://github.com/realm/realm-core/pull/5987)).
+
+----------------------------------------------
+
+# 12.11.0 Release notes
+
+### Fixed
+* Calling `SectionedResults::reset_section_callback()` on a `SectionedResults` which had been evaluated would result in an assertion failure the next time the sections are evaluated ([PR #5965](https://github.com/realm/realm-core/pull/5965), since v12.10.0).
+* Opening an unencrypted file with an encryption key would sometimes report a misleading error message that indicated that the problem was something other than a decryption failure ([PR #5915](https://github.com/realm/realm-core/pull/5915), since 0.86.1).
+* Fix a rare deadlock which could occur when closing a synchronized Realm immediately after committing a write transaction when the sync worker thread has also just finished processing a changeset from the server ([PR #5948](https://github.com/realm/realm-core/pull/5948)).
+
+### Breaking changes
+* Websocket errors caused by the client sending a websocket message that is too large (i.e. greater than 16MB) now get reported as a `ProtocolError::limits_exceeded` error with a `ClientReset` requested by the server ([#5209](https://github.com/realm/realm-core/issues/5209)).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Added integration test for opening synchronized realms as in-memory realms ([#5955](https://github.com/realm/realm-core/pull/5955)).
+* Added realm core version to the app login request ([#5959](https://github.com/realm/realm-core/issues/5959))
+
+----------------------------------------------
+
+# 12.10.0 Release notes
+
+### Enhancements
+* Improve performance of client reset with automatic recovery and converting top-level tables into embedded tables (PR [#5897](https://github.com/realm/realm-core/pull/5897)).
+* Adding `realm_query_parse_for_set` in the C API ([#5935](https://github.com/realm/realm-core/pull/5935)).
+
+### Fixed
+* Fixed an assertion failure when observing change notifications on a sectioned result, if the first modification was to a linked property that did not cause the state of the sections to change. ([#5912](https://github.com/realm/realm-core/issues/5912), since the introduction of sectioned results in v12.3.0)
+* CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
+* Fix a use-after-free if the last external reference to an encrypted Realm was closed between when a client reset error was received and when the download of the new Realm began. ([PR #5949](https://github.com/realm/realm-core/pull/5949), since 12.4.0).
+* Fixed an assertion failure during client reset with recovery when recovering a list operation on an embedded object that has a link column in the path prefix to the list from the top level object. ([PR #5957](https://github.com/realm/realm-core/issues/5957), since introduction of automatic recovery in v11.16.0).
+
+### Breaking changes
+* Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
+* Introduced new callback type realm_return_apikey_list_func_t and realm_return_apikey_func_t in the C-API ([PR #5945](https://github.com/realm/realm-core/pull/5945)).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Remove the unused utility function `copy_dir_recursive()`.
+* StringData and Timestamp are now constexpr-constructible.
+* Remove `set_backlink_class_prefix()` and just always use the `class_` prefix when parsing or serializing queries.
+* Updated `install_baas.sh` to use files stored on s3 ([#5932](https://github.com/realm/realm-core/issues/5932))
+
+----------------------------------------------
+
+# 12.9.0 Release notes
+
+### Enhancements
+* Prioritize integration of local changes over remote changes - shorten the time users may have to wait when committing local changes. Stop storing downloaded changesets in history. ([PR #5844](https://github.com/realm/realm-core/pull/5844)).
+* Greatly improve the performance of sorting or distincting a Dictionary's keys or values. The most expensive operation is now performed O(log N) rather than O(N log N) times, and large Dictionaries can see upwards of 99% reduction in time to sort. ([PR #5166](https://github.com/realm/realm-core/pulls/5166))
+* Expose `realm_get_value_by_property_index` to the C API. ([PR #5906](https://github.com/realm/realm-core/pull/5906))
+* Add support for fetching directly backlinks in the C API. ([PR #5904](https://github.com/realm/realm-core/pull/5904))
+
+### Fixed
+* Fix a data race reported by thread sanitizer when preparing to deliver change notifications. This probably did not cause observable problems in practice ([PR #5892](https://github.com/realm/realm-core/pull/5892) since 12.7.0).
+* Changed the behaviour of creating a collection of non-nullable Mixed type to throw a descriptive error message rather than asserting in debug mode. ([#5894](https://github.com/realm/realm-core/issues/5894), since the introduction of the Mixed type).
+* Fix a use-after-free when a sync session is closed and the app is destroyed at the same time ([#5752](https://github.com/realm/realm-core/issues/5752), since v11.5.2).
+* Fix Http transport doesn't correctly preserve the request body ([#5890](https://github.com/realm/realm-core/issues/5890), since 12.8.0).
+* IN Query fails if left operator is a TypedLink ([5946](https://github.com/realm/realm-core/issues/5946), since v10.5.2)
+
+### Breaking changes
+* Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()` ([PR #5898](https://github.com/realm/realm-core/pull/5898)).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Reenable sync benchmark.
+* Add util/http.hpp to the release package.
+* Implement test commands in sync wire protocol to be used in flx sync testing.
+
+----------------------------------------------
+
+# 12.8.0 Release notes
+
+### Enhancements
+* Cut the runtime of aggregate operations on large dictionaries in half ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Improve performance of aggregate operations on collections of objects by 2x to 10x ([PR #5864](https://github.com/realm/realm-core/pull/5864)).
+* Adding support in the C API for `realm_results_find` and supporting all native types for `realm_results_get()` ([PR 5875](https://github.com/realm/realm-core/pull/5875)).
+* Reconstruct app url after a migration ([#5648](https://github.com/realm/realm-core/issues/5648)).
+
+### Fixed
+* Results permitted some nonsensical aggregate operations on column types which do not make sense to aggregate, giving garbage results rather than reporting an error ([#5876](https://github.com/realm/realm-core/pull/5876), since v6.0.0).
+* Removed blocking wait for upload/download completion due to possibility of deadlock ([#5829](https://github.com/realm/realm-core/issues/5829), since v11.17.0).
+
+### Breaking changes
+* The typed aggregation functions (e.g. `minimum_int`) on `Table`, `TableView`, and `Query` have been removed and replaced with simpler untyped versions which return `Mixed`. This does not effect SDKs which only used them via the Object Store types.
+* Callback for `GenericNetworkTransport::send_request_to_server()` now receives both the original Request and Response objects (does not affect the C-API).
+* Removed blocking `SyncSession::wait_for_upload_completion` and `SyncSession::wait_for_download_completion`.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Updated install_baas.sh to use go1.18.6 ([#5863](https://github.com/realm/realm-core/issues/5862)).
+* Updated Windows distros on Evergreen CI to use vsCurrent.
+
+----------------------------------------------
+
+# 12.7.0 Release notes
+
+### Enhancements
+* Convert object_store::Collection types into Results (PR [#5845](https://github.com/realm/realm-core/pull/5845))
+* Expose `realm_object_get_parent` in the C API (PR [#5851](https://github.com/realm/realm-core/pull/5851))
+* Expose `realm_list_find` in the C API (PR [#5848](https://github.com/realm/realm-core/pull/5848))
+* Expose `Group::remove_table` in the C API (PR [#5860](https://github.com/realm/realm-core/pull/5860))
+
+### Fixed
+* Prevent migrations to an embedded object type when there are incoming links from Mixed/TypedLink properties until we can support them. ([#5796](https://github.com/realm/realm-core/pull/5796), since 6.1.0)
+* `Realm::refresh()` did not actually advance to the latest version in some cases. If there was a version newer than the current version which did not require blocking it would advance to that instead, contrary to the documented behavior ([#7625](https://github.com/realm/realm-swift/issues/7625), since v10.0.0).
+* Several issues around notifications were fixed ([#5799](https://github.com/realm/realm-core/pull/5799))
+  * Fix a data race on RealmCoordinator::m_sync_session which could occur if multiple threads performed the initial open of a Realm at once. (since v11.8.0).
+  * If a SyncSession outlived the parent Realm and then was adopted by a new Realm for the same file, other processes would not get notified for sync writes on that file (since v10.0.0).
+  * Fix one cause of QoS inversion warnings when performing writes on the main thread on Apple platforms. Waiting for async notifications to be ready is now done in a QoS-aware ways (since v10.0.0).
+* If you set a subscription on a link in flexible sync, the server would not know how to handle it ([#5409](https://github.com/realm/realm-core/issues/5409), since v11.6.1)
+* Fixed `realm_query_parse_for_results` ignoring query for `query_result_t` passed as parameter ([#5841](https://github.com/realm/realm-core/pull/5841), since 11.10.0).
+* Fixed `realm_query_parse_for_list` ignoring existing query ([#5850](https://github.com/realm/realm-core/pull/5850), since 11.10.0).
+* Fixed not allowing asymmetric tables in partition based sync ([#5691](https://github.com/realm/realm-core/issues/5691), since 12.1.0).
+* Disable auto refresh for old realm instance passed to migration callbacks. ([#5856](https://github.com/realm/realm-core/pull/5856), since 10.0.0).
+* If a case insensitive query searched for a string including an 4-byte UTF8 character, the program would crash ([#5825](https://github.com/realm/realm-core/issues/5825), since v2.3.0)
+* Throw exception if `Realm::Convert` tries to convert to flexible sync. ([#5798](https://github.com/realm/realm-core/issues/5798), since v11.16.0).
+* Fix crash when upserting a document with the primary key not an ObjectId into a mongo collection. ([#5345](https://github.com/realm/realm-core/issues/5345), since v10.0.0).
+
+### Breaking changes
+None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Traversal functions use a typed IteratorControl value rather than true/false. ([#5857](https://github.com/realm/realm-core/issues/5857))
+
+----------------------------------------------
+
+# 12.6.0 Release notes
+
+### Enhancements
+* Notify when read transaction version is advanced. ([PR #5704](https://github.com/realm/realm-core/pull/5704)).
+* Action returned from the server in the json error messages is surfaced through the SyncError. ([PR #5690](https://github.com/realm/realm-core/pull/5690)).
+* `NotificationToken` grew an `unregister()` method as an alternative to destroying it or doing `token = {};` ([PR #5776](https://github.com/realm/realm-core/pull/5776)).
+* Automatic handling backlinks for schema migrations where a class changes to being embedded. ([PR #5737](https://github.com/realm/realm-core/pull/5737)).
+* Expose `Obj::add_int()` in the CAPI. ([PR #5770](https://github.com/realm/realm-core/pull/5770)).
+* Expose `Realm::async_begin_transaction`, `Realm::async_commit_transaction`, `Realm::async_cancel_transaction` in the CAPI.([PR 5783 #](https://github.com/realm/realm-core/pull/5783)).
+* Added `Obj::get_parent_object()` that will allow you to get the parent object of an embedded object ([#3898](https://github.com/realm/realm-core/issues/3898))
+* Improve performance when a new Realm file connects to the server for the first time, especially when significant amounts of data has been written while offline.
+* Shift more of the work done on the sync worker thread out of the write transaction used to apply server changes, reducing how long it blocks other threads from writing.
+* Improve the performance of the sync changeset parser, which speeds up applying changesets from the server.
+* Sync client sends integration errors to the server. ([PR #5719](https://github.com/realm/realm-core/pull/5719)).
+
+### Fixed
+* Fixed undefined behaviour on queries involving a constant and an indexed column on some property types like UUID and Timestamp. ([#5753](https://github.com/realm/realm-core/issues/5753), since 12.5.0)
+* Fix all UBSan failures hit by tests. It is unclear if any of these manifested as visible bugs. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
+* Fix sorting order for `realm_query_find_first` in the C API.([#5720](https://github.com/realm/realm-core/issues/5720))
+* Upload completion callbacks may have called before the download message that completed them was fully integrated. ([#4865](https://github.com/realm/realm-core/issues/4865)).
+* Fixed an exception "fcntl() with F_BARRIERFSYNC failed: Inappropriate ioctl for device" when running with MacOS on an exFAT drive. ([#5789](https://github.com/realm/realm-core/issues/5789) since 12.0.0)
+* Syncing of a Decimal128 with big significand could result in a crash. ([#5728](https://github.com/realm/realm-core/issues/5728))
+* Recovery/discardLocal client reset modes will now wait for FLX sync realms to be fully synchronized before beginning recovery operations ([#5705](https://github.com/realm/realm-core/issues/5705))
+
+### Breaking changes
 * None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* `util::Any` is now just a typedef for `std::any`. `util::any_cast()` remains for deployment support on older Apple platforms. Outside of niche ADL implications, this should not have any visible effects. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
+* Use correct endpoints for checking if sync has been terminated in client reset tests ([#5815](https://github.com/realm/realm-core/pull/5815))
+* The sync protocol is now version 7.
 
 ----------------------------------------------
 
@@ -34,7 +226,7 @@
 * Parsing a constant list of strings from RealmJS SDK to QueryParser would result in a "use after free situation". ([#5735](https://github.com/realm/realm-core/issues/5735))
 
 ### Breaking changes
-* None.
+* Notification callbacks no longer take an `exception_ptr` argument because errors haven't been possible for a few years. (PR [#5741](https://github.com/realm/realm-core/pull/5741))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

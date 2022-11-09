@@ -136,9 +136,6 @@ struct RealmConfig {
         return schema_mode == SchemaMode::ReadOnly;
     }
 
-    // The following are intended for internal/testing purposes and
-    // should not be publicly exposed in binding APIs
-
     // If false, always return a new Realm instance, and don't return
     // that Realm instance for other requests for a cached Realm. Useful
     // for dynamic Realms and for tests that need multiple instances on
@@ -149,11 +146,6 @@ struct RealmConfig {
     // format. Used by the browser to warn the user that it'll modify
     // the file.
     bool disable_format_upgrade = false;
-    // Disable the background worker thread for producing change
-    // notifications. Useful for tests for those notifications so that
-    // everything can be done deterministically on one thread, and
-    // speeds up tests that don't need notifications.
-    bool automatic_change_notifications = true;
 
     // The Scheduler which this Realm should be bound to. If not supplied,
     // a default one for the current thread will be used.
@@ -175,6 +167,19 @@ struct RealmConfig {
 
     // Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
+
+    // By default converting a top-level table to embedded will fail if there
+    // are any objects without exactly one incoming link. Enabling this makes
+    // it instead delete orphans and duplicate objects with multiple incoming links.
+    bool automatically_handle_backlinks_in_migrations = false;
+
+    // Only for internal testing. Not to be exposed by SDKs.
+    //
+    // Disable the background worker thread for producing change
+    // notifications. Useful for tests for those notifications so that
+    // everything can be done deterministically on one thread, and
+    // speeds up tests that don't need notifications.
+    bool automatic_change_notifications = true;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {

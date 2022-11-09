@@ -42,26 +42,12 @@ namespace bson {
 class Bson;
 }
 
-enum class SimplifiedProtocolError {
-    ConnectionIssue,
-    UnexpectedInternalIssue,
-    SessionIssue,
-    BadAuthentication,
-    PermissionDenied,
-    ClientResetRequested,
-    CompensatingWrite,
-};
-
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 } // namespace sync
 
-SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
-
 struct SyncError {
-    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
-
     std::error_code error_code;
     bool is_fatal;
     /// A consolidated explanation of the error, including a link to the server logs if applicable.
@@ -78,9 +64,9 @@ struct SyncError {
     /// whether because of a version mismatch or an oversight. It is still valuable
     /// to expose these errors so that users can do something about them.
     bool is_unrecognized_by_client = false;
-    // the server may explicitly send down "IsClientReset" as part of an error
+    // the server may explicitly send down an action the client should take as part of an error (i.e, client reset)
     // if this is set, it overrides the clients interpretation of the error
-    util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
+    sync::ProtocolErrorInfo::Action server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     // If this error resulted from a compensating write, this vector will contain information about each object
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
@@ -108,13 +94,13 @@ struct SyncError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ReconnectMode {
-    /// This is the mode that should always be used in production. In this
+    /// This is the mode that should always be used by SDKs. In this
     /// mode the client uses a scheme for determining a reconnect delay that
     /// prevents it from creating too many connection requests in a short
     /// amount of time (i.e., a server hammering protection mechanism).
     normal,
 
-    /// For testing purposes only.
+    /// For internal sync-client testing purposes only.
     ///
     /// Never reconnect automatically after the connection is closed due to
     /// an error. Allow immediate reconnect if the connection was closed
@@ -144,6 +130,27 @@ enum class ClientResyncMode : unsigned char {
     RecoverOrDiscard,
 };
 
+enum class SyncClientHookEvent {
+    DownloadMessageReceived,
+    DownloadMessageIntegrated,
+    BootstrapMessageProcessed,
+    BootstrapProcessed,
+};
+
+enum class SyncClientHookAction {
+    NoAction,
+    EarlyReturn,
+    SuspendWithRetryableError,
+};
+
+struct SyncClientHookData {
+    SyncClientHookEvent event;
+    sync::SyncProgress progress;
+    int64_t query_version;
+    sync::DownloadBatchState batch_state;
+    size_t num_changesets;
+};
+
 struct SyncConfig {
     struct FLXSyncEnabled {
     };
@@ -165,6 +172,11 @@ struct SyncConfig {
     std::function<SSLVerifyCallback> ssl_verify_callback;
     util::Optional<ProxyConfig> proxy_config;
     bool flx_sync_requested = false;
+
+    // When integrating a flexible sync bootstrap, process this many bytes of changeset data in a single integration
+    // attempt. This many bytes of changesets will be uncompressed and held in memory while being applied.
+    size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
+
     bool client_validate_ssl = true;
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones
@@ -186,17 +198,14 @@ struct SyncConfig {
     std::function<void(std::shared_ptr<Realm> before_frozen, ThreadSafeReference after, bool did_recover)>
         notify_after_client_reset;
 
-    // Will be called after a download message is received and validated by the client but befefore it's been
-    // transformed or applied. To be used in testing only.
-    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-        on_download_message_received_hook;
-    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
-    // processing a finalized bootstrap. For testing only.
-    std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
-        on_bootstrap_message_processed_hook;
+    // Used by core testing to hook into the sync client when various events occur and maybe inject
+    // errors/disconnects deterministically.
+    std::function<SyncClientHookAction(std::weak_ptr<SyncSession>, const SyncClientHookData&)>
+        on_sync_client_event_hook;
 
     bool simulate_integration_error = false;
 
+    SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

@@ -16,34 +16,42 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
 
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <external/json/json.hpp>
 
+#include <algorithm>
+
 namespace realm {
 namespace app {
 
+const std::pair<const std::string, std::string>*
+AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
+{
+    for (auto&& current : search_map) {
+#ifdef _MSC_VER
+        if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
+#else
+        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+#endif
+            return &current;
+        }
+    }
+    return nullptr;
+}
+
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
+    std::string error_msg;
     bool http_status_code_is_fatal =
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
-    auto find_case_insensitive_header = [&response](const std::string& needle) {
-        for (auto it = response.headers.begin(); it != response.headers.end(); ++it) {
-            if (std::equal(it->first.begin(), it->first.end(), needle.begin(), needle.end(), [](char a, char b) {
-                    return tolower(a) == tolower(b);
-                })) {
-                return it;
-            }
-        }
-        return response.headers.end();
-    };
-
     try {
-        auto ct = find_case_insensitive_header("content-type");
-        if (ct != response.headers.end() && ct->second == "application/json") {
+        auto ct = find_header("content-type", response.headers);
+        if (ct && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");
@@ -66,16 +74,22 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         // ignore parse errors from our attempt to read the error from json
     }
 
+    if (response.client_error_code) {
+        error_msg = response.body.empty() ? "client error code value considered fatal" : response.body;
+        return AppError(make_client_error_code(*(response.client_error_code)), error_msg, "",
+                        response.http_status_code);
+    }
+
     if (response.custom_status_code != 0) {
-        std::string error_msg =
-            (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        error_msg = response.body.empty() ? "non-zero custom status code considered fatal" : response.body;
         return AppError(make_custom_error_code(response.custom_status_code), error_msg, "",
                         response.http_status_code);
     }
 
     if (http_status_code_is_fatal) {
-        return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal", "",
-                        response.http_status_code);
+        error_msg = response.body.empty() ? "http error code considered fatal"
+                                          : "http error code considered fatal: " + response.body;
+        return AppError(make_http_error_code(response.http_status_code), error_msg, "", response.http_status_code);
     }
 
     return {};

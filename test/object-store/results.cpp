@@ -55,15 +55,15 @@ public:
 
 namespace Catch {
 template <>
-struct StringMaker<realm::util::Any> {
-    static std::string convert(realm::util::Any const& any)
+struct StringMaker<std::any> {
+    static std::string convert(std::any const& any)
     {
         return realm::util::format("Any<%1>", any.type().name());
     }
 };
 template <>
-struct StringMaker<realm::util::Optional<realm::util::Any>> {
-    static std::string convert(realm::util::Optional<realm::util::Any> any)
+struct StringMaker<realm::util::Optional<std::any>> {
+    static std::string convert(realm::util::Optional<std::any> any)
     {
         return any ? realm::util::format("some(Any<%1>)", any->type().name()) : "none";
     }
@@ -75,8 +75,8 @@ using namespace std::string_literals;
 using util::any_cast;
 
 namespace {
-using AnyDict = std::map<std::string, util::Any>;
-using AnyVec = std::vector<util::Any>;
+using AnyDict = std::map<std::string, std::any>;
+using AnyVec = std::vector<std::any>;
 } // namespace
 
 struct TestContext : CppContext {
@@ -91,11 +91,11 @@ struct TestContext : CppContext {
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
-    std::string print(util::Any)
+    std::string print(std::any)
     {
         return "not implemented";
     }
-    bool allow_missing(util::Any)
+    bool allow_missing(std::any)
     {
         return false;
     }
@@ -126,8 +126,7 @@ TEST_CASE("notifications: async delivery") {
     Results results(r, table->where().greater(col, 0).less(col, 10));
 
     int notification_calls = 0;
-    auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-        REQUIRE_FALSE(err);
+    auto token = results.add_notification_callback([&](CollectionChangeSet) {
         ++notification_calls;
     });
 
@@ -323,9 +322,9 @@ TEST_CASE("notifications: async delivery") {
     SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
-            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token3 = results.add_notification_callback([&](CollectionChangeSet) {
                 called = true;
             });
         });
@@ -343,9 +342,9 @@ TEST_CASE("notifications: async delivery") {
 
         bool called = false;
         auto check = [&](Results& outer, Results& inner) {
-            token2 = outer.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = outer.add_notification_callback([&](CollectionChangeSet) {
                 token2 = {};
-                token3 = inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = inner.add_notification_callback([&](CollectionChangeSet) {
                     called = true;
                 });
             });
@@ -366,13 +365,13 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("Results which used to have callbacks but no longer does") {
             SECTION("notifier before active") {
-                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet) {
                     token3 = {};
                 });
                 check(results3, results2);
             }
             SECTION("notifier after active") {
-                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet) {
                     token3 = {};
                 });
                 check(results, results2);
@@ -381,11 +380,11 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("Results which already has callbacks") {
             SECTION("notifier before active") {
-                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+                token4 = results2.add_notification_callback([&](CollectionChangeSet) {});
                 check(results3, results2);
             }
             SECTION("notifier after active") {
-                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+                token4 = results2.add_notification_callback([&](CollectionChangeSet) {});
                 check(results, results2);
             }
         }
@@ -394,11 +393,11 @@ TEST_CASE("notifications: async delivery") {
     SECTION("remote changes made before adding a callback from within a callback are not reported") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
             make_remote_change();
             coordinator->on_change();
-            token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            token3 = results.add_notification_callback([&](CollectionChangeSet c) {
                 called = true;
                 REQUIRE(c.empty());
                 REQUIRE(table->begin()->get<int64_t>(col) == 5);
@@ -413,10 +412,10 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("notifications are not delivered when a callback is removed from within a callback") {
         NotificationToken token2, token3;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token3 = {};
         });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token3 = results.add_notification_callback([&](CollectionChangeSet) {
             REQUIRE(false);
         });
 
@@ -426,10 +425,10 @@ TEST_CASE("notifications: async delivery") {
     SECTION("removing the current callback does not stop later ones from being called") {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token2 = results.add_notification_callback([&](CollectionChangeSet) {
             token2 = {};
         });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        token3 = results.add_notification_callback([&](CollectionChangeSet) {
             called = true;
         });
 
@@ -440,7 +439,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("the first call of a notification can include changes if it previously ran for a different callback") {
         r->begin_transaction();
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             REQUIRE(!c.empty());
         });
 
@@ -451,116 +450,91 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("handling of results not ready") {
         make_remote_change();
+        auto initial_version = r->read_transaction_version().version;
 
-        SECTION("notify() does nothing") {
+        SECTION("notify() does nothing if no notifiers are ready") {
             r->notify();
             REQUIRE(notification_calls == 1);
+            REQUIRE(r->read_transaction_version().version == initial_version);
+
             coordinator->on_change();
             r->notify();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
         }
 
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the "
-                "newest at the time it is called") {
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                make_remote_change();
-                coordinator->on_change();
-                make_remote_change();
-            });
-            // advances to the version after the one it was waiting for, but still
-            // not the latest
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-
-            thread.join();
-            REQUIRE(notification_calls == 2);
-
-            // now advances to the latest
+        SECTION("notify() advances to a stale ready version") {
             coordinator->on_change();
-            r->refresh();
+            make_remote_change();
+
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+
+            coordinator->on_change();
+            r->notify();
             REQUIRE(notification_calls == 3);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
         }
 
-        SECTION("begin_transaction() blocks") {
+        SECTION("refresh() runs the stale notifiers") {
             REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
+            // note: no on_change()
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
+        }
+
+        SECTION("refresh() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+        }
+
+        SECTION("begin_transaction() runs the stale notifiers") {
+            REQUIRE(notification_calls == 1);
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 1);
             r->cancel_transaction();
         }
 
-        SECTION("refresh() does not block for results without callbacks") {
+        SECTION(
+            "begin_transaction() runs stale notifiers even if there's an older version with notifications ready") {
+            coordinator->on_change();
+            make_remote_change();
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(r->read_transaction_version().version == initial_version + 2);
+            r->cancel_transaction();
+        }
+
+        SECTION("refresh() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->refresh();
         }
 
-        SECTION("begin_transaction() does not block for results without callbacks") {
+        SECTION("begin_transaction() does not run stale notifiers if there are no callbacks") {
             token = {};
-            // this would deadlock if it waits for the notifier to be ready
+            // this would deadlock if it waits for the notifier to be ready or tries to run the notifiers
+            auto lock = coordinator->block_notifier_execution();
             r->begin_transaction();
             r->cancel_transaction();
         }
 
-        SECTION("begin_transaction() does not block for Results for different Realms") {
+        SECTION("begin_transaction() does not run stale notifiers if they are for a different Realm") {
             // this would deadlock if beginning the write on the secondary Realm
             // waited for the primary Realm to be ready
+            auto lock = coordinator->block_notifier_execution();
             make_remote_change();
 
             // sanity check that the notifications never did run
             r->notify();
             REQUIRE(notification_calls == 1);
-        }
-    }
-
-    SECTION("handling of stale results") {
-        make_remote_change();
-        coordinator->on_change();
-        make_remote_change();
-
-        SECTION("notify() uses the older version") {
-            r->notify();
-            REQUIRE(notification_calls == 2);
-            coordinator->on_change();
-            r->notify();
-            REQUIRE(notification_calls == 3);
-            r->notify();
-            REQUIRE(notification_calls == 3);
-        }
-
-        SECTION("refresh() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->refresh();
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("begin_transaction() blocks") {
-            REQUIRE(notification_calls == 1);
-            JoiningThread thread([&] {
-                std::this_thread::sleep_for(std::chrono::microseconds(5000));
-                coordinator->on_change();
-            });
-            r->begin_transaction();
-            REQUIRE(notification_calls == 2);
-            r->cancel_transaction();
         }
     }
 
@@ -630,8 +604,7 @@ TEST_CASE("notifications: async delivery") {
     }
 
     SECTION("refresh() from within a notification is a no-op") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             REQUIRE_FALSE(r->refresh()); // would deadlock if it actually tried to refresh
         });
         advance_and_notify(*r);
@@ -646,8 +619,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("begin_transaction() from within a notification sends notifications recursively") {
         size_t calls = 0;
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
             if (++calls != 2)
                 return;
 
@@ -671,14 +643,14 @@ TEST_CASE("notifications: async delivery") {
     SECTION("begin_transaction() from within a notification adds new changes to the pending callbacks"
             " and restarts invoking callbacks recursively") {
         size_t calls1 = 0, calls2 = 0, calls3 = 0;
-        token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        token = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls1;
             // This callback is before the callback performing writes and so
             // sees each notification normally
             if (calls1 > 1)
                 REQUIRE_INDICES(c.insertions, calls1 + 2);
         });
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls2;
             if (calls2 > 1)
                 REQUIRE_INDICES(c.insertions, calls2 + 2);
@@ -701,7 +673,7 @@ TEST_CASE("notifications: async delivery") {
             // recurred all the way to 10
             REQUIRE(calls2 == 10);
         });
-        auto token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls3;
             // This callback comes after the one performing writes, and so doesn't
             // even get the initial notification until after all the writes.
@@ -718,8 +690,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
         size_t calls = 0;
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (++calls != 2)
                 return;
 
@@ -731,8 +702,7 @@ TEST_CASE("notifications: async delivery") {
 
         auto results2 = results;
         size_t calls2 = 0;
-        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c) {
             if (++calls2 == 1)
                 return;
             REQUIRE_INDICES(c.insertions, 0);
@@ -781,8 +751,7 @@ TEST_CASE("notifications: async delivery") {
     SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes "
             "can be made") {
         bool first = true;
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (first) {
                 REQUIRE_FALSE(r->is_in_transaction());
                 first = false;
@@ -802,8 +771,7 @@ TEST_CASE("notifications: async delivery") {
     }
 
     SECTION("invalidate() from within notification is a no-op") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             r->invalidate();
             REQUIRE(r->is_in_read_transaction());
         });
@@ -818,8 +786,7 @@ TEST_CASE("notifications: async delivery") {
 
     SECTION(
         "cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
-        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        token = results.add_notification_callback([&](CollectionChangeSet) {
             if (r->is_in_transaction())
                 r->cancel_transaction();
         });
@@ -836,12 +803,12 @@ TEST_CASE("notifications: async delivery") {
         auto table2 = r2->read_group().get_table("class_object");
 
         SECTION("other write set skip version") {
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token = results.add_notification_callback([&](CollectionChangeSet) {
                 if (++calls != 1)
                     return;
 
                 Results results2(r2, table2);
-                auto token2 = results2.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+                auto token2 = results2.add_notification_callback([](CollectionChangeSet) {});
                 advance_and_notify(*r2);
                 r2->begin_transaction();
                 table2->begin()->set(col, 5);
@@ -856,7 +823,7 @@ TEST_CASE("notifications: async delivery") {
         }
 
         SECTION("other write did not set skip version") {
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token = results.add_notification_callback([&](CollectionChangeSet) {
                 if (++calls != 1)
                     return;
 
@@ -899,8 +866,7 @@ TEST_CASE("notifications: skip") {
     Results results(r, table->where());
 
     auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
-        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        return results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls;
             changes = std::move(c);
         });
@@ -1131,7 +1097,7 @@ TEST_CASE("notifications: skip") {
         // Create a new notifier and then immediately remove the callback so
         // that begin_transaction() doesn't block
         Results results2(r, r->read_group().get_table("class_object")->where());
-        results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+        results2.add_notification_callback([&](CollectionChangeSet) {});
 
         r->begin_transaction();
         table->create_object();
@@ -1147,7 +1113,7 @@ TEST_CASE("notifications: skip") {
     }
 
     SECTION("skipping from a write inside the skipped callback works") {
-        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c) {
             if (c.empty())
                 return;
             r->begin_transaction();
@@ -1179,7 +1145,7 @@ TEST_CASE("notifications: skip") {
         int calls3 = 0;
         CollectionChangeSet changes3;
         NotificationToken token3;
-        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet) {
             if (calls1 != 2)
                 return;
             REQUIRE(calls3 == 1);
@@ -1212,7 +1178,7 @@ TEST_CASE("notifications: skip") {
         int calls2 = 0;
         CollectionChangeSet changes2;
         NotificationToken token2 = add_callback(results, calls2, changes2);
-        auto token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet) {
             if (calls1 != 2)
                 return;
             REQUIRE(calls2 == 2);
@@ -1275,7 +1241,7 @@ TEST_CASE("notifications: TableView delivery") {
     results.evaluate_query_if_needed();
     // Create and immediately remove a callback so that the notifier gets created
     // even though we have automatic change notifications disabled
-    static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+    static_cast<void>(results.add_notification_callback([&](CollectionChangeSet) {}));
     REQUIRE(results.get_mode() == Results::Mode::TableView);
     REQUIRE(results.size() == 0);
 
@@ -1378,7 +1344,7 @@ TEST_CASE("notifications: TableView delivery") {
             // weird state and switching back to Auto doesn't work.
             Results results(r, table->where());
             results.evaluate_query_if_needed();
-            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet) {}));
             advance_and_notify(*r);
             REQUIRE(results.size() == 10);
             make_remote_change();
@@ -1401,215 +1367,6 @@ TEST_CASE("notifications: TableView delivery") {
     }
 }
 
-
-#if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
-TEST_CASE("notifications: async error handling") {
-    _impl::RealmCoordinator::assert_no_open_realms();
-
-    InMemoryTestFile config;
-    config.cache = false;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object",
-         {
-             {"value", PropertyType::Int},
-         }},
-    });
-
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    Results results(r, *r->read_group().get_table("class_object"));
-
-    auto r2 = Realm::get_shared_realm(config);
-
-    class OpenFileLimiter {
-    public:
-        OpenFileLimiter()
-        {
-            // Set the max open files to zero so that opening new files will fail
-            getrlimit(RLIMIT_NOFILE, &m_old);
-            rlimit rl = m_old;
-            rl.rlim_cur = 0;
-            setrlimit(RLIMIT_NOFILE, &rl);
-        }
-
-        ~OpenFileLimiter()
-        {
-            setrlimit(RLIMIT_NOFILE, &m_old);
-        }
-
-    private:
-        rlimit m_old;
-    };
-
-    SECTION("error when opening the advancer SG") {
-        OpenFileLimiter limiter;
-
-        bool called = false;
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE(err);
-            REQUIRE_FALSE(called);
-            called = true;
-        });
-        REQUIRE(!called);
-
-        SECTION("error is delivered on notify() without changes") {
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->notify();
-            REQUIRE(called);
-        }
-
-        SECTION("error is delivered on notify() with changes") {
-            r2->begin_transaction();
-            r2->commit_transaction();
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->notify();
-            REQUIRE(called);
-        }
-
-        SECTION("error is delivered on refresh() without changes") {
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->refresh();
-            REQUIRE(called);
-        }
-
-        SECTION("error is delivered on refresh() with changes") {
-            r2->begin_transaction();
-            r2->commit_transaction();
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->refresh();
-            REQUIRE(called);
-        }
-
-        SECTION("error is delivered on begin_transaction() without changes") {
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->begin_transaction();
-            REQUIRE(called);
-            r->cancel_transaction();
-        }
-
-        SECTION("error is delivered on begin_transaction() with changes") {
-            r2->begin_transaction();
-            r2->commit_transaction();
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->begin_transaction();
-            REQUIRE(called);
-            r->cancel_transaction();
-        }
-
-        SECTION("adding another callback sends the error to only the newly added one") {
-            advance_and_notify(*r);
-            REQUIRE(called);
-
-            bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called2);
-                called2 = true;
-            });
-
-            advance_and_notify(*r);
-            REQUIRE(called2);
-        }
-
-        SECTION("destroying a token from before the error does not remove newly added callbacks") {
-            advance_and_notify(*r);
-
-            bool called = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called);
-                called = true;
-            });
-            token = {};
-
-            advance_and_notify(*r);
-            REQUIRE(called);
-        }
-
-        SECTION("adding another callback from within an error callback defers delivery") {
-            NotificationToken token2;
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                    REQUIRE(err);
-                    REQUIRE_FALSE(called);
-                    called = true;
-                });
-            });
-            advance_and_notify(*r);
-            REQUIRE(!called);
-            advance_and_notify(*r);
-            REQUIRE(called);
-        }
-
-        SECTION("adding a callback to a different collection from within the error callback defers delivery") {
-            auto results2 = results;
-            NotificationToken token2;
-            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                    REQUIRE(err);
-                    REQUIRE_FALSE(called);
-                    called = true;
-                });
-            });
-            advance_and_notify(*r);
-            REQUIRE(!called);
-            advance_and_notify(*r);
-            REQUIRE(called);
-        }
-    }
-
-    SECTION("error when opening the executor SG") {
-        SECTION("error is delivered asynchronously") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                called = true;
-            });
-            OpenFileLimiter limiter;
-
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->notify();
-            REQUIRE(called);
-        }
-
-        SECTION("adding another callback only sends the error to the new one") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called);
-                called = true;
-            });
-            OpenFileLimiter limiter;
-
-            advance_and_notify(*r);
-
-            bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called2);
-                called2 = true;
-            });
-
-            advance_and_notify(*r);
-
-            REQUIRE(called2);
-        }
-    }
-}
-#endif
 
 #if REALM_ENABLE_SYNC
 TEST_CASE("notifications: sync") {
@@ -1634,8 +1391,8 @@ TEST_CASE("notifications: sync") {
 
         Results results(r, r->read_group().get_table("class_object"));
         Results wait_results(wait_realm, wait_realm->read_group().get_table("class_object"));
-        auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
-        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+        auto token1 = results.add_notification_callback([&](CollectionChangeSet) {});
+        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet) {});
 
         // Add an object to the Realm so that notifications are needed
         {
@@ -1755,8 +1512,7 @@ TEST_CASE("notifications: results") {
     SECTION("unsorted notifications") {
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -1947,10 +1703,6 @@ TEST_CASE("notifications: results") {
                 ++after_calls;
                 on_after();
             }
-            void error(std::exception_ptr)
-            {
-                FAIL("error() should not be called");
-            }
         } callback;
         auto token = results.add_notification_callback(&callback);
         advance_and_notify(*r);
@@ -2012,8 +1764,7 @@ TEST_CASE("notifications: results") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -2249,29 +2000,25 @@ TEST_CASE("notifications: results") {
         // Distinguishing between these two cases would be a big change for little value.
         SECTION("some callbacks have filters") {
             auto token_without_filter = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_without_filter = collection_change_set;
                     ++notification_calls_without_filter;
                 });
             auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_table_value = collection_change_set;
                     ++notification_calls_table_value;
                 },
                 key_path_array_table_value);
             auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
+                [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_linked_to_value = collection_change_set;
                     ++notification_calls_linked_to_value;
                 },
                 key_path_array_linked_to_value);
             auto token_for_filter_on_other_linked_to_value =
                 results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_other_linked_to_value = collection_change_set;
                         ++notification_calls_other_linked_to_value;
                     },
@@ -2429,8 +2176,7 @@ TEST_CASE("notifications: results") {
         SECTION("all callbacks have filters") {
             SECTION("keypath filter on root table 'object', property 'value'") {
                 auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_table_value = collection_change_set;
                         ++notification_calls_table_value;
                     },
@@ -2500,8 +2246,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value'") {
                 auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2575,8 +2320,7 @@ TEST_CASE("notifications: results") {
                 "keypath filter on related table 'linked to object', property 'value' - using object link dictionary"
                 "dictionary") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2638,8 +2382,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using object link set") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2702,8 +2445,7 @@ TEST_CASE("notifications: results") {
             SECTION(
                 "keypath filter on related table 'linked to object', property 'value' - using object link array") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2765,8 +2507,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed dictionary") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2829,8 +2570,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed set") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2892,8 +2632,7 @@ TEST_CASE("notifications: results") {
 
             SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed array") {
                 auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
+                    [&](CollectionChangeSet collection_change_set) {
                         collection_change_set_linked_to_value = collection_change_set;
                         ++notification_calls_linked_to_value;
                     },
@@ -2986,8 +2725,7 @@ TEST_CASE("notifications: results") {
             SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value'") {
                 SECTION("all callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
@@ -3025,7 +2763,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3036,17 +2774,15 @@ TEST_CASE("notifications: results") {
 
                 SECTION("some callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
                         key_path_array_backlink_to_value);
                     int notification_calls_without_filter = 0;
                     CollectionChangeSet collection_change_set_without_filter;
-                    auto token_without_filter = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                    auto token_without_filter =
+                        results_linked_to.add_notification_callback([&](CollectionChangeSet collection_change_set) {
                             collection_change_set_without_filter = collection_change_set;
                             notification_calls_without_filter++;
                         });
@@ -3092,7 +2828,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3105,8 +2841,7 @@ TEST_CASE("notifications: results") {
             SECTION("keypath filter on related table 'linked to object's backlink to 'object'") {
                 SECTION("all callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
@@ -3124,7 +2859,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3135,17 +2870,15 @@ TEST_CASE("notifications: results") {
 
                 SECTION("some callbacks have filters") {
                     auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                        [&](CollectionChangeSet collection_change_set) {
                             collection_change_set_backlink_to_value = collection_change_set;
                             notification_calls_backlink_to_value++;
                         },
                         key_path_array_backlink);
                     int notification_calls_without_filter = 0;
                     CollectionChangeSet collection_change_set_without_filter;
-                    auto token_backlink_second_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
+                    auto token_backlink_second_value =
+                        results_linked_to.add_notification_callback([&](CollectionChangeSet collection_change_set) {
                             collection_change_set_without_filter = collection_change_set;
                             notification_calls_without_filter++;
                         });
@@ -3164,7 +2897,7 @@ TEST_CASE("notifications: results") {
                             Obj obj = table->create_object();
                             Object object(r, obj);
                             object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                                                      std::any(linked_to_table->get_object(target_keys[0])));
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
@@ -3181,8 +2914,7 @@ TEST_CASE("notifications: results") {
 
         int notification_calls = 0;
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
             ++notification_calls;
         });
@@ -3250,8 +2982,7 @@ TEST_CASE("notifications: results") {
 
     SECTION("schema changes") {
         CollectionChangeSet change;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
             change = c;
         });
         advance_and_notify(*r);
@@ -3371,8 +3102,7 @@ TEST_CASE("results: notifications after move") {
     auto results = std::make_unique<Results>(r, table);
 
     int notification_calls = 0;
-    auto token = results->add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-        REQUIRE_FALSE(err);
+    auto token = results->add_notification_callback([&](CollectionChangeSet) {
         ++notification_calls;
     });
 
@@ -3432,7 +3162,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // Create and then immediately remove a callback because
         // `automatic_change_notifications = false` makes Results not implicitly
         // create a notifier
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
 
         auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
@@ -3443,7 +3173,7 @@ TEST_CASE("results: notifier with no callbacks") {
     }
 
     SECTION("refresh() does not attempt to deliver stale results") {
-        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
+        results.add_notification_callback([](CollectionChangeSet const&) {});
 
         // Create version 1
         r->begin_transaction();
@@ -3787,9 +3517,7 @@ TEST_CASE("results: snapshots") {
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
 
-        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
-        });
+        auto token = results.add_notification_callback([&](CollectionChangeSet) {});
         advance_and_notify(*r);
 
         SECTION("snapshot of lvalue") {
@@ -3815,7 +3543,7 @@ TEST_CASE("results: snapshots") {
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
         auto snapshot = results.snapshot();
-        CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
+        CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet) {}));
     }
 
     SECTION("accessors should return none for detached row") {
@@ -4392,35 +4120,35 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 
     SECTION("get()") {
         for (int i = 0; i < 10; ++i)
-            CHECK(any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
+            CHECK(util::any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
         CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 greater than max 9");
     }
 
     SECTION("first()") {
-        CHECK(any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
+        CHECK(util::any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
     }
 
     SECTION("last()") {
-        CHECK(any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
+        CHECK(util::any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
     }
 
     SECTION("index_of()") {
         SECTION("valid") {
             for (size_t i = 0; i < 10; ++i)
-                REQUIRE(results.index_of(ctx, util::Any(results.get<Obj>(i))) == i);
+                REQUIRE(results.index_of(ctx, std::any(results.get<Obj>(i))) == i);
         }
         SECTION("wrong object type") {
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(other_obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(other_obj)),
                               "Object of type 'different type' does not match Results type 'object'");
         }
         SECTION("wrong realm") {
             auto obj = r2->read_group().get_table("class_object")->get_object(0);
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(obj)),
                               "Object of type 'object' does not match Results type 'object'");
         }
         SECTION("detached object") {
             Obj detached_obj;
-            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(detached_obj)),
+            CHECK_THROWS_WITH(results.index_of(ctx, std::any(detached_obj)),
                               "Attempting to access an invalid object");
         }
     }
@@ -4511,6 +4239,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"float", PropertyType::Float | PropertyType::Nullable},
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
+             {"int list", PropertyType::Int | PropertyType::Array},
          }},
         {"linking_object",
          {
@@ -4524,6 +4253,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
+    ColKey col_int_list = table->get_column_key("int list");
+    ColKey col_invalid(ColKey::Idx{10}, col_type_Int, {}, 0);
 
     SECTION("one row with null values") {
         r->begin_transaction();
@@ -4543,6 +4274,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_float)->get_float() == 2.f);
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
+            REQUIRE_THROWS_AS(results.max(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.max(col_invalid), LogicError);
         }
 
         SECTION("min") {
@@ -4550,6 +4283,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_float)->get_float() == 0.f);
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
+            REQUIRE_THROWS_AS(results.min(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.min(col_invalid), LogicError);
         }
 
         SECTION("average") {
@@ -4557,6 +4292,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
             REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.average(col_invalid), LogicError);
         }
 
         SECTION("sum") {
@@ -4564,6 +4301,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
             REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_int_list), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.sum(col_invalid), LogicError);
         }
     }
 
@@ -4650,17 +4389,22 @@ TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalid
     TestContext ctx(realm);
 
     ColKey invalid_col;
+    ColKey well_formed_key(ColKey::Idx{0}, col_type_Int, {}, 0);
     SECTION("max") {
         REQUIRE(!results.max(invalid_col));
+        REQUIRE(!results.max(well_formed_key));
     }
     SECTION("min") {
         REQUIRE(!results.min(invalid_col));
+        REQUIRE(!results.min(well_formed_key));
     }
     SECTION("average") {
         REQUIRE(!results.average(invalid_col));
+        REQUIRE(!results.average(well_formed_key));
     }
     SECTION("sum") {
         REQUIRE(!results.sum(invalid_col));
+        REQUIRE(!results.sum(well_formed_key));
     }
     SECTION("first") {
         REQUIRE(!results.first());
@@ -4719,20 +4463,20 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("non-existing property name") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)),
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", std::any(false)),
                           Results::InvalidPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("readonly property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), ReadOnlyPropertyException);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", std::any(false)), ReadOnlyPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("primarykey property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), std::logic_error);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", std::any(1)), std::logic_error);
         realm->cancel_transaction();
     }
 
@@ -4740,7 +4484,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
         realm->begin_transaction();
         Results results(realm, table->where().equal(table->get_column_key("int"), 0));
         CHECK(results.size() == 2);
-        r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
+        r.set_property_value(ctx, "int", std::any(INT64_C(42)));
         CHECK(results.size() == 0);
         realm->cancel_transaction();
     }
@@ -4748,70 +4492,70 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     SECTION("set property value") {
         realm->begin_transaction();
 
-        r.set_property_value<util::Any>(ctx, "bool", util::Any(true));
+        r.set_property_value<std::any>(ctx, "bool", std::any(true));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Bool>("bool") == true);
         }
 
-        r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
+        r.set_property_value(ctx, "int", std::any(INT64_C(42)));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Int>("int") == 42);
         }
 
-        r.set_property_value(ctx, "float", util::Any(1.23f));
+        r.set_property_value(ctx, "float", std::any(1.23f));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<float>("float") == 1.23f);
         }
 
-        r.set_property_value(ctx, "double", util::Any(1.234));
+        r.set_property_value(ctx, "double", std::any(1.234));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<double>("double") == 1.234);
         }
 
-        r.set_property_value(ctx, "string", util::Any(std::string("abc")));
+        r.set_property_value(ctx, "string", std::any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<String>("string") == "abc");
         }
 
-        r.set_property_value(ctx, "data", util::Any(std::string("abc")));
+        r.set_property_value(ctx, "data", std::any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<Binary>("data") == BinaryData("abc", 3));
         }
 
-        util::Any timestamp = Timestamp(1, 2);
+        std::any timestamp = Timestamp(1, 2);
         r.set_property_value(ctx, "date", timestamp);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Timestamp>("date") == any_cast<Timestamp>(timestamp));
+            CHECK(r.get(i).get<Timestamp>("date") == util::any_cast<Timestamp>(timestamp));
         }
 
-        util::Any object_id = ObjectId("ffffffffffffffffffffffff");
+        std::any object_id = ObjectId("ffffffffffffffffffffffff");
         r.set_property_value(ctx, "object id", object_id);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<ObjectId>("object id") == any_cast<ObjectId>(object_id));
+            CHECK(r.get(i).get<ObjectId>("object id") == util::any_cast<ObjectId>(object_id));
         }
 
-        util::Any decimal = Decimal128("876.54e32");
+        std::any decimal = Decimal128("876.54e32");
         r.set_property_value(ctx, "decimal", decimal);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
+            CHECK(r.get(i).get<Decimal128>("decimal") == util::any_cast<Decimal128>(decimal));
         }
 
-        util::Any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
+        std::any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
         r.set_property_value(ctx, "uuid", uuid);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<UUID>("uuid") == any_cast<UUID>(uuid));
+            CHECK(r.get(i).get<UUID>("uuid") == util::any_cast<UUID>(uuid));
         }
 
         ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
-        r.set_property_value(ctx, "object", util::Any(linked_obj));
+        r.set_property_value(ctx, "object", std::any(linked_obj));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<ObjKey>("object") == object_key);
         }
 
         ObjKey list_object_key = table->create_object_with_primary_key(4).get_key();
         Object list_object(realm, "AllTypes", list_object_key);
-        r.set_property_value(ctx, "list", util::Any(AnyVector{list_object, list_object}));
+        r.set_property_value(ctx, "list", std::any(AnyVector{list_object, list_object}));
         for (size_t i = 0; i < r.size(); i++) {
             auto list = r.get(i).get_linklist("list");
             CHECK(list.size() == 2);
@@ -4836,41 +4580,41 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             }
         };
 
-        r.set_property_value(ctx, "bool array", util::Any(AnyVec{true, false}));
+        r.set_property_value(ctx, "bool array", std::any(AnyVec{true, false}));
         check_array(table->get_column_key("bool array"), true, false);
 
-        r.set_property_value(ctx, "int array", util::Any(AnyVec{INT64_C(5), INT64_C(6)}));
+        r.set_property_value(ctx, "int array", std::any(AnyVec{INT64_C(5), INT64_C(6)}));
         check_array(table->get_column_key("int array"), INT64_C(5), INT64_C(6));
 
-        r.set_property_value(ctx, "float array", util::Any(AnyVec{1.1f, 2.2f}));
+        r.set_property_value(ctx, "float array", std::any(AnyVec{1.1f, 2.2f}));
         check_array(table->get_column_key("float array"), 1.1f, 2.2f);
 
-        r.set_property_value(ctx, "double array", util::Any(AnyVec{3.3, 4.4}));
+        r.set_property_value(ctx, "double array", std::any(AnyVec{3.3, 4.4}));
         check_array(table->get_column_key("double array"), 3.3, 4.4);
 
-        r.set_property_value(ctx, "string array", util::Any(AnyVec{"a"s, "b"s, "c"s}));
+        r.set_property_value(ctx, "string array", std::any(AnyVec{"a"s, "b"s, "c"s}));
         check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
 
-        r.set_property_value(ctx, "data array", util::Any(AnyVec{"d"s, "e"s, "f"s}));
+        r.set_property_value(ctx, "data array", std::any(AnyVec{"d"s, "e"s, "f"s}));
         check_array(table->get_column_key("data array"), BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
 
         r.set_property_value(ctx, "date array",
-                             util::Any(AnyVec{Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40)}));
+                             std::any(AnyVec{Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40)}));
         check_array(table->get_column_key("date array"), Timestamp(10, 20), Timestamp(20, 30), Timestamp(30, 40));
 
         r.set_property_value(
             ctx, "object id array",
-            util::Any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
+            std::any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
         check_array(table->get_column_key("object id array"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
                     ObjectId("888888888888888888888888"));
 
         r.set_property_value(ctx, "decimal array",
-                             util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
+                             std::any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
         check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
 
         r.set_property_value(ctx, "uuid array",
-                             util::Any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
-                                              UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
+                             std::any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                                             UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
         check_array(table->get_column_key("uuid array"), UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
                     UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
     }
@@ -4991,8 +4735,7 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("notifications on results using all descriptor types") {
         r = r.distinct({"value"}).sort({{"value", false}}).limit(2);
         int notification_calls = 0;
-        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = r.add_notification_callback([&](CollectionChangeSet c) {
             if (notification_calls == 0) {
                 REQUIRE(c.empty());
                 REQUIRE(r.size() == 2);
@@ -5023,8 +4766,7 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("notifications on only limited results") {
         r = r.limit(2);
         int notification_calls = 0;
-        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        auto token = r.add_notification_callback([&](CollectionChangeSet c) {
             if (notification_calls == 0) {
                 REQUIRE(c.empty());
                 REQUIRE(r.size() == 2);
@@ -5051,6 +4793,52 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
         REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
+    }
+}
+
+TEST_CASE("results: public name declared") {
+    InMemoryTestFile config;
+    // config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {
+             {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "public_value"},
+         }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
+
+    realm->begin_transaction();
+    for (int i = 0; i < 8; ++i) {
+        table->create_object().set(col, (i + 2) % 4);
+    }
+    realm->commit_transaction();
+    Results r(realm, table);
+
+    SECTION("sorted") {
+        auto sorted = r.sort({{"public_value", true}});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 6);
+        REQUIRE_ORDER(sorted.limit(8), 2, 6, 3, 7, 0, 4, 1, 5);
+        REQUIRE_ORDER(sorted.limit(100), 2, 6, 3, 7, 0, 4, 1, 5);
+    }
+
+    SECTION("distinct") {
+        auto sorted = r.distinct({"public_value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 0);
+        REQUIRE_ORDER(sorted.limit(2), 0, 1);
+        REQUIRE_ORDER(sorted.limit(8), 0, 1, 2, 3);
+
+        sorted = r.sort({{"public_value", true}}).distinct({"public_value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 3);
+        REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
     }
 }
 
@@ -5082,8 +4870,7 @@ TEST_CASE("notifications: objects with PK recreated") {
     });
 
     auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
-        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
+        return results.add_notification_callback([&](CollectionChangeSet c) {
             ++calls;
             changes = std::move(c);
         });
@@ -5095,7 +4882,7 @@ TEST_CASE("notifications: objects with PK recreated") {
     auto table3 = r->read_group().get_table("class_string_pk");
 
     TestContext d(r);
-    auto create = [&](StringData type, util::Any&& value) {
+    auto create = [&](StringData type, std::any&& value) {
         return Object::create(d, r, *r->schema().find(type), value);
     };
 

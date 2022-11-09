@@ -16,7 +16,6 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-
 namespace realm::c_api {
 
 
@@ -125,7 +124,7 @@ RLM_API bool realm_is_closed(realm_t* realm)
 
 RLM_API bool realm_is_writable(const realm_t* realm)
 {
-    return (*realm)->is_in_transaction();
+    return (*realm)->is_in_transaction() || (*realm)->is_in_async_transaction();
 }
 
 RLM_API bool realm_close(realm_t* realm)
@@ -164,6 +163,49 @@ RLM_API bool realm_rollback(realm_t* realm)
 {
     return wrap_err([&]() {
         (*realm)->cancel_transaction();
+        return true;
+    });
+}
+
+RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
+                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                             bool notify_only)
+{
+    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
+        callback(userdata.get());
+    };
+    return wrap_err([&]() {
+        return (*realm)->async_begin_transaction(std::move(cb), notify_only);
+    });
+}
+
+RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
+                                        realm_free_userdata_func_t userdata_free, bool allow_grouping)
+{
+    auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
+        if (err) {
+            try {
+                std::rethrow_exception(err);
+            }
+            catch (const std::exception& e) {
+                callback(userdata.get(), true, e.what());
+            }
+        }
+        else {
+            callback(userdata.get(), false, nullptr);
+        }
+    };
+    return wrap_err([&]() {
+        return (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+    });
+}
+
+RLM_API bool realm_async_cancel(realm_t* realm, unsigned int token, bool* cancelled)
+{
+    return wrap_err([&]() {
+        auto res = (*realm)->async_cancel_transaction(token);
+        if (cancelled)
+            *cancelled = res;
         return true;
     });
 }
@@ -221,8 +263,30 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {
         auto& p = **realm;
-        *did_compact = p.compact();
+        if (did_compact)
+            *did_compact = p.compact();
         return true;
+    });
+}
+
+RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* table_deleted)
+{
+    if (table_deleted)
+        *table_deleted = false;
+
+    return wrap_err([&] {
+        auto table = ObjectStore::table_for_object_type((*realm)->read_group(), table_name);
+        if (table) {
+            const auto& schema = (*realm)->schema();
+            const auto& object_schema = schema.find(table_name);
+            if (object_schema != schema.end()) {
+                throw std::logic_error("Attempt to remove a table that is currently part of the schema");
+            }
+            (*realm)->read_group().remove_table(table->get_key());
+            *table_deleted = true;
+        }
+        return true;
+        ;
     });
 }
 

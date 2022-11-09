@@ -21,6 +21,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -41,6 +42,7 @@
 #include <external/mpark/variant.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
@@ -118,7 +120,7 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 static std::string create_jwt(const std::string& appId)
 {
     nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
-    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
+    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1961896476}};
 
     payload["user_data"]["name"] = "Foo Bar";
     payload["user_data"]["occupation"] = "firefighter";
@@ -233,7 +235,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
         client.register_email(email_to_reject, password, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == util::format("failed to confirm user %1", email_to_reject));
+            CHECK(error->message == util::format("failed to confirm user \"%1\"", email_to_reject));
             CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::bad_request);
             processed = true;
         });
@@ -301,7 +303,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string rejected_password = util::format("%1", random_string(10));
         client.call_reset_password_function(email, rejected_password, {"foo", "bar"}, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == util::format("failed to reset password for user %1", email));
+            CHECK(error->message == util::format("failed to reset password for user \"%1\"", email));
             CHECK(error->is_service_error());
             processed = true;
         });
@@ -792,6 +794,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto db = remote_client.db(get_runtime_app_session("").config.mongo_dbname);
     auto dog_collection = db["Dog"];
+    auto cat_collection = db["Cat"];
     auto person_collection = db["Person"];
 
     bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
@@ -803,6 +806,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         {"_id", dog3_object_id},
         {"name", "petunia"},
         {"breed", "french bulldog"},
+    };
+
+    auto cat_id_string = random_string(10);
+    bson::BsonDocument cat_document{
+        {"_id", cat_id_string},
+        {"name", "luna"},
+        {"breed", "scottish fold"},
     };
 
     bson::BsonDocument person_document{
@@ -855,7 +865,17 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(static_cast<ObjectId>(bson["insertedId"]) == dog3_object_id);
         });
 
+        cat_collection.insert_one_bson(cat_document, [&](Optional<bson::Bson> value, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            auto bson = static_cast<bson::BsonDocument>(*value);
+            CHECK(static_cast<std::string>(bson["insertedId"]) == cat_id_string);
+        });
+
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_one(cat_document, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -882,6 +902,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(static_cast<ObjectId>(*object_id) == dog3_object_id);
         });
 
+        cat_collection.insert_one(cat_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(object_id->type() == bson::Bson::Type::String);
+            CHECK(static_cast<std::string>(*object_id) == cat_id_string);
+        });
+
         person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id});
         person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
@@ -889,6 +915,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
 
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_one(cat_document, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -1220,7 +1250,18 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                       CHECK(!result.upserted_id);
                                   });
 
+        cat_collection.update_one({}, cat_document, true,
+                                  [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
+                                      REQUIRE_FALSE(error);
+                                      CHECK(result.upserted_id->type() == bson::Bson::Type::String);
+                                      CHECK(result.upserted_id == cat_id_string);
+                                  });
+
         dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        cat_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -1238,6 +1279,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                            auto document = static_cast<bson::BsonDocument>(*bson);
                                            auto foundUpsertedId = document.find("upsertedId") != document.end();
                                            REQUIRE(!foundUpsertedId);
+                                       });
+
+        cat_collection.update_one_bson({}, cat_document, true,
+                                       [&](Optional<bson::Bson> bson, Optional<AppError> error) {
+                                           REQUIRE_FALSE(error);
+                                           auto upserted_id = static_cast<bson::BsonDocument>(*bson)["upsertedId"];
+                                           REQUIRE(upserted_id.type() == bson::Bson::Type::String);
+                                           REQUIRE(upserted_id == cat_id_string);
                                        });
 
         person_document["dogs"] = bson::BsonArray();
@@ -1556,13 +1605,12 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
         CppContext c(realm);
         realm->begin_transaction();
-        auto target_obj =
-            Object::create(c, realm, "Target",
-                           util::Any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
+        auto target_obj = Object::create(
+            c, realm, "Target", std::any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
         mixed_list_values.push_back(Mixed(target_obj.obj().get_link()));
 
         Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{
+                       std::any(AnyDict{
                            {valid_pk_name, obj_id},
                            {"mixed_array", mixed_list_values},
                        }),
@@ -1578,12 +1626,71 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
         CHECK(!wait_for_download(*realm));
         CppContext c(realm);
-        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
-        auto list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "mixed_array"));
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{obj_id});
+        auto list = util::any_cast<List&&>(obj.get_property_value<std::any>(c, "mixed_array"));
         for (size_t idx = 0; idx < list.size(); ++idx) {
             Mixed mixed = list.get_any(idx);
-            CHECK(mixed == any_cast<Mixed>(mixed_list_values[idx]));
+            if (idx == 3) {
+                CHECK(mixed.is_type(type_TypedLink));
+                auto link = mixed.get<ObjLink>();
+                auto link_table = realm->read_group().get_table(link.get_table_key());
+                CHECK(link_table->get_name() == "class_Target");
+                auto link_obj = link_table->get_object(link.get_obj_key());
+                CHECK(link_obj.get_primary_key() == target_id);
+            }
+            else {
+                CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
+            }
         }
+    }
+}
+
+TEST_CASE("app: roundtrip values", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"decimal", PropertyType::Decimal | PropertyType::Nullable},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "roundtrip_values", schema);
+    auto app_session = create_app(server_app_config);
+    auto partition = random_string(100);
+
+    Decimal128 large_significand = Decimal128(70) / Decimal128(1.09);
+    auto obj_id = ObjectId::gen();
+    {
+        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        SyncTestFile config(test_session.app(), partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {valid_pk_name, obj_id},
+                           {"decimal", large_significand},
+                       }),
+                       CreatePolicy::ForceCreate);
+        realm->commit_transaction();
+        CHECK(!wait_for_upload(*realm, std::chrono::seconds(600)));
+    }
+
+    {
+        TestAppSession test_session(app_session);
+        SyncTestFile config(test_session.app(), partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+
+        CHECK(!wait_for_download(*realm));
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
+        auto val = obj.get_column_value<Decimal128>("decimal");
+        CHECK(val == large_significand);
     }
 }
 
@@ -1729,7 +1836,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         realm->begin_transaction();
         auto array_of_objs =
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{
+                           std::any(AnyDict{
                                {valid_pk_name, array_of_objs_id},
                                {"array_of_objs", AnyVector{AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}},
                            }),
@@ -1737,7 +1844,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         auto embedded_obj =
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{
+                           std::any(AnyDict{
                                {valid_pk_name, embedded_obj_id},
                                {"embedded_obj", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
                            }),
@@ -1745,7 +1852,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         auto dict_obj = Object::create(
             c, realm, "TopLevel",
-            util::Any(AnyDict{
+            std::any(AnyDict{
                 {valid_pk_name, dict_obj_id},
                 {"embedded_dict", AnyDict{{"foo", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}}},
             }),
@@ -1755,7 +1862,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         {
             realm->begin_transaction();
             embedded_obj.set_property_value(c, "embedded_obj",
-                                            util::Any(AnyDict{{
+                                            std::any(AnyDict{{
                                                 "array",
                                                 AnyVector{INT64_C(3), INT64_C(4)},
                                             }}),
@@ -1767,7 +1874,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             realm->begin_transaction();
             List array(array_of_objs, array_of_objs.get_object_schema().property_for_name("array_of_objs"));
             CppContext c2(realm, &array.get_object_schema());
-            array.set(c2, 0, util::Any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
+            array.set(c2, 0, std::any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
             realm->commit_transaction();
         }
 
@@ -1775,7 +1882,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             realm->begin_transaction();
             object_store::Dictionary dict(dict_obj, dict_obj.get_object_schema().property_for_name("embedded_dict"));
             CppContext c2(realm, &dict.get_object_schema());
-            dict.insert(c2, "foo", util::Any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
+            dict.insert(c2, "foo", std::any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
             realm->commit_transaction();
         }
         CHECK(!wait_for_upload(*realm));
@@ -1788,31 +1895,31 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         CHECK(!wait_for_download(*realm));
         CppContext c(realm);
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{embedded_obj_id});
-            auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{embedded_obj_id});
+            auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<std::any>(c, "embedded_obj"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<std::any>(c, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(3));
             CHECK(array_list.get<int64_t>(1) == int64_t(4));
         }
 
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{array_of_objs_id});
-            auto embedded_list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{array_of_objs_id});
+            auto embedded_list = util::any_cast<List&&>(obj.get_property_value<std::any>(c, "array_of_objs"));
             CppContext c2(realm, &embedded_list.get_object_schema());
-            auto embedded_array_obj = any_cast<Object&&>(embedded_list.get(c2, 0));
-            auto array_list = any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_array_obj = util::any_cast<Object&&>(embedded_list.get(c2, 0));
+            auto array_list = util::any_cast<List&&>(embedded_array_obj.get_property_value<std::any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(5));
             CHECK(array_list.get<int64_t>(1) == int64_t(6));
         }
 
         {
-            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{dict_obj_id});
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{dict_obj_id});
             object_store::Dictionary dict(obj, obj.get_object_schema().property_for_name("embedded_dict"));
             CppContext c2(realm, &dict.get_object_schema());
-            auto embedded_obj = any_cast<Object&&>(dict.get(c2, "foo"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_obj = util::any_cast<Object&&>(dict.get(c2, "foo"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<std::any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(7));
             CHECK(array_list.get<int64_t>(1) == int64_t(8));
@@ -1837,10 +1944,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         realm->begin_transaction();
         CppContext c;
         Object::create(c, realm, "Person",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"age", INT64_C(64)},
-                                                {"firstName", std::string("Paul")},
-                                                {"lastName", std::string("McCartney")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"age", INT64_C(64)},
+                                               {"firstName", std::string("Paul")},
+                                               {"lastName", std::string("McCartney")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
         wait_for_download(*realm);
@@ -1850,10 +1957,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         // Write some additional data
         realm->begin_transaction();
         Object::create(c, realm, "Dog",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"breed", std::string("stabyhoun")},
-                                                {"name", std::string("albert")},
-                                                {"realm_id", std::string("foo")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"breed", std::string("stabyhoun")},
+                                               {"name", std::string("albert")},
+                                               {"realm_id", std::string("foo")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
     }
@@ -1874,10 +1981,10 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         realm->begin_transaction();
         CppContext c;
         Object::create(c, realm, "Dog",
-                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                                {"breed", std::string("bulldog")},
-                                                {"name", std::string("fido")},
-                                                {"realm_id", std::string("foo")}}));
+                       std::any(realm::AnyDict{{"_id", std::any(ObjectId::gen())},
+                                               {"breed", std::string("bulldog")},
+                                               {"name", std::string("fido")},
+                                               {"realm_id", std::string("foo")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
     }
@@ -1900,7 +2007,27 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
+static void set_app_config_defaults(app::App::Config& app_config,
+                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
+{
+    if (!app_config.transport)
+        app_config.transport = transport;
+    if (app_config.platform.empty())
+        app_config.platform = "Object Store Test Platform";
+    if (app_config.platform_version.empty())
+        app_config.platform_version = "Object Store Test Platform Version";
+    if (app_config.sdk_version.empty())
+        app_config.sdk_version = "SDK Version";
+    if (app_config.app_id.empty())
+        app_config.app_id = "app_id";
+    if (!app_config.local_app_version)
+        app_config.local_app_version.emplace("A Local App Version");
+}
+
 TEST_CASE("app: sync integration", "[sync][app]") {
+    auto logger = std::make_unique<util::StderrLogger>();
+    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+
     const auto schema = default_app_config("").schema;
 
     auto get_dogs = [](SharedRealm r) -> Results {
@@ -1913,9 +2040,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->begin_transaction();
         CppContext c;
         Object::create(c, r, "Dog",
-                       util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                         {"breed", std::string("bulldog")},
-                                         {"name", std::string("fido")}}),
+                       std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                        {"breed", std::string("bulldog")},
+                                        {"name", std::string("fido")}}),
                        CreatePolicy::ForceCreate);
         r->commit_transaction();
     };
@@ -1938,6 +2065,31 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         {
             create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            Results dogs = get_dogs(r);
+            REQUIRE(dogs.size() == 1);
+            REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+            REQUIRE(dogs.get(0).get<String>("name") == "fido");
+        }
+    }
+
+    SECTION("MemOnly durability") {
+        {
+            SyncTestFile config(app, partition, schema);
+            config.in_memory = true;
+
+            REQUIRE(config.options().durability == DBOptions::Durability::MemOnly);
+            auto r = Realm::get_shared_realm(config);
+
+            REQUIRE(get_dogs(r).size() == 0);
+            create_one_dog(r);
+            REQUIRE(get_dogs(r).size() == 1);
+        }
+
+        {
+            create_user_and_log_in(app);
+            SyncTestFile config(app, partition, schema);
+            config.in_memory = true;
             auto r = Realm::get_shared_realm(config);
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
@@ -1973,23 +2125,209 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
+            if (simulated_response) {
+                return completion(*simulated_response);
+            }
+            SynchronousTestTransport::send_request_to_server(request, [&](const Response& response) mutable {
                 if (response_hook) {
-                    response_hook(request, const_cast<Response&>(response));
+                    response_hook(request, response);
                 }
-                completion_block(response);
+                completion(response);
             });
         }
-        util::UniqueFunction<void(Request&, Response&)> response_hook;
-        util::UniqueFunction<void(Request&)> request_hook;
+        // Optional handler for the request and response before it is returned to completion
+        util::UniqueFunction<void(const Request&, const Response&)> response_hook;
+        // Optional handler for the request before it is sent to the server
+        util::UniqueFunction<void(const Request&)> request_hook;
+        // Optional Response object to return immediately instead of communicating with the server
+        util::Optional<Response> simulated_response;
     };
 
+    {
+        std::unique_ptr<realm::AppSession> app_session;
+        std::string base_file_path = util::make_temp_dir() + random_string(10);
+        auto redir_transport = std::make_shared<HookedTransport>();
+        AutoVerifiedEmailCredentials creds;
+
+        auto app_config = get_config(redir_transport, session.app_session());
+        set_app_config_defaults(app_config, redir_transport);
+
+        util::try_make_dir(base_file_path);
+        SyncClientConfig sc_config;
+        sc_config.base_file_path = base_file_path;
+        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+
+        // initialize app and sync client
+        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+
+        SECTION("Test invalid redirect response") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](const Request& request) {
+                if (request_count == 0) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", ""}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+            };
+
+            // This will fail due to no Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+
+            // This will fail due to empty Location header
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
+                    REQUIRE(error->message == "Redirect response missing location header");
+                });
+        }
+
+        SECTION("Test redirect response") {
+            int request_count = 0;
+            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string original_host = "localhost:9090";
+            std::string redirect_scheme = "http://";
+            std::string redirect_host = "127.0.0.1:9090";
+            std::string redirect_url = "http://127.0.0.1:9090";
+            redir_transport->request_hook = [&](const Request& request) {
+                if (request_count == 0) {
+                    if (request.url.find("https://") != std::string::npos) {
+                        redirect_scheme = "https://";
+                    }
+                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                        redirect_host = "localhost:9090";
+                        original_host = "127.0.0.1:9090";
+                    }
+                    redirect_url = redirect_scheme + redirect_host;
+                    logger->trace("redirect_url (%1): %2", request_count, redirect_url);
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.redirect_count);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 2) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find("somehost:9090") != std::string::npos);
+                    redir_transport->simulated_response = {
+                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 3) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", redirect_scheme + original_host}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 4) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
+                    // Let the init_app_metadata request go through
+                    redir_transport->simulated_response = util::none;
+                    request_count++;
+                }
+                else if (request_count == 5) {
+                    // This is the original request after the init app metadata
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    auto sync_manager = redir_app->sync_manager();
+                    REQUIRE(sync_manager);
+                    auto app_metadata = sync_manager->app_metadata();
+                    REQUIRE(app_metadata);
+                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
+                    logger->trace("Location: %1", app_metadata->location);
+                    logger->trace("Hostname: %1", app_metadata->hostname);
+                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
+                    REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
+                    redir_transport->simulated_response = util::none;
+                    // Validate the retry count tracked in the original message
+                    REQUIRE(request.redirect_count == 3);
+                    request_count++;
+                }
+            };
+
+            // This will be successful after a couple of retries due to the redirect response
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                });
+        }
+        SECTION("Test too many redirects") {
+            int request_count = 0;
+            redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request_count <= 21);
+                redir_transport->simulated_response = {
+                    301,
+                    0,
+                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                    "Some body data"};
+                request_count++;
+            };
+
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_client_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
+                    REQUIRE(error->message == "number of redirections exceeded 20");
+                });
+        }
+        SECTION("Test server in maintenance") {
+            redir_transport->request_hook = [&](const Request&) {
+                nlohmann::json maintenance_error = {{"error_code", "MaintenanceInProgress"},
+                                                    {"error", "This service is currently undergoing maintenance"},
+                                                    {"link", "https://link.to/server_logs"}};
+                redir_transport->simulated_response = {
+                    500, 0, {{"Content-Type", "application/json"}}, maintenance_error.dump()};
+            };
+
+            redir_app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->is_service_error());
+                    REQUIRE(error->error_code.value() == static_cast<int>(ServiceErrorCode::maintenance_in_progress));
+                    REQUIRE(error->message == "This service is currently undergoing maintenance");
+                    REQUIRE(error->link_to_server_logs == "https://link.to/server_logs");
+                    REQUIRE(error->http_status_code == 500);
+                });
+        }
+    }
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
@@ -2014,7 +2352,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](Request&) {
+        transport->request_hook = [&](const Request&) {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto& session : user->all_sessions()) {
@@ -2025,6 +2363,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     seen_waiting_for_access_token = true;
                 }
             }
+            return true;
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
@@ -2072,7 +2411,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             bool seen_waiting_for_access_token = false;
-            transport->request_hook = [&](Request&) {
+            transport->request_hook = [&](const Request&) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto& session : user->all_sessions()) {
@@ -2093,13 +2432,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->response_hook = [&](Request& request, Response& response) {
+            transport->response_hook = [&](const Request& request, const Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
-                    response.http_status_code = 401;
-                    response.body = "fake: refresh token could not be refreshed";
+                    auto& response_ref = const_cast<Response&>(response);
+                    response_ref.http_status_code = 401;
+                    response_ref.body = "fake: refresh token could not be refreshed";
                 }
             };
             SyncTestFile config(app, partition, schema);
@@ -2123,14 +2463,15 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> did_receive_valid_token{false};
             constexpr size_t num_error_responses = 6;
 
-            transport->response_hook = [&](Request& request, Response& response) {
+            transport->response_hook = [&](const Request& request, const Response& response) {
                 // simulate the server experiencing an internal server error
                 if (request.url.find("/session") != std::string::npos) {
                     if (response_times.size() >= num_error_responses) {
                         did_receive_valid_token.store(true);
                         return;
                     }
-                    response.http_status_code = 500;
+                    auto& response_ref = const_cast<Response&>(response);
+                    response_ref.http_status_code = 500;
                 }
             };
             transport->request_hook = [&](const Request& request) {
@@ -2376,9 +2717,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         for (auto i = 'a'; i < 'z'; ++i) {
             r->begin_transaction();
             Object::create(c, r, "Dog",
-                           util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                             {"breed", std::string("bulldog")},
-                                             {"name", random_string(1024 * 1024)}}),
+                           std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                            {"breed", std::string("bulldog")},
+                                            {"name", random_string(1024 * 1024)}}),
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
@@ -2402,16 +2743,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("too large sync message error handling") {
         SyncTestFile config(app, partition, schema);
 
-        std::mutex sync_error_mutex;
-        bool done = false;
-        config.sync_config->error_handler = [&](auto, SyncError error) {
-            if (error.error_code.category() != util::websocket::websocket_close_status_category())
-                return;
-            std::lock_guard<std::mutex> lk(sync_error_mutex);
-            done = true;
-            REQUIRE(error.error_code.value() == 1009);
-            REQUIRE(error.message == "read limited at 16777217 bytes");
-        };
+        auto pf = util::make_promise_future<SyncError>();
+        config.sync_config->error_handler =
+            [sp = util::CopyablePromiseHolder(std::move(pf.promise))](auto, SyncError error) mutable {
+                sp.get_promise().emplace_value(std::move(error));
+            };
         auto r = Realm::get_shared_realm(config);
 
         // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
@@ -2420,21 +2756,19 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         CppContext c;
         for (auto i = 'a'; i < 'z'; ++i) {
             Object::create(c, r, "Dog",
-                           util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
-                                             {"breed", std::string("bulldog")},
-                                             {"name", random_string(1024 * 1024)}}),
+                           std::any(AnyDict{{"_id", std::any(ObjectId::gen())},
+                                            {"breed", std::string("bulldog")},
+                                            {"name", random_string(1024 * 1024)}}),
                            CreatePolicy::ForceCreate);
         }
         r->commit_transaction();
 
-        // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
-        // and we should fail the test.
-        timed_wait_for(
-            [&] {
-                std::lock_guard<std::mutex> lk(sync_error_mutex);
-                return done;
-            },
-            std::chrono::minutes(5));
+        auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
+        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::limits_exceeded));
+        REQUIRE(error.message == "Sync websocket closed because the server received a message that was too large: "
+                                 "read limited at 16777217 bytes");
+        REQUIRE(error.is_client_reset_requested());
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
 
     SECTION("validation") {
@@ -2580,7 +2914,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         r->begin_transaction();
         auto object = Object::create(
             c, r, "source",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
@@ -2593,7 +2927,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         r->begin_transaction();
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
@@ -2720,11 +3054,11 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
     };
     using T = typename TestType::Type;
     CppContext c;
-    auto create_object = [&](realm::SharedRealm r, int64_t val, util::Any partition) {
+    auto create_object = [&](realm::SharedRealm r, int64_t val, std::any partition) {
         r->begin_transaction();
         auto object = Object::create(
             c, r, Group::table_name_to_class_name(table_name),
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {partition_key_col_name, partition}}),
+            std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {partition_key_col_name, partition}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
     };
@@ -2788,10 +3122,9 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         {
         }
 
-        void send_request_to_server(Request&&,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
         {
-            completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
+            completion(Response{0, m_code, HttpHeaders(), m_message});
         }
 
     private:
@@ -2873,11 +3206,15 @@ public:
     }
 
 private:
-    void handle_profile(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_profile(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
-        CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
+        auto content_type = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(content_type);
+        CHECK(content_type->second == "application/json;charset=utf-8");
+        auto authorization = AppUtils::find_header("Authorization", request.headers);
+        CHECK(authorization);
+        CHECK(authorization->second == "Bearer " + access_token);
         CHECK(request.body.empty());
         CHECK(request.timeout_ms == 60000);
 
@@ -2889,20 +3226,23 @@ private:
                             {"data", profile_0}})
                 .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion(Response{200, 0, {}, response});
     }
 
-    void handle_login(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_login(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
                                 {"appVersion", "A Local App Version"},
                                 {"platform", "Object Store Test Platform"},
                                 {"platformVersion", "Object Store Test Platform Version"},
-                                {"sdkVersion", "SDK Version"}}}}));
+                                {"sdkVersion", "SDK Version"},
+                                {"coreVersion", REALM_VERSION_STRING}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
@@ -2912,10 +3252,10 @@ private:
                                                {"device_id", "Panda Bear"}})
                                    .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion(Response{200, 0, {}, response});
     }
 
-    void handle_location(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_location(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -2926,13 +3266,15 @@ private:
                                                {"location", "matter"}})
                                    .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion(Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_create_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
         CHECK(request.timeout_ms == 60000);
 
@@ -2940,13 +3282,15 @@ private:
             nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
                 .dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_fetch_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -2954,13 +3298,15 @@ private:
         std::string response =
             nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
 
-        completion_block(Response{200, 0, {}, response});
+        completion(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_fetch_api_keys(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::get);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -2970,13 +3316,15 @@ private:
             elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
         }
 
-        completion_block(Response{200, 0, {}, nlohmann::json(elements).dump()});
+        completion(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
+    void handle_token_refresh(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
     {
         CHECK(request.method == HttpMethod::post);
-        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        auto item = AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -2984,40 +3332,40 @@ private:
         auto elements = std::vector<nlohmann::json>();
         nlohmann::json json{{"access_token", access_token}};
 
-        completion_block(Response{200, 0, {}, json.dump()});
+        completion(Response{200, 0, {}, json.dump()});
     }
 
 public:
-    void send_request_to_server(Request&& request,
-                                util::UniqueFunction<void(const Response&)>&& completion_block) override
+    void send_request_to_server(const Request& request,
+                                util::UniqueFunction<void(const Response&)>&& completion) override
     {
         if (request.url.find("/login") != std::string::npos) {
-            handle_login(request, completion_block);
+            handle_login(request, std::move(completion));
         }
         else if (request.url.find("/profile") != std::string::npos) {
-            handle_profile(request, completion_block);
+            handle_profile(request, std::move(completion));
         }
         else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            completion_block(Response{200, 0, {}, ""});
+            completion(Response{200, 0, {}, ""});
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
-            handle_create_api_key(request, completion_block);
+            handle_create_api_key(request, std::move(completion));
         }
         else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos &&
                  request.method == HttpMethod::get) {
-            handle_fetch_api_key(request, completion_block);
+            handle_fetch_api_key(request, std::move(completion));
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
-            handle_fetch_api_keys(request, completion_block);
+            handle_fetch_api_keys(request, std::move(completion));
         }
         else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-            handle_token_refresh(request, completion_block);
+            handle_token_refresh(request, std::move(completion));
         }
         else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
-            handle_location(request, completion_block);
+            handle_location(request, std::move(completion));
         }
         else {
-            completion_block(Response{200, 0, {}, "something arbitrary"});
+            completion(Response{200, 0, {}, "something arbitrary"});
         }
     }
 };
@@ -3175,14 +3523,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
     SECTION("login_anonymous bad") {
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/login") != std::string::npos) {
-                    completion_block({200, 0, {}, user_json(bad_access_token).dump()});
+                    completion({200, 0, {}, user_json(bad_access_token).dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
+                    UnitTestTransport::send_request_to_server(request, std::move(completion));
                 }
             }
         };
@@ -3393,9 +3741,9 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(Request&&, util::UniqueFunction<void(const Response&)>&& completion_block) override
+    void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
     {
-        completion_block(Response(*m_response));
+        completion(Response(*m_response));
     }
 
 private:
@@ -3409,7 +3757,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                                 {"device_id", "Panda Bear"}})
                                     .dump();
 
-    Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
+    Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
 
     TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
     auto app = tsm.app();
@@ -3422,7 +3770,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 404);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Client Error: 404");
         CHECK(error.link_to_server_logs.empty());
     }
@@ -3434,7 +3782,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
         CHECK(error.error_code.value() == 500);
-        CHECK(error.message == std::string("http error code considered fatal"));
+        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.error_code.message() == "Server Error: 500");
         CHECK(error.link_to_server_logs.empty());
     }
@@ -3453,6 +3801,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("session error code") {
+        response.headers = HttpHeaders{{"Content-Type", "application/json"}};
         response.http_status_code = 400;
         response.body = nlohmann::json({{"error_code", "MongoDBError"},
                                         {"error", "a fake MongoDB error message!"},
@@ -3757,16 +4106,16 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
                     nlohmann::json json{{"access_token", good_access_token}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion({200, 0, {}, json.dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
+                    UnitTestTransport::send_request_to_server(request, std::move(completion));
                 }
             }
         };
@@ -3788,16 +4137,16 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
                     nlohmann::json json{{"access_token", bad_access_token}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion({200, 0, {}, json.dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
+                    UnitTestTransport::send_request_to_server(request, std::move(completion));
                 }
             }
         };
@@ -3831,17 +4180,19 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             bool get_profile_2_hit = false;
             bool refresh_hit = false;
 
-            void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     login_hit = true;
-                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
+                    completion({200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/profile") != std::string::npos) {
                     CHECK(login_hit);
 
-                    auto access_token = request.headers.at("Authorization");
+                    auto item = AppUtils::find_header("Authorization", request.headers);
+                    CHECK(item);
+                    auto access_token = item->second;
                     // simulated bad token request
                     if (access_token.find(good_access_token2) != std::string::npos) {
                         CHECK(login_hit);
@@ -3850,13 +4201,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
                         get_profile_2_hit = true;
 
-                        completion_block({200, 0, {}, user_profile_json().dump()});
+                        completion({200, 0, {}, user_profile_json().dump()});
                     }
                     else if (access_token.find(good_access_token) != std::string::npos) {
                         CHECK(!get_profile_2_hit);
                         get_profile_1_hit = true;
 
-                        completion_block({401, 0, {}});
+                        completion({401, 0, {}});
                     }
                 }
                 else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
@@ -3866,15 +4217,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     refresh_hit = true;
 
                     nlohmann::json json{{"access_token", good_access_token2}};
-                    completion_block({200, 0, {}, json.dump()});
+                    completion({200, 0, {}, json.dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
                     CHECK(request.method == HttpMethod::get);
-                    completion_block({200,
-                                      0,
-                                      {},
-                                      "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                      "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                    completion({200,
+                                0,
+                                {},
+                                "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
@@ -3894,10 +4245,10 @@ public:
     {
     }
 
-    void add_work_item(Response response, util::UniqueFunction<void(const Response&)> completion_block)
+    void add_work_item(Response&& response, util::UniqueFunction<void(const Response&)>&& completion)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
-        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion_block)});
+        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion)});
         transport_work_cond.notify_one();
     }
 
@@ -3920,7 +4271,7 @@ public:
 private:
     struct ResponseWorkItem {
         Response response;
-        util::UniqueFunction<void(const Response&)> completion_block;
+        util::UniqueFunction<void(const Response&)> completion;
     };
 
     void worker_routine()
@@ -3937,7 +4288,7 @@ private:
                 lk.unlock();
 
                 mpark::visit(util::overload{[](ResponseWorkItem& work_item) {
-                                                work_item.completion_block(std::move(work_item.response));
+                                                work_item.completion(std::move(work_item.response));
                                             },
                                             [](util::UniqueFunction<void()>& cb) {
                                                 cb();
@@ -3963,7 +4314,6 @@ private:
 
 } // namespace
 
-#if 0
 TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
@@ -4004,16 +4354,14 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
-
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
                 mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
-                    std::move(completion_block));
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 // simulated bad token request
@@ -4022,31 +4370,29 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                 if (cur_state == TestState::refresh_1) {
                     state.advance_to(TestState::profile_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                        std::move(completion_block));
+                                                        std::move(completion));
                 }
                 else if (cur_state == TestState::login) {
                     state.advance_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
+                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
                 }
             }
             else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
                 if (state.get() == TestState::profile_1) {
                     state.advance_to(TestState::refresh_1);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                        std::move(completion_block));
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
                 else if (state.get() == TestState::profile_2) {
                     state.advance_to(TestState::refresh_2);
                     mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
-                                                        std::move(completion_block));
+                                                        std::move(completion));
                 }
                 else {
                     CHECK(state.get() == TestState::refresh_2);
                     state.advance_to(TestState::refresh_3);
                     nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                        std::move(completion_block));
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
                 }
             }
             else if (request.url.find("/location") != std::string::npos) {
@@ -4059,7 +4405,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                              {},
                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion_block));
+                    std::move(completion));
             }
         }
 
@@ -4098,32 +4444,31 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
-#endif
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";
 
     struct transport : UnitTestTransport {
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                completion_block({200,
-                                  0,
-                                  {},
-                                  nlohmann::json({{"deployment_model", "LOCAL"},
-                                                  {"location", "IE"},
-                                                  {"hostname", test_hostname},
-                                                  {"ws_hostname", test_ws_hostname}})
-                                      .dump()});
+                completion({200,
+                            0,
+                            {},
+                            nlohmann::json({{"deployment_model", "LOCAL"},
+                                            {"location", "IE"},
+                                            {"hostname", test_hostname},
+                                            {"ws_hostname", test_ws_hostname}})
+                                .dump()});
             }
             else if (request.url.find("functions/call") != std::string::npos) {
                 REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
             }
             else {
-                UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
+                UnitTestTransport::send_request_to_server(request, std::move(completion));
             }
         }
     };
@@ -4265,6 +4610,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
     }
 }
 
+#if 0
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
@@ -4302,21 +4648,19 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(Request&& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
-
+        void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
         {
             if (request.url.find("/login") != std::string::npos) {
                 state.advance_to(TestState::login);
                 state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
-                    std::move(completion_block));
+                    std::move(completion));
             }
             else if (request.url.find("/profile") != std::string::npos) {
                 state.advance_to(TestState::profile);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                    std::move(completion_block));
+                                                    std::move(completion));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
@@ -4327,7 +4671,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
                              {},
                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion_block));
+                    std::move(completion));
             }
         }
 
@@ -4357,3 +4701,4 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
+#endif

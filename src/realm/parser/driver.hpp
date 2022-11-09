@@ -146,8 +146,13 @@ public:
         , m_comp_type(comp_type)
     {
     }
+    void add_table(std::string table_name)
+    {
+        target_table = table_name.substr(1, table_name.size() - 2);
+    }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
     util::Optional<ExpressionComparisonType> m_comp_type;
+    std::string target_table;
 };
 
 class ListNode : public ParserNode {
@@ -527,8 +532,6 @@ public:
         error_string = err;
         parse_error = true;
     }
-
-    StringData get_printable_name(StringData table_name) const;
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

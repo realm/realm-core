@@ -226,33 +226,34 @@ public:
 
     Ringbuffer() noexcept
     {
-        entries = init_readers_size;
+        m_entries = init_readers_size;
         for (int i = 0; i < init_readers_size; i++) {
-            data[i].version = 1;
-            data[i].count.store(1, std::memory_order_relaxed);
-            data[i].current_top = 0;
-            data[i].filesize = 0;
-            data[i].next = i + 1;
+            m_data[i].version = 1;
+            m_data[i].count.store(1, std::memory_order_relaxed);
+            m_data[i].current_top = 0;
+            m_data[i].filesize = 0;
+            m_data[i].next = i + 1;
         }
-        old_pos = 0;
-        data[0].count.store(0, std::memory_order_relaxed);
-        data[init_readers_size - 1].next = 0;
-        put_pos.store(0, std::memory_order_release);
+        m_old_pos = 0;
+        m_data[0].count.store(0, std::memory_order_relaxed);
+        m_data[init_readers_size - 1].next = 0;
+        m_put_pos.store(0, std::memory_order_release);
     }
 
     void dump()
     {
-        uint_fast32_t i = old_pos;
+        ReadCount* data = this->data();
+        uint_fast32_t i = m_old_pos;
         std::cout << "--- " << std::endl;
-        while (i != put_pos.load()) {
+        while (i != m_put_pos.load()) {
             std::cout << "  used " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
+            i = m_data[i].next;
         }
         std::cout << "  LAST " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-        i = data[i].next;
-        while (i != old_pos) {
+        i = m_data[i].next;
+        while (i != m_old_pos) {
             std::cout << "  free " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
+            i = m_data[i].next;
         }
         std::cout << "--- Done" << std::endl;
     }
@@ -261,16 +262,17 @@ public:
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
-        for (uint32_t i = entries; i < new_entries; i++) {
+        ReadCount* data = this->data();
+        for (uint32_t i = m_entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
-        data[new_entries - 1].next = old_pos;
-        data[put_pos.load(std::memory_order_relaxed)].next = entries;
-        entries = uint32_t(new_entries);
+        data[new_entries - 1].next = m_old_pos;
+        data[m_put_pos.load(std::memory_order_relaxed)].next = m_entries;
+        m_entries = uint32_t(new_entries);
         // dump();
     }
 
@@ -284,17 +286,17 @@ public:
 
     uint_fast32_t get_num_entries() const noexcept
     {
-        return entries;
+        return m_entries;
     }
 
     uint_fast32_t last() const noexcept
     {
-        return put_pos.load(std::memory_order_acquire);
+        return m_put_pos.load(std::memory_order_acquire);
     }
 
     const ReadCount& get(uint_fast32_t idx) const noexcept
     {
-        return data[idx];
+        return data()[idx];
     }
 
     const ReadCount& get_last() const noexcept
@@ -311,7 +313,7 @@ public:
     // It is most likely not suited for any other use.
     ReadCount& reinit_last() noexcept
     {
-        ReadCount& r = data[last()];
+        ReadCount& r = data()[last()];
         // r.count is an atomic<> due to other usage constraints. Right here, we're
         // operating under mutex protection, so the use of an atomic store is immaterial
         // and just forced on us by the type of r.count.
@@ -323,13 +325,13 @@ public:
 
     const ReadCount& get_oldest() const noexcept
     {
-        return get(old_pos.load(std::memory_order_relaxed));
+        return get(m_old_pos.load(std::memory_order_relaxed));
     }
 
     bool is_full() const noexcept
     {
         uint_fast32_t idx = get(last()).next;
-        return idx == old_pos.load(std::memory_order_relaxed);
+        return idx == m_old_pos.load(std::memory_order_relaxed);
     }
 
     uint_fast32_t next() const noexcept
@@ -342,13 +344,13 @@ public:
     ReadCount& get_next() noexcept
     {
         REALM_ASSERT(!is_full());
-        return data[next()];
+        return data()[next()];
     }
 
     void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store(uint32_t(next()), std::memory_order_release);
+        m_put_pos.store(uint32_t(next()), std::memory_order_release);
     }
 
     void cleanup() noexcept
@@ -356,20 +358,20 @@ public:
         // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
-        while (old_pos.load(std::memory_order_relaxed) != put_pos.load(std::memory_order_relaxed)) {
-            const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
+        while (m_old_pos.load(std::memory_order_relaxed) != m_put_pos.load(std::memory_order_relaxed)) {
+            const ReadCount& r = get(m_old_pos.load(std::memory_order_relaxed));
             if (!atomic_one_if_zero(r.count))
                 break;
-            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next_ndx, std::memory_order_relaxed);
+            auto next_ndx = get(m_old_pos.load(std::memory_order_relaxed)).next;
+            m_old_pos.store(next_ndx, std::memory_order_relaxed);
         }
     }
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint32_t entries;
-    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
+    uint32_t m_entries;
+    std::atomic<uint32_t> m_put_pos; // only changed under lock, but accessed outside lock
+    std::atomic<uint32_t> m_old_pos; // only changed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -379,7 +381,17 @@ private:
     // IMPORTANT II:
     // To ensure proper alignment across all platforms, the SharedInfo structure
     // should NOT have a stricter alignment requirement than the ReadCount structure.
-    ReadCount data[init_readers_size];
+    ReadCount m_data[init_readers_size];
+
+    // Silence UBSan errors about out-of-bounds reads on m_data by casting to a pointer
+    ReadCount* data() noexcept
+    {
+        return m_data;
+    }
+    const ReadCount* data() const noexcept
+    {
+        return m_data;
+    }
 };
 
 // Using lambda rather than function so that shared_ptr shared state doesn't need to hold a function pointer.
@@ -636,7 +648,7 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
+void DB::open(const std::string& path, bool no_create_file, const DBOptions& options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -892,7 +904,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
-            cfg.encryption_key = m_key;
+            cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -1036,7 +1048,15 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                                                     path);
                 }
 
-                if (m_key) {
+                bool need_file_format_upgrade =
+                    current_file_format_version < target_file_format_version && top_ref != 0;
+                if (!options.allow_file_format_upgrade && (need_hist_schema_upgrade || need_file_format_upgrade)) {
+                    throw FileFormatUpgradeRequired("Database upgrade required but prohibited", m_db_path);
+                }
+
+                alloc.convert_from_streaming_form(top_ref);
+
+                if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
@@ -1087,7 +1107,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 uint64_t pid = getpid();
 #endif
 
-                if (m_key && info->session_initiator_pid != pid) {
+                if (options.encryption_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
@@ -1188,7 +1208,7 @@ void DB::open(BinaryData buffer, bool take_ownership)
         m_alloc.own_buffer();
 }
 
-void DB::open(Replication& repl, const std::string& file, const DBOptions options)
+void DB::open(Replication& repl, const std::string& file, const DBOptions& options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -1268,7 +1288,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     }
     SharedInfo* info = m_file_map.get_addr();
     Durability dura = Durability(info->durability);
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
@@ -1348,6 +1368,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
+        m_alloc.convert_from_streaming_form(top_ref);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
         SharedInfo* r_info = m_reader_map.get_addr();
@@ -1504,6 +1525,17 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // info->~SharedInfo(); // DO NOT Call destructor
         m_file.close();
     }
+}
+
+bool DB::other_writers_waiting_for_lock() const
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
+    uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
+    // When holding the write lock, next_ticket = next_served + 1, hence, if the diference between 'next_ticket' and
+    // 'next_served' is greater than 1, there is at least one thread waiting to acquire the write lock.
+    return next_ticket > next_served + 1;
 }
 
 class DB::AsyncCommitHelper {
@@ -2249,14 +2281,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                     out.commit(new_top_ref); // Throws
                 }
                 else {
-                    out.flush_all_mappings();
+                    out.sync_all_mappings();
                 }
                 break;
             case Durability::MemOnly:
                 // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually flush the data to disk
-                // (the OS may do so opportinisticly, or when swapping). So in this
-                // mode the file on disk may very likely be in an invalid state.
+                // the shared memory. So we never actually sync the data to disk
+                // (the OS may do so opportinisticly, or when swapping).
+                // however, we still need to flush any private caches into the buffer cache
+                out.flush_all_mappings();
                 break;
         }
         size_t new_file_size = out.get_file_size();
@@ -2477,8 +2510,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 }
 
 inline DB::DB(const DBOptions& options)
-    : m_key(options.encryption_key)
-    , m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);
@@ -2495,21 +2527,21 @@ public:
 };
 } // namespace
 
-DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
+DBRef DB::create(const std::string& file, bool no_create, const DBOptions& options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
 
-DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options)
+DBRef DB::create(Replication& repl, const std::string& file, const DBOptions& options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, file, options);
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions options)
+DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions& options)
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);

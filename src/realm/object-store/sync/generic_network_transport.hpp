@@ -31,7 +31,13 @@
 
 namespace realm::app {
 
-enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2, app_deallocated = 3 };
+enum class ClientErrorCode {
+    user_not_found = 1,
+    user_not_logged_in = 2,
+    app_deallocated = 3,
+    redirect_error = 4,
+    too_many_redirects = 5
+};
 
 enum class JSONErrorCode { bad_token = 1, malformed_json = 2, missing_json_key = 3, bad_bson_parse = 4 };
 
@@ -87,6 +93,7 @@ enum class ServiceErrorCode {
     bad_request = 48,
     account_name_in_use = 49,
     invalid_email_password = 50,
+    maintenance_in_progress = 51,
 
     unknown = -1,
     none = 0
@@ -158,6 +165,11 @@ std::ostream& operator<<(std::ostream& os, AppError error);
 enum class HttpMethod { get, post, patch, put, del };
 
 /**
+ * Request/Response headers type
+ */
+using HttpHeaders = std::map<std::string, std::string>;
+
+/**
  * An HTTP request that can be made to an arbitrary server.
  */
 struct Request {
@@ -178,9 +190,9 @@ struct Request {
     uint64_t timeout_ms = 0;
 
     /**
-     * The HTTP headers of this request.
+     * The HTTP headers of this request - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    HttpHeaders headers;
 
     /**
      * The body of the request.
@@ -189,6 +201,11 @@ struct Request {
 
     /// Indicates if the request uses the refresh token or the access token
     bool uses_refresh_token = false;
+
+    /**
+     * A recursion counter to prevent too many redirects
+     */
+    int redirect_count = 0;
 };
 
 /**
@@ -201,27 +218,45 @@ struct Response {
     int http_status_code;
 
     /**
-     * A custom status code provided by the language binding.
+     * A custom status code provided by the language binding (SDK).
      */
     int custom_status_code;
 
     /**
-     * The headers of the HTTP response.
+     * The headers of the HTTP response - keys are case insensitive.
      */
-    std::map<std::string, std::string> headers;
+    HttpHeaders headers;
 
     /**
      * The body of the HTTP response.
      */
     std::string body;
+
+    /**
+     * An error code used by the client to report http processing errors.
+     */
+    util::Optional<ClientErrorCode> client_error_code;
 };
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(Request&& request,
-                                        util::UniqueFunction<void(const Response&)>&& completionBlock) = 0;
     virtual ~GenericNetworkTransport() = default;
+    virtual void send_request_to_server(const Request& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion) = 0;
+
+    void send_request_to_server(Request&& request,
+                                util::UniqueFunction<void(Request&&, const Response&)>&& completion)
+    {
+        auto request_ptr = std::make_unique<Request>(std::move(request));
+        const auto& request_ref = *request_ptr;
+        send_request_to_server(request_ref, [request_ptr = std::move(request_ptr),
+                                             completion = std::move(completion)](const Response& response) {
+            completion(std::move(*request_ptr), response);
+        });
+    }
 };
+
+const char* httpmethod_to_string(HttpMethod method);
 
 } // namespace realm::app
 

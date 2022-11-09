@@ -20,6 +20,23 @@
 
 namespace realm::app {
 
+const char* httpmethod_to_string(HttpMethod method)
+{
+    switch (method) {
+        case HttpMethod::get:
+            return "GET";
+        case HttpMethod::post:
+            return "POST";
+        case HttpMethod::patch:
+            return "PATCH";
+        case HttpMethod::put:
+            return "PUT";
+        case HttpMethod::del:
+            return "DEL";
+    }
+    return "UNKNOWN";
+}
+
 namespace {
 
 std::string get_error_message(JSONErrorCode error)
@@ -101,6 +118,7 @@ static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"BadRequest", ServiceErrorCode::bad_request},
     {"AccountNameInUse", ServiceErrorCode::account_name_in_use},
     {"InvalidPassword", ServiceErrorCode::invalid_email_password},
+    {"MaintenanceInProgress", ServiceErrorCode::maintenance_in_progress},
     {"Unknown", ServiceErrorCode::unknown},
 };
 
@@ -172,6 +190,24 @@ struct CustomErrorCategory : public std::error_category {
 
 CustomErrorCategory g_custom_error_category;
 
+std::string get_error_message(ClientErrorCode error)
+{
+    static const std::vector<std::pair<std::string, ClientErrorCode>> client_errors = {
+        {"user_not_found", ClientErrorCode::user_not_found},
+        {"user_not_logged_in", ClientErrorCode::user_not_logged_in},
+        {"app_deallocated", ClientErrorCode::app_deallocated},
+        {"redirect_error", ClientErrorCode::redirect_error},
+        {"too_many_redirects", ClientErrorCode::too_many_redirects}};
+    if (auto it = std::find_if(client_errors.begin(), client_errors.end(),
+                               [&](const auto& pair) {
+                                   return pair.second == error;
+                               });
+        it != client_errors.end()) {
+        return it->first;
+    }
+    return "unknown";
+}
+
 struct ClientErrorCategory : public std::error_category {
     const char* name() const noexcept final override
     {
@@ -180,7 +216,7 @@ struct ClientErrorCategory : public std::error_category {
 
     std::string message(int code) const override final
     {
-        return util::format("code %1", code);
+        return get_error_message(ClientErrorCode(code));
     }
 };
 

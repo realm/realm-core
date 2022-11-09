@@ -130,9 +130,8 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     sync_config = std::make_shared<realm::SyncConfig>(user, partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
-                  << std::endl;
+        util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
+                     error.message);
         abort();
     };
     schema_version = 1;
@@ -146,10 +145,9 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config = std::make_shared<realm::SyncConfig>(user, SyncConfig::FLXSyncEnabled{});
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
-        std::cerr << util::format(
-                         "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
-                         error.message, session->path())
-                  << std::endl;
+        util::format(std::cerr,
+                     "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
+                     error.message, session->path());
         abort();
     };
     schema_version = 1;
@@ -178,11 +176,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
 
                    sync::Server::Config config;
                    config.logger = m_logger.get();
-                   config.history_compaction_clock = this;
                    config.token_expiration_clock = this;
-                   config.disable_history_compaction = false;
-                   config.history_ttl = 1s;
-                   config.history_compaction_interval = 1s;
                    config.listen_address = "127.0.0.1";
                    config.disable_sync_to_disk = true;
 
@@ -220,27 +214,37 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
+struct WaitForSessionState {
+    std::condition_variable cv;
+    std::mutex mutex;
+    bool complete = false;
+    std::error_code ec;
+};
+
 static std::error_code wait_for_session(Realm& realm,
                                         void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
                                         std::chrono::seconds timeout)
 {
-    std::condition_variable cv;
-    std::mutex wait_mutex;
-    bool wait_flag(false);
-    std::error_code ec;
+    auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([&](std::error_code error) {
-        std::unique_lock<std::mutex> lock(wait_mutex);
-        wait_flag = true;
-        ec = error;
-        cv.notify_one();
+    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](std::error_code error) {
+        auto shared_state = weak_state.lock();
+        if (!shared_state) {
+            return;
+        }
+        std::lock_guard<std::mutex> lock(shared_state->mutex);
+        shared_state->complete = true;
+        shared_state->ec = error;
+        shared_state->cv.notify_one();
     });
-    std::unique_lock<std::mutex> lock(wait_mutex);
-    bool completed = cv.wait_for(lock, timeout, [&]() {
-        return wait_flag == true;
+    std::unique_lock<std::mutex> lock(shared_state->mutex);
+    bool completed = shared_state->cv.wait_for(lock, timeout, [&]() {
+        return shared_state->complete == true;
     });
-    REALM_ASSERT_RELEASE(completed);
-    return ec;
+    if (!completed) {
+        throw std::runtime_error("wait_For_session() timed out");
+    }
+    return shared_state->ec;
 }
 
 std::error_code wait_for_upload(Realm& realm, std::chrono::seconds timeout)
@@ -329,11 +333,10 @@ TestAppSession::~TestAppSession()
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
+    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
+    , m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    if (config.transport)
-        transport = config.transport;
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
 

@@ -31,29 +31,13 @@
 
 namespace realm::query_parser {
 
-/// Exception thrown when parsing fails due to invalid syntax.
-struct SyntaxError : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
-/// Exception thrown when binding a syntactically valid query string in a
-/// context where it does not make sense.
-struct InvalidQueryError : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
-/// Exception thrown when there is a problem accessing the arguments in a query string
-struct InvalidQueryArgError : std::invalid_argument {
-    using std::invalid_argument::invalid_argument;
-};
-
 struct AnyContext {
     template <typename T>
-    T unbox(const util::Any& wrapper)
+    T unbox(const std::any& wrapper)
     {
         return util::any_cast<T>(wrapper);
     }
-    bool is_null(const util::Any& wrapper)
+    bool is_null(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return true;
@@ -63,7 +47,7 @@ struct AnyContext {
         }
         return false;
     }
-    bool is_list(const util::Any& wrapper)
+    bool is_list(const std::any& wrapper)
     {
         if (!wrapper.has_value()) {
             return false;
@@ -73,7 +57,7 @@ struct AnyContext {
         }
         return false;
     }
-    DataType get_type_of(const util::Any& wrapper)
+    DataType get_type_of(const std::any& wrapper)
     {
         const std::type_info& type{wrapper.type()};
         if (type == typeid(int64_t)) {
@@ -125,7 +109,7 @@ public:
         : m_count(num_args)
     {
     }
-    virtual ~Arguments();
+    virtual ~Arguments() = default;
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;

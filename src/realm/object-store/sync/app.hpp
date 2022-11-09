@@ -27,6 +27,7 @@
 #include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/object_id.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
 
@@ -37,6 +38,7 @@ class SyncUser;
 class SyncSession;
 class SyncManager;
 struct SyncClientConfig;
+class SyncAppMetadata;
 
 namespace app {
 
@@ -44,7 +46,7 @@ class App;
 
 typedef std::shared_ptr<App> SharedApp;
 
-/// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
+/// The `App` has the fundamental set of methods for communicating with a Atlas App Services backend.
 ///
 /// This class provides access to login and authentication.
 ///
@@ -300,22 +302,26 @@ public:
         return T(this);
     }
 
+    void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name, std::string_view args_ejson,
+                       const util::Optional<std::string>& service_name,
+                       util::UniqueFunction<void(const std::string*, util::Optional<AppError>)>&& completion) final;
+
     void call_function(
         const std::shared_ptr<SyncUser>& user, const std::string& name, const bson::BsonArray& args_bson,
         const util::Optional<std::string>& service_name,
-        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::shared_ptr<SyncUser>& user, const std::string&, const bson::BsonArray& args_bson,
-        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::string& name, const bson::BsonArray& args_bson, const util::Optional<std::string>& service_name,
-        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) final;
 
     void call_function(
         const std::string&, const bson::BsonArray& args_bson,
-        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) final;
 
     template <typename T>
     void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name,
@@ -368,6 +374,11 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
+    std::unique_ptr<util::Logger> m_logger;
+
+    template <class... Params>
+    void log(const char* message, Params&&... params);
+    bool would_log();
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
@@ -387,7 +398,24 @@ private:
 
     std::string url_for_path(const std::string& path) const override;
 
-    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion);
+    /// Return the app route for this App instance, or creates a new app route string if
+    /// a new hostname is provided
+    /// @param hostname The hostname to generate a new app route
+    std::string get_app_route(const util::Optional<std::string>& hostname = util::none) const;
+
+    /// Request the app metadata information from the server if it has not been processed yet. If
+    /// a new hostname is provided, the app metadata will be refreshed using the new hostname.
+    /// @param completion The server response if an error was encountered during the update
+    /// @param new_hostname If provided, the metadata will be requested from this hostname
+    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion,
+                           const util::Optional<std::string>& new_hostname = util::none);
+
+    /// Update the app metadata and resend the request with the updated metadata
+    /// @param request The original request object that needs to be sent after the update
+    /// @param completion The original completion object that will be called with the response to the request
+    /// @param new_hostname If provided, the metadata will be requested from this hostname
+    void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                                    const util::Optional<std::string>& new_hostname = util::none);
 
     void basic_request(std::string&& route, std::string&& body,
                        util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
@@ -398,6 +426,20 @@ private:
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
     void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
+
+    /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
+    /// @param request The request to be performed (in case it needs to be sent again)
+    /// @param response The response from the send_request_to_server operation
+    /// @param completion Returns the response from the server if not a redirect
+    void handle_possible_redirect_response(Request&& request, const Response& response,
+                                           util::UniqueFunction<void(const Response&)>&& completion);
+
+    /// Process the redirect response received from the last request that was sent to the server
+    /// @param request The request to be performed (in case it needs to be sent again)
+    /// @param response The response from the send_request_to_server operation
+    /// @param completion Returns the response from the server if not a redirect
+    void handle_redirect_response(Request&& request, const Response& response,
+                                  util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
@@ -431,6 +473,12 @@ private:
     std::string function_call_url_path() const;
 
     void configure(const SyncClientConfig& sync_client_config);
+
+    std::string make_sync_route(const std::string& http_app_route);
+
+    void update_hostname(const util::Optional<realm::SyncAppMetadata>& metadata);
+
+    void update_hostname(const std::string& hostname, const util::Optional<std::string>& ws_hostname = util::none);
 
     bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };

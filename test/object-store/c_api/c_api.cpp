@@ -9,6 +9,7 @@
 #include "sync/flx_sync_harness.hpp"
 #include "util/test_file.hpp"
 #include "util/event_loop.hpp"
+#include "realm/util/logger.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
@@ -762,7 +763,20 @@ bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_s
     static_cast<void>(old);
     static_cast<void>(new_);
     ++userdata->num_migrations;
+    REQUIRE_FALSE((*old)->auto_refresh());
     return true;
+}
+
+bool migrate_schema_delete_old_table(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t*)
+{
+    auto userdata = static_cast<ConfigUserdata*>(userdata_p);
+    static_cast<void>(old);
+    static_cast<void>(new_);
+    ++userdata->num_migrations;
+    bool table_deleted = false;
+    CHECK(checked(realm_remove_table(new_, "Foo", &table_deleted)));
+    CHECK(table_deleted);
+    return table_deleted;
 }
 
 bool migrate_schema_rename_prop(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t* schema)
@@ -834,6 +848,70 @@ TEST_CASE("C API", "[c_api]") {
             realm_config_set_migration_function(config2.get(), migrate_schema, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
+        }
+
+        SECTION("migrate schema and delete old table") {
+            TestFile test_file_3;
+            ConfigUserdata userdata;
+
+            realm_config_set_migration_function(config.get(), migrate_schema_delete_old_table, &userdata, nullptr);
+            const realm_class_info_t foo_class[1] = {{
+                "Foo",
+                "int",
+                1,
+                0,
+                RLM_INVALID_CLASS_KEY,
+                RLM_CLASS_NORMAL,
+            }};
+            const realm_class_info_t bar_class[1] = {{
+                "Bar",
+                "int",
+                1,
+                0,
+                RLM_INVALID_CLASS_KEY,
+                RLM_CLASS_NORMAL,
+            }};
+            const realm_property_info_t properties[1] = {
+                {
+                    "int",
+                    "",
+                    RLM_PROPERTY_TYPE_INT,
+                    RLM_COLLECTION_TYPE_NONE,
+                    "",
+                    "",
+                    RLM_INVALID_PROPERTY_KEY,
+                    RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
+                },
+            };
+            const realm_property_info_t* props[1] = {properties};
+            auto schema = cptr(realm_schema_new(foo_class, 1, props));
+            auto new_schema = cptr(realm_schema_new(bar_class, 1, props));
+            CHECK(checked(schema.get()));
+            CHECK(checked(new_schema.get()));
+            REQUIRE(checked(realm_schema_validate(schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            REQUIRE(checked(realm_schema_validate(new_schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            // realm with schema containing Foo
+            auto config = cptr(realm_config_new());
+            realm_config_set_path(config.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config.get(), 0);
+            realm_config_set_schema(config.get(), schema.get());
+            auto realm = cptr_checked(realm_open(config.get()));
+            CHECK(userdata.num_migrations == 0);
+            realm.reset();
+            // migrate schema basically changing Foo into Bar
+            auto config2 = cptr(realm_config_new());
+            realm_config_set_path(config2.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config2.get(), 999);
+            realm_config_set_schema(config2.get(), new_schema.get());
+            realm_config_set_migration_function(config2.get(), migrate_schema_delete_old_table, &userdata, nullptr);
+            auto realm2 = cptr_checked(realm_open(config2.get()));
+            CHECK(userdata.num_migrations == 1);
+            auto new_db_schema = realm_get_schema(realm2.get());
+            CHECK(realm_equals(new_db_schema, new_schema.get()));
+            realm2.reset();
+            realm_release(new_db_schema);
         }
 
         SECTION("migration callback rename property") {
@@ -1083,31 +1161,47 @@ TEST_CASE("C API", "[c_api]") {
     }
 
     SECTION("realm refresh async pending") {
-        bool realm_refresh_callback_called = false;
-        // bool on_transaction_completed = false;
-        bool done = false;
+        struct TestingObj {
+            static TestingObj& get()
+            {
+                static TestingObj obj;
+                return obj;
+            }
+            bool done{false};
+            bool realm_refresh_callback_called{false};
+            realm_t* realm{nullptr};
+        };
+
         auto wait_for_done = [&]() {
             util::EventLoop::main().run_until([&] {
-                return done;
+                return TestingObj::get().done;
             });
-            REQUIRE(done);
+            REQUIRE(TestingObj::get().done);
         };
-        (*realm)->async_begin_transaction([&]() {
-            auto token = cptr(realm_add_realm_refresh_callback(
-                realm,
-                [](void* userdata) {
-                    *reinterpret_cast<bool*>(userdata) = true;
-                },
-                &realm_refresh_callback_called, [](void*) {}));
+        TestingObj::get().realm = realm;
 
-            (*realm)->async_commit_transaction([&](std::exception_ptr) {
-                done = true;
-            });
-        });
+        realm_async_begin_write(
+            realm,
+            [](void*) {
+                auto realm = TestingObj::get().realm;
+                auto token_refresh = cptr(realm_add_realm_refresh_callback(
+                    realm,
+                    [](void* userdata) {
+                        *reinterpret_cast<bool*>(userdata) = true;
+                    },
+                    &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
 
+                realm_async_commit(
+                    realm,
+                    [](void*, bool, const char*) {
+                        TestingObj::get().done = true;
+                    },
+                    nullptr, nullptr, false);
+            },
+            nullptr, nullptr, false);
 
         wait_for_done();
-        CHECK(realm_refresh_callback_called);
+        CHECK(TestingObj::get().realm_refresh_callback_called);
     }
 
     SECTION("realm async refresh - main use case") {
@@ -1371,6 +1465,13 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(did_compact);
     }
 
+    SECTION("realm_remove_table()") {
+        bool table_deleted = true;
+        CHECK(!realm_remove_table(realm, "Foo", &table_deleted));
+        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK(!table_deleted);
+    }
+
     SECTION("realm_get_class_keys()") {
         realm_class_key_t keys[2];
         // return total number of keys present, copy only if there is enough space in the vector passed in
@@ -1550,6 +1651,14 @@ TEST_CASE("C API", "[c_api]") {
         REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
 
+        SECTION("realm_get_value_by_property_index") {
+            realm_value value;
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 0, &value)));
+            CHECK(value.integer == int_val1.integer);
+            CHECK(checked(realm_get_value_by_property_index(obj1.get(), 16, &value)));
+            CHECK(value.string.data == std::string{"Hello, World!"});
+        }
+
         SECTION("realm_clone()") {
             auto obj1a = clone_cptr(obj1);
             CHECK(realm_equals(obj1a.get(), obj1.get()));
@@ -1714,6 +1823,18 @@ TEST_CASE("C API", "[c_api]") {
                 realm_get_value(obj1.get(), foo_str_key, &value);
                 CHECK(value.type == RLM_TYPE_STRING);
             });
+        }
+
+        SECTION("realm_object_add_int errors") {
+            SECTION("SUCCESS") {
+                realm_begin_write(realm);
+                CHECK(realm_object_add_int(obj1.get(), foo_int_key, 10));
+                realm_commit(realm);
+            }
+            SECTION("ERROR") {
+                CHECK(!realm_object_add_int(obj1.get(), foo_int_key, 10));
+                CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            }
         }
 
         SECTION("get/set all property types") {
@@ -2053,6 +2174,56 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(found_value.link.target == realm_object_get_key(obj1.get()));
             }
 
+            SECTION("verify order realm_query_find_first()") {
+                realm_property_info_t info_string;
+                realm_property_info_t info_int;
+                bool found_string = false, found_int = false;
+                REQUIRE(realm_find_property(realm, class_foo.key, "string", &found_string, &info_string));
+                REQUIRE(realm_find_property(realm, class_foo.key, "int", &found_int, &info_int));
+                CHECK(info_string.key != RLM_INVALID_PROPERTY_KEY);
+                CHECK(info_int.key != RLM_INVALID_PROPERTY_KEY);
+                CPtr<realm_object_t> obj1, obj2;
+                checked(realm_begin_write(realm));
+                obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                obj2 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+                CHECK(obj2);
+                CHECK(checked(realm_set_value(obj1.get(), info_string.key, rlm_str_val("Test"), false)));
+                CHECK(checked(realm_set_value(obj2.get(), info_string.key, rlm_str_val("Test"), false)));
+                CHECK(checked(realm_set_value(obj1.get(), info_int.key, rlm_int_val(10), false)));
+                CHECK(checked(realm_set_value(obj2.get(), info_int.key, rlm_int_val(11), false)));
+                checked(realm_commit(realm));
+                checked(realm_refresh(realm));
+
+                size_t count = 0;
+                realm_value_t arg_data[1] = {rlm_str_val("Test")};
+                realm_query_arg_t args[1] = {realm_query_arg_t{1, false, &arg_data[0]}};
+                realm_query_arg_t* arg_list = &args[0];
+                auto q = cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", 1, arg_list));
+                CHECK(checked(realm_query_count(q.get(), &count)));
+                CHECK(count == 2);
+
+                auto q2 =
+                    cptr_checked(realm_query_append_query(q.get(), "string == $0 SORT(int ASCENDING)", 1, arg_list));
+                realm_value_t found_value = rlm_null();
+                bool found_sorted;
+                CHECK(checked(realm_query_find_first(q2.get(), &found_value, &found_sorted)));
+                CHECK(found_sorted);
+                CHECK(found_value.type == RLM_TYPE_LINK);
+                CHECK(found_value.link.target_table == class_foo.key);
+                CHECK(found_value.link.target == realm_object_get_key(obj1.get()));
+
+                auto q3 =
+                    cptr_checked(realm_query_append_query(q.get(), "string == $0 SORT(int DESCENDING)", 1, arg_list));
+                found_value = rlm_null();
+                found_sorted = false;
+                CHECK(checked(realm_query_find_first(q3.get(), &found_value, &found_sorted)));
+                CHECK(found_sorted);
+                CHECK(found_value.type == RLM_TYPE_LINK);
+                CHECK(found_value.link.target_table == class_foo.key);
+                CHECK(found_value.link.target == realm_object_get_key(obj2.get()));
+            }
+
             SECTION("results") {
                 auto r = cptr_checked(realm_query_find_all(q.get()));
                 CHECK(!realm_is_frozen(r.get()));
@@ -2080,6 +2251,11 @@ TEST_CASE("C API", "[c_api]") {
                     realm_value_t value = rlm_null();
                     CHECK(!realm_results_get(r2.get(), 0, &value));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find(r2.get(), &value, &index, &found));
+                    CHECK(index == realm::not_found);
+                    CHECK(found == false);
                 }
 
                 SECTION("realm_results_get()") {
@@ -2088,18 +2264,30 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(value.type == RLM_TYPE_LINK);
                     CHECK(value.link.target_table == class_foo.key);
                     CHECK(value.link.target == realm_object_get_key(obj1.get()));
-
                     CHECK(!realm_results_get(r.get(), 1, &value));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find(r.get(), &value, &index, &found));
+                    CHECK(index == realm::not_found);
+                    CHECK(found == false);
                 }
 
                 SECTION("realm_results_get_object()") {
                     auto p = cptr_checked(realm_results_get_object(r.get(), 0));
                     CHECK(p.get());
                     CHECK(realm_equals(p.get(), obj1.get()));
+                    size_t index = -1;
+                    bool found = false;
+                    CHECK(realm_results_find_object(r.get(), p.get(), &index, &found));
+                    CHECK(found == true);
+                    CHECK(index == 0);
 
                     CHECK(!realm_results_get_object(r.get(), 1));
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    CHECK(!realm_results_find_object(r.get(), obj2.get(), &index, &found));
+                    CHECK(found == false);
+                    CHECK(index == realm::not_found);
                 }
 
                 SECTION("realm_results_filter()") {
@@ -2226,6 +2414,48 @@ TEST_CASE("C API", "[c_api]") {
                     cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE", 0, nullptr));
                 }
 
+                SECTION("lists append query") {
+                    auto list = cptr_checked(realm_get_list(obj1.get(), foo_properties["link_list"]));
+
+                    auto bar_link = realm_object_as_link(obj2.get());
+                    realm_value_t bar_link_val;
+                    bar_link_val.type = RLM_TYPE_LINK;
+                    bar_link_val.link = bar_link;
+
+                    write([&]() {
+                        CHECK(checked(realm_list_insert(list.get(), 0, bar_link_val)));
+                        CHECK(checked(realm_list_insert(list.get(), 1, bar_link_val)));
+                        CHECK(checked(realm_list_insert(list.get(), 2, bar_link_val)));
+                    });
+
+                    size_t n = 0;
+                    realm_list_size(list.get(), &n);
+                    CHECK(n == 3);
+                    auto query = cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE ", 0, nullptr));
+                    n = 0;
+                    realm_query_count(query.get(), &n);
+                    CHECK(n == 3);
+
+                    write([&]() {
+                        realm_list_clear(list.get());
+                    });
+                }
+
+                SECTION("combine results query") {
+                    realm_value_t int_arg = rlm_int_val(123);
+                    const size_t num_args = 1;
+                    realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &int_arg}};
+                    realm_query_arg_t* arg_list = &args[0];
+                    auto q_int =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "int == $0", num_args, arg_list));
+                    auto combined_result_q =
+                        cptr_checked(realm_query_parse_for_results(r.get(), q_int->get_description(), 0, nullptr));
+                    auto result = cptr_checked(realm_query_find_all(combined_result_q.get()));
+                    size_t count;
+                    CHECK(realm_results_count(result.get(), &count));
+                    CHECK(count == 1);
+                }
+
                 SECTION("empty results") {
                     auto empty_q = cptr_checked(realm_query_parse_for_results(r.get(), "FALSEPREDICATE", 0, nullptr));
                     auto empty_r = cptr_checked(realm_query_find_all(empty_q.get()));
@@ -2340,6 +2570,35 @@ TEST_CASE("C API", "[c_api]") {
                         CHECK(rlm_stdstr(a2) == "a");
                         CHECK(rlm_stdstr(b2) == "b");
                         CHECK(c2.type == RLM_TYPE_NULL);
+
+                        size_t out_index = -1;
+                        bool found;
+                        CHECK(checked(realm_list_find(strings.get(), &a2, &out_index, &found)));
+                        CHECK(out_index == 0);
+                        CHECK(found);
+                        CHECK(checked(realm_list_find(strings.get(), &b2, &out_index, &found)));
+                        CHECK(out_index == 1);
+                        CHECK(found);
+                        CHECK(checked(realm_list_find(strings.get(), &c2, &out_index, &found)));
+                        CHECK(out_index == 2);
+                        CHECK(found);
+
+                        realm_value_t dummy = rlm_str_val("c");
+                        CHECK(checked(realm_list_find(strings.get(), &dummy, &out_index, &found)));
+                        CHECK(!found);
+                        CHECK(out_index == realm::not_found);
+
+                        // verify that conversion to results works
+                        auto results = cptr_checked(realm_list_to_results(strings.get()));
+                        CHECK(checked(realm_results_find(results.get(), &a2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 0);
+                        CHECK(checked(realm_results_find(results.get(), &b2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 1);
+                        CHECK(checked(realm_results_find(results.get(), &c2, &out_index, &found)));
+                        CHECK(found);
+                        CHECK(out_index == 2);
                     });
                 }
 
@@ -2438,49 +2697,77 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(realm_list_insert(nullable_uuid_list.get(), 1, null));
                 });
 
-                realm_value_t value;
+                auto find = ([&](auto* list, auto* value) {
+                    std::size_t index = -1;
+                    bool found = false;
+                    CHECK(checked(realm_list_find(list, value, &index, &found)));
+                    CHECK(index == 0);
+                    CHECK(found);
+                    return (index < list->size()) && found == true;
+                });
 
+                realm_value_t value;
                 CHECK(realm_list_get(int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
                 CHECK(!realm_list_get_linked_object(int_list.get(), 0));
+                CHECK(find(int_list.get(), &value));
                 CHECK(realm_list_get(bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
+                CHECK(find(bool_list.get(), &value));
                 CHECK(realm_list_get(string_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, string));
+                CHECK(find(string_list.get(), &value));
                 CHECK(realm_list_get(binary_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, binary));
+                CHECK(find(binary_list.get(), &value));
                 CHECK(realm_list_get(timestamp_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, timestamp));
+                CHECK(find(timestamp_list.get(), &value));
                 CHECK(realm_list_get(float_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, fnum));
+                CHECK(find(float_list.get(), &value));
                 CHECK(realm_list_get(double_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, dnum));
+                CHECK(find(double_list.get(), &value));
                 CHECK(realm_list_get(decimal_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, decimal));
+                CHECK(find(decimal_list.get(), &value));
                 CHECK(realm_list_get(object_id_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, object_id));
+                CHECK(find(object_id_list.get(), &value));
                 CHECK(realm_list_get(uuid_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, uuid));
+                CHECK(find(uuid_list.get(), &value));
                 CHECK(realm_list_get(nullable_int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
+                CHECK(find(nullable_int_list.get(), &value));
                 CHECK(realm_list_get(nullable_bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
+                CHECK(find(nullable_bool_list.get(), &value));
                 CHECK(realm_list_get(nullable_string_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, string));
+                CHECK(find(nullable_string_list.get(), &value));
                 CHECK(realm_list_get(nullable_binary_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, binary));
+                CHECK(find(nullable_binary_list.get(), &value));
                 CHECK(realm_list_get(nullable_timestamp_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, timestamp));
+                CHECK(find(nullable_timestamp_list.get(), &value));
                 CHECK(realm_list_get(nullable_float_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, fnum));
+                CHECK(find(nullable_float_list.get(), &value));
                 CHECK(realm_list_get(nullable_double_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, dnum));
+                CHECK(find(nullable_double_list.get(), &value));
                 CHECK(realm_list_get(nullable_decimal_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, decimal));
+                CHECK(find(nullable_decimal_list.get(), &value));
                 CHECK(realm_list_get(nullable_object_id_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, object_id));
+                CHECK(find(nullable_object_id_list.get(), &value));
                 CHECK(realm_list_get(nullable_uuid_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, uuid));
+                CHECK(find(nullable_uuid_list.get(), &value));
 
                 write([&]() {
                     CHECK(realm_list_insert(nullable_int_list.get(), 0, null));
@@ -2531,6 +2818,20 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_list_size(bars.get(), &size)));
                     CHECK(size == 2);
+
+                    bool found = true;
+                    size_t index = -1;
+                    CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
+                    CHECK(index == 0);
+                    CHECK(found);
+
+                    realm_list_clear(bars.get());
+                    CHECK(checked(realm_list_find(bars.get(), &bar_link_val, &index, &found)));
+                    CHECK(index == realm::not_found);
+                    CHECK(!found);
+
+                    CHECK(checked(realm_list_insert(bars.get(), 0, bar_link_val)));
+                    CHECK(checked(realm_list_insert(bars.get(), 1, bar_link_val)));
                 });
 
                 SECTION("get") {
@@ -2624,11 +2925,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->called = true;
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_list_t> strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
 
                 auto str1 = rlm_str_val("a");
@@ -2636,8 +2932,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_list_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                   nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_list_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2648,7 +2944,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -2693,8 +2989,8 @@ TEST_CASE("C API", "[c_api]") {
                     realm_key_path_elem_t bar_strings[] = {{class_bar.key, bar_doubles_key}};
                     realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
                     realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
-                    auto token = cptr_checked(realm_list_add_notification_callback(
-                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error));
+                    auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
+                                                                                   &key_path_array, on_change));
                     checked(realm_refresh(realm));
 
                     state.called = false;
@@ -2865,6 +3161,12 @@ TEST_CASE("C API", "[c_api]") {
                             cptr_checked(realm_get_set(obj3.get(), foo_properties["nullable_string_set"]));
                         CHECK(!realm_equals(strings.get(), strings3.get()));
                     });
+                }
+
+                SECTION("parse query for sets") {
+                    auto links = cptr_checked(realm_get_set(obj1.get(), foo_properties["link_set"]));
+                    CHECK(links);
+                    cptr_checked(realm_query_parse_for_set(links.get(), "TRUEPREDICATE", 0, nullptr));
                 }
             }
 
@@ -3055,6 +3357,16 @@ TEST_CASE("C API", "[c_api]") {
                     size_t size;
                     CHECK(checked(realm_set_size(bars.get(), &size)));
                     CHECK(size == 1);
+
+                    auto results =
+                        cptr_checked(realm_get_backlinks(obj2.get(), class_foo.key, foo_properties["link_set"]));
+                    CHECK(results->size() == 1);
+                    auto mixed_link = results->get_any(0);
+                    CHECK(!mixed_link.is_unresolved_link());
+                    CHECK(mixed_link.is_type(type_TypedLink));
+                    auto link = mixed_link.get_link();
+                    CHECK(link.get_obj_key() == obj1->obj().get_key());
+                    CHECK(link.get_table_key() == obj1->obj().get_table()->get_key());
                 });
 
                 SECTION("get") {
@@ -3131,11 +3443,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_set_t> strings =
                     cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
 
@@ -3144,8 +3451,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                  nullptr, on_change, on_error));
+                    auto token = cptr_checked(
+                        realm_set_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3156,7 +3463,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3653,11 +3960,6 @@ TEST_CASE("C API", "[c_api]") {
                     state->changes = clone_cptr(changes);
                 };
 
-                auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                    auto* state = static_cast<State*>(userdata);
-                    state->error = clone_cptr(err);
-                };
-
                 CPtr<realm_dictionary_t> strings =
                     cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_string_dict"]));
 
@@ -3667,7 +3969,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error));
+                        strings.get(), &state, nullptr, nullptr, on_change));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3678,7 +3980,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3732,14 +4034,9 @@ TEST_CASE("C API", "[c_api]") {
                 state->called = true;
             };
 
-            auto on_error = [](void* userdata, const realm_async_error_t* err) {
-                auto state = static_cast<State*>(userdata);
-                state->error = clone_cptr(err);
-            };
-
             auto require_change = [&]() {
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr,
-                                                                         on_change, on_error));
+                auto token =
+                    cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr, on_change));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -3783,8 +4080,8 @@ TEST_CASE("C API", "[c_api]") {
                 realm_key_path_elem_t origin_value[] = {{class_foo.key, foo_int_key}};
                 realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
                 realm_key_path_array_t key_path_array = {1, key_path_origin_value};
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array,
-                                                                         on_change, on_error));
+                auto token = cptr(
+                    realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array, on_change));
                 checked(realm_refresh(realm));
                 state.called = false;
                 write([&]() {
@@ -4340,6 +4637,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
+    local_config.sync_config = std::make_shared<realm_sync_config_t>(*local_config.sync_config);
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
 
     struct ResetRealmFiles {
@@ -4368,6 +4666,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             local_sync_config,
             [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
                 REQUIRE(sync_error.is_client_reset_requested);
+                REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
                 ResetRealmFiles::instance().reset_realm(realm_sync_error_original_file_path_key);
                 baas_client_stop.store(true);
             },
@@ -4424,6 +4723,9 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
                 local_sync_config,
                 [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
                     REQUIRE(sync_error.is_client_reset_requested);
+                    // Callback in `realm_sync_config_set_before_client_reset_handler` fails, so
+                    // a synthetic error is created with no action.
+                    REQUIRE(sync_error.server_requests_action == RLM_SYNC_ERROR_ACTION_NO_ACTION);
                     ResetRealmFiles::instance().reset_realm(realm_sync_error_original_file_path_key);
                     error_handler_counter.fetch_add(1);
                     baas_client_stop.store(true);
@@ -4461,7 +4763,6 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     }
 }
 
-
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
 static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
@@ -4482,8 +4783,79 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
     }
 }
 
-TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
-    TestAppSession session;
+TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
+    struct TestTransportUserData {
+        TestTransportUserData()
+            : logger(std::make_unique<util::StderrLogger>())
+            , transport(std::make_unique<SynchronousTestTransport>())
+        {
+            logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+        }
+        std::unique_ptr<util::StderrLogger> logger;
+        std::unique_ptr<realm::app::GenericNetworkTransport> transport;
+    };
+
+    auto send_request_to_server = [](realm_userdata_t userdata, const realm_http_request_t request,
+                                     void* request_context) {
+        using namespace realm::app;
+
+        constexpr uint64_t default_timeout_ms = 60000;
+        REQUIRE(userdata != nullptr);
+        TestTransportUserData* user_data(static_cast<TestTransportUserData*>(userdata));
+        REQUIRE(user_data != nullptr);
+        REQUIRE(user_data->transport != nullptr);
+        REQUIRE(user_data->logger != nullptr);
+        REQUIRE(strlen(request.url) > 0);
+        HttpHeaders headers;
+        for (size_t i = 0; i < request.num_headers; i++) {
+            REQUIRE(request.headers[i].name != nullptr);
+            REQUIRE(request.headers[i].value != nullptr);
+            std::string name(request.headers[i].name);
+            std::string value(request.headers[i].value);
+            REQUIRE(!name.empty());
+            REQUIRE(!value.empty());
+            headers.emplace(name, value);
+        }
+        REQUIRE(request_context != nullptr);
+        auto new_request = Request{HttpMethod(request.method), request.url, default_timeout_ms, std::move(headers),
+                                   std::string(request.body, request.body_size)};
+        user_data->logger->trace("CAPI: Request URL (%1): %2", httpmethod_to_string(new_request.method),
+                                 new_request.url);
+        user_data->logger->trace("CAPI: Request body: %1", new_request.body);
+        user_data->transport->send_request_to_server(new_request, [&](const Response& response) mutable {
+            std::vector<realm_http_header_t> c_headers;
+            c_headers.reserve(response.headers.size());
+            for (auto&& header : response.headers) {
+                c_headers.push_back({header.first.c_str(), header.second.c_str()});
+            }
+
+            auto c_response = std::make_unique<realm_http_response_t>();
+            c_response->status_code = response.http_status_code;
+            c_response->custom_status_code = response.custom_status_code;
+            c_response->headers = c_headers.data();
+            c_response->num_headers = c_headers.size();
+            c_response->body = response.body.data();
+            c_response->body_size = response.body.size();
+            user_data->logger->trace("CAPI: Response (%1): %2", c_response->status_code,
+                                     std::string(c_response->body, c_response->body_size));
+            realm_http_transport_complete_request(request_context, c_response.get());
+        });
+    };
+
+    auto user_data_free = [](void* userdata) {
+        REQUIRE(userdata != nullptr);
+        std::unique_ptr<TestTransportUserData> user_data(static_cast<TestTransportUserData*>(userdata));
+        REQUIRE(user_data != nullptr);
+        REQUIRE(user_data->transport != nullptr);
+        REQUIRE(user_data->logger != nullptr);
+        user_data->logger->trace("CAPI: user_data free called");
+    };
+
+    // user_data will be deleted when user_data_free() is called
+    auto user_data = new TestTransportUserData();
+    auto http_transport = realm_http_transport_new(send_request_to_server, user_data, user_data_free);
+    auto app_session = get_runtime_app_session(get_base_url());
+    TestAppSession session(app_session, *http_transport, DeleteApp{false});
     realm_app app(session.app());
 
     SECTION("remove_user integration") {
@@ -4636,6 +5008,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
             realm_release(current_user);
         }
     }
+    realm_release(http_transport);
 }
 
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
@@ -4656,11 +5029,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
 
     harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
+        Object::create(
+            c, realm, "Obj",
+            std::any(AnyDict{{"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
-                           {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
-        Object::create(c, realm, "Obj",
-                       util::Any(AnyDict{
+                       std::any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
     });
 

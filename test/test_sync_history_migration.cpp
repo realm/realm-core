@@ -173,7 +173,6 @@ TEST(Sync_HistoryMigration)
         std::mt19937_64 m_random;
     };
     ServerHistoryContext server_history_context;
-    _impl::ServerHistory::DummyCompactionControl compaction_control;
 
     // Accesses file without migrating it
     auto get_history_info = [&](const std::string& path, int& history_type, int& history_schema_version) {
@@ -192,7 +191,7 @@ TEST(Sync_HistoryMigration)
     };
 
     auto verify_server_file = [&](const std::string& server_path) {
-        _impl::ServerHistory history{server_history_context, compaction_control};
+        _impl::ServerHistory history{server_history_context};
         DBRef sg = DB::create(history, server_path);
         ReadTransaction rt{sg};
         rt.get_group().verify();
@@ -208,7 +207,7 @@ TEST(Sync_HistoryMigration)
 
     auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
         auto history_1 = sync::make_client_replication();
-        _impl::ServerHistory history_2{server_history_context, compaction_control};
+        _impl::ServerHistory history_2{server_history_context};
         DBRef sg_1 = DB::create(*history_1, client_path);
         DBRef sg_2 = DB::create(history_2, server_path);
         ReadTransaction rt_1{sg_1};

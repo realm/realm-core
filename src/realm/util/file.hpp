@@ -649,7 +649,7 @@ private:
         size_t m_reservation_size = 0;
         size_t m_offset = 0;
         FileDesc m_fd;
-        AccessMode m_a;
+        AccessMode m_access_mode = access_ReadOnly;
 
         MapBase() noexcept;
         ~MapBase() noexcept;
@@ -772,7 +772,7 @@ public:
             unmap();
         m_addr = other.get_addr();
         m_size = other.m_size;
-        m_a = other.m_a;
+        m_access_mode = other.m_access_mode;
         m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
         m_fd = other.m_fd;
@@ -842,6 +842,11 @@ public:
     /// Map instance. The address range may then be unmapped later by
     /// a call to File::unmap().
     T* release() noexcept;
+
+    bool is_writeable() const noexcept
+    {
+        return m_access_mode == access_ReadWrite;
+    }
 
 #if REALM_ENABLE_ENCRYPTION
     /// Get the encrypted file mapping corresponding to this mapping

@@ -31,16 +31,16 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 namespace realm {
-app::Response do_http_request(app::Request&& request);
+app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
 public:
-    app::Response get() const;
+    app::Response get(const std::vector<std::pair<std::string, std::string>>& params = {}) const;
     app::Response patch(std::string body) const;
     app::Response post(std::string body) const;
     app::Response put(std::string body) const;
     app::Response del() const;
-    nlohmann::json get_json() const;
+    nlohmann::json get_json(const std::vector<std::pair<std::string, std::string>>& params = {}) const;
     nlohmann::json patch_json(nlohmann::json body) const;
     nlohmann::json post_json(nlohmann::json body) const;
     nlohmann::json put_json(nlohmann::json body) const;
@@ -100,7 +100,9 @@ public:
             }
         }
     };
+
     std::vector<Service> get_services(const std::string& app_id) const;
+    std::vector<std::string> get_errors(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;
     ServiceConfig get_config(const std::string& app_id, const Service& service) const;
     ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id,
@@ -112,6 +114,8 @@ public:
     ServiceConfig set_disable_recovery_to(const std::string& app_id, const std::string& service_id,
                                           ServiceConfig sync_config, bool disable) const;
     bool is_sync_enabled(const std::string& app_id) const;
+    bool is_sync_terminated(const std::string& app_id) const;
+    bool is_initial_sync_complete(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {
@@ -155,8 +159,8 @@ struct AppCreateConfig {
     struct FLXSyncRole {
         std::string name;
         nlohmann::json apply_when = nlohmann::json::object();
-        mpark::variant<bool, nlohmann::json> read;
-        mpark::variant<bool, nlohmann::json> write;
+        nlohmann::json read;
+        nlohmann::json write;
     };
 
     struct FLXSyncConfig {
@@ -199,13 +203,13 @@ AppSession create_app(const AppCreateConfig& config);
 
 class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
-    void send_request_to_server(app::Request&& request,
+    void send_request_to_server(const app::Request& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
         {
             std::lock_guard barrier(m_mutex);
         }
-        completion(do_http_request(std::move(request)));
+        completion(do_http_request(request));
     }
 
     void block()

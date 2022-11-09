@@ -30,12 +30,15 @@ namespace sync {
 //
 //   6 Support for asymmetric tables.
 //
+//   7 Client takes the 'action' specified in the 'json_error' messages received
+//     from server. Client sends 'json_error' messages to the server.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 6;
+    return 7;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -131,6 +134,7 @@ struct DownloadCursor {
 enum class DownloadBatchState {
     MoreToCome,
     LastInBatch,
+    SteadyState,
 };
 
 /// Checks that `dc.last_integrated_client_version` is zero if
@@ -195,7 +199,7 @@ struct SyncProgress {
 
 struct CompensatingWriteErrorInfo {
     std::string object_name;
-    Mixed primary_key;
+    OwnedMixed primary_key;
     std::string reason;
 };
 
@@ -206,6 +210,17 @@ struct ResumptionDelayInfo {
 };
 
 struct ProtocolErrorInfo {
+    enum class Action {
+        NoAction,
+        ProtocolViolation,
+        ApplicationBug,
+        Warning,
+        Transient,
+        DeleteRealm,
+        ClientReset,
+        ClientResetNoRecovery
+    };
+
     ProtocolErrorInfo() = default;
     ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
         : raw_error_code(error_code)
@@ -213,6 +228,7 @@ struct ProtocolErrorInfo {
         , try_again(do_try_again)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
+        , server_requests_action(Action::NoAction)
     {
     }
     int raw_error_code = 0;
@@ -223,6 +239,7 @@ struct ProtocolErrorInfo {
     util::Optional<std::string> log_url;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+    Action server_requests_action;
 
     bool is_fatal() const
     {
@@ -369,6 +386,29 @@ constexpr bool session_level_error_requires_suspend(ProtocolError error)
         default:
             return true;
     }
+}
+
+inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action action)
+{
+    switch (action) {
+        case ProtocolErrorInfo::Action::NoAction:
+            return o << "NoAction";
+        case ProtocolErrorInfo::Action::ProtocolViolation:
+            return o << "ProtocolViolation";
+        case ProtocolErrorInfo::Action::ApplicationBug:
+            return o << "ApplicationBug";
+        case ProtocolErrorInfo::Action::Warning:
+            return o << "Warning";
+        case ProtocolErrorInfo::Action::Transient:
+            return o << "Transient";
+        case ProtocolErrorInfo::Action::DeleteRealm:
+            return o << "DeleteRealm";
+        case ProtocolErrorInfo::Action::ClientReset:
+            return o << "ClientReset";
+        case ProtocolErrorInfo::Action::ClientResetNoRecovery:
+            return o << "ClientResetNoRecovery";
+    }
+    return o << "Invalid error action: " << int64_t(action);
 }
 
 } // namespace sync

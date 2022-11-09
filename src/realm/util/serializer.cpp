@@ -26,6 +26,7 @@
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/table.hpp>
 
 #include <cctype>
 #include <cmath>
@@ -164,16 +165,24 @@ std::string print_value<>(realm::ObjKey k)
     return ss.str();
 }
 
-template <>
-std::string print_value<>(realm::ObjLink link)
+std::string print_value(realm::ObjLink link, Group* g)
 {
-    std::stringstream ss;
     if (!link) {
-        ss << "NULL";
+        return "NULL";
     }
     else {
-        ss << "L" << link.get_table_key().value << ":" << link.get_obj_key().value;
+        TableRef target_table = g ? g->get_table(link.get_table_key()) : TableRef();
+        if (ColKey pk_col = target_table ? target_table->get_primary_key_column() : ColKey{}) {
+            if (auto obj = target_table->try_get_object(link.get_obj_key())) {
+                auto pk_val = obj.get_any(pk_col);
+                std::ostringstream ostr;
+                ostr << "obj(" << util::serializer::print_value(target_table->get_name()) << "," << pk_val << ')';
+                return ostr.str();
+            }
+        }
     }
+    std::stringstream ss;
+    ss << "L" << link.get_table_key().value << ":" << link.get_obj_key().value;
     return ss.str();
 }
 
@@ -181,14 +190,6 @@ template <>
 std::string print_value<>(realm::UUID uuid)
 {
     return "uuid(" + uuid.to_string() + ")";
-}
-
-StringData get_printable_table_name(StringData name, const std::string& prefix)
-{
-    if (prefix.size() && name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
-        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
-    }
-    return name;
 }
 
 template <>
@@ -242,7 +243,7 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = get_printable_table_name(origin->first->get_name(), class_prefix);
+        std::string source_table_name = origin->first->get_class_name();
         std::string source_col_name = get_column_name(origin->first, origin->second);
 
         return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +

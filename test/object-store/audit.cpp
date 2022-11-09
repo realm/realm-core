@@ -77,7 +77,16 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
     REALM_ASSERT(sync_manager);
     auto sessions = sync_manager->get_all_sessions();
     for (auto& session : sessions) {
-        session->wait_for_upload_completion();
+        // The realm user session has been manually closed, don't try to wait for it to sync
+        // If the session is still active (in this case the audit session) wait for audit to complete
+        if (session->state() == SyncSession::State::Active) {
+            auto [promise, future] = util::make_promise_future<void>();
+            session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
+                // Don't care if error occurred, just finish operation
+                promise.emplace_value();
+            });
+            future.get();
+        }
         session->shutdown_and_wait();
     }
     sync_manager->wait_for_sessions_to_terminate();
@@ -171,12 +180,12 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
                 count = c;
             });
             if (count < expected_count) {
-                millisleep(500); // don't spam the server too much
+                millisleep(500); // slow down the number of retries
                 return false;
             }
             return true;
         },
-        std::chrono::minutes(60));
+        std::chrono::minutes(5));
 
     collection.find({}, {},
                     [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
@@ -728,7 +737,7 @@ TEST_CASE("audit object serialization") {
 
         audit->begin_scope("scope");
         Object object(realm, obj);
-        auto obj_list = util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
+        auto obj_list = util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
         obj_list.filter(target_table->where().greater(target_table->get_column_key("value"), 10)).snapshot();
         audit->end_scope(assert_no_error);
         audit->wait_for_completion();
@@ -799,7 +808,7 @@ TEST_CASE("audit object serialization") {
         SECTION("links followed serialize the full object") {
             audit->begin_scope("scope");
             Object object(realm, obj);
-            object.get_property_value<util::Any>(context, "object");
+            object.get_property_value<std::any>(context, "object");
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
 
@@ -818,10 +827,10 @@ TEST_CASE("audit object serialization") {
         SECTION("instantiating a collection accessor does not count as a read") {
             audit->begin_scope("scope");
             Object object(realm, obj);
-            util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
-            util::any_cast<object_store::Set>(object.get_property_value<util::Any>(context, "object set"));
+            util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
+            util::any_cast<object_store::Set>(object.get_property_value<std::any>(context, "object set"));
             util::any_cast<object_store::Dictionary>(
-                object.get_property_value<util::Any>(context, "object dictionary"));
+                object.get_property_value<std::any>(context, "object dictionary"));
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
 
@@ -837,7 +846,7 @@ TEST_CASE("audit object serialization") {
             SECTION("list") {
                 audit->begin_scope("scope");
                 Object object(realm, obj);
-                auto list = util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
+                auto list = util::any_cast<List>(object.get_property_value<std::any>(context, "object list"));
                 SECTION("get()") {
                     list.get(1);
                 }
@@ -861,7 +870,7 @@ TEST_CASE("audit object serialization") {
                 audit->begin_scope("scope");
                 Object object(realm, obj);
                 auto set =
-                    util::any_cast<object_store::Set>(object.get_property_value<util::Any>(context, "object set"));
+                    util::any_cast<object_store::Set>(object.get_property_value<std::any>(context, "object set"));
                 SECTION("get()") {
                     set.get(1);
                 }
@@ -885,7 +894,7 @@ TEST_CASE("audit object serialization") {
                 audit->begin_scope("scope");
                 Object object(realm, obj);
                 auto dict = util::any_cast<object_store::Dictionary>(
-                    object.get_property_value<util::Any>(context, "object dictionary"));
+                    object.get_property_value<std::any>(context, "object dictionary"));
                 SECTION("get_object()") {
                     dict.get_object("b");
                 }
@@ -916,7 +925,7 @@ TEST_CASE("audit object serialization") {
             "link access on an object read outside of a scope does not produce a read on the parent in the scope") {
             Object object(realm, obj);
             audit->begin_scope("scope");
-            object.get_property_value<util::Any>(context, "object");
+            object.get_property_value<std::any>(context, "object");
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
 
@@ -933,7 +942,7 @@ TEST_CASE("audit object serialization") {
             audit->end_scope(assert_no_error);
 
             audit->begin_scope("scope 2");
-            object.get_property_value<util::Any>(context, "object");
+            object.get_property_value<std::any>(context, "object");
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
 
@@ -949,7 +958,7 @@ TEST_CASE("audit object serialization") {
         SECTION("link access tracking is reset between scopes") {
             audit->begin_scope("scope 1");
             Object object(realm, obj);
-            object.get_property_value<util::Any>(context, "object");
+            object.get_property_value<std::any>(context, "object");
             audit->end_scope(assert_no_error);
 
             audit->begin_scope("scope 2");
@@ -984,7 +993,7 @@ TEST_CASE("audit object serialization") {
             Object object(realm, obj);
 
             audit->begin_scope("scope");
-            object.get_property_value<util::Any>(context, "object");
+            object.get_property_value<std::any>(context, "object");
             Object(realm, obj);
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
@@ -1714,6 +1723,9 @@ TEST_CASE("audit integration tests") {
                                               REQUIRE_FALSE(error);
                                               deleted = *count;
                                           });
+                    if (deleted == 0) {
+                        millisleep(100); // slow down the number of retries
+                    }
                 }
             };
 
@@ -1739,6 +1751,9 @@ TEST_CASE("audit integration tests") {
                             REQUIRE_FALSE(error);
                             count = result.modified_count;
                         });
+                    if (count == 0) {
+                        millisleep(100); // slow down the number of retries
+                    }
                 }
             };
 

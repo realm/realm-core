@@ -149,13 +149,13 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
                 REQUIRE(set().template get<T>(ndx) == T(val));
                 REQUIRE(set().get_any(ndx) == Mixed{T(val)});
                 auto ctx_val = set().get(ctx, ndx);
-                REQUIRE(any_cast<Boxed>(ctx_val) == Boxed(T(val)));
+                REQUIRE(util::any_cast<Boxed>(ctx_val) == Boxed(T(val)));
                 // and through results
                 auto res_ndx = set_as_results().index_of(T(val));
                 REQUIRE(res_ndx == ndx);
                 REQUIRE(set_as_results().template get<T>(res_ndx) == T(val));
                 auto res_ctx_val = set_as_results().get(ctx, res_ndx);
-                REQUIRE(any_cast<Boxed>(res_ctx_val) == Boxed(T(val)));
+                REQUIRE(util::any_cast<Boxed>(res_ctx_val) == Boxed(T(val)));
                 REQUIRE(set_as_results().get_any(res_ndx) == Mixed{T(val)});
             }
             // we do not require any particular ordering
@@ -677,7 +677,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
         object_store::Set int_set{r, obj, col_int_set};
 
         auto require_change = [&] {
-            auto token = link_set.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -686,11 +686,10 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token =
-                link_set.add_notification_callback([&, first](CollectionChangeSet, std::exception_ptr) mutable {
-                    REQUIRE(first);
-                    first = false;
-                });
+            auto token = link_set.add_notification_callback([&, first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            });
             advance_and_notify(*r);
             return token;
         };
@@ -863,7 +862,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
             auto require_change_filter_table2_value = [&] {
                 auto token = link_set.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr) {
+                    [&](CollectionChangeSet c) {
                         collection_change_set_with_filter_on_table2_value = c;
                     },
                     key_path_array_table2_value);
@@ -873,7 +872,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
             auto require_change_filter_table2_value2 = [&] {
                 auto token = link_set.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr) {
+                    [&](CollectionChangeSet c) {
                         collection_change_set_with_filter_on_table2_value2 = c;
                     },
                     key_path_array_table2_value2);
@@ -892,7 +891,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             // Distinguishing between these two cases would be a big change for little value.
             SECTION("some callbacks have filters") {
                 auto require_change_no_filter = [&] {
-                    auto token = link_set.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
                         collection_change_set_without_filter = c;
                     });
                     advance_and_notify(*r);
@@ -932,7 +931,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             SECTION("all callbacks have filters") {
                 auto require_change = [&] {
                     auto token = link_set.add_notification_callback(
-                        [&](CollectionChangeSet c, std::exception_ptr) {
+                        [&](CollectionChangeSet c) {
                             collection_change_set_with_filter_on_table2_value = c;
                         },
                         key_path_array_table2_value);
@@ -943,7 +942,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 auto require_no_change = [&] {
                     bool first = true;
                     auto token = link_set.add_notification_callback(
-                        [&, first](CollectionChangeSet, std::exception_ptr) mutable {
+                        [&, first](CollectionChangeSet) mutable {
                             REQUIRE(first);
                             first = false;
                         },
@@ -1310,7 +1309,7 @@ TEST_CASE("set with mixed links", "[set]") {
     Results all_objects(r, table->where());
     REQUIRE(all_objects.size() == 2);
     CollectionChangeSet local_changes;
-    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c) {
         local_changes = c;
     });
     advance_and_notify(*r);

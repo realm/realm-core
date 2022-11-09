@@ -10,6 +10,7 @@ endif()
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 add_subdirectory(benchmark-larger)
+add_subdirectory(benchmark-sync)
 # FIXME: Add other benchmarks
 
 set(CORE_TEST_SOURCES
@@ -178,13 +179,13 @@ if(REALM_ENABLE_SYNC)
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
-        test_noinst_vacuum.cpp
         test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp
         test_sync_subscriptions.cpp
+        test_sync_pending_bootstraps.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp
@@ -216,11 +217,6 @@ if(REALM_ENABLE_SYNC)
         client/statistics.hpp
     )
 
-    set(BENCH_TRANSFORM_SOURCES
-        bench-sync/bench_transform.cpp
-        test_all.cpp
-    )
-
     file(GLOB TEST_RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
         *.json *.pem
         ../certificate-authority/certs/*
@@ -245,8 +241,4 @@ if(REALM_ENABLE_SYNC)
         # This enables symbols in backtraces
         target_link_libraries(SyncTests "-rdynamic")
     endif()
-
-    add_executable(BenchTransform EXCLUDE_FROM_ALL ${BENCH_TRANSFORM_SOURCES})
-    set_target_properties(BenchTransform PROPERTIES OUTPUT_NAME "bench-transform")
-    target_link_libraries(BenchTransform TestUtil Sync)
 endif()

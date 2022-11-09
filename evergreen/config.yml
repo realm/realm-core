@@ -81,6 +81,15 @@ functions:
               set_cmake_var realm_vars REALM_TSAN BOOL On
           fi
 
+          if [ -n "${enable_ubsan|}" ]; then
+              set_cmake_var realm_vars REALM_USAN BOOL On
+          fi
+
+          if [ -n "${enable_valgrind|}" ]; then
+              set_cmake_var realm_vars REALM_VALGRIND BOOL On
+              set_cmake_var realm_vars REALM_ENABLE_ALLOC_SET_ZERO BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -145,6 +154,8 @@ functions:
               exit 1
           fi
 
+          export UNITTEST_THREADS=1
+
           BENCHMARK=$(./evergreen/abspath.sh ./build/test/benchmark-${benchmark_name}/${cmake_build_type|Debug}/realm-benchmark-${benchmark_name})
           echo "Going to run benchmark $BENCHMARK"
 
@@ -178,6 +189,10 @@ functions:
           fi
 
           TEST_FLAGS="--no-tests=error $TEST_FLAGS ${test_flags|}"
+
+          if [[ -n "${llvm_symbolizer}" ]]; then
+              export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
+          fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_PROGRESS=1
@@ -310,10 +325,12 @@ timeout:
 tasks:
 - name: compile
   tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
 
 - name: package
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - command: shell.exec
@@ -345,6 +362,7 @@ tasks:
       content_type: '${content_type|application/x-gzip}'
 
 - name: swift-build-and-test
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -365,7 +383,37 @@ tasks:
         xcrun swift build
         xcrun swift run ObjectStoreTests
 
+- name: test-on-exfat
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build
+      shell: /bin/bash
+      script: ../tools/run-tests-on-exfat.sh
+
+- name: valgrind
+  exec_timeout_secs: 18000
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: "CoreTests"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test
+      shell: /bin/bash
+      script: |-
+        export UNITTEST_PROGRESS=1
+        export UNITTEST_THREADS=1
+        valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
+
 - name: bloaty
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -481,6 +529,8 @@ tasks:
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
+    vars:
+      target_to_build: "CoreTests"
   - func: "run tests"
     vars:
       test_filter: CoreTests
@@ -501,6 +551,14 @@ tasks:
     vars:
       benchmark_name: crud
 
+- name: benchmark-sync
+  exec_timeout_secs: 1800
+  tags: [ "benchmark" ]
+  commands:
+  - func: "run benchmark"
+    vars:
+      benchmark_name: sync
+
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
@@ -515,6 +573,8 @@ tasks:
   exec_timeout_secs: 2100
   commands:
   - func: "compile"
+    vars:
+      target_to_build: "ObjectStoreTests"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec
@@ -575,6 +635,7 @@ tasks:
 
 - name: lint
   tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -637,8 +698,7 @@ task_groups:
   - compile
   - .test_suite
 
-- name: compile_core_tests
-  max_hosts: 1
+- name: core_tests_group
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
@@ -648,7 +708,6 @@ task_groups:
   timeout:
   - func: "run hang analyzer"
   tasks:
-  - compile
   - core-tests
 
 - name: benchmarks
@@ -712,7 +771,7 @@ buildvariants:
     run_with_encryption: On
     enable_tsan: On
   tasks:
-  - name: compile_core_tests
+  - name: core_tests_group
     distros:
     - ubuntu2004-large
 
@@ -727,10 +786,11 @@ buildvariants:
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     run_with_encryption: On
     enable_asan: On
   tasks:
-  - name: compile_core_tests
+  - name: core_tests_group
     distros:
     - ubuntu2004-large
 
@@ -770,6 +830,7 @@ buildvariants:
     enable_asan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
   tasks:
   - name: compile_test
     distros:
@@ -786,6 +847,23 @@ buildvariants:
     fetch_missing_dependencies: On
     run_tests_against_baas: On
     enable_tsan: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
+  - name: compile_test
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-ubsan
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 UBSAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_ubsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
@@ -810,6 +888,18 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - rhel70-large
+
+- name: ubuntu-valgrind
+  display_name: "Ubuntu 2204 Valgrind"
+  run_on: ubuntu2204-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    enable_valgrind: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+  - name: valgrind
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
@@ -858,7 +948,7 @@ buildvariants:
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     run_with_encryption: On
   tasks:
-  - name: compile_core_tests
+  - name: core_tests_group
 
 - name: macos-release
   display_name: "MacOS 11.0 x86_64 (Release build)"
@@ -878,6 +968,7 @@ buildvariants:
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
+  - name: test-on-exfat
 
 - name: macos-1100-arm64
   display_name: "MacOS 11 arm64"
@@ -918,7 +1009,7 @@ buildvariants:
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
-  run_on: windows-64-vs2019-test
+  run_on: windows-vsCurrent-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
     cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
@@ -930,13 +1021,27 @@ buildvariants:
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_and_package
-    distros:
-    - windows-64-vs2019-large
   - name: long-running-tests
+
+- name: windows-64-encryption
+  display_name: "Windows x86_64 (Encryption enabled)"
+  run_on: windows-vsCurrent-large
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A x64"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    build_zlib: On
+    python3: "/cygdrive/c/python/python37/python.exe"
+    run_with_encryption: On
+  tasks:
+  - name: core_tests_group
 
 - name: windows-64-vs2019-release
   display_name: "Windows x86_64 (VS 2019 Release build)"
-  run_on: windows-64-vs2019-test
+  run_on: windows-vsCurrent-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
     cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
@@ -949,5 +1054,3 @@ buildvariants:
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test
-    distros:
-    - windows-64-vs2019-large
