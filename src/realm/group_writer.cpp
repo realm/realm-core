@@ -117,6 +117,7 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
+    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -132,7 +133,7 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-    m_map.flush(); // <--- not needed, triggered by unmap() below
+    m_map.sync();
     m_map.unmap();
 }
 
