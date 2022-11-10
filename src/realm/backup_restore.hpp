@@ -25,12 +25,12 @@ namespace realm {
 
 class BackupHandler {
 public:
-    using version_list_t = std::vector<int>;
-    using version_time_list_t = std::vector<std::pair<int, int>>;
+    using VersionList = std::vector<int>;
+    using VersionTimeList = std::vector<std::pair<int, int>>;
 
-    BackupHandler(const std::string& path, const version_list_t& accepted, const version_time_list_t& to_be_deleted);
-    bool is_accepted_file_format(int current_file_format_version);
-    bool must_restore_from_backup(int current_file_format_version);
+    BackupHandler(const std::string& path, const VersionList& accepted, const VersionTimeList& to_be_deleted);
+    bool is_accepted_file_format(int current_file_format_version) const noexcept;
+    bool must_restore_from_backup(int current_file_format_version) const;
     void restore_from_backup();
     void cleanup_backups();
     void backup_realm_if_needed(int current_file_format_version, int target_file_format_version);
@@ -38,8 +38,8 @@ public:
 
     static std::string get_prefix_from_path(const std::string& path);
     // default lists of accepted versions and backups to delete when they get old enough
-    static version_list_t accepted_versions_;
-    static version_time_list_t delete_versions_;
+    static const VersionList accepted_versions_;
+    static const VersionTimeList delete_versions_;
 
 private:
     void prep_logging();
@@ -47,8 +47,8 @@ private:
     std::string m_path;
     std::string m_prefix;
     char m_time_buf[100];
-    version_list_t m_accepted_versions;
-    version_time_list_t m_delete_versions;
+    VersionList m_accepted_versions;
+    VersionTimeList m_delete_versions;
     std::unique_ptr<util::AppendToFileLogger> m_logger;
 };
 

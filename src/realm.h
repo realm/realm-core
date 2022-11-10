@@ -2839,6 +2839,8 @@ typedef void (*realm_return_apikey_func_t)(realm_userdata_t userdata, realm_app_
 typedef void (*realm_return_apikey_list_func_t)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count,
                                                 realm_app_error_t*);
 
+typedef void (*realm_return_string_func_t)(realm_userdata_t userdata, const char* serialized_ejson_response,
+                                           const realm_app_error_t*);
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -3218,9 +3220,7 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     const char* serialized_ejson_args,
-                                     void (*)(realm_userdata_t userdata, const char* serialized_ejson_response,
-                                              const realm_app_error_t*),
+                                     const char* serialized_ejson_args, realm_return_string_func_t callback,
                                      realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
@@ -3566,10 +3566,11 @@ typedef struct realm_flx_sync_subscription_desc realm_flx_sync_subscription_desc
 typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_UNCOMMITTED = 0,
     RLM_SYNC_SUBSCRIPTION_PENDING,
-    RLM_SYNC_BOOTSTRAPPING,
+    RLM_SYNC_SUBSCRIPTION_BOOTSTRAPPING,
     RLM_SYNC_SUBSCRIPTION_COMPLETE,
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
+    RLM_SYNC_SUBSCRIPTION_AWAITING_MARK,
 } realm_flx_sync_subscription_set_state_e;
 typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
                                                            realm_flx_sync_subscription_set_state_e state);

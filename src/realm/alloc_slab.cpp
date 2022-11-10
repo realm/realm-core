@@ -731,7 +731,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     if (cfg.encryption_key && size == 0 && physical_file_size != 0) {
         // The opened file holds data, but is so small it cannot have
         // been created with encryption
-        throw std::runtime_error("Attempt to open unencrypted file with encryption key");
+        throw InvalidDatabase("Attempt to open unencrypted file with encryption key", path);
     }
     if (size == 0 || cfg.clear_file) {
         if (REALM_UNLIKELY(cfg.read_only))
@@ -756,24 +756,25 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_start(this);
         // we'll read header and (potentially) footer
         File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
-        // if file is too small we'll catch it in validate_header - but we need to prevent an invalid mapping first
-        size_t footer_ref = size < (sizeof(StreamingFooter) + sizeof(Header)) ? 0 : (size - sizeof(StreamingFooter));
-        size_t footer_page_base = footer_ref & ~(page_size() - 1);
-        size_t footer_offset = footer_ref - footer_page_base;
-        File::Map<char> map_footer(m_file, footer_page_base, File::access_ReadOnly,
-                                   sizeof(StreamingFooter) + footer_offset, 0);
         realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
         auto header = reinterpret_cast<const Header*>(map_header.get_addr());
-        auto footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
+
+        File::Map<char> map_footer;
+        const StreamingFooter* footer = nullptr;
+        if (is_file_on_streaming_form(*header) && size >= sizeof(StreamingFooter) + sizeof(Header)) {
+            size_t footer_ref = size - sizeof(StreamingFooter);
+            size_t footer_page_base = footer_ref & ~(page_size() - 1);
+            size_t footer_offset = footer_ref - footer_page_base;
+            map_footer = File::Map<char>(m_file, footer_page_base, File::access_ReadOnly,
+                                         sizeof(StreamingFooter) + footer_offset, 0);
+            realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
+            footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
+        }
+
         top_ref = validate_header(header, footer, size, path); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_data = map_header.get_addr(); // <-- needed below
 
-        // Make sure the database is not on streaming format. If we did not do this,
-        // a later commit would have to do it. That would require coordination with
-        // anybody concurrently joining the session, so it seems easier to do it at
-        // session initialization, even if it means writing the database during open.
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
             // Also don't compare reserved fields.
@@ -791,22 +792,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             REALM_ASSERT_EX(header->m_top_ref[1] == 0, header->m_top_ref[1], get_file_path_for_assertions());
             REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
                             get_file_path_for_assertions());
-            {
-                File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-                Header& writable_header = *writable_map.get_addr();
-                realm::util::encryption_read_barrier(writable_map, 0);
-                writable_header.m_top_ref[1] = footer->m_top_ref;
-                writable_header.m_file_format[1] = writable_header.m_file_format[0];
-                realm::util::encryption_write_barrier(writable_map, 0);
-                writable_map.sync();
-                realm::util::encryption_read_barrier(writable_map, 0);
-                writable_header.m_flags |= flags_SelectBit;
-                realm::util::encryption_write_barrier(writable_map, 0);
-                writable_map.sync();
-
-                realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
-            }
         }
+
         if (top_ref) {
             // Get the expected file size by looking up logical file size stored in top array
             constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
@@ -898,6 +885,33 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     m_realm_file_info = util::get_file_info_for_file(m_file);
 #endif
     return top_ref;
+}
+
+void SlabAlloc::convert_from_streaming_form(ref_type top_ref)
+{
+    auto header = reinterpret_cast<const Header*>(m_data);
+    if (!is_file_on_streaming_form(*header))
+        return;
+
+    // Make sure the database is not on streaming format. If we did not do this,
+    // a later commit would have to do it. That would require coordination with
+    // anybody concurrently joining the session, so it seems easier to do it at
+    // session initialization, even if it means writing the database during open.
+    {
+        File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+        Header& writable_header = *writable_map.get_addr();
+        realm::util::encryption_read_barrier(writable_map, 0);
+        writable_header.m_top_ref[1] = top_ref;
+        writable_header.m_file_format[1] = writable_header.m_file_format[0];
+        realm::util::encryption_write_barrier(writable_map, 0);
+        writable_map.sync();
+        realm::util::encryption_read_barrier(writable_map, 0);
+        writable_header.m_flags |= flags_SelectBit;
+        realm::util::encryption_write_barrier(writable_map, 0);
+        writable_map.sync();
+
+        realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
+    }
 }
 
 void SlabAlloc::note_reader_start(const void* reader_id)
@@ -1009,6 +1023,7 @@ ref_type SlabAlloc::validate_header(const Header* header, const StreamingFooter*
             std::string msg = "Invalid streaming format size (" + util::to_string(size) + ")";
             throw InvalidDatabase(msg, path);
         }
+        REALM_ASSERT(footer);
         top_ref = footer->m_top_ref;
         if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie)) {
             std::string msg = "Invalid streaming format cookie (" + util::to_string(footer->m_magic_cookie) + ")";

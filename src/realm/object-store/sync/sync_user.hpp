@@ -322,6 +322,8 @@ private:
 
     bool do_is_logged_in() const REQUIRES(m_tokens_mutex);
 
+    std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
+
     std::atomic<State> m_state GUARDED_BY(m_mutex);
 
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;

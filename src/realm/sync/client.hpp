@@ -307,6 +307,10 @@ public:
 
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
 
+        /// When integrating a flexible sync bootstrap, process this many bytes of
+        /// changeset data in a single integration attempt.
+        size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
+
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
         ///
@@ -459,7 +463,6 @@ public:
     /// the session object is destroyed. Please see "Callback semantics" section
     /// under Session for more on this.
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
-
 
     using ConnectionStateChangeListener = void(ConnectionState, util::Optional<SessionErrorInfo>);
 
