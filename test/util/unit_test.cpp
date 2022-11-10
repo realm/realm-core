@@ -617,7 +617,7 @@ bool TestList::run(Config config)
             for (int i = 0; i != num_threads; ++i) {
                 formatter.str(std::string());
                 formatter << "Thread[" << std::setw(thread_digits) << (i + 1) << "]: ";
-                loggers[i] = std::make_unique<util::PrefixLogger>(formatter.str(), shared_logger);
+                loggers[i] = std::make_shared<util::PrefixLogger>(formatter.str(), shared_logger);
             }
         }
         else {
@@ -631,7 +631,7 @@ bool TestList::run(Config config)
                 formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
                 shared_logger->info("Logging to %1", path);
-                loggers[i] = std::make_unique<util::FileLogger>(path);
+                loggers[i] = std::make_shared<util::FileLogger>(path);
             }
         }
     }

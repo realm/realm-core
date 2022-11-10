@@ -307,7 +307,7 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
-            util::NullLogger logger;
+            util::StderrLogger logger(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
             perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,

@@ -209,7 +209,7 @@ void SyncManager::reset_for_testing()
 {
     {
         util::CheckedLockGuard lock(m_file_system_mutex);
-        m_metadata_manager = nullptr;
+        m_metadata_manager.reset();
     }
 
     {
@@ -219,7 +219,7 @@ void SyncManager::reset_for_testing()
             user->detach_from_sync_manager();
         }
         m_users.clear();
-        m_current_user = nullptr;
+        m_current_user.reset();
     }
 
     {
@@ -251,7 +251,7 @@ void SyncManager::reset_for_testing()
 
         // Reset even more state.
         m_config = {};
-        m_logger_ptr = nullptr;
+        m_logger_ptr.reset();
         m_sync_route = "";
     }
 
@@ -259,7 +259,7 @@ void SyncManager::reset_for_testing()
         util::CheckedLockGuard lock(m_file_system_mutex);
         if (m_file_manager)
             util::try_remove_dir_recursive(m_file_manager->base_path());
-        m_file_manager = nullptr;
+        m_file_manager.reset();
     }
 }
 
@@ -444,7 +444,7 @@ void SyncManager::log_out_user(const std::string& user_id)
 
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity("");
-    m_current_user = nullptr;
+    m_current_user.reset();
 }
 
 void SyncManager::set_current_user(const std::string& user_id)
@@ -495,7 +495,7 @@ void SyncManager::delete_user(const std::string& user_id)
     user->detach_from_sync_manager();
 
     if (m_current_user && m_current_user->identity() == user->identity())
-        m_current_user = nullptr;
+        m_current_user.reset();
 
     util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)

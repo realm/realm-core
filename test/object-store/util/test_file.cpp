@@ -171,6 +171,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
                    m_logger.reset(logger);
 #else
+                   // Logging is disabled, use a NullLogger to prevent printing anything
                    m_logger.reset(new util::NullLogger());
 #endif
 
