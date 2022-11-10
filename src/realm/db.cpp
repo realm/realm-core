@@ -2281,14 +2281,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                     out.commit(new_top_ref); // Throws
                 }
                 else {
-                    out.flush_all_mappings();
+                    out.sync_all_mappings();
                 }
                 break;
             case Durability::MemOnly:
                 // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually flush the data to disk
-                // (the OS may do so opportinisticly, or when swapping). So in this
-                // mode the file on disk may very likely be in an invalid state.
+                // the shared memory. So we never actually sync the data to disk
+                // (the OS may do so opportinisticly, or when swapping).
+                // however, we still need to flush any private caches into the buffer cache
+                out.flush_all_mappings();
                 break;
         }
         size_t new_file_size = out.get_file_size();
