@@ -202,7 +202,7 @@ std::error_code sync::auth::make_error_code(auth::Error error) noexcept
 
 class Client::Request {
 public:
-    util::Logger& m_logger;
+    util::Logger& logger;
 
     Request(Client& client, std::int_fast64_t request_counter);
 
@@ -251,7 +251,7 @@ private:
 
     void initiate_http_request()
     {
-        m_http_client.emplace(*this, m_logger); // Throws
+        m_http_client.emplace(*this, logger); // Throws
         do_initiate_http_request();           // Throws
     }
 
@@ -305,8 +305,7 @@ std::string Client::make_http_host(bool auth_ssl, const std::string& auth_addres
 }
 
 Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id, Config config)
-    : m_logger_ptr{config.logger ? std::move(config.logger) : std::make_unique<util::StderrLogger>()}
-    , m_logger{*m_logger_ptr}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
     , m_service{} // Throws
     , m_auth_ssl{auth_ssl}
     , m_auth_address{std::move(auth_address)}
@@ -320,7 +319,7 @@ Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std
     , m_app_request_path{m_request_base_path + "/app/" + app_id} // Throws
     , m_keep_running_timer{m_service}
 {
-    m_logger.info("Auth client started for server: [%1]:%2'", auth_address, auth_port);
+    logger_ptr->info("Auth client started for server: [%1]:%2'", auth_address, auth_port);
 
     util::seed_prng_nondeterministically(m_random);
     start_keep_running_timer();
@@ -458,7 +457,7 @@ void Client::schedule_requests()
 // Request
 
 Client::Request::Request(Client& client, std::int_fast64_t request_counter)
-    : m_logger{client.m_logger}
+    : logger{*(client.logger_ptr)}
     , m_client{client}
     , m_request_counter{request_counter}
     , m_wait_timer{client.get_service()}
@@ -517,7 +516,7 @@ void Client::Request::initiate_resolve()
     const std::string& auth_address = m_client.get_auth_address();
     port_type auth_port = m_client.get_auth_port();
 
-    m_logger.debug("Resolving [%1]:%2", auth_address, auth_port);
+    logger.debug("Resolving [%1]:%2", auth_address, auth_port);
 
     util::network::Resolver::Query query(auth_address, util::to_string(auth_port));
     auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
@@ -533,7 +532,7 @@ void Client::Request::handle_resolve(std::error_code ec, util::network::Endpoint
 {
     m_resolver = none;
     if (ec) {
-        m_logger.error("Resolve failed with error = %1", ec);
+        logger.error("Resolve failed with error = %1", ec);
         disconnect_and_wait();
         return;
     }
@@ -546,7 +545,7 @@ void Client::Request::initiate_tcp_connect(util::network::Endpoint::List endpoin
     REALM_ASSERT(i < endpoints.size());
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
-    m_logger.debug("Connecting to endpoint [%1]:%2 (%3/%4)", ep.address(), ep.port(), (i + 1), endpoints.size());
+    logger.debug("Connecting to endpoint [%1]:%2 (%3/%4)", ep.address(), ep.port(), (i + 1), endpoints.size());
 
     auto handler = [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         if (ec != util::error::operation_aborted)
@@ -562,22 +561,22 @@ void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endp
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
-        m_logger.debug("Failed to connect to endpoint [%1]:%2: %3", ep.address(), ep.port(), ec.message());
+        logger.debug("Failed to connect to endpoint [%1]:%2: %3", ep.address(), ep.port(), ec.message());
         std::size_t i_2 = i + 1;
         if (i_2 < endpoints.size()) {
             initiate_tcp_connect(std::move(endpoints), i_2);
             return;
         }
         // All endpoints failed
-        m_logger.error("All connection attempts to the auth server failed.");
+        logger.error("All connection attempts to the auth server failed.");
         disconnect_and_wait();
         return;
     }
 
     REALM_ASSERT(m_socket);
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
-    m_logger.debug("Connected to endpoint [%1]:%2 (from [%3]:%4)", ep.address(), ep.port(), ep_2.address(),
-                   ep_2.port()); // Throws
+    logger.debug("Connected to endpoint [%1]:%2 (from [%3]:%4)", ep.address(), ep.port(), ep_2.address(),
+                 ep_2.port()); // Throws
 
     if (m_client.m_auth_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -605,7 +604,7 @@ void Client::Request::initiate_ssl_handshake()
     }
 
     m_ssl_stream.emplace(*m_socket, *m_ssl_context, Stream::client); // Throws
-    m_ssl_stream->set_logger(&m_logger);
+    m_ssl_stream->set_logger(m_client.logger_ptr.get());
     m_ssl_stream->set_host_name(m_client.m_auth_address); // Throws
     if (m_client.m_verify_servers_ssl_certificate) {
         m_ssl_stream->set_verify_mode(VerifyMode::peer); // Throws
@@ -640,7 +639,7 @@ void Client::Request::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
-        m_logger.error("SSL handshake failed: %1", ec.message()); // Throws
+        logger.error("SSL handshake failed: %1", ec.message()); // Throws
         disconnect_and_wait();                                  // Throws
         return;
     }
@@ -651,7 +650,7 @@ void Client::Request::handle_ssl_handshake(std::error_code ec)
 
 void Client::Request::initiate_wait(std::uint_fast64_t delay)
 {
-    m_logger.debug("Waiting %1 ms before connecting to the auth server", delay);
+    logger.debug("Waiting %1 ms before connecting to the auth server", delay);
 
     auto handler = [this](std::error_code ec) {
         if (ec != util::error::operation_aborted) {
@@ -728,7 +727,7 @@ void Client::LoginRequest::do_initiate_http_request()
 {
     std::string path, body;
     if (m_has_user) {
-        m_logger.debug("Requesting user login");                                     // Throws
+        logger.debug("Requesting user login");                                       // Throws
         path = m_client.m_app_request_path + "/auth/providers/local-userpass/login"; // Throws
         body = "{"
                "\"provider\": \"local-userpass\", "
@@ -739,7 +738,7 @@ void Client::LoginRequest::do_initiate_http_request()
                to_json(m_password) + "}"; // Throws
     }
     else {
-        m_logger.debug("Requesting anonymous login");                           // Throws
+        logger.debug("Requesting anonymous login");                             // Throws
         path = m_client.m_app_request_path + "/auth/providers/anon-user/login"; // Throws
         body = "{\"provider\": \"anon-user\"}";                                 // Throws
     }
@@ -765,10 +764,10 @@ void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, st
     if (ec)
         return disconnect_and_wait();
 
-    m_logger.trace("Login response: %1", res);
+    logger.trace("Login response: %1", res);
 
     if (res.status == util::HTTPStatus::Ok) {
-        m_logger.debug("Login was successful");
+        logger.debug("Login was successful");
         std::string access_token, refresh_token;
         if (get_tokens_from_login(res, access_token, refresh_token)) {           // Throws
             std::error_code ec;                                                  // Success
@@ -776,18 +775,18 @@ void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, st
             finalize();
         }
         else {
-            m_logger.error("Login failed: Bad syntax in response");
+            logger.error("Login failed: Bad syntax in response");
             call_handler(make_error_code(Error::bad_syntax), {}, {}); // Throws
             finalize();
         }
     }
     else if (res.status == util::HTTPStatus::Unauthorized) {
-        m_logger.debug("Login failed: Unauthorized");
+        logger.debug("Login failed: Unauthorized");
         call_handler(make_error_code(Error::unauthorized), {}, {}); // Throws
         finalize();
     }
     else {
-        m_logger.error("Login failed: Bad HTTP response status");
+        logger.error("Login failed: Bad HTTP response status");
         call_handler(make_error_code(Error::unexpected_response_status), {}, {}); // Throws
         finalize();
     }
@@ -812,7 +811,7 @@ void Client::RefreshRequest::call_handler(std::error_code ec, std::string access
 
 void Client::RefreshRequest::do_initiate_http_request()
 {
-    m_logger.debug("Requesting access token refresh"); // Throws
+    logger.debug("Requesting access token refresh"); // Throws
     util::HTTPRequest req;
     req.method = util::HTTPMethod::Post;
     req.path = m_client.m_request_base_path + "/auth/session"; // Throws
@@ -833,10 +832,10 @@ void Client::RefreshRequest::handle_http_request(const util::HTTPResponse& res, 
     if (ec)
         return disconnect_and_wait();
 
-    m_logger.trace("Refresh response: %1", res);
+    logger.trace("Refresh response: %1", res);
 
     if (res.status == util::HTTPStatus::Created) {
-        m_logger.debug("Refresh was successful");
+        logger.debug("Refresh was successful");
         std::string access_token;
         if (get_access_token_from_refresh(res, access_token)) { // Throws
             std::error_code ec;                                 // Success
@@ -844,18 +843,18 @@ void Client::RefreshRequest::handle_http_request(const util::HTTPResponse& res, 
             finalize();
         }
         else {
-            m_logger.error("Refresh failed: Bad syntax in response");
+            logger.error("Refresh failed: Bad syntax in response");
             call_handler(make_error_code(Error::bad_syntax), {}); // Throws
             finalize();
         }
     }
     else if (res.status == util::HTTPStatus::Unauthorized) {
-        m_logger.debug("Refresh failed: Unauthorized");
+        logger.debug("Refresh failed: Unauthorized");
         call_handler(make_error_code(Error::unauthorized), {}); // Throws
         finalize();
     }
     else {
-        m_logger.error("Refresh failed: Bad HTTP response status");
+        logger.error("Refresh failed: Bad HTTP response status");
         call_handler(make_error_code(Error::unexpected_response_status), {}); // Throws
         finalize();
     }

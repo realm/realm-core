@@ -1077,7 +1077,7 @@ public:
                    std::unique_ptr<util::network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<util::network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint)
-        : logger(make_logger_prefix(id), serv.logger) // Throws
+        : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{std::move(socket)}
@@ -1439,7 +1439,7 @@ public:
     util::PrefixLogger logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : logger(make_logger_prefix(id), serv.logger) // Throws
+        : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{new util::network::Socket{serv.get_service()}} // Throws

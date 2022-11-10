@@ -198,7 +198,8 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    // An HTTPParserBase is tied to
+    // An HTTPParserBase is tied to to an HTTPClient or HTTPServer, which are owned
+    // by either a Websocket or ServerImpl class, so no need for a shared_ptr
     util::Logger& logger;
 
     // FIXME: Generally useful?
@@ -209,8 +210,8 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& logger)
-        : logger{logger}
+    HTTPParserBase(util::Logger& l)
+        : logger{l}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.

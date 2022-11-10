@@ -62,8 +62,9 @@ public:
         /// level threshold set to util::Logger::Level::info. The client does
         /// not require a thread-safe logger, and it guarantees that all logging
         /// happens either on behalf of the constructor or on behalf of the
-        /// invocation of run().
-        std::unique_ptr<util::Logger> logger = nullptr;
+        /// invocation of run(). This is a shared_ptr to match
+        /// realm::sync::Client::Config
+        std::shared_ptr<util::Logger> logger;
 
         /// Specifies the maximum number of TCP connections the client can have
         /// to the auth server at any point in time.
@@ -81,8 +82,7 @@ public:
         std::string request_base_path = "/api/client/v2.0";
     };
 
-    std::unique_ptr<util::Logger> m_logger_ptr;
-    util::Logger& m_logger;
+    std::shared_ptr<util::Logger> logger_ptr;
 
     /// The client runs in its own thread with an event loop. auth_address and
     /// auth_port specifies the address and port of an username/password

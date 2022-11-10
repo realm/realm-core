@@ -271,6 +271,9 @@ private:
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
+    // internally create a new logger - used by configure() and set_logger_factory()
+    void do_make_logger() REQUIRES(m_mutex);
+
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;
 

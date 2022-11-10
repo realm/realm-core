@@ -725,7 +725,7 @@ public:
 
 private:
     websocket::Config& m_config;
-    // Wesocket is owned by the server or websocket factory, so a shared_ptr isn't needed
+    // websocket is owned by the server or websocket factory, so a shared_ptr isn't needed
     util::Logger& m_logger;
     FrameReader m_frame_reader;
 

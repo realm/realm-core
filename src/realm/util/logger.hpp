@@ -128,8 +128,8 @@ std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 
 /// A logger that writes to STDERR. This logger is not thread-safe.
 ///
-/// Since this class is a Logger it contains modifiable a log level
-/// threshold.
+/// Since this class is a subclass of Logger, it contains a modifiable log
+/// level threshold.
 class StderrLogger : public Logger {
 public:
     StderrLogger() noexcept = default;
@@ -146,8 +146,8 @@ protected:
 
 /// A logger that writes to a stream. This logger is not thread-safe.
 ///
-/// Since this class is a Logger, it contains modifiable a log level
-/// threshold.
+/// Since this class is a subclass of Logger, it contains a modifiable log
+/// level threshold.
 class StreamLogger : public Logger {
 public:
     explicit StreamLogger(std::ostream&) noexcept;
@@ -162,8 +162,8 @@ private:
 
 /// A logger that writes to a file. This logger is not thread-safe.
 ///
-/// Since this class is a Logger, it contains modifiable a log level
-/// threshold.
+/// Since this class is a subclass of Logger, it contains a modifiable log
+/// level threshold.
 class FileLogger : public StreamLogger {
 public:
     explicit FileLogger(std::string path);
@@ -206,8 +206,7 @@ private:
 };
 
 
-/// A logger that adds a fixed prefix to each message. This logger inherits the
-/// LevelThreshold object of the specified base logger. This logger is
+/// A logger that adds a fixed prefix to each message. This logger is
 /// thread-safe if, and only if the base logger is thread-safe.
 class PrefixLogger : public Logger {
 public:
@@ -240,7 +239,7 @@ public:
     void set_level_threshold(Level) noexcept override {}
 
 protected:
-    // Since we don't want to log anything, do_log() does nothing and the level is off
+    // Since we don't want to log anything, do_log() does nothing
     void do_log(Level, const std::string&) override {}
 };
 

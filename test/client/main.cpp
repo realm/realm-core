@@ -1090,7 +1090,7 @@ int main(int argc, char* argv[])
             break;
     }
     sync::auth::Client::Config auth_config;
-    auth_config.logger = std::make_unique<util::PrefixLogger>("Auth: ", logger);
+    auth_config.logger = std::make_shared<util::PrefixLogger>("Auth: ", logger);
     auth_config.request_base_path = request_base_path;
     sync::auth::Client auth{auth_ssl, server_address, server_port, app_id, std::move(auth_config)};
 

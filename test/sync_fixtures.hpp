@@ -299,12 +299,12 @@ public:
     using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
     using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 
-    util::PrefixLogger m_logger;
+    util::PrefixLogger logger;
 
-    HTTPRequestClient(util::Logger& logger, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
-        : m_logger{"HTTP client: ", logger}
+    HTTPRequestClient(util::Logger& l, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
+        : logger{"HTTP client: ", l}
         , m_endpoint{endpoint}
-        , m_http_client{*this, logger}
+        , m_http_client{*this, l}
         , m_request{request}
     {
     }
@@ -355,20 +355,20 @@ private:
                 handle_tcp_connect(ec);
         };
         m_socket.async_connect(m_endpoint, std::move(handler));
-        m_logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
+        logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
     }
 
     void handle_tcp_connect(std::error_code ec)
     {
         if (ec) {
-            m_logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(), m_endpoint.port(),
-                           ec.message());
+            logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(), m_endpoint.port(),
+                         ec.message());
             stop();
             return;
         }
 
         m_socket.set_option(util::network::SocketBase::no_delay(true));
-        m_logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
+        logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
 
 
         initiate_http_request();
@@ -379,7 +379,7 @@ private:
         auto handler = [this](util::HTTPResponse response, std::error_code ec) {
             if (ec != util::error::operation_aborted) {
                 if (ec) {
-                    m_logger.debug("HTTP response error, ec = %1", ec.message());
+                    logger.debug("HTTP response error, ec = %1", ec.message());
                     stop();
                     return;
                 }
@@ -391,7 +391,7 @@ private:
 
     void handle_http_response(const util::HTTPResponse response)
     {
-        m_logger.debug("HTTP response received, status = %1", int(response.status));
+        logger.debug("HTTP response received, status = %1", int(response.status));
         m_response = response;
         stop();
     }
@@ -1047,8 +1047,8 @@ inline void RealmFixture::nonempty_transact()
 
 inline bool RealmFixture::transact(TransactFunc transact_func)
 {
-    auto tr = m_db->start_write();           // Throws
-    if (!transact_func(*tr))                 // Throws
+    auto tr = m_db->start_write(); // Throws
+    if (!transact_func(*tr))       // Throws
         return false;
     version_type new_version = tr->commit();        // Throws
     m_session.nonsync_transact_notify(new_version); // Throws
