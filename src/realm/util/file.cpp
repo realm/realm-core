@@ -1047,7 +1047,6 @@ void File::barrier()
         // If fcntl fails, we fallback to full sync.
         // This is known to occur on exFAT which does not support F_BARRIERSYNC.
 #endif
-    // sync();
 }
 
 #ifndef _WIN32

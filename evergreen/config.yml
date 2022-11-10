@@ -933,7 +933,6 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
-  - name: test-on-exfat
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
@@ -950,7 +949,6 @@ buildvariants:
     run_with_encryption: On
   tasks:
   - name: core_tests_group
-  - name: test-on-exfat
 
 - name: macos-release
   display_name: "MacOS 11.0 x86_64 (Release build)"
