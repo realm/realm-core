@@ -950,6 +950,7 @@ buildvariants:
     run_with_encryption: On
   tasks:
   - name: core_tests_group
+  - name: test-on-exfat
 
 - name: macos-release
   display_name: "MacOS 11.0 x86_64 (Release build)"
