@@ -2018,30 +2018,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             REQUIRE(table->size() == 0);
         });
     }
-// TODO: Re-enable it in RCORE-1238.
-#if 0
-    SECTION("replace object") {
-        harness->do_with_new_realm([&](SharedRealm realm) {
-            CppContext c(realm);
-            auto foo_obj_id = ObjectId::gen();
-            realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
-            realm->commit_transaction();
-            realm->begin_transaction();
-            // Update `location` field.
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "bar"s}}));
-            realm->commit_transaction();
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
-            auto table = realm->read_group().get_table("class_Asymmetric");
-            REQUIRE(table->size() == 0);
-        });
-    }
-#endif
     SECTION("create multiple objects - separate commits") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);

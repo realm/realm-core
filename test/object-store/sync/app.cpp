@@ -4427,6 +4427,23 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         CHECK(cur_user);
 
         SyncTestFile config(app->current_user(), bson::Bson("foo"));
+        // Ignore websocket errors, since sometimes a websocket connection gets started during the test
+        config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
+            // Ignore websocket errors, since there's not really an app out there...
+            if (error.message.find("Bad WebSocket") != std::string::npos) {
+                util::format(std::cerr,
+                             "An expected possible WebSocket error was caught during test: 'app destroyed during "
+                             "token refresh': '%1' for '%2'",
+                             error.message, session->path());
+            }
+            else {
+                util::format(std::cerr,
+                             "An unexpected sync error was caught during test: 'app destroyed during token refresh': "
+                             "'%1' for '%2'",
+                             error.message, session->path());
+                abort();
+            }
+        };
         auto r = Realm::get_shared_realm(config);
         auto session = r->sync_session();
         mock_transport_worker.add_work_item([session] {
