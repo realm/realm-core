@@ -928,7 +928,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
-        m_alloc.get_file().barrier();
     }
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
@@ -939,7 +938,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     window->flush();
     if (!disable_sync) {
         window->sync();
-        m_alloc.get_file().barrier();
     }
 }
 
