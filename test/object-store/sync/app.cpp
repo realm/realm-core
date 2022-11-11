@@ -4793,7 +4793,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
                    });
 
     auto cur_user = std::move(cur_user_future).get();
-    CHECK(state.state == TestState::profile);
+    CHECK(state.get() == TestState::profile);
     CHECK(cur_user);
     CHECK(cur_user == logged_in_user);
 
