@@ -1042,12 +1042,13 @@ void File::sync()
 void File::barrier()
 {
 #if REALM_PLATFORM_APPLE
-    if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
-        return;
-        // If fcntl fails, we fallback to full sync.
-        // This is known to occur on exFAT which does not support F_BARRIERSYNC.
-#endif
+    // If F_BARRIERSYNC is not suppported (this is known on exFAT) we don't fallback to sync().
+    // This is not longer needed becasue msync already guarantees that the pages are going to be
+    // flushed on disk.
+    ::fcntl(m_fd, F_BARRIERFSYNC);
+#else
     sync();
+#endif
 }
 
 #ifndef _WIN32
