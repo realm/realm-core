@@ -24,6 +24,7 @@
 #include <mutex>
 #include <map>
 #include <atomic>
+#include <cstring>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -110,7 +111,7 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     , size(s)
 {
     total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
-    addr = static_cast<char*>(util::mmap_anon(size));
+    addr = new char[size];
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
 #endif
@@ -120,7 +121,7 @@ SlabAlloc::Slab::~Slab()
 {
     total_slab_allocated.fetch_sub(size, std::memory_order_relaxed);
     if (addr)
-        util::munmap(addr, size);
+        delete[] addr;
 }
 
 void SlabAlloc::detach() noexcept
@@ -144,6 +145,9 @@ void SlabAlloc::detach() noexcept
             m_mappings.clear();
             m_youngest_live_version = 0;
             m_file.close();
+            break;
+        case attach_Heap:
+            m_data = 0;
             break;
         default:
             REALM_UNREACHABLE();
@@ -956,6 +960,28 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     return top_ref;
 }
 
+void SlabAlloc::init_in_memory_buffer()
+{
+    m_attach_mode = attach_Heap;
+    m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, 0);
+    m_data = m_virtual_file_buffer.back().addr;
+    m_virtual_file_size = sizeof(empty_file_header);
+    memcpy(const_cast<char*>(m_data), &empty_file_header, m_virtual_file_size);
+
+    m_baseline = m_virtual_file_size;
+    m_translation_table_size = 1;
+    auto ref_translation_ptr = new RefTranslation[1]{RefTranslation{const_cast<char*>(m_data)}};
+    ref_translation_ptr->lowest_possible_xover_offset = m_virtual_file_buffer.back().size;
+    m_ref_translation_ptr = ref_translation_ptr;
+}
+
+char* SlabAlloc::translate_memory_pos(ref_type ref) const noexcept
+{
+    auto idx = get_section_index(ref);
+    REALM_ASSERT(idx < m_virtual_file_buffer.size());
+    auto& buf = m_virtual_file_buffer[idx];
+    return buf.addr + (ref - buf.start_ref);
+}
 
 void SlabAlloc::attach_empty()
 {
@@ -1136,83 +1162,89 @@ void SlabAlloc::update_reader_view(size_t file_size)
     if (file_size <= old_baseline) {
         return;
     }
-    REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
-    REALM_ASSERT_EX(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile, m_attach_mode,
-                    get_file_path_for_assertions());
-    REALM_ASSERT_DEBUG(is_free_space_clean());
 
-    // Create the new mappings we needed to cover the new size. We don't mutate
-    // any of the member variables until we've successfully created all of the
-    // mappings so that we leave things in a consistent state if one of them
-    // hits an allocation failure.
-    bool replace_last_mapping = false;
-    std::vector<MapEntry> new_mappings;
     const auto old_slab_base = align_size_to_section_boundary(old_baseline);
+    bool replace_last_mapping = false;
     size_t old_num_mappings = get_section_index(old_slab_base);
-    REALM_ASSERT(m_mappings.size() == old_num_mappings);
 
-    {
-        // If the old slab base was greater than the old baseline then the final
-        // mapping was a partial section and we need to replace it with a larger
-        // mapping.
-        if (old_baseline < old_slab_base) {
-            // old_slab_base should be 0 if we had no mappings previously
-            REALM_ASSERT(old_num_mappings > 0);
-            // try to extend the old mapping in-place instead of replacing it.
-            MapEntry& cur_entry = m_mappings.back();
-            const size_t section_start_offset = get_section_base(old_num_mappings - 1);
-            const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
-            if (!cur_entry.primary_mapping.try_extend_to(section_size)) {
-                replace_last_mapping = true;
-                --old_num_mappings;
-            }
-        }
+    if (!is_in_memory()) {
+        REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
+        REALM_ASSERT_EX(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile, m_attach_mode,
+                        get_file_path_for_assertions());
+        REALM_ASSERT_DEBUG(is_free_space_clean());
 
-        // Create new mappings covering from the end of the last complete
-        // section to the end of the new file size.
-        const auto new_slab_base = align_size_to_section_boundary(file_size);
-        const size_t num_mappings = get_section_index(new_slab_base);
-        new_mappings.reserve(num_mappings - old_num_mappings);
-        for (size_t k = old_num_mappings; k < num_mappings; ++k) {
-            const size_t section_start_offset = get_section_base(k);
-            const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
-            if (section_size == (1 << section_shift)) {
-                new_mappings.push_back(
-                    {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
+        // Create the new mappings we needed to cover the new size. We don't mutate
+        // any of the member variables until we've successfully created all of the
+        // mappings so that we leave things in a consistent state if one of them
+        // hits an allocation failure.
+
+        std::vector<MapEntry> new_mappings;
+        REALM_ASSERT(m_mappings.size() == old_num_mappings);
+
+        {
+            // If the old slab base was greater than the old baseline then the final
+            // mapping was a partial section and we need to replace it with a larger
+            // mapping.
+            if (old_baseline < old_slab_base) {
+                // old_slab_base should be 0 if we had no mappings previously
+                REALM_ASSERT(old_num_mappings > 0);
+                // try to extend the old mapping in-place instead of replacing it.
+                MapEntry& cur_entry = m_mappings.back();
+                const size_t section_start_offset = get_section_base(old_num_mappings - 1);
+                const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
+                if (!cur_entry.primary_mapping.try_extend_to(section_size)) {
+                    replace_last_mapping = true;
+                    --old_num_mappings;
+                }
             }
-            else {
-                new_mappings.push_back({util::File::Map<char>()});
-                auto& mapping = new_mappings.back().primary_mapping;
-                bool reserved =
-                    mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
-                if (reserved) {
-                    // if reservation is supported, first attempt at extending must succeed
-                    if (!mapping.try_extend_to(section_size))
-                        throw std::bad_alloc();
+
+            // Create new mappings covering from the end of the last complete
+            // section to the end of the new file size.
+            const auto new_slab_base = align_size_to_section_boundary(file_size);
+            const size_t num_mappings = get_section_index(new_slab_base);
+            new_mappings.reserve(num_mappings - old_num_mappings);
+            for (size_t k = old_num_mappings; k < num_mappings; ++k) {
+                const size_t section_start_offset = get_section_base(k);
+                const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
+                if (section_size == (1 << section_shift)) {
+                    new_mappings.push_back(
+                        {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
                 }
                 else {
-                    new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
-                                                            section_start_offset);
+                    new_mappings.push_back({util::File::Map<char>()});
+                    auto& mapping = new_mappings.back().primary_mapping;
+                    bool reserved =
+                        mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
+                    if (reserved) {
+                        // if reservation is supported, first attempt at extending must succeed
+                        if (!mapping.try_extend_to(section_size))
+                            throw std::bad_alloc();
+                    }
+                    else {
+                        new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
+                                                                section_start_offset);
+                    }
                 }
             }
         }
+
+        // Now that we've successfully created our mappings, update our member
+        // variables (and assume that resizing a simple vector won't produce memory
+        // allocation failures, unlike 64 MB mmaps).
+        if (replace_last_mapping) {
+            MapEntry& cur_entry = m_mappings.back();
+            // We should not have a xover mapping here because that would mean
+            // that there was already something mapped after the last section
+            REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
+            // save the old mapping/keep it open
+            m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
+            m_mappings.pop_back();
+            m_mapping_version++;
+        }
+
+        std::move(new_mappings.begin(), new_mappings.end(), std::back_inserter(m_mappings));
     }
 
-    // Now that we've successfully created our mappings, update our member
-    // variables (and assume that resizing a simple vector won't produce memory
-    // allocation failures, unlike 64 MB mmaps).
-    if (replace_last_mapping) {
-        MapEntry& cur_entry = m_mappings.back();
-        // We should not have a xover mapping here because that would mean
-        // that there was already something mapped after the last section
-        REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
-        // save the old mapping/keep it open
-        m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
-        m_mappings.pop_back();
-        m_mapping_version++;
-    }
-
-    std::move(new_mappings.begin(), new_mappings.end(), std::back_inserter(m_mappings));
     m_baseline.store(file_size, std::memory_order_relaxed);
 
     const size_t ref_start = align_size_to_section_boundary(file_size);
@@ -1271,7 +1303,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)
 {
     size_t free_space_size = m_slabs.size();
-    auto num_mappings = m_mappings.size();
+    auto num_mappings = is_in_memory() ? m_virtual_file_buffer.size() : m_mappings.size();
     if (m_translation_table_size < num_mappings + free_space_size) {
         requires_new_translation = true;
     }
@@ -1289,11 +1321,16 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         old_num_sections = 0;
     }
     for (size_t i = old_num_sections; i < num_mappings; ++i) {
-        new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
-        REALM_ASSERT(new_translation_table[i].mapping_addr);
+        if (is_in_memory()) {
+            new_translation_table[i].mapping_addr = m_virtual_file_buffer[i].addr;
+        }
+        else {
+            new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
 #endif
+        }
+        REALM_ASSERT(new_translation_table[i].mapping_addr);
         // We don't copy over data for the cross over mapping. If the mapping is needed,
         // copying will happen on demand (in get_or_add_xover_mapping).
         // Note: that may never be needed, because if the array that needed the original cross over
@@ -1357,6 +1394,9 @@ void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
         if (m.xover_mapping.is_attached())
             mappings.insert(m.xover_mapping.get_addr());
     }
+    for (auto& m : m_virtual_file_buffer) {
+        mappings.insert(m.addr);
+    }
     if (m_data)
         mappings.insert(m_data);
     for (auto& t : m_old_translations) {
@@ -1418,15 +1458,27 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size
 
 void SlabAlloc::resize_file(size_t new_file_size)
 {
-    REALM_ASSERT_EX(new_file_size == round_up_to_page_size(new_file_size), get_file_path_for_assertions());
-    m_file.prealloc(new_file_size); // Throws
-    // resizing is done based on the logical file size. It is ok for the file
-    // to actually be bigger, but never smaller.
-    REALM_ASSERT(new_file_size <= static_cast<size_t>(m_file.get_size()));
+    if (m_attach_mode == attach_SharedFile) {
+        REALM_ASSERT_EX(new_file_size == round_up_to_page_size(new_file_size), get_file_path_for_assertions());
+        m_file.prealloc(new_file_size); // Throws
+        // resizing is done based on the logical file size. It is ok for the file
+        // to actually be bigger, but never smaller.
+        REALM_ASSERT(new_file_size <= static_cast<size_t>(m_file.get_size()));
 
-    bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
-    if (!disable_sync)
-        m_file.sync(); // Throws
+        bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
+        if (!disable_sync)
+            m_file.sync(); // Throws
+    }
+    else {
+        size_t current_size = 0;
+        for (auto& b : m_virtual_file_buffer) {
+            current_size += b.size;
+        }
+        if (new_file_size > current_size) {
+            m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, current_size);
+        }
+        m_virtual_file_size = new_file_size;
+    }
 }
 
 #ifdef REALM_DEBUG

@@ -108,7 +108,15 @@ DBOptions TestFile::options() const
 InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
+    schema_version = 0;
     encryption_key = std::vector<char>();
+}
+
+DBOptions InMemoryTestFile::options() const
+{
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    return options;
 }
 
 #if REALM_ENABLE_SYNC

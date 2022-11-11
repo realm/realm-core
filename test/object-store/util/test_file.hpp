@@ -86,8 +86,9 @@ private:
     std::string m_temp_dir;
 };
 
-struct InMemoryTestFile : TestFile {
+struct InMemoryTestFile : realm::Realm::Config {
     InMemoryTestFile();
+    realm::DBOptions options() const;
 };
 
 void advance_and_notify(realm::Realm& realm);

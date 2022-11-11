@@ -6115,4 +6115,36 @@ TEST(LangBindHelper_SchemaChangeNotification)
     CHECK(handler_called);
 }
 
+TEST(LangBindHelper_InMemoryDB)
+{
+    DBRef sg = DB::create(make_in_realm_history());
+    ColKey col;
+    auto rt = sg->start_read();
+    {
+        auto wt = sg->start_write();
+        TableRef t = wt->add_table("Foo");
+        col = t->add_column(type_Int, "int");
+        t->create_object(ObjKey(123)).set(col, 1);
+        t->create_object(ObjKey(456)).set(col, 2);
+        wt->commit();
+    }
+
+    rt->advance_read();
+    auto table = rt->get_table("Foo");
+    const Obj o1 = table->get_object(ObjKey(123));
+    const Obj o2 = table->get_object(ObjKey(456));
+    CHECK_EQUAL(o1.get<int64_t>(col), 1);
+    CHECK_EQUAL(o2.get<int64_t>(col), 2);
+
+    {
+        auto wt = sg->start_write();
+        TableRef t = wt->get_table("Foo");
+        t->remove_object(ObjKey(123));
+        wt->commit();
+    }
+    rt->advance_read();
+    CHECK_THROW(o1.get<int64_t>(col), KeyNotFound);
+    CHECK_EQUAL(o2.get<int64_t>(col), 2);
+}
+
 #endif
