@@ -659,7 +659,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     TestAppSession session;
     auto app = session.app();
 
-    SECTION("link_user intergration") {
+    SECTION("link_user integration") {
         AutoVerifiedEmailCredentials creds;
         bool processed = false;
         std::shared_ptr<SyncUser> sync_user;
@@ -4718,3 +4718,100 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     mock_transport_worker.mark_complete();
 }
 #endif
+
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, profile };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    struct transport : public GenericNetworkTransport {
+        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state,
+                  std::shared_ptr<SyncUser>& logged_in_user)
+            : mock_transport_worker(worker)
+            , state(state)
+            , logged_in_user(logged_in_user)
+        {
+        }
+
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
+        {
+            if (request.url.find("/login") != std::string::npos) {
+                state.advance_to(TestState::login);
+                mock_transport_worker.add_work_item(
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                logged_in_user->log_out();
+                state.advance_to(TestState::profile);
+                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                    std::move(completion));
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                state.advance_to(TestState::location);
+                mock_transport_worker.add_work_item(
+                    Response{200,
+                             0,
+                             {},
+                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    std::move(completion));
+            }
+        }
+
+        AsyncMockNetworkTransport& mock_transport_worker;
+        TestStateBundle& state;
+        std::shared_ptr<SyncUser>& logged_in_user;
+    };
+
+    std::shared_ptr<SyncUser> logged_in_user;
+    auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
+
+    TestSyncManager sync_manager(get_config(transporter));
+    auto app = sync_manager.app();
+
+    logged_in_user = app->sync_manager()->get_user(UnitTestTransport::user_id, good_access_token, good_access_token,
+                                                   "anon-user", dummy_device_id);
+    auto custom_credentials = AppCredentials::facebook("a_token");
+    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
+
+    app->link_user(logged_in_user, custom_credentials,
+                   [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                           util::Optional<AppError> error) mutable {
+                       REQUIRE_FALSE(error);
+                       promise.emplace_value(std::move(user));
+                   });
+
+    auto cur_user = std::move(cur_user_future).get();
+    CHECK(state.get() == TestState::profile);
+    CHECK(cur_user);
+    CHECK(cur_user == logged_in_user);
+
+    mock_transport_worker.mark_complete();
+}
