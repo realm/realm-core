@@ -1079,7 +1079,17 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
     // search through the chunk, finding a place within it,
     // where an allocation will not cross a mmap boundary
     size_t start_pos = it->second;
-    size_t alloc_pos = alloc.find_section_in_range(start_pos, chunk_size, size);
+    // prevent allocation from first page
+    size_t alloc_pos;
+    // if (start_pos < page_size()) {
+    //     if (start_pos + chunk_size <= page_size())
+    //         return m_size_map.end();
+    //     size_t reduction = page_size() - start_pos;
+    //     alloc_pos = alloc.find_section_in_range(page_size(), chunk_size - reduction, size);
+    // }
+    // else {
+    alloc_pos = alloc.find_section_in_range(start_pos, chunk_size, size);
+    //}
     if (alloc_pos == 0) {
         return m_size_map.end();
     }

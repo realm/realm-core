@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <system_error>
+#include <chrono>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
@@ -258,13 +259,14 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     auto retry = [&](const char* debug_from) {
         // don't wait too long because we hold the DB lock here, but we want to wait long enough
         // for a new page to be written to disk by another process before we retry reading it.
-        constexpr size_t millis_to_sleep_before_retry = 23;
-        constexpr auto max_retry_period = std::chrono::seconds(20);
+        constexpr size_t millis_to_sleep_before_retry = 0;
+        constexpr auto max_retry_period = std::chrono::seconds(1);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
         if (elapsed > max_retry_period) {
-            auto str = util::format("Reader starvation detected after %1 seconds (retry_count=%2, from=%3, size=%4)",
-                                    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
-                                    debug_from, size);
+            auto str =
+                util::format("Reader starvation detected after %1 seconds (retry_count=%2, from=%3, pos=%4 size=%5)",
+                             std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
+                             debug_from, pos, size);
             std::cout << str << std::endl;
             throw DecryptionFailed(str);
         }
@@ -272,8 +274,12 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // don't wait on the first retry as we want to optimize the case where the first read
             // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
             if (retry_count != 0) {
-                millisleep(millis_to_sleep_before_retry);
+                if (millis_to_sleep_before_retry)
+                    millisleep(millis_to_sleep_before_retry);
+                else
+                    sched_yield();
             }
+            // std::cout << "Retry " << retry_count << " on pos " << pos << std::endl;
             ++retry_count;
         }
     };
