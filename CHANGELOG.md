@@ -7,9 +7,10 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
- 
+
 ### Breaking changes
-* None.
+* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr`
+* `util::RootLogger` has been replaced with `util::Logger`
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Update logger references in primary Sync/ObjectStore classes to use `shared_ptr`
 
 ----------------------------------------------
 
@@ -36,8 +37,7 @@
 * Fix database corruption and encryption issues on apple platforms, reported in several bugs listed in the PR. ([PR #5993](https://github.com/realm/realm-core/pull/5993), since v11.8.0)
 
 ### Breaking changes
-* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr`
-* `util::RootLogger` has been replaced with `util::Logger`
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -48,7 +48,6 @@
 * Fix `BPlusTreeInner::verify()` ([#5974](https://github.com/realm/realm-core/pull/5974)).
 * Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
 * Defer converting Realm files from streaming form until after we've validated the version ([PR #5987](https://github.com/realm/realm-core/pull/5987)).
-* Update logger references in primary Sync/ObjectStore classes to use `shared_ptr`
 
 ----------------------------------------------
 
