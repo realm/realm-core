@@ -149,6 +149,7 @@ public:
     void flush_all_mappings();
 
 private:
+    friend class InMemoryWriter;
     struct FreeSpaceEntry {
         FreeSpaceEntry(size_t r, size_t s, uint64_t v)
             : ref(r)
@@ -244,7 +245,8 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     FreeListElement extend_free_space(size_t requested_size);
 
-    void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
+    template <class T>
+    void write_array_at(T* translator, ref_type, const char* data, size_t size);
     FreeListElement split_freelist_chunk(FreeListElement, size_t alloc_pos);
 
     /// Backdate (if possible) any blocks in the freelist belonging to

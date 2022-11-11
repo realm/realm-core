@@ -119,6 +119,7 @@ public:
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
                         const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
+    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions& options = DBOptions());
 
     ~DB() noexcept;
 
@@ -425,6 +426,8 @@ protected:
 private:
     class AsyncCommitHelper;
     class VersionManager;
+    class FileVersionManager;
+    class InMemoryVersionManager;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -464,6 +467,8 @@ private:
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    std::unique_ptr<SharedInfo> m_in_memory_info;
+    SharedInfo* m_info = nullptr;
     bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
@@ -515,6 +520,7 @@ private:
         REQUIRES(!m_mutex);
     void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
+    void open(Replication& repl, const DBOptions options = DBOptions()) REQUIRES(!m_mutex);
 
     void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
@@ -623,7 +629,7 @@ struct DB::BadVersion : std::exception {
 
 inline bool DB::is_attached() const noexcept
 {
-    return bool(m_fake_read_lock_if_immutable) || m_file_map.is_attached();
+    return bool(m_fake_read_lock_if_immutable) || m_info;
 }
 
 class DB::ReadLockGuard {

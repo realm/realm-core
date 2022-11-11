@@ -296,6 +296,7 @@ TransactionRef make_transaction_ref(Args&&... args)
 
 } // anonymous namespace
 
+namespace realm {
 
 /// The structure of the contents of the per session `.lock` file. Note that
 /// this file is transient in that it is recreated/reinitialized at the
@@ -507,17 +508,11 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 
 class DB::VersionManager {
 public:
-    VersionManager(File& file, util::InterprocessMutex& mutex)
-        : m_file(file)
-        , m_mutex(mutex)
+    VersionManager(util::InterprocessMutex& mutex)
+        : m_mutex(mutex)
     {
-        std::lock_guard lock(m_mutex);
-        size_t size = static_cast<size_t>(m_file.get_size());
-        m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
-        m_info = m_reader_map.get_addr();
-        m_local_max_entry = m_info->readers.capacity();
-        REALM_ASSERT(sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry) == size);
     }
+    virtual ~VersionManager() {}
 
     void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
     {
@@ -604,6 +599,12 @@ public:
         return read_lock;
     }
 
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
+    {
+        std::lock_guard lock(m_mutex);
+        m_info->init_versioning(top_ref, file_size, initial_version);
+    }
+
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
         std::lock_guard lock(m_mutex);
@@ -614,24 +615,46 @@ public:
         // allocation failed, expand VersionList (and lockfile) and retry
         auto entries = m_info->readers.capacity();
         auto new_entries = entries + 32;
+        expand_version_list(new_entries);
+        m_local_max_entry = new_entries;
+        m_info->readers.reserve(new_entries);
+        auto success = m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
+        REALM_ASSERT_EX(success, new_entries, new_version);
+    }
+    virtual void expand_version_list(unsigned new_entries) = 0;
+
+protected:
+    unsigned int m_local_max_entry = 0;
+    SharedInfo* m_info = nullptr;
+    virtual void ensure_full_reader_mapping() = 0;
+
+private:
+    util::InterprocessMutex& m_mutex;
+};
+
+class DB::FileVersionManager : public DB::VersionManager {
+public:
+    FileVersionManager(File& file, util::InterprocessMutex& mutex)
+        : VersionManager(mutex)
+        , m_file(file)
+    {
+        size_t size = static_cast<size_t>(m_file.get_size());
+        m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
+        m_info = m_reader_map.get_addr();
+        m_local_max_entry = m_info->readers.capacity();
+        REALM_ASSERT(sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry) == size);
+    }
+
+    void expand_version_list(unsigned new_entries) override
+    {
         size_t new_info_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(new_entries);
         m_file.prealloc(new_info_size);                                          // Throws
         m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
         m_info = m_reader_map.get_addr();
-        m_local_max_entry = new_entries;
-        m_info->readers.reserve(new_entries);
-        auto success = m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version);
-        REALM_ASSERT_EX(success, new_info_size, new_version);
-    }
-
-    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
-    {
-        std::lock_guard lock(m_mutex);
-        m_info->init_versioning(top_ref, file_size, initial_version);
     }
 
 private:
-    void ensure_full_reader_mapping()
+    void ensure_full_reader_mapping() override
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
@@ -646,11 +669,25 @@ private:
             m_info = m_reader_map.get_addr();
         }
     }
-    unsigned int m_local_max_entry;
-    SharedInfo* m_info;
     File& m_file;
-    File::Map<DB::SharedInfo> m_reader_map;
-    util::InterprocessMutex& m_mutex;
+    File::Map<SharedInfo> m_reader_map;
+};
+
+class DB::InMemoryVersionManager : public DB::VersionManager {
+public:
+    InMemoryVersionManager(SharedInfo* info, util::InterprocessMutex& mutex)
+        : VersionManager(mutex)
+    {
+        m_info = info;
+        m_local_max_entry = m_info->readers.capacity();
+    }
+    void expand_version_list(unsigned) override
+    {
+        REALM_ASSERT(false);
+    }
+
+private:
+    void ensure_full_reader_mapping() override {}
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -754,13 +791,13 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // old lock file.
             m_file_map.map(m_file, File::access_ReadWrite, sizeof(SharedInfo), File::map_NoSync); // Throws
             File::UnmapGuard fug(m_file_map);
-            SharedInfo* info_2 = m_file_map.get_addr();
+            SharedInfo* info = m_file_map.get_addr();
 
-            new (info_2) SharedInfo{options.durability, openers_hist_type, openers_hist_schema_version}; // Throws
+            new (info) SharedInfo{options.durability, openers_hist_type, openers_hist_schema_version}; // Throws
 
             // Because init_complete is an std::atomic, it's guaranteed not to be observable by others
             // as being 1 before the entire SharedInfo header has been written.
-            info_2->init_complete = 1;
+            info->init_complete = 1;
         }
 
 // We hold the shared lock from here until we close the file!
@@ -903,7 +940,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            auto version_manager = std::make_unique<VersionManager>(m_file, m_versionlist_mutex);
+            auto version_manager = std::make_unique<FileVersionManager>(m_file, m_versionlist_mutex);
 
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
@@ -1176,6 +1213,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             // make our presence noted:
             ++info->num_participants;
+            m_info = info;
 
             // Keep the mappings and file open:
             m_version_manager = std::move(version_manager);
@@ -1245,6 +1283,45 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
     open(file, no_create, options); // Throws
 }
 
+void DB::open(Replication& repl, const DBOptions options)
+{
+    REALM_ASSERT(!is_attached());
+    repl.initialize(*this); // Throws
+    set_replication(&repl);
+
+    m_alloc.init_in_memory_buffer();
+
+    auto hist_type = repl.get_history_type();
+    m_in_memory_info =
+        std::make_unique<SharedInfo>(DBOptions::Durability::MemOnly, hist_type, repl.get_history_schema_version());
+    SharedInfo* info = m_in_memory_info.get();
+    m_writemutex.set_shared_part(info->shared_writemutex, "", "write");
+    m_controlmutex.set_shared_part(info->shared_controlmutex, "", "control");
+    m_new_commit_available.set_shared_part(info->new_commit_available, "", "new_commit",
+                                           options.temp_dir);
+    m_pick_next_writer.set_shared_part(info->pick_next_writer, "", "pick_writer", options.temp_dir);
+    m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, "", "versions");
+
+    auto target_file_format_version = uint_fast8_t(Group::get_target_file_format_version_for_session(0, hist_type));
+    info->file_format_version = target_file_format_version;
+    info->number_of_versions = 1;
+    info->latest_version_number = 1;
+    info->init_versioning(0, m_alloc.get_baseline(), 1);
+    ++info->num_participants;
+
+    m_version_manager = std::make_unique<InMemoryVersionManager>(info, m_versionlist_mutex);
+
+    m_file_format_version = target_file_format_version;
+
+#if REALM_METRICS
+    if (options.enable_metrics) {
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
+    }
+#endif // REALM_METRICS
+    m_info = info;
+    m_alloc.set_read_only(true);
+}
+
 void DB::create_new_history(Replication& repl)
 {
     Replication* old_repl = get_replication();
@@ -1310,7 +1387,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
     }
-    SharedInfo* info = m_file_map.get_addr();
+    auto info = m_info;
     Durability dura = Durability(info->durability);
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
@@ -1402,8 +1479,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
 void DB::write_copy(StringData path, const char* output_encryption_key)
 {
-    SharedInfo* info = m_file_map.get_addr();
-
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
@@ -1429,15 +1504,14 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
     file.open(path, File::access_ReadWrite, File::create_Must, 0);
     file.resize(0);
 
-    tr->write(file, output_encryption_key, info->latest_version_number, writer);
+    tr->write(file, output_encryption_key, m_info->latest_version_number, writer);
 }
 
 uint_fast64_t DB::get_number_of_versions()
 {
     if (m_fake_read_lock_if_immutable)
         return 1;
-    SharedInfo* info = m_file_map.get_addr();
-    return info->number_of_versions;
+    return m_info->number_of_versions;
 }
 
 size_t DB::get_allocated_size() const
@@ -1500,7 +1574,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         if (!allow_open_read_transactions && m_transaction_count)
             throw LogicError(LogicError::wrong_transact_state);
     }
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
     {
         if (!lock.owns_lock())
             lock.lock();
@@ -1536,20 +1610,25 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         m_new_commit_available.close();
         m_pick_next_writer.close();
 
-        // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread
-        // may
-        // interleave which is not permitted on Windows. It is permitted on *nix.
-        m_file_map.unmap();
-        m_version_manager.reset();
-        m_file.unlock();
-        // info->~SharedInfo(); // DO NOT Call destructor
-        m_file.close();
+        if (m_in_memory_info) {
+            m_in_memory_info.reset();
+        }
+        else {
+            // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another
+            // thread may interleave which is not permitted on Windows. It is permitted on *nix.
+            m_file_map.unmap();
+            m_version_manager.reset();
+            m_file.unlock();
+            // info->~SharedInfo(); // DO NOT Call destructor
+            m_file.close();
+        }
+        m_info = nullptr;
     }
 }
 
 bool DB::other_writers_waiting_for_lock() const
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
     uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
@@ -1822,12 +1901,11 @@ bool DB::has_changed(TransactionRef& tr)
 bool DB::wait_for_change(TransactionRef& tr)
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
-    SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (tr->m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
+    while (tr->m_read_lock.m_version == m_info->latest_version_number && m_wait_for_change_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
-    return tr->m_read_lock.m_version != info->latest_version_number;
+    return tr->m_read_lock.m_version != m_info->latest_version_number;
 }
 
 
@@ -2006,7 +2084,7 @@ bool DB::do_try_begin_write()
 
 void DB::do_begin_write()
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     // Get write lock - the write lock is held until do_end_write().
     //
@@ -2068,8 +2146,7 @@ void DB::do_begin_write()
 
 void DB::finish_begin_write()
 {
-    SharedInfo* info = m_file_map.get_addr();
-    if (info->commit_in_critical_phase) {
+    if (m_info->commit_in_critical_phase) {
         m_writemutex.unlock();
         throw std::runtime_error("Crash of other process detected, session restart required");
     }
@@ -2084,8 +2161,7 @@ void DB::finish_begin_write()
 
 void DB::do_end_write() noexcept
 {
-    SharedInfo* info = m_file_map.get_addr();
-    info->next_served.fetch_add(1, std::memory_order_relaxed);
+    m_info->next_served.fetch_add(1, std::memory_order_relaxed);
 
     CheckedLockGuard local_lock(m_mutex);
     REALM_ASSERT(m_write_transaction_open);
@@ -2141,7 +2217,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 
 void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk)
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     // Version of oldest snapshot currently (or recently) bound in a transaction
     // of the current session.
@@ -2455,6 +2531,15 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
     return retval;
 }
 
+DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
+{
+    REALM_ASSERT(repl);
+    DBRef retval = std::make_shared<DBInit>(options);
+    retval->m_history = std::move(repl);
+    retval->open(*retval->m_history, options);
+    return retval;
+}
+
 DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYSIS
 {
     DBOptions options;
@@ -2468,10 +2553,9 @@ void DB::claim_sync_agent()
 {
     REALM_ASSERT(is_attached());
     std::unique_lock<InterprocessMutex> lock(m_controlmutex);
-    SharedInfo* info = m_file_map.get_addr();
-    if (info->sync_agent_present)
+    if (m_info->sync_agent_present)
         throw MultipleSyncAgents{};
-    info->sync_agent_present = 1; // Set to true
+    m_info->sync_agent_present = 1; // Set to true
     m_is_sync_agent = true;
 }
 
@@ -2481,9 +2565,8 @@ void DB::release_sync_agent()
     std::unique_lock<InterprocessMutex> lock(m_controlmutex);
     if (!m_is_sync_agent)
         return;
-    SharedInfo* info = m_file_map.get_addr();
-    REALM_ASSERT(info->sync_agent_present);
-    info->sync_agent_present = 0;
+    REALM_ASSERT(m_info->sync_agent_present);
+    m_info->sync_agent_present = 0;
     m_is_sync_agent = false;
 }
 
@@ -2521,3 +2604,5 @@ DisableReplication::~DisableReplication()
     if (m_version != m_tr.get_version())
         m_tr.initialize_replication();
 }
+
+} // namespace realm
