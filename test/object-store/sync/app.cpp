@@ -4703,7 +4703,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 }
 #endif
 
-TEST_CASE("app: user logs our while profile is fetched", "[sync][app]") {
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
@@ -4792,8 +4792,8 @@ TEST_CASE("app: user logs our while profile is fetched", "[sync][app]") {
                        promise.emplace_value(std::move(user));
                    });
 
-    state.wait_for(TestState::profile);
     auto cur_user = std::move(cur_user_future).get();
+    CHECK(state.state == TestState::profile);
     CHECK(cur_user);
     CHECK(cur_user == logged_in_user);
 
