@@ -9,7 +9,8 @@
 * Fetching a user's profile while the user logs out would result in an assertion failure. ([PR #6017](https://github.com/realm/realm-core/issues/5571), since v11.0.3)
 
 ### Breaking changes
-* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr`
+* `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
+* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr` ([PR #5980](https://github.com/realm/realm-core/pull/5980))
 * `util::RootLogger` has been replaced with `util::Logger`
 
 ### Compatibility
@@ -18,7 +19,7 @@
 -----------
 
 ### Internals
-* Update logger references in primary Sync/ObjectStore classes to use `shared_ptr`
+* Update logger references in primary Sync/ObjectStore classes to use `shared_ptr` ([#5983](https://github.com/realm/realm-core/issues/5983))
 
 ----------------------------------------------
 
