@@ -19,6 +19,7 @@
 #ifndef REALM_TABLE_HPP
 #define REALM_TABLE_HPP
 
+#include "external/mpark/variant.hpp"
 #include <algorithm>
 #include <map>
 #include <utility>
@@ -547,11 +548,13 @@ public:
     }
     Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments = {}) const;
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
