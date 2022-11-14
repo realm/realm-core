@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 
 #ifdef REALM_DEBUG
@@ -85,6 +86,36 @@ struct iv_table {
     uint8_t hmac1[28];
     uint32_t iv2;
     uint8_t hmac2[28];
+    iv_table()
+    {
+        iv1 = 0;
+        iv2 = 0;
+        memset(&hmac1, 0, 28);
+        memset(&hmac2, 0, 28);
+    }
+    iv_table(const iv_table& other)
+    {
+        iv1 = other.iv1;
+        iv2 = other.iv2;
+        memmove(&hmac1, &other.hmac1, 28);
+        memmove(&hmac2, &other.hmac2, 28);
+    }
+    void operator=(const iv_table& other)
+    {
+        iv1 = other.iv1;
+        iv2 = other.iv2;
+        memmove(&hmac1, &other.hmac1, 28);
+        memmove(&hmac2, &other.hmac2, 28);
+    }
+    bool operator==(const iv_table& other) const
+    {
+        return iv1 == other.iv1 && iv2 == other.iv2 && memcmp(hmac1, other.hmac1, 28) == 0 &&
+               memcmp(hmac2, other.hmac2, 28) == 0;
+    }
+    bool operator!=(const iv_table& other) const
+    {
+        return !(*this == other);
+    }
 };
 
 namespace {
@@ -251,14 +282,15 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     REALM_ASSERT_EX(size % block_size == 0, size, block_size);
     // We need to throw DecryptionFailed if the key is incorrect or there has been a corruption in the data but
     // not in a reader starvation scenario where a different process is writing pages and ivs faster than we can read
-    // them. The following combination of 100 retries of 23 ms produces a max wait time of 1.1 seconds if all retries
-    // fail.
+    // them. We also want to optimize for a single process writer since in that case all the cached ivs are correct.
+    // To do this, we first attempt to use the cached IV, and if it is invalid, read from disk again. During reader
+    // starvation, the just read IV could already be out of date with the data page, so continue trying to read until
+    // a match is found (for up to 20 seconds before giving up entirely).
     size_t retry_count = 0;
+    std::pair<iv_table, size_t> last_iv_and_data_hash;
     auto retry_start_time = std::chrono::steady_clock::now();
-    auto retry = [&](const char* debug_from) {
-        // don't wait too long because we hold the DB lock here, but we want to wait long enough
-        // for a new page to be written to disk by another process before we retry reading it.
-        constexpr size_t millis_to_sleep_before_retry = 23;
+    size_t num_identical_reads = 1;
+    auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
         constexpr auto max_retry_period = std::chrono::seconds(20);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
         if (elapsed > max_retry_period) {
@@ -271,11 +303,23 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
         else {
             // don't wait on the first retry as we want to optimize the case where the first read
             // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
+            std::pair<iv_table, size_t> cur_iv_and_data_hash =
+                std::make_pair(iv, std::hash<std::string_view>{}(page_data));
             if (retry_count != 0) {
-                millisleep(millis_to_sleep_before_retry);
+                sched_yield();
+                if (last_iv_and_data_hash == cur_iv_and_data_hash) {
+                    ++num_identical_reads;
+                }
             }
+            last_iv_and_data_hash = cur_iv_and_data_hash;
             ++retry_count;
         }
+    };
+
+    auto should_retry = [&]() -> bool {
+        // if we do not observe identical data or iv within several sequential reads then
+        // this is a multiprocess reader starvation scenario so keep trying until we get a match
+        return retry_count <= 5 || retry_count - num_identical_reads > 1;
     };
 
     while (size > 0) {
@@ -286,8 +330,8 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 
         iv_table& iv = get_iv_table(fd, pos, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch);
         if (iv.iv1 == 0) {
-            if (retry_count < 10) {
-                retry("iv1 == 0");
+            if (should_retry()) {
+                retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "iv1 == 0");
                 continue;
             }
             // This block has never been written to, so we've just read pre-allocated
@@ -300,8 +344,8 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
-                if (retry_count < 10) {
-                    retry("iv2 == 0");
+                if (should_retry()) {
+                    retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "iv2 == 0");
                     continue;
                 }
                 // Very first write was interrupted
@@ -326,7 +370,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 }
                 if (i != bytes_read) {
                     // at least one byte wasn't zero
-                    retry("i != bytes_read");
+                    retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "i != bytes_read");
                     continue;
                 }
             }
