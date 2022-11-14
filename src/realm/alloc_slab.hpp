@@ -150,6 +150,15 @@ public:
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& file_path, Config& cfg);
 
+    /// If the attached file is in streaming form, convert it to normal form.
+    ///
+    /// This conversion must be done as part of session initialization to avoid
+    /// tricky coordination problems with other sessions at the time the
+    /// conversion is done. However, we want to do it after all validation has
+    /// completed to avoid writing to a file in an unknown format, so this
+    /// cannot be done in `attach_file()`.
+    void convert_from_streaming_form(ref_type top_ref);
+
     /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
     util::File& get_file();

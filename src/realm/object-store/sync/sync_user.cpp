@@ -186,14 +186,7 @@ void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string&
                 // Call set_state() rather than update_state_and_tokens to remove a user.
                 REALM_UNREACHABLE();
             case State::LoggedIn:
-                sessions_to_revive.reserve(m_waiting_sessions.size());
-                for (auto& pair : m_waiting_sessions) {
-                    if (auto ptr = pair.second.lock()) {
-                        m_sessions[pair.first] = ptr;
-                        sessions_to_revive.emplace_back(std::move(ptr));
-                    }
-                }
-                m_waiting_sessions.clear();
+                sessions_to_revive = revive_sessions();
                 break;
             case State::LoggedOut: {
                 REALM_ASSERT(m_access_token == RealmJWT{});
@@ -217,6 +210,20 @@ void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string&
     emit_change_to_subscribers(*this);
 }
 
+std::vector<std::shared_ptr<SyncSession>> SyncUser::revive_sessions()
+{
+    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
+    sessions_to_revive.reserve(m_waiting_sessions.size());
+    for (auto& [path, weak_session] : m_waiting_sessions) {
+        if (auto ptr = weak_session.lock()) {
+            m_sessions[path] = ptr;
+            sessions_to_revive.emplace_back(std::move(ptr));
+        }
+    }
+    m_waiting_sessions.clear();
+    return sessions_to_revive;
+}
+
 void SyncUser::update_refresh_token(std::string&& token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
@@ -230,16 +237,9 @@ void SyncUser::update_refresh_token(std::string&& token)
                 m_refresh_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
-                sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_refresh_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
-                for (auto& pair : m_waiting_sessions) {
-                    if (auto ptr = pair.second.lock()) {
-                        m_sessions[pair.first] = ptr;
-                        sessions_to_revive.emplace_back(std::move(ptr));
-                    }
-                }
-                m_waiting_sessions.clear();
+                sessions_to_revive = revive_sessions();
                 break;
             }
         }
@@ -272,16 +272,9 @@ void SyncUser::update_access_token(std::string&& token)
                 m_access_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
-                sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_access_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
-                for (auto& pair : m_waiting_sessions) {
-                    if (auto ptr = pair.second.lock()) {
-                        m_sessions[pair.first] = ptr;
-                        sessions_to_revive.emplace_back(std::move(ptr));
-                    }
-                }
-                m_waiting_sessions.clear();
+                sessions_to_revive = revive_sessions();
                 break;
             }
         }
@@ -312,7 +305,10 @@ std::vector<SyncUserIdentity> SyncUser::identities() const
 void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
 {
     util::CheckedLockGuard lock(m_mutex);
-    REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
+    if (m_state != SyncUser::State::LoggedIn) {
+        return;
+    }
+
     m_user_identities = identities;
 
     m_sync_manager->perform_metadata_update([&](const auto& manager) {
@@ -357,10 +353,10 @@ void SyncUser::log_out()
         sync_manager_shared = m_sync_manager->shared_from_this();
         // Move all active sessions into the waiting sessions pool. If the user is
         // logged back in, they will automatically be reactivated.
-        for (auto& pair : m_sessions) {
-            if (auto ptr = pair.second.lock()) {
+        for (auto& [path, weak_session] : m_sessions) {
+            if (auto ptr = weak_session.lock()) {
                 ptr->log_out();
-                m_waiting_sessions[pair.first] = ptr;
+                m_waiting_sessions[path] = std::move(ptr);
             }
         }
         m_sessions.clear();
@@ -443,7 +439,9 @@ util::Optional<bson::BsonDocument> SyncUser::custom_data() const
 void SyncUser::update_user_profile(const SyncUserProfile& profile)
 {
     util::CheckedLockGuard lock(m_mutex);
-    REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
+    if (m_state != SyncUser::State::LoggedIn) {
+        return;
+    }
 
     m_user_profile = profile;
 
@@ -459,10 +457,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
     util::CheckedUniqueLock lock(m_mutex);
     switch (m_state) {
         case State::LoggedIn:
-            // Immediately ask the session to come online.
             m_sessions[path] = session;
-            lock.unlock();
-            session->revive_if_needed();
             break;
         case State::LoggedOut:
             m_waiting_sessions[path] = session;

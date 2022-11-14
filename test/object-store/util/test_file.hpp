@@ -20,7 +20,7 @@
 #define REALM_TEST_UTIL_TEST_FILE_HPP
 
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/util/tagged_bool.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
@@ -266,7 +266,7 @@ public:
 
         realm::util::UniqueFunction<void(const realm::app::Response&)>& network_callback;
     };
-    std::shared_ptr<realm::app::GenericNetworkTransport> transport = std::make_shared<Transport>(network_callback);
+    const std::shared_ptr<realm::app::GenericNetworkTransport> transport;
 
 private:
     std::shared_ptr<realm::app::App> m_app;

@@ -134,11 +134,13 @@ enum class SyncClientHookEvent {
     DownloadMessageReceived,
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
+    BootstrapProcessed,
 };
 
 enum class SyncClientHookAction {
     NoAction,
     EarlyReturn,
+    SuspendWithRetryableError,
 };
 
 struct SyncClientHookData {
@@ -170,6 +172,11 @@ struct SyncConfig {
     std::function<SSLVerifyCallback> ssl_verify_callback;
     util::Optional<ProxyConfig> proxy_config;
     bool flx_sync_requested = false;
+
+    // When integrating a flexible sync bootstrap, process this many bytes of changeset data in a single integration
+    // attempt. This many bytes of changesets will be uncompressed and held in memory while being applied.
+    size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
+
     bool client_validate_ssl = true;
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones

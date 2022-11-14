@@ -811,7 +811,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
         StringData key(begin, sep - begin);
         begin = sep + (sep != end);
 
-        auto prop = object_schema->property_for_name(key);
+        auto prop = object_schema->property_for_public_name(key);
         check(prop, "property '%1.%2' does not exist", object_schema->name, key);
         check(is_sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'", object_schema->name, key,
               string_for_property_type(prop->type));
