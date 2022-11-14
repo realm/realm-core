@@ -1664,33 +1664,12 @@ std::string File::parent_dir(const std::string& path)
     auto is_sep = [](char c) -> bool {
         return c == '/' || c == '\\';
     };
-    std::vector<size_t> sep_indices;
-    for (size_t i = 0; i < path.size();) {
-        size_t seq_len = sequence_length(path[i]);
-        if (seq_len == 1 && is_sep(path[i])) {
-            sep_indices.push_back(i);
-        }
-        i += seq_len;
-    }
-    if (sep_indices.empty()) {
-        return "";
-    }
-    if (sep_indices.size() == 1) {
-        return path.substr(0, sep_indices[0]);
-    }
-    // remove consecutive trailing separators
-    auto it = sep_indices.rbegin();
-    size_t last = *it;
-    while (++it != sep_indices.rend()) {
-        if (last != *it + 1) {
-            return path.substr(0, last);
-        }
-        last = *it;
-    }
-    return path.substr(0, last);
+    auto it = std::find_if(path.rbegin(), path.rend(), is_sep);
+    while (it != path.rend() && is_sep(*it))
+        ++it;
+    return path.substr(0, path.rend() - it);
 #endif
 }
-
 
 bool File::for_each(const std::string& dir_path, ForEachHandler handler)
 {
