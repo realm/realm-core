@@ -26,11 +26,13 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
+#if REALM_ENABLE_FILE_SYSTEM
 #include <realm/util/file.hpp>
+#include <realm/util/file_mapper.hpp>
+#endif
 #include <realm/exceptions.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/node_header.hpp>
-#include <realm/util/file_mapper.hpp>
 
 // Temporary workaround for
 // https://developercommunity.visualstudio.com/content/problem/994075/64-bit-atomic-load-ices-cl-1924-with-o2-ob1.html
@@ -252,7 +254,9 @@ protected:
     virtual char* do_translate(ref_type ref) const noexcept = 0;
     char* translate_critical(RefTranslation*, ref_type ref) const noexcept;
     char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
+#if REALM_ENABLE_FILE_SYSTEM
     virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
+#endif
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
@@ -366,10 +370,12 @@ public:
     }
 
 protected:
+#if REALM_ENABLE_FILE_SYSTEM
     void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override
     {
         m_alloc->get_or_add_xover_mapping(txl, index, offset, size);
     }
+#endif
 
 private:
     Allocator* m_alloc;

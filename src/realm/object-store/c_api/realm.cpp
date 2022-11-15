@@ -73,6 +73,7 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config, bool merge_with_existing)
 {
     return wrap_err([&]() {
@@ -94,6 +95,7 @@ RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, rea
         return true;
     });
 }
+#endif
 
 RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm)
 {

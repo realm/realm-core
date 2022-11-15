@@ -36,7 +36,6 @@
 
 #include <realm/db.hpp>
 #include <realm/util/fifo_helper.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -1082,6 +1081,7 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void Realm::convert(const Config& config, bool merge_into_existing)
 {
     verify_thread();
@@ -1132,6 +1132,7 @@ void Realm::convert(const Config& config, bool merge_into_existing)
         _impl::translate_file_exception(config.path);
     }
 }
+#endif
 
 OwnedBinaryData Realm::write_copy()
 {
@@ -1322,6 +1323,7 @@ void Realm::close()
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
 {
+#if REALM_ENABLE_FILE_SYSTEM
     try {
         auto lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
             DB::delete_files(path, did_delete_realm);
@@ -1337,6 +1339,12 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
             *did_delete_realm = false;
         }
     }
+#else
+    static_cast<void>(realm_file_path);
+    if (did_delete_realm) {
+        *did_delete_realm = true; // fake it!
+    }
+#endif
 }
 
 AuditInterface* Realm::audit_context() const noexcept

@@ -1694,6 +1694,7 @@ TEST_CASE("app: roundtrip values", "[sync][app]") {
     }
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
@@ -1788,6 +1789,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     advance_and_notify(*r1);
     // r1->read_group().to_json(std::cout);
 }
+#endif
 
 TEST_CASE("app: set new embedded object", "[sync][app]") {
     std::string base_url = get_base_url();
@@ -1927,6 +1929,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     }
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 TEST_CASE("app: make distributable client file", "[sync][app]") {
     TestAppSession session;
     auto app = session.app();
@@ -2000,6 +2003,7 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         REQUIRE(realm->read_group().get_table("class_Dog")->size() == 2);
     }
 }
+#endif
 
 constexpr size_t minus_25_percent(size_t val)
 {

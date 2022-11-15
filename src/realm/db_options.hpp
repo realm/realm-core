@@ -21,7 +21,10 @@
 
 #include <functional>
 #include <string>
+
+#if REALM_ENABLE_FILE_SYSTEM
 #include <realm/backup_restore.hpp>
+#endif
 
 namespace realm {
 
@@ -93,11 +96,13 @@ struct DBOptions {
     /// Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
 
+#if REALM_ENABLE_FILE_SYSTEM
     /// List of versions we can upgrade from
     BackupHandler::VersionList accepted_versions = BackupHandler::accepted_versions_;
 
     /// List of versions for which backup files are automatically removed at specified age.
     BackupHandler::VersionTimeList to_be_deleted = BackupHandler::delete_versions_;
+#endif
 
     /// Must be set for the async writes feature to be used. On some platforms
     /// this will make *all* writes async and then wait on the result, which has

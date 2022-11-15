@@ -25,7 +25,6 @@
 #include <iomanip>
 #endif
 
-#include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
@@ -70,6 +69,7 @@ Group::Group()
 }
 
 
+#if REALM_ENABLE_FILE_SYSTEM
 Group::Group(const std::string& file_path, const char* encryption_key)
     : m_local_alloc(new SlabAlloc) // Throws
     , m_alloc(*m_local_alloc)
@@ -91,7 +91,7 @@ Group::Group(const std::string& file_path, const char* encryption_key)
 
     open(top_ref, file_path);
 }
-
+#endif
 
 Group::Group(BinaryData buffer, bool take_ownership)
     : m_local_alloc(new SlabAlloc) // Throws
@@ -391,6 +391,7 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
     // Select file format if it is still undecided.
     auto file_format_version = alloc.get_committed_file_format_version();
 
+#if REALM_ENABLE_FILE_SYSTEM
     bool file_format_ok = false;
     // It is not possible to open prior file format versions without an upgrade.
     // Since a Realm file cannot be upgraded when opened in this mode
@@ -407,6 +408,10 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
     }
     if (REALM_UNLIKELY(!file_format_ok))
         throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+#else
+    static_cast<void>(top_ref);
+    static_cast<void>(path);
+#endif
     return file_format_version;
 }
 
@@ -980,6 +985,7 @@ void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t vers
     write(out, m_file_format_version, writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(file.get_size() == 0);
@@ -1011,6 +1017,7 @@ void Group::write(const std::string& path, const char* encryption_key, uint64_t 
     DefaultTableWriter table_writer(write_history);
     write(file, encryption_key, version_number, table_writer);
 }
+#endif
 
 
 BinaryData Group::write_to_mem() const

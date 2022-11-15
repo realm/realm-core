@@ -57,6 +57,13 @@ set_target_properties(RealmDump PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 
+find_package(LibUV)
+if(LibUV_FOUND)
+    set(libuv_target LibUV::LibUV)
+endif()
+add_executable(RealmInMemory EXCLUDE_FROM_ALL realm_in_memory.cpp )
+target_link_libraries(RealmInMemory Storage QueryParser ObjectStore ${libuv_target})
+
 install(TARGETS ${ExecTargetsToInstall}
         COMPONENT runtime
         DESTINATION bin)

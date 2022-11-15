@@ -21,7 +21,6 @@
 #include <realm/util/file.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/util/load_file.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/optional.hpp>

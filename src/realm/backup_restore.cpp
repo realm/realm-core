@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <realm/backup_restore.hpp>
-#include <realm/util/file.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/time.hpp>
 
 #include <vector>
@@ -80,6 +80,8 @@ BackupHandler::BackupHandler(const std::string& path, const VersionList& accepte
     m_accepted_versions = accepted;
     m_delete_versions = to_be_deleted;
 }
+
+BackupHandler::~BackupHandler() = default;
 
 bool BackupHandler::must_restore_from_backup(int current_file_format_version) const
 {

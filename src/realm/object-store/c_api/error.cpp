@@ -144,6 +144,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         }
     }
 
+#if REALM_ENABLE_FILE_SYSTEM
     // File exceptions:
     catch (const util::File::PermissionDenied& ex) {
         populate_error(ex, RLM_ERR_FILE_PERMISSION_DENIED);
@@ -151,6 +152,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     catch (const util::File::AccessError& ex) {
         populate_error(ex, RLM_ERR_FILE_ACCESS_ERROR);
     }
+#endif
 
     // Object Store exceptions:
     catch (const InvalidTransactionException& ex) {

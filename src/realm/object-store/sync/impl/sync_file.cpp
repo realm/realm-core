@@ -19,7 +19,6 @@
 #include <realm/object-store/sync/impl/sync_file.hpp>
 
 #include <realm/db.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/time.hpp>
@@ -42,8 +41,9 @@ inline static int mkstemp(char* _template)
 #include <unistd.h>
 #endif
 
-
+#if REALM_ENABLE_FILE_SYSTEM
 using File = realm::util::File;
+#endif
 
 namespace realm {
 
@@ -237,39 +237,57 @@ SyncFileManager::SyncFileManager(const std::string& base_path, const std::string
     , m_app_path(util::file_path_by_appending_component(m_base_path, util::validate_and_clean_path(app_id),
                                                         util::FilePathType::Directory))
 {
+#if REALM_ENABLE_FILE_SYSTEM
     util::try_make_dir(m_base_path);
     util::try_make_dir(m_app_path);
+#endif
 }
 
 std::string SyncFileManager::get_special_directory(std::string directory_name) const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     auto dir_path = file_path_by_appending_component(m_app_path, directory_name, util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return dir_path;
+#else
+    static_cast<void>(directory_name);
+    return "";
+#endif
 }
 
 std::string SyncFileManager::user_directory(const std::string& user_identity) const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     std::string user_path = get_user_directory_path(user_identity);
     util::try_make_dir(user_path);
     return user_path;
+#else
+    static_cast<void>(user_identity);
+    return "";
+#endif
 }
 
 void SyncFileManager::remove_user_realms(const std::string& user_identity,
                                          const std::vector<std::string>& realm_paths) const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     for (auto& path : realm_paths) {
         remove_realm(path);
     }
     // The following is redundant except for apps built before file tracking.
     std::string user_path = get_user_directory_path(user_identity);
     util::try_remove_dir_recursive(user_path);
+#else
+    static_cast<void>(user_identity);
+    static_cast<void>(realm_paths);
+#endif
 }
 
 bool SyncFileManager::remove_realm(const std::string& absolute_path) const
 {
-    REALM_ASSERT(absolute_path.length() > 0);
     bool success = true;
+#if REALM_ENABLE_FILE_SYSTEM
+    REALM_ASSERT(absolute_path.length() > 0);
     try {
         constexpr bool delete_lockfile = true;
         realm::DB::delete_files(absolute_path, &success, delete_lockfile);
@@ -277,11 +295,15 @@ bool SyncFileManager::remove_realm(const std::string& absolute_path) const
     catch (File::AccessError const&) {
         success = false;
     }
+#else
+    static_cast<void>(absolute_path);
+#endif
     return success;
 }
 
 bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::string& new_path) const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     REALM_ASSERT(old_path.length() > 0);
     try {
         if (File::exists(new_path)) {
@@ -296,6 +318,11 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
         return false;
     }
     return true;
+#else
+    static_cast<void>(old_path);
+    static_cast<void>(new_path);
+    return false;
+#endif
 }
 
 bool SyncFileManager::remove_realm(const std::string& user_identity, const std::string& local_identity,
@@ -311,6 +338,7 @@ bool SyncFileManager::remove_realm(const std::string& user_identity, const std::
 
 bool SyncFileManager::try_file_exists(const std::string& path) noexcept
 {
+#if REALM_ENABLE_FILE_SYSTEM
     try {
         // May throw; for example when the path is too long
         return util::File::exists(path);
@@ -318,8 +346,13 @@ bool SyncFileManager::try_file_exists(const std::string& path) noexcept
     catch (const std::exception&) {
         return false;
     }
+#else
+    static_cast<void>(path);
+    return true;
+#endif
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 static bool try_file_remove(const std::string& path) noexcept
 {
     try {
@@ -329,6 +362,7 @@ static bool try_file_remove(const std::string& path) noexcept
         return false;
     }
 }
+#endif
 
 util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
                                                                           const std::string& local_user_identity,
@@ -392,7 +426,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
     if (existing_path) {
         return *existing_path;
     }
-
+#if REALM_ENABLE_FILE_SYSTEM
     // since this appears to be a new file, test the normal location
     // we use a test file with the same name and a suffix of the
     // same length so we can catch "filename too long" errors on windows
@@ -429,18 +463,27 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
     }
 
     return preferred_name_with_suffix;
+#else
+    REALM_UNREACHABLE();
+    return "";
+#endif
 }
 
 std::string SyncFileManager::metadata_path() const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     auto dir_path = file_path_by_appending_component(get_utility_directory(), c_metadata_directory,
                                                      util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return util::file_path_by_appending_component(dir_path, c_metadata_realm);
+#else
+    return "";
+#endif
 }
 
 bool SyncFileManager::remove_metadata_realm() const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     auto dir_path = file_path_by_appending_component(get_utility_directory(), c_metadata_directory,
                                                      util::FilePathType::Directory);
     try {
@@ -450,6 +493,9 @@ bool SyncFileManager::remove_metadata_realm() const
     catch (File::AccessError const&) {
         return false;
     }
+#else
+    return true;
+#endif
 }
 
 std::string SyncFileManager::preferred_realm_path_without_suffix(const std::string& user_identity,

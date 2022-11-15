@@ -21,7 +21,10 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#include <realm/util/logger.hpp>
+#if REALM_ENABLE_FILE_SYSTEM
 #include <realm/util/file.hpp>
+#endif
 
 #include <cstring>
 #include <ostream>
@@ -157,7 +160,7 @@ private:
     std::ostream& m_out;
 };
 
-
+#if REALM_ENABLE_FILE_SYSTEM
 /// A logger that writes to a file. This logger is not thread-safe.
 ///
 /// Since this class is a RootLogger, it contains modifiable a log level
@@ -183,7 +186,7 @@ private:
     util::File::Streambuf m_streambuf;
     std::ostream m_out;
 };
-
+#endif
 
 /// A thread-safe logger. This logger ignores the level threshold of the base
 /// logger. Instead, it introduces new a LevelThreshold object with a fixed
@@ -405,6 +408,7 @@ inline StreamLogger::StreamLogger(std::ostream& out) noexcept
 {
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 inline FileLogger::FileLogger(std::string path)
     : StreamLogger(m_out)
     , m_file(path, util::File::mode_Write) // Throws
@@ -436,6 +440,7 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
     , m_out(&m_streambuf)  // Throws
 {
 }
+#endif
 
 inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger, Level threshold)
     : Logger::LevelThreshold()

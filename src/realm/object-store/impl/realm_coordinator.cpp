@@ -335,6 +335,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
 #endif
 
+#if REALM_ENABLE_FILE_SYSTEM
 REALM_NOINLINE void realm::_impl::translate_file_exception(StringData path, bool immutable)
 {
     try {
@@ -398,6 +399,7 @@ REALM_NOINLINE void realm::_impl::translate_file_exception(StringData path, bool
             ex.what());
     }
 }
+#endif
 
 void RealmCoordinator::open_db()
 {
@@ -454,9 +456,14 @@ void RealmCoordinator::open_db()
             m_db = DB::create(std::move(history), m_config.path, options);
         }
         else {
+#if REALM_ENABLE_FILE_SYSTEM
             m_db = DB::create(m_config.path, true, options);
+#else
+            REALM_UNREACHABLE();
+#endif
         }
     }
+#if REALM_ENABLE_FILE_SYSTEM
     catch (realm::FileFormatUpgradeRequired const&) {
         if (!schema_mode_reset_file) {
             translate_file_exception(m_config.path, m_config.immutable());
@@ -490,6 +497,11 @@ void RealmCoordinator::open_db()
         if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
             m_db->compact();
     }
+#else
+    catch (...) {
+        throw;
+    }
+#endif
 
     init_external_helpers();
 }
@@ -536,10 +548,12 @@ void RealmCoordinator::close()
 
 void RealmCoordinator::delete_and_reopen()
 {
+#if REALM_ENABLE_FILE_SYSTEM
     util::CheckedLockGuard lock(m_realm_mutex);
     close();
     util::File::remove(m_config.path);
     open_db();
+#endif
 }
 
 TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
@@ -1285,10 +1299,12 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void RealmCoordinator::write_copy(StringData path, const char* key)
 {
     m_db->write_copy(path, key);
 }
+#endif
 
 void RealmCoordinator::async_request_write_mutex(Realm& realm)
 {

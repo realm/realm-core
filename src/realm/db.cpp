@@ -37,7 +37,6 @@
 #include <realm/replication.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/features.h>
-#include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
@@ -632,6 +631,7 @@ private:
     util::InterprocessMutex& m_mutex;
 };
 
+#if REALM_ENABLE_FILE_SYSTEM
 class DB::FileVersionManager : public DB::VersionManager {
 public:
     FileVersionManager(File& file, util::InterprocessMutex& mutex)
@@ -672,6 +672,7 @@ private:
     File& m_file;
     File::Map<SharedInfo> m_reader_map;
 };
+#endif
 
 class DB::InMemoryVersionManager : public DB::VersionManager {
 public:
@@ -713,7 +714,7 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // be able to reinitialize a process-shared mutex if the first
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
-
+#if REALM_ENABLE_FILE_SYSTEM
 void DB::open(const std::string& path, bool no_create_file, const DBOptions& options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
@@ -1259,6 +1260,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
     m_alloc.set_read_only(true);
 }
+#endif
 
 void DB::open(BinaryData buffer, bool take_ownership)
 {
@@ -1268,6 +1270,7 @@ void DB::open(BinaryData buffer, bool take_ownership)
         m_alloc.own_buffer();
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void DB::open(Replication& repl, const std::string& file, const DBOptions& options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
@@ -1282,6 +1285,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
     bool no_create = false;
     open(file, no_create, options); // Throws
 }
+#endif
 
 void DB::open(Replication& repl, const DBOptions options)
 {
@@ -1346,7 +1350,6 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
     m_history = std::move(repl);
 }
 
-
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails.
 // Tracked by https://github.com/realm/realm-core/issues/4111
@@ -1377,6 +1380,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
                               // tell that tr->db->m_mutex is the same thing as m_mutex
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
+#if REALM_ENABLE_FILE_SYSTEM
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
 
     // To enter compact, the DB object must already have been attached to a file,
@@ -1474,9 +1478,14 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
     }
+#else
+    static_cast<void>(bump_version_number);
+    static_cast<void>(output_encryption_key);
+#endif
     return true;
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void DB::write_copy(StringData path, const char* output_encryption_key)
 {
     auto tr = start_read();
@@ -1506,6 +1515,7 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
 
     tr->write(file, output_encryption_key, m_info->latest_version_number, writer);
 }
+#endif
 
 uint_fast64_t DB::get_number_of_versions()
 {
@@ -1592,6 +1602,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // std::cerr << "closing" << std::endl;
         if (end_of_session) {
 
+#if REALM_ENABLE_FILE_SYSTEM
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
             if (Durability(info->durability) == Durability::MemOnly) {
@@ -1601,6 +1612,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
                 catch (...) {
                 } // ignored on purpose.
             }
+#endif
         }
         lock.unlock();
     }
@@ -1614,6 +1626,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
             m_in_memory_info.reset();
         }
         else {
+#if REALM_ENABLE_FILE_SYSTEM
             // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another
             // thread may interleave which is not permitted on Windows. It is permitted on *nix.
             m_file_map.unmap();
@@ -1621,6 +1634,9 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
             m_file.unlock();
             // info->~SharedInfo(); // DO NOT Call destructor
             m_file.close();
+#else
+            REALM_UNREACHABLE();
+#endif
         }
         m_info = nullptr;
     }
@@ -1926,6 +1942,7 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
                              int current_hist_schema_version, int target_hist_schema_version)
 {
@@ -2008,6 +2025,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
             wt->commit(); // Throws
     }
 }
+#endif
 
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
@@ -2332,6 +2350,7 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock&& callback)
 {
+#if REALM_ENABLE_FILE_SYSTEM
     auto lockfile_path = get_core_file(realm_path, CoreFileType::Lock);
 
     File lockfile;
@@ -2343,8 +2362,13 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock&& callba
         return true;
     }
     return false;
+#else
+    callback(realm_path);
+    return true;
+#endif
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 std::string DB::get_core_file(const std::string& base_path, CoreFileType type)
 {
     switch (type) {
@@ -2376,6 +2400,7 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
         File::try_remove(get_core_file(base_path, CoreFileType::Lock));
     }
 }
+#endif
 
 TransactionRef DB::start_read(VersionID version_id)
 {
@@ -2507,17 +2532,24 @@ public:
 };
 } // namespace
 
+#if REALM_ENABLE_FILE_SYSTEM
 DBRef DB::create(const std::string& file, bool no_create, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
+#endif
 
 DBRef DB::create(Replication& repl, const std::string& file, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
 {
     DBRef retval = std::make_shared<DBInit>(options);
+#if REALM_ENABLE_FILE_SYSTEM
     retval->open(repl, file, options);
+#else
+    retval->open(repl, options);
+    retval->m_db_path = file;
+#endif
     return retval;
 }
 
@@ -2527,7 +2559,12 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);
     retval->m_history = std::move(repl);
+#if REALM_ENABLE_FILE_SYSTEM
     retval->open(*retval->m_history, file, options);
+#else
+    retval->open(*retval->m_history, options);
+    retval->m_db_path = file;
+#endif
     return retval;
 }
 

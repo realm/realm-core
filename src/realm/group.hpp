@@ -56,6 +56,7 @@ public:
     /// with an external memory buffer.
     Group();
 
+#if REALM_ENABLE_FILE_SYSTEM
     /// Attach this Group instance to the specified database file.
     ///
     /// The specified file is opened in read-only mode. This allows opening
@@ -119,6 +120,7 @@ public:
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     explicit Group(const std::string& file, const char* encryption_key = nullptr);
+#endif
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -337,6 +339,7 @@ public:
     /// to the end of a page
     void write(std::ostream& out, bool pad = false) const;
 
+#if REALM_ENABLE_FILE_SYSTEM
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
     /// overwriting a database file that is currently open, which
@@ -360,7 +363,7 @@ public:
     /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
                bool write_history = true) const;
-
+#endif
     /// Write this database to a memory buffer.
     ///
     /// Ownership of the returned buffer is transferred to the
@@ -698,7 +701,9 @@ private:
 
     void mark_all_table_accessors() noexcept;
 
+#if REALM_ENABLE_FILE_SYSTEM
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
+#endif
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;

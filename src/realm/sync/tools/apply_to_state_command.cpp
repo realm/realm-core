@@ -9,7 +9,7 @@
 #include "realm/sync/changeset_parser.hpp"
 #include "realm/util/cli_args.hpp"
 #include "realm/util/compression.hpp"
-#include "realm/util/load_file.hpp"
+#include "realm/util/file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 
 #include <external/mpark/variant.hpp>
@@ -268,7 +268,7 @@ int main(int argc, const char** argv)
 
     std::string encryption_key;
     if (encryption_key_arg) {
-        encryption_key = load_file(encryption_key_arg.as<std::string>());
+        encryption_key = File::load_file(encryption_key_arg.as<std::string>());
     }
 
     realm::DBOptions db_opts(encryption_key.empty() ? nullptr : encryption_key.c_str());
@@ -276,7 +276,7 @@ int main(int argc, const char** argv)
     auto local_db = realm::DB::create(repl, realm_path, db_opts);
     auto& history = repl.get_history();
 
-    auto input_contents = load_file(input_arg.as<std::string>());
+    auto input_contents = File::load_file(input_arg.as<std::string>());
     HeaderLineParser msg(input_contents);
     while (!msg.at_end()) {
         Message message;

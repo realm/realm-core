@@ -18,10 +18,12 @@
 
 #include <string>
 #include <vector>
-
-#include <realm/util/logger.hpp>
+#include <memory>
 
 namespace realm {
+namespace util {
+class AppendToFileLogger;
+}
 
 class BackupHandler {
 public:
@@ -29,6 +31,7 @@ public:
     using VersionTimeList = std::vector<std::pair<int, int>>;
 
     BackupHandler(const std::string& path, const VersionList& accepted, const VersionTimeList& to_be_deleted);
+    ~BackupHandler();
     bool is_accepted_file_format(int current_file_format_version) const noexcept;
     bool must_restore_from_backup(int current_file_format_version) const;
     void restore_from_backup();

@@ -67,8 +67,13 @@ set(REALM_SOURCES
     utilities.cpp
     uuid.cpp
     version.cpp
-    backup_restore.cpp
 ) # REALM_SOURCES
+
+if(REALM_ENABLE_FILE_SYSTEM)
+    list(APPEND REALM_SOURCES
+        backup_restore.cpp
+    )
+endif()
 
 set(UTIL_SOURCES
     util/backtrace.cpp
@@ -76,10 +81,7 @@ set(UTIL_SOURCES
     util/basic_system_errors.cpp
     util/cli_args.cpp
     util/compression.cpp
-    util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
-    util/file.cpp
-    util/file_mapper.cpp
     util/interprocess_condvar.cpp
     util/logger.cpp
     util/memory_stream.cpp
@@ -98,7 +100,6 @@ set(UTIL_SOURCES
     util/enum.cpp
     util/http.cpp
     util/json_parser.cpp
-    util/load_file.cpp
     util/misc_ext_errors.cpp
     util/parent_dir.cpp
     util/random.cpp
@@ -106,6 +107,14 @@ set(UTIL_SOURCES
     util/substitute.cpp
     util/uri.cpp
 )
+
+if(REALM_ENABLE_FILE_SYSTEM)
+    list(APPEND UTIL_SOURCES
+        util/encrypted_file_mapping.cpp
+        util/file.cpp
+        util/file_mapper.cpp
+    )
+endif()
 
 set(REALM_INSTALL_HEADERS
     aggregate_ops.hpp
@@ -275,9 +284,7 @@ set(REALM_NOINST_HEADERS
     util/enum.hpp
     util/ez_websocket.hpp
     util/from_chars.hpp
-    util/get_file_size.hpp
     util/json_parser.hpp
-    util/load_file.hpp
     util/network_ssl.hpp
     util/parent_dir.hpp
     util/platform_info.hpp

@@ -11,7 +11,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/quote.hpp>
 #include <realm/util/timestamp_formatter.hpp>
-#include <realm/util/load_file.hpp>
+#include <realm/util/file.hpp>
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
 #include <realm/bplustree.hpp>
@@ -551,7 +551,7 @@ int main(int argc, char* argv[])
     std::string encryption_key_2;
     const char* encryption_key_3 = nullptr;
     if (!encryption_key.empty()) {
-        encryption_key_2 = util::load_file(encryption_key);
+        encryption_key_2 = util::File::load_file(encryption_key);
         encryption_key_3 = encryption_key_2.data();
     }
     Group group{realm_path, encryption_key_3};

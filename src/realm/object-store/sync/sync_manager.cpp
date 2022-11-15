@@ -130,9 +130,14 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
                     m_file_manager->remove_user_realms(user.identity(), user.realm_file_paths());
                     dead_users.emplace_back(std::move(user));
                 }
+#if REALM_ENABLE_FILE_SYSTEM
                 catch (util::File::AccessError const&) {
                     continue;
                 }
+#else
+                catch (...) {
+                }
+#endif
             }
             for (auto& user : dead_users) {
                 user.remove();
@@ -177,6 +182,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
             m_file_manager->remove_realm(md.original_name());
             return true;
         case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
+#if REALM_ENABLE_FILE_SYSTEM
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
             auto new_name = md.new_name();
             auto original_name = md.original_name();
@@ -196,6 +202,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
                 md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
                 return false;
             }
+#endif
             return false;
     }
     return false;
@@ -250,12 +257,14 @@ void SyncManager::reset_for_testing()
         m_sync_route = "";
     }
 
+#if REALM_ENABLE_FILE_SYSTEM
     {
         util::CheckedLockGuard lock(m_file_system_mutex);
         if (m_file_manager)
             util::try_remove_dir_recursive(m_file_manager->base_path());
         m_file_manager = nullptr;
     }
+#endif
 }
 
 void SyncManager::set_log_level(util::Logger::Level level) noexcept

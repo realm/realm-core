@@ -35,7 +35,9 @@
 #include <cstdlib>
 #endif
 
+#ifdef REALM_ENABLE_FILE_SYSTEM
 #include <realm/util/encrypted_file_mapping.hpp>
+#endif
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
@@ -77,11 +79,12 @@ SlabAlloc::SlabAlloc()
     m_baseline = 0;
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 util::File& SlabAlloc::get_file()
 {
     return m_file;
 }
-
+#endif
 
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     {0, 0}, // top-refs
@@ -138,6 +141,7 @@ void SlabAlloc::detach() noexcept
         case attach_OwnedBuffer:
             delete[] m_data;
             break;
+#if REALM_ENABLE_FILE_SYSTEM
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
@@ -145,6 +149,7 @@ void SlabAlloc::detach() noexcept
             m_youngest_live_version = 0;
             m_file.close();
             break;
+#endif
         case attach_Heap:
             m_data = 0;
             break;
@@ -645,16 +650,16 @@ char* SlabAlloc::do_translate(ref_type) const noexcept
     return nullptr;
 }
 
-
 int SlabAlloc::get_committed_file_format_version() const noexcept
 {
+#if REALM_ENABLE_FILE_SYSTEM
     if (m_mappings.size()) {
         // if we have mapped a file, m_mappings will have at least one mapping and
         // the first will be to the start of the file. Don't come here, if we're
         // just attaching a buffer. They don't have mappings.
         realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     }
-
+#endif
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
     int file_format_version = int(header.m_file_format[slot_selector]);
@@ -685,9 +690,14 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
 
 std::string SlabAlloc::get_file_path_for_assertions() const
 {
+#if REALM_ENABLE_FILE_SYSTEM
     return m_file.get_path();
+#else
+    return "";
+#endif
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 {
     m_cfg = cfg;
@@ -917,6 +927,7 @@ void SlabAlloc::convert_from_streaming_form(ref_type top_ref)
         realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     }
 }
+#endif
 
 void SlabAlloc::note_reader_start(const void* reader_id)
 {
@@ -1167,6 +1178,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     bool replace_last_mapping = false;
     size_t old_num_mappings = get_section_index(old_slab_base);
 
+#if REALM_ENABLE_FILE_SYSTEM
     if (!is_in_memory()) {
         REALM_ASSERT_EX(file_size % 8 == 0, file_size, get_file_path_for_assertions()); // 8-byte alignment required
         REALM_ASSERT_EX(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile, m_attach_mode,
@@ -1244,7 +1256,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
 
         std::move(new_mappings.begin(), new_mappings.end(), std::back_inserter(m_mappings));
     }
-
+#else
+    REALM_ASSERT_RELEASE(is_in_memory());
+#endif
     m_baseline.store(file_size, std::memory_order_relaxed);
 
     const size_t ref_start = align_size_to_section_boundary(file_size);
@@ -1303,7 +1317,12 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)
 {
     size_t free_space_size = m_slabs.size();
-    auto num_mappings = is_in_memory() ? m_virtual_file_buffer.size() : m_mappings.size();
+    auto num_mappings = m_virtual_file_buffer.size();
+#if REALM_ENABLE_FILE_SYSTEM
+    if (!is_in_memory()) {
+        num_mappings = m_mappings.size();
+    }
+#endif
     if (m_translation_table_size < num_mappings + free_space_size) {
         requires_new_translation = true;
     }
@@ -1324,12 +1343,16 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         if (is_in_memory()) {
             new_translation_table[i].mapping_addr = m_virtual_file_buffer[i].addr;
         }
+#if REALM_ENABLE_FILE_SYSTEM
         else {
             new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
 #if REALM_ENABLE_ENCRYPTION
         new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
 #endif
         }
+#else
+        REALM_ASSERT(is_in_memory());
+#endif
         REALM_ASSERT(new_translation_table[i].mapping_addr);
         // We don't copy over data for the cross over mapping. If the mapping is needed,
         // copying will happen on demand (in get_or_add_xover_mapping).
@@ -1350,6 +1373,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     m_ref_translation_ptr = new_translation_table;
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size)
 {
     auto _page_size = page_size();
@@ -1377,6 +1401,7 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
 #endif
     txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
 }
+#endif
 
 void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
 {
@@ -1384,6 +1409,7 @@ void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
     // thing that we haven't released yet.
 #if REALM_DEBUG
     std::unordered_set<const char*> mappings;
+#if REALM_ENABLE_FILE_SYSTEM
     for (auto& m : m_old_mappings) {
         REALM_ASSERT(m.mapping.is_attached());
         mappings.insert(m.mapping.get_addr());
@@ -1394,6 +1420,7 @@ void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
         if (m.xover_mapping.is_attached())
             mappings.insert(m.xover_mapping.get_addr());
     }
+#endif
     for (auto& m : m_virtual_file_buffer) {
         mappings.insert(m.addr);
     }
@@ -1421,7 +1448,9 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     auto pred = [=](auto& oldie) {
         return oldie.replaced_at_version < oldest_live_version;
     };
+#if REALM_ENABLE_FILE_SYSTEM
     m_old_mappings.erase(std::remove_if(m_old_mappings.begin(), m_old_mappings.end(), pred), m_old_mappings.end());
+#endif
     m_old_translations.erase(std::remove_if(m_old_translations.begin(), m_old_translations.end(), pred),
                              m_old_translations.end());
     m_youngest_live_version = youngest_live_version;
@@ -1458,7 +1487,18 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size
 
 void SlabAlloc::resize_file(size_t new_file_size)
 {
-    if (m_attach_mode == attach_SharedFile) {
+    if (m_attach_mode == attach_Heap) {
+        size_t current_size = 0;
+        for (auto& b : m_virtual_file_buffer) {
+            current_size += b.size;
+        }
+        if (new_file_size > current_size) {
+            m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, current_size);
+        }
+        m_virtual_file_size = new_file_size;
+    }
+#if REALM_ENABLE_FILE_SYSTEM
+    else if (m_attach_mode == attach_SharedFile) {
         REALM_ASSERT_EX(new_file_size == round_up_to_page_size(new_file_size), get_file_path_for_assertions());
         m_file.prealloc(new_file_size); // Throws
         // resizing is done based on the logical file size. It is ok for the file
@@ -1469,21 +1509,13 @@ void SlabAlloc::resize_file(size_t new_file_size)
         if (!disable_sync)
             m_file.sync(); // Throws
     }
-    else {
-        size_t current_size = 0;
-        for (auto& b : m_virtual_file_buffer) {
-            current_size += b.size;
-        }
-        if (new_file_size > current_size) {
-            m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, current_size);
-        }
-        m_virtual_file_size = new_file_size;
-    }
+#endif
 }
 
 #ifdef REALM_DEBUG
 void SlabAlloc::reserve_disk_space(size_t size)
 {
+#if REALM_ENABLE_FILE_SYSTEM
     if (size != round_up_to_page_size(size))
         size = round_up_to_page_size(size);
     m_file.prealloc(size); // Throws
@@ -1491,6 +1523,9 @@ void SlabAlloc::reserve_disk_space(size_t size)
     bool disable_sync = get_disable_sync_to_disk() || m_cfg.disable_sync;
     if (!disable_sync)
         m_file.sync(); // Throws
+#else
+    static_cast<void>(size);
+#endif
 }
 #endif
 

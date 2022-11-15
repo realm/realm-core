@@ -27,7 +27,6 @@
 #include <mutex>
 
 #include <realm/util/features.h>
-#include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -161,7 +160,9 @@ public:
 
     /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
+#if REALM_ENABLE_FILE_SYSTEM
     util::File& get_file();
+#endif
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -336,7 +337,11 @@ public:
 
     size_t get_file_size() const
     {
+#if REALM_ENABLE_FILE_SYSTEM
         return (m_attach_mode == attach_SharedFile) ? m_file.get_size() : m_virtual_file_size;
+#else
+        return m_virtual_file_size;
+#endif
     }
 
     /// Returns the total amount of memory currently allocated in slab area
@@ -591,10 +596,19 @@ private:
     };
 
     // Description of to-be-deleted memory mapping
+#if REALM_ENABLE_FILE_SYSTEM
     struct OldMapping {
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
+    // mappings used by newest transactions - additional mappings may be open
+    // and in use by older transactions. These translations are in m_old_mappings.
+    struct MapEntry {
+        util::File::Map<char> primary_mapping;
+        size_t lowest_possible_xover_offset = 0;
+        util::File::Map<char> xover_mapping;
+    };
+#endif
     struct OldRefTranslation {
         OldRefTranslation(uint64_t v, size_t c, RefTranslation* m) noexcept
             : replaced_at_version(v)
@@ -618,24 +632,19 @@ private:
 
     void verify_old_translations(uint64_t verify_old_translations);
 
-    // mappings used by newest transactions - additional mappings may be open
-    // and in use by older transactions. These translations are in m_old_mappings.
-    struct MapEntry {
-        util::File::Map<char> primary_mapping;
-        size_t lowest_possible_xover_offset = 0;
-        util::File::Map<char> xover_mapping;
-    };
-    std::vector<MapEntry> m_mappings;
     size_t m_translation_table_size = 0;
     std::atomic<uint64_t> m_mapping_version = 1;
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
-    util::File m_file;
-    util::SharedFileInfo* m_realm_file_info = nullptr;
     // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
+#if REALM_ENABLE_FILE_SYSTEM
+    util::File m_file;
+    std::vector<MapEntry> m_mappings;
     std::vector<OldMapping> m_old_mappings;
+#endif
     std::vector<OldRefTranslation> m_old_translations;
+    util::SharedFileInfo* m_realm_file_info = nullptr;
     // Rebuild the ref translations in a thread-safe manner. Save the old one along with it's
     // versioning information for later deletion - 'requires_new_fast_mapping' must be
     // true if there are changes to entries among the existing translations. Must be called
@@ -644,8 +653,9 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
+#if REALM_ENABLE_FILE_SYSTEM
     void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override;
-
+#endif
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
@@ -724,12 +734,22 @@ private:
 
 // Implementation:
 
+#if REALM_ENABLE_FILE_SYSTEM
 struct InvalidDatabase : util::File::AccessError {
     InvalidDatabase(const std::string& msg, const std::string& path)
         : util::File::AccessError(msg, path)
     {
     }
 };
+#else
+struct InvalidDatabase : std::runtime_error {
+    InvalidDatabase(const std::string& msg, const std::string& path)
+        : std::runtime_error(msg)
+    {
+        REALM_ASSERT_RELEASE(path.size() == 0);
+    }
+};
+#endif
 
 inline void SlabAlloc::own_buffer() noexcept
 {

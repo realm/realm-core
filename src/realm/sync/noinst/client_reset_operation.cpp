@@ -109,6 +109,7 @@ void ClientResetOperation::clean_up_state() noexcept
             long use_count = m_db_fresh.use_count();
             REALM_ASSERT_DEBUG_EX(use_count == 1, use_count, path_to_clean);
             m_db_fresh.reset();
+#if REALM_ENABLE_FILE_SYSTEM
             // clean up the fresh Realm
             // we don't mind leaving the fresh lock file around because trying to delete it
             // here could cause a race if there are multiple resets ongoing
@@ -121,6 +122,7 @@ void ClientResetOperation::clean_up_state() noexcept
                               "There were %2 refs remaining.",
                               path_to_clean, use_count);
             }
+#endif
         }
         catch (const std::exception& err) {
             m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "

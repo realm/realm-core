@@ -551,6 +551,9 @@ public:
     /// string is interpreted as a relative path.
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
+    static std::string load_file(const std::string& path);
+    static std::string load_file_and_chomp(const std::string& path);
+
     using ForEachHandler = util::FunctionRef<bool(const std::string& file, const std::string& dir)>;
 
     /// Scan the specified directory recursivle, and report each file

@@ -902,7 +902,11 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
+#if REALM_ENABLE_ENCRYPTION
         size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
+#else
+        size_t num_decrypted_pages = 0;
+#endif
 
         if (stage == DB::transact_Reading) {
             if (m_transact_stage == DB::transact_Writing) {

@@ -19,7 +19,6 @@
 #ifndef REALM_DB_HPP
 #define REALM_DB_HPP
 
-#include <realm/db_options.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/changeset_input_stream.hpp>
@@ -32,6 +31,7 @@
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/version_id.hpp>
+#include <realm/db_options.hpp>
 
 #include <functional>
 #include <cstdint>
@@ -43,6 +43,7 @@ namespace realm {
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
 
+#if REALM_ENABLE_FILE_SYSTEM
 /// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile : std::runtime_error {
@@ -82,7 +83,7 @@ struct FileFormatUpgradeRequired : util::File::AccessError {
     {
     }
 };
-
+#endif
 
 /// A DB facilitates transactions.
 ///
@@ -114,7 +115,9 @@ public:
     // calling DB::close(), but after that no new association can be established. To reopen the
     // file (or another file), a new DB object is needed. The specified Replication instance, if
     // any, must remain in existence for as long as the DB.
+#if REALM_ENABLE_FILE_SYSTEM
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
+#endif
     static DBRef create(Replication& repl, const std::string& file, const DBOptions& options = DBOptions());
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
                         const DBOptions& options = DBOptions());
@@ -173,7 +176,11 @@ public:
 
     const char* get_encryption_key() const noexcept
     {
+#if REALM_ENABLE_FILE_SYSTEM
         return m_alloc.m_file.get_encryption_key();
+#else
+        return nullptr;
+#endif
     }
 
 #ifdef REALM_DEBUG
@@ -307,8 +314,9 @@ public:
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none)
         REQUIRES(!m_mutex);
-
+#if REALM_ENABLE_FILE_SYSTEM
     void write_copy(StringData path, const char* output_encryption_key) REQUIRES(!m_mutex);
+#endif
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
@@ -382,6 +390,7 @@ public:
     using CallbackWithLock = util::FunctionRef<void(const std::string& realm_path)>;
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock&& callback);
 
+#if REALM_ENABLE_FILE_SYSTEM
     enum CoreFileType : uint8_t {
         Lock,
         Storage,
@@ -410,6 +419,7 @@ public:
     ///        do so. If this is true, the lock file is deleted along with the other files.
     static void delete_files(const std::string& base_path, bool* did_delete_realm = nullptr,
                              bool delete_lockfile = false);
+#endif
 
     /// Mark this DB as the sync agent for the file.
     /// \throw MultipleSyncAgents if another DB is already the sync agent.
@@ -465,8 +475,10 @@ private:
     size_t m_used_space GUARDED_BY(m_mutex) = 0;
     std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
+#if REALM_ENABLE_FILE_SYSTEM
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+#endif
     std::unique_ptr<SharedInfo> m_in_memory_info;
     SharedInfo* m_info = nullptr;
     bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
@@ -484,6 +496,7 @@ private:
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     bool m_is_sync_agent = false;
 
+#if REALM_ENABLE_FILE_SYSTEM
     /// Attach this DB instance to the specified database file.
     ///
     /// While at least one instance of DB exists for a specific
@@ -518,8 +531,9 @@ private:
     /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions())
         REQUIRES(!m_mutex);
-    void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
+#endif
+    void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication& repl, const DBOptions options = DBOptions()) REQUIRES(!m_mutex);
 
     void do_open(const std::string& file, bool no_create, const DBOptions& options);

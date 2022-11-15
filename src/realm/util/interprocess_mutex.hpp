@@ -21,7 +21,9 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#if REALM_ENABLE_FILE_SYSTEM
 #include <realm/util/file.hpp>
+#endif
 #include <realm/utilities.hpp>
 #include <mutex>
 #include <map>
@@ -93,8 +95,9 @@ public:
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// elsewhere.
     void set_shared_part(SharedPart& shared_part, const std::string& path, const std::string& mutex_name);
+#if REALM_ENABLE_FILE_SYSTEM
     void set_shared_part(SharedPart& shared_part, File&& lock_file);
-
+#endif
     /// Destroy shared object. Potentially release system resources. Caller must
     /// ensure that the shared_part is not in use at the point of call.
     void release_shared_part();
@@ -283,6 +286,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
 #endif
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, File&& lock_file)
 {
 #if REALM_ROBUST_MUTEX_EMULATION
@@ -309,6 +313,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, File&& l
     static_cast<void>(lock_file);
 #endif
 }
+#endif
 
 inline void InterprocessMutex::release_shared_part()
 {

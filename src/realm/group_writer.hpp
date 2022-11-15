@@ -23,7 +23,6 @@
 #include <utility>
 #include <map>
 
-#include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/array.hpp>
 #include <realm/impl/array_writer.hpp>
@@ -141,7 +140,6 @@ public:
         }
     }
 
-
     // Flush all cached memory mappings
     // Sync all cached memory mappings to disk - includes flush if needed
     void sync_all_mappings();
@@ -166,7 +164,9 @@ private:
     static void move_free_in_file_to_size_map(const std::vector<GroupWriter::FreeSpaceEntry>& list,
                                               std::multimap<size_t, size_t>& size_map);
 
+#if REALM_ENABLE_FILE_SYSTEM
     class MapWindow;
+#endif
     Group& m_group;
     SlabAlloc& m_alloc;
     Array m_free_positions; // 4th slot in Group::m_top
@@ -182,7 +182,6 @@ private:
     size_t m_evacuation_limit;
     int64_t m_backoff;
     size_t m_logical_size = 0;
-    Durability m_durability;
 
     //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
@@ -193,6 +192,9 @@ private:
 
     void read_in_freelist();
     size_t recreate_freelist(size_t reserve_pos);
+
+#if REALM_ENABLE_FILE_SYSTEM
+    Durability m_durability;
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
     // from a modest number of windows, depending upon fragmentation, so
@@ -206,6 +208,7 @@ private:
     // potentially adding it to the cache, potentially closing
     // the least recently used and sync'ing it to disk
     MapWindow* get_window(ref_type start_ref, size_t size);
+#endif
 
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if

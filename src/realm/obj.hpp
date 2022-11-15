@@ -23,6 +23,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
 #include <realm/mixed.hpp>
+#include <realm/util/function_ref.hpp>
 #include <map>
 
 #define REALM_CLUSTER_IF

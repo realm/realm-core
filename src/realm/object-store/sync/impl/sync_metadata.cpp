@@ -376,10 +376,14 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
         if (auto realm = try_get_realm())
             return realm;
 
+#if REALM_ENABLE_FILE_SYSTEM
         // Encryption key changed, so delete the existing metadata realm and
         // recreate it
         util::File::remove(m_metadata_config.path);
         return get_realm();
+#else
+        REALM_UNREACHABLE();
+#endif
     }
 
 #if REALM_PLATFORM_APPLE

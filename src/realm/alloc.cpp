@@ -87,10 +87,12 @@ public:
     }
 
     void verify() const override {}
+#if REALM_ENABLE_FILE_SYSTEM
     void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) override
     {
         REALM_ASSERT(false);
     }
+#endif
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
@@ -140,6 +142,7 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
 #endif
         return addr;
     }
+#if REALM_ENABLE_FILE_SYSTEM
     else {
         // we need a cross-over mapping. If one is already established, use that.
         auto xover_mapping_addr = txl.xover_mapping_addr.load(std::memory_order_acquire);
@@ -157,5 +160,9 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
 #endif
         return addr;
     }
+#else
+    REALM_UNREACHABLE();
+    return nullptr;
+#endif
 }
 } // namespace realm

@@ -1519,7 +1519,11 @@ void Session::activate()
         // reference which we don't want to happen.
         util::Optional<ClientReset>& client_reset_config = get_client_reset_config();
 
+#if REALM_ENABLE_FILE_SYSTEM
         bool file_exists = util::File::exists(get_realm_path());
+#else
+        bool file_exists = false;
+#endif
 
         logger.info("client_reset_config = %1, Realm exists = %2, "
                     "client reset = %3",

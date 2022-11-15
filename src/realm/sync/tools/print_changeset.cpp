@@ -5,7 +5,7 @@
 
 #include <realm/util/compression.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/util/load_file.hpp>
+#include <realm/util/file.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
@@ -72,7 +72,7 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
 
 void print_changeset(const std::string& path, bool hex, bool compressed)
 {
-    std::string file_contents = util::load_file(path);
+    std::string file_contents = util::File::load_file(path);
     std::string changeset_binary;
     if (hex) {
         changeset_binary = changeset_hex_to_binary(file_contents);

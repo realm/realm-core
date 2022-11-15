@@ -351,6 +351,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     std::shared_ptr<DB> db;
     auto fresh_path = ClientResetOperation::get_fresh_path_for(m_db->get_path());
     try {
+#if REALM_ENABLE_FILE_SYSTEM
         // We want to attempt to use a pre-existing file to reduce the chance of
         // downloading the first part of the file only to then delete it over
         // and over, but if we fail to open it then we should just start over.
@@ -360,7 +361,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         catch (...) {
             util::File::try_remove(fresh_path);
         }
-
+#endif
         if (!db) {
             db = DB::create(sync::make_client_replication(), fresh_path, options);
         }

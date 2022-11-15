@@ -32,7 +32,6 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
-using namespace realm;
 using namespace realm::util;
 using namespace realm::metrics;
 
@@ -66,9 +65,9 @@ private:
     GroupWriter& m_owner;
     SlabAlloc& m_alloc;
 };
-} // namespace realm
 
 
+#if REALM_ENABLE_FILE_SYSTEM
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
@@ -196,7 +195,15 @@ void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t s
 {
     realm::util::encryption_write_barrier(start_addr, size, m_map.get_encrypted_mapping());
 }
-
+#else
+namespace util {
+static size_t round_up_to_page_size(size_t size) noexcept
+{
+    static constexpr size_t fake_page_size_mask = 1024 * 1024 - 1;
+    return (size + fake_page_size_mask) & ~fake_page_size_mask;
+}
+} // namespace util
+#endif
 
 GroupWriter::GroupWriter(Group& group, Durability dura)
     : m_group(group)
@@ -204,9 +211,13 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     , m_free_positions(m_alloc)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
-    , m_durability(dura)
 {
+#if REALM_ENABLE_FILE_SYSTEM
+    m_durability = dura;
     m_map_windows.reserve(num_map_windows);
+#else
+    static_cast<void>(dura);
+#endif
 #if REALM_PLATFORM_APPLE && REALM_MOBILE
     m_window_alignment = 1 * 1024 * 1024; // 1M
 #else
@@ -325,20 +336,25 @@ size_t GroupWriter::get_file_size() const noexcept
 
 void GroupWriter::flush_all_mappings()
 {
+#if REALM_ENABLE_FILE_SYSTEM
     for (const auto& window : m_map_windows) {
         window->flush();
     }
+#endif
 }
 
 void GroupWriter::sync_all_mappings()
 {
+#if REALM_ENABLE_FILE_SYSTEM
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
         window->sync();
     }
+#endif
 }
 
+#if REALM_ENABLE_FILE_SYSTEM
 // Get a window matching a request, either creating a new window or reusing an
 // existing one (possibly extended to accomodate the new request). Maintain a
 // cache of open windows which are sync'ed and closed following a least recently
@@ -362,6 +378,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }
+#endif
 
 #define REALM_ALLOC_DEBUG 0
 #if REALM_ALLOC_DEBUG
@@ -729,8 +746,8 @@ ref_type GroupWriter::write_group()
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
     auto reserve = reserve_free_space(max_free_space_needed + 8); // Throws
-    size_t reserve_pos = reserve->second;
-    size_t reserve_size = reserve->first;
+    const size_t reserve_pos = reserve->second;
+    const size_t reserve_size = reserve->first;
 
     // Now we can check, if we can reduce the logical file size. This can be done
     // when there is only one block in m_under_evacuation, which means that all
@@ -806,8 +823,8 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
 
     // Get final sizes
-    size_t top_byte_size = top.get_byte_size();
-    ref_type end_ref = top_ref + top_byte_size;
+    const size_t top_byte_size = top.get_byte_size();
+    const ref_type end_ref = top_ref + top_byte_size;
     REALM_ASSERT_3(size_t(end_ref), <=, reserve_pos + max_free_space_needed);
 
     // Deduct the used space from the reserved chunk. Note that we have made
@@ -816,7 +833,6 @@ ref_type GroupWriter::write_group()
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
-    size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
@@ -873,6 +889,8 @@ ref_type GroupWriter::write_group()
         write_array_at(translator, top_ref, top.get_header(), top_byte_size); // Throws
     }
     else {
+#if REALM_ENABLE_FILE_SYSTEM
+        const size_t used = size_t(end_ref) - reserve_pos;
         MapWindow* window = get_window(reserve_ref, end_ref - reserve_ref);
         char* start_addr = window->translate(reserve_ref);
         window->encryption_read_barrier(start_addr, used);
@@ -883,6 +901,9 @@ ref_type GroupWriter::write_group()
         // Write top
         write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
         window->encryption_write_barrier(start_addr, used);
+#else
+        REALM_UNREACHABLE();
+#endif
     }
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
@@ -1278,6 +1299,7 @@ bool inline is_aligned(char* addr)
 
 ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum)
 {
+#if REALM_ENABLE_FILE_SYSTEM
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
 
@@ -1292,6 +1314,13 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     // return ref of the written array
     ref_type ref = to_ref(pos);
     return ref;
+#else
+    static_cast<void>(data);
+    static_cast<void>(size);
+    static_cast<void>(checksum);
+    REALM_UNREACHABLE();
+    return 0;
+#endif
 }
 
 template <class T>
@@ -1315,10 +1344,13 @@ void GroupWriter::commit(ref_type new_top_ref)
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::group_writer__commit); // Throws
 
+#if REALM_ENABLE_FILE_SYSTEM
     MapWindow* window = get_window(0, sizeof(SlabAlloc::Header));
     SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(window->translate(0));
     window->encryption_read_barrier(&file_header, sizeof file_header);
-
+#else
+    SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(const_cast<char*>(m_alloc.m_data));
+#endif
     // One bit of the flags field selects which of the two top ref slots are in
     // use (same for file format version slots). The current value of the bit
     // reflects the currently bound snapshot, so we need to invert it for the
@@ -1334,31 +1366,37 @@ void GroupWriter::commit(ref_type new_top_ref)
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
+#if REALM_ENABLE_FILE_SYSTEM
         window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
                                          sizeof(file_header.m_file_format[slot_selector]));
+#endif
     }
 
-    // When running the test suite, device synchronization is disabled
-    bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
     file_header.m_top_ref[slot_selector] = new_top_ref;
 
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
 #endif // REALM_METRICS
 
+#if REALM_ENABLE_FILE_SYSTEM
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
+
     flush_all_mappings();
+    // When running the test suite, device synchronization is disabled
+    bool disable_sync = get_disable_sync_to_disk() || m_durability == Durability::Unsafe;
     if (!disable_sync) {
         sync_all_mappings();
         m_alloc.get_file().barrier();
     }
+#endif
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 
+#if REALM_ENABLE_FILE_SYSTEM
     // Write new selector to disk
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
     window->flush();
@@ -1366,6 +1404,7 @@ void GroupWriter::commit(ref_type new_top_ref)
         window->sync();
         m_alloc.get_file().barrier();
     }
+#endif
 }
 
 
@@ -1383,3 +1422,4 @@ void GroupWriter::dump()
 }
 
 #endif
+} // namespace realm

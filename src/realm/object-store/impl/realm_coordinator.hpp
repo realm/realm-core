@@ -191,8 +191,11 @@ public:
     void wait_for_change_release();
 
     void close();
+
     bool compact();
+#if REALM_ENABLE_FILE_SYSTEM
     void write_copy(StringData path, const char* key);
+#endif
 
     // Close the DB, delete the file, and then reopen it. This operation is *not*
     // implemented in a safe manner and will only work in fairly specific circumstances
@@ -266,8 +269,9 @@ private:
     NotifierVector notifiers_for_realm(Realm&) REQUIRES(m_notifier_mutex);
 };
 
+#if REALM_ENABLE_FILE_SYSTEM
 void translate_file_exception(StringData path, bool immutable = false);
-
+#endif
 } // namespace _impl
 } // namespace realm
 

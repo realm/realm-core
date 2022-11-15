@@ -353,6 +353,7 @@ public:
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
 
+#if REALM_ENABLE_FILE_SYSTEM
     /**
      * Copy this Realm's data into another Realm file.
      *
@@ -385,6 +386,7 @@ public:
      *                            rather than throwing an exception.
      */
     void convert(const Config& config, bool merge_into_existing = true);
+#endif
 
     OwnedBinaryData write_copy();
 
