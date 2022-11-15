@@ -1746,6 +1746,15 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
+ * Move the element at @a from_index to @a to_index.
+ *
+ * @param from_index The index of the element to move.
+ * @param to_index The index to move the element to.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_list_move(realm_list_t*, size_t from_index, size_t to_index);
+
+/**
  * Insert an embedded object at a given position.
  *
  * @return A non-NULL pointer if the object was created successfully.

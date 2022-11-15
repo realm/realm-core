@@ -29,6 +29,7 @@
 * App::call_function now supports taking and receiving ejson strings, bypassing parsing/serialization in core. ([#4182](https://github.com/realm/realm-core/issues/4182))
 * Flexible sync will now wait for the server to have sent all pending history after a bootstrap before marking a subscription as Complete. ([#5795](https://github.com/realm/realm-core/pull/5795))
 * Add typedef for realm_app_call_function callbacks. ([#5996](https://github.com/realm/realm-core/pull/5996))
+* Expose List::move on C api as realm_list_move. ([#6032](https://github.com/realm/realm-core/pull/6032))
 
 ### Fixed
 * Fix a race condition which could result in "operation cancelled" errors being delivered to async open callbacks rather than the actual sync error which caused things to fail ([PR #5968](https://github.com/realm/realm-core/pull/5968), since the introduction of async open).

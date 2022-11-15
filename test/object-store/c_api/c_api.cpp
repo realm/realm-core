@@ -2804,6 +2804,42 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(rlm_val_eq(value, null));
             }
 
+            SECTION("move") {
+                auto int_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["int_list"]));
+                write([&]() {
+                    for (int i = 0; i < 10; ++i) {
+                        CHECK(realm_list_insert(int_list.get(), i, rlm_int_val(i)));
+                    }
+                });
+
+                realm_value_t value;
+                auto expected = std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+                for (int i = 0; i < 10; ++i) {
+                    CHECK(realm_list_get(int_list.get(), i, &value));
+                    CHECK(rlm_val_eq(value, rlm_int_val(expected[i])));
+                }
+
+                write([&]() {
+                    CHECK(realm_list_move(int_list.get(), 0, 1));
+                });
+
+                expected = std::vector<int64_t>{1, 0, 2, 3, 4, 5, 6, 7, 8, 9};
+                for (int i = 0; i < 10; ++i) {
+                    CHECK(realm_list_get(int_list.get(), i, &value));
+                    CHECK(rlm_val_eq(value, rlm_int_val(expected[i])));
+                }
+
+                write([&]() {
+                    CHECK(realm_list_move(int_list.get(), 3, 2));
+                });
+
+                expected = std::vector<int64_t>{1, 0, 3, 2, 4, 5, 6, 7, 8, 9};
+                for (int i = 0; i < 10; ++i) {
+                    CHECK(realm_list_get(int_list.get(), i, &value));
+                    CHECK(rlm_val_eq(value, rlm_int_val(expected[i])));
+                }
+            }
+
             SECTION("links") {
                 CPtr<realm_list_t> bars;
 
