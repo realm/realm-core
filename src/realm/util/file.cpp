@@ -1045,10 +1045,10 @@ void File::barrier()
     // If F_BARRIERSYNC is not suppported (this is known on exFAT) we don't fallback to sync().
     // This is not longer needed becasue msync already guarantees that the pages are going to be
     // flushed on disk.
-    ::fcntl(m_fd, F_BARRIERFSYNC);
-#else
-    sync();
+    if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
+        return;
 #endif
+    sync();
 }
 
 #ifndef _WIN32

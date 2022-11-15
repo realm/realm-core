@@ -384,7 +384,7 @@ tasks:
         xcrun swift run ObjectStoreTests
 
 - name: test-on-exfat
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 2700
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -933,6 +933,7 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+  - name: test-on-exfat
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
