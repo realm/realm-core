@@ -555,7 +555,7 @@ private:
     // check if current transaction version is lower than last transaction version for the latest cached schema.
     // In case this is happening and we have opened realm in additive mode, we load the cached schema.
     // This could happed when new properties and classes are added to the schema if realm is open in additive mode.
-    void load_cached_schema_if_needed(uint64_t, Schema&);
+    void load_schema_for_version_if_needed(uint64_t, Schema&);
 
     void add_schema_change_handler();
     void cache_new_schema();

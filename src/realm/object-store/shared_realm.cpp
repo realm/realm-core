@@ -239,7 +239,7 @@ void Realm::read_schema_from_group_if_needed()
     m_schema_version = ObjectStore::get_schema_version(group);
     schema = ObjectStore::schema_from_group(group);
 
-    load_cached_schema_if_needed(current_version, schema);
+    load_schema_for_version_if_needed(current_version, schema);
 
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
@@ -261,7 +261,7 @@ void Realm::read_schema_from_group_if_needed()
     notify_schema_changed();
 }
 
-void Realm::load_cached_schema_if_needed(uint64_t current_tr_version, Schema& schema)
+void Realm::load_schema_for_version_if_needed(uint64_t current_tr_version, Schema& schema)
 {
     if (m_coordinator && m_config.allow_complete_schema_view()) {
         Schema local_schema;
