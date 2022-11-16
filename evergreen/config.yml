@@ -384,7 +384,7 @@ tasks:
         xcrun swift run ObjectStoreTests
 
 - name: test-on-exfat
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 2700
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
