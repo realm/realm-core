@@ -112,8 +112,9 @@ public:
     ~SyncManager();
 
     // Sets the log level for the Sync Client.
-    // The log level can only be set up until the point the Sync Client is created. This happens when the first
-    // Session is created.
+    // The log level can only be set up until the point the Sync Client is
+    // created (when the first Session is created) or an App operation is
+    // performed (e.g. log in).
     void set_log_level(util::Logger::Level) noexcept REQUIRES(!m_mutex);
     void set_logger_factory(SyncClientConfig::LoggerFactory) REQUIRES(!m_mutex);
 

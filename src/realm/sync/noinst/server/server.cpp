@@ -424,7 +424,7 @@ public:
     util::PrefixLogger logger;
 
     // Logger to be used by the worker thread
-    util::PrefixLogger m_wlogger;
+    util::PrefixLogger wlogger;
 
     ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path, std::string real_path,
                bool disable_sync_to_disk);
@@ -751,7 +751,7 @@ public:
 
     util::Mutex last_client_accesses_mutex;
 
-    std::shared_ptr<util::Logger> logger_ptr;
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     util::network::Service& get_service() noexcept
@@ -1070,7 +1070,6 @@ private:
 
 class SyncConnection : public util::websocket::Config {
 public:
-    // The SyncConnection lifetime is tied to the ServerImpl, so no need for a shared_ptr
     util::PrefixLogger logger;
 
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<util::network::Socket>&& socket,
@@ -1435,7 +1434,6 @@ std::string g_user_agent = "User-Agent";
 
 class HTTPConnection {
 public:
-    // An HTTPConnection is owned by the ServerImpl so no shared_ptr neeeded
     util::PrefixLogger logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
@@ -3156,8 +3154,8 @@ void SessionQueue::clear() noexcept
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
                        std::string real_path, bool disable_sync_to_disk)
-    : logger{"ServerFile[" + virt_path + "]: ", server.logger}                 // Throws
-    , m_wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
+    : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
+    , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
     , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, true, disable_sync_to_disk}
@@ -3359,7 +3357,7 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     milliseconds_type parallel_time = 0;
 
     Work& work = m_work;
-    m_wlogger.debug("Work unit execution started"); // Throws
+    wlogger.debug("Work unit execution started"); // Throws
 
     if (work.has_primary_work) {
         if (REALM_UNLIKELY(!m_work.file_ident_alloc_slots.empty()))
@@ -3369,7 +3367,7 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
             worker_integrate_changes_from_downstream(state); // Throws
     }
 
-    m_wlogger.debug("Work unit execution completed"); // Throws
+    wlogger.debug("Work unit execution completed"); // Throws
 
     milliseconds_type time = steady_duration(start_time);
     milliseconds_type seq_time = time - parallel_time;
@@ -3537,7 +3535,7 @@ bool ServerFile::worker_integrate_changes_from_downstream(WorkerState& state)
     bool backup_whole_realm = false;
     bool produced_new_realm_version = hist.integrate_client_changesets(
         m_work.changesets_from_downstream, m_work.version_info, backup_whole_realm, m_work.integration_result,
-        m_wlogger); // Throws
+        wlogger); // Throws
     bool produced_new_sync_version = !m_work.integration_result.integrated_changesets.empty();
     REALM_ASSERT(!produced_new_sync_version || produced_new_realm_version);
     if (produced_new_realm_version) {
@@ -3693,7 +3691,7 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : logger("Worker: ", server.logger) // Throws
+    : logger{"Worker: ", server.logger} // Throws
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
@@ -4630,7 +4628,7 @@ void SyncConnection::protocol_error(ProtocolError error_code, Session* sess)
     REALM_ASSERT(!sess || m_sessions.count(sess->get_session_ident()) == 1);
     if (logger.would_log(util::Logger::Level::debug)) {
         const char* message = get_protocol_error_message(int(error_code));
-        auto& logger_2 = (session_level ? sess->logger : logger);
+        Logger& logger_2 = (session_level ? sess->logger : logger);
         logger_2.debug("Protocol error: %1 (error_code=%2)", message, int(error_code)); // Throws
     }
     session_ident_type session_ident = (session_level ? sess->get_session_ident() : 0);

@@ -135,7 +135,7 @@ struct SyncClient {
 
 private:
     sync::Client m_client;
-    const std::shared_ptr<util::Logger> m_logger_ptr;
+    std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
     std::thread m_thread;
 #if NETWORK_REACHABILITY_AVAILABLE

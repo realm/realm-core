@@ -126,7 +126,9 @@ template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 
 
-/// A logger that writes to STDERR. This logger is not thread-safe.
+/// A logger that writes to STDERR, which is thread safe. However, the setting
+/// the threshold level is not thread safe. Wrap this class in a ThreadSafeLogger
+/// to make this class fully thread safe.
 ///
 /// Since this class is a subclass of Logger, it contains a modifiable log
 /// level threshold.

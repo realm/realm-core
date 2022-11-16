@@ -209,7 +209,7 @@ void SyncManager::reset_for_testing()
 {
     {
         util::CheckedLockGuard lock(m_file_system_mutex);
-        m_metadata_manager.reset();
+        m_metadata_manager = nullptr;
     }
 
     {
@@ -219,7 +219,7 @@ void SyncManager::reset_for_testing()
             user->detach_from_sync_manager();
         }
         m_users.clear();
-        m_current_user.reset();
+        m_current_user = nullptr;
     }
 
     {
@@ -247,7 +247,7 @@ void SyncManager::reset_for_testing()
     {
         util::CheckedLockGuard lock(m_mutex);
         // Destroy the client now that we have no remaining sessions.
-        m_sync_client.reset();
+        m_sync_client = nullptr;
 
         // Reset even more state.
         m_config = {};
@@ -259,7 +259,7 @@ void SyncManager::reset_for_testing()
         util::CheckedLockGuard lock(m_file_system_mutex);
         if (m_file_manager)
             util::try_remove_dir_recursive(m_file_manager->base_path());
-        m_file_manager.reset();
+        m_file_manager = nullptr;
     }
 }
 
@@ -295,9 +295,6 @@ void SyncManager::do_make_logger()
     else {
         // recreate the logger as a StderrLogger, even if it was created before...
         m_logger_ptr = std::make_shared<util::StderrLogger>(m_config.log_level);
-    }
-    if (auto app = m_app.lock()) {
-        app->set_logger(m_logger_ptr);
     }
 }
 
@@ -444,7 +441,7 @@ void SyncManager::log_out_user(const std::string& user_id)
 
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity("");
-    m_current_user.reset();
+    m_current_user = nullptr;
 }
 
 void SyncManager::set_current_user(const std::string& user_id)
@@ -495,7 +492,7 @@ void SyncManager::delete_user(const std::string& user_id)
     user->detach_from_sync_manager();
 
     if (m_current_user && m_current_user->identity() == user->identity())
-        m_current_user.reset();
+        m_current_user = nullptr;
 
     util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)

@@ -62,8 +62,7 @@ public:
         /// level threshold set to util::Logger::Level::info. The client does
         /// not require a thread-safe logger, and it guarantees that all logging
         /// happens either on behalf of the constructor or on behalf of the
-        /// invocation of run(). This is a shared_ptr to match
-        /// realm::sync::Client::Config
+        /// invocation of run().
         std::shared_ptr<util::Logger> logger;
 
         /// Specifies the maximum number of TCP connections the client can have
@@ -120,8 +119,6 @@ public:
     ///
     /// This functions is thread-safe.
     void refresh(std::string refresh_token, std::function<RefreshHandler>);
-
-    static std::string make_http_host(bool auth_ssl, const std::string& auth_address, const port_type& auth_port);
 
     util::network::Service& get_service();
     const std::string& get_auth_address();

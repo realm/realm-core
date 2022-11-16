@@ -659,10 +659,10 @@ public:
 
 private:
     Peer(file_ident_type file_ident, const std::string& test_path, TestDirNameGenerator* changeset_dump_dir_gen,
-         util::Logger& l)
+         util::Logger& logger)
         : local_file_ident(file_ident)
         , path_guard(test_path) // Throws
-        , m_logger(l)
+        , m_logger(logger)
         , history(file_ident, changeset_dump_dir_gen)  // Throws
         , shared_group(DB::create(history, test_path)) // Throws
     {

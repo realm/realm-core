@@ -262,23 +262,26 @@ void App::configure(const SyncClientConfig& sync_client_config)
     }
 }
 
-void App::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
+inline bool App::init_logger()
 {
-    std::lock_guard<std::mutex> lock(*m_logger_mutex);
-    m_logger_ptr = logger;
+    // If a log function is called before configure(), a null ptr will be
+    // returned by get_logger()
+    if (!m_logger_ptr) {
+        m_logger_ptr = m_sync_manager->get_logger();
+    }
+    return bool(m_logger_ptr);
 }
 
 bool App::would_log(util::Logger::Level level)
 {
-    std::lock_guard<std::mutex> lock(*m_logger_mutex);
+    init_logger();
     return m_logger_ptr && m_logger_ptr->would_log(level);
 }
 
 template <class... Params>
 void App::log_debug(const char* message, Params&&... params)
 {
-    std::lock_guard<std::mutex> lock(*m_logger_mutex);
-    if (m_logger_ptr) {
+    if (init_logger()) {
         m_logger_ptr->log(util::Logger::Level::debug, message, std::forward<Params>(params)...);
     }
 }
@@ -286,8 +289,7 @@ void App::log_debug(const char* message, Params&&... params)
 template <class... Params>
 void App::log_error(const char* message, Params&&... params)
 {
-    std::lock_guard<std::mutex> lock(*m_logger_mutex);
-    if (m_logger_ptr) {
+    if (init_logger()) {
         m_logger_ptr->log(util::Logger::Level::error, message, std::forward<Params>(params)...);
     }
 }

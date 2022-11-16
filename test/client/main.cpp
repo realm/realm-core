@@ -263,6 +263,9 @@ int main(int argc, char* argv[])
     bool ensure_blob_class = false;
     bool download_first = false;
     // Client reset options are also used for async open.
+    std::string client_reset_metadata_dir = "";
+    bool disable_client_reset_recover_local_changes = false;
+    bool disable_client_reset_require_recent_state_realm = false;
     int num_download_waits = 1;
     bool follow = false;
     bool interactive = false;
@@ -287,6 +290,7 @@ int main(int argc, char* argv[])
     milliseconds_type pong_timeout = 120000;          //  2 minutes
     milliseconds_type connect_timeout = 120000;       //  2 minutes
     milliseconds_type connection_linger_time = 30000; // 30 seconds
+    bool tcp_no_delay = false;
     bool verify_ssl_cert = false;
     std::string ssl_trust_cert = "";
     std::string metrics_prefix = "realm";
@@ -489,6 +493,18 @@ int main(int argc, char* argv[])
                 download_first = true;
                 continue;
             }
+            else if (std::strcmp(arg, "--client-reset-metadata-dir") == 0) {
+                if (get_string_value(client_reset_metadata_dir))
+                    continue;
+            }
+            else if (std::strcmp(arg, "--disable-client-reset-recover-local-changes") == 0) {
+                disable_client_reset_recover_local_changes = true;
+                continue;
+            }
+            else if (std::strcmp(arg, "--disable-client-reset-require-recent-state-realm") == 0) {
+                disable_client_reset_require_recent_state_realm = true;
+                continue;
+            }
             else if (std::strcmp(arg, "-W") == 0 || std::strcmp(arg, "--num-download-waits") == 0) {
                 if (get_parsed_value_with_check(num_download_waits, [](auto v) {
                         return v >= 0;
@@ -607,6 +623,10 @@ int main(int argc, char* argv[])
                         return v >= 0;
                     }))
                     continue;
+            }
+            else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--tcp-no-delay") == 0) {
+                tcp_no_delay = true;
+                continue;
             }
             else if (std::strcmp(arg, "-V") == 0 || std::strcmp(arg, "--verify-ssl-cert") == 0) {
                 verify_ssl_cert = true;
@@ -934,6 +954,8 @@ int main(int argc, char* argv[])
                          "  -L, --connection-linger-time  Time in milliseconds to keep a connection\n"
                          "                       open after all sessions have been abandoned or\n"
                          "                       suspended by errors. The default is 30'000 (30 seconds).\n"
+                         "  -o, --tcp-no-delay   Set the `TCP_NODELAY` option on all TCP/IP sockets.\n"
+                         "                       This disables the Nagle algorithm.\n"
                          "  -V, --verify-ssl-cert  Verify the servers SSL certificate.\n"
                          "  -T, --ssl-trust-cert  Path of a trust certificate used for verification.\n"
                          "  -M, --metrics-prefix  Prefix for metrics labels (`realm` by default). The\n"
@@ -979,6 +1001,13 @@ int main(int argc, char* argv[])
     }
 
     util::Optional<sync::Session::Config::ClientReset> client_reset_config;
+    if (client_reset_metadata_dir != "") {
+        sync::Session::Config::ClientReset client_reset_config_2;
+        client_reset_config_2.metadata_dir = client_reset_metadata_dir;
+        client_reset_config_2.recover_local_changes = !disable_client_reset_recover_local_changes;
+        client_reset_config_2.require_recent_state_realm = !disable_client_reset_require_recent_state_realm;
+        client_reset_config = client_reset_config_2;
+    }
 
     if (halt_on_crash) {
 #ifndef _WIN32
@@ -1057,6 +1086,7 @@ int main(int argc, char* argv[])
     config.pong_keepalive_timeout = pong_timeout;
     config.connect_timeout = connect_timeout;
     config.connection_linger_time = connection_linger_time;
+    config.tcp_no_delay = tcp_no_delay;
     config.disable_sync_to_disk = disable_sync_to_disk;
     config.disable_upload_compaction = disable_upload_compaction;
     if (report_roundtrip_times) {

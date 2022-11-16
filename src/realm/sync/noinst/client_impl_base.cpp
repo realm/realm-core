@@ -95,7 +95,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 }
 
 
-ClientImpl::ClientImpl(ClientConfig&& config)
+ClientImpl::ClientImpl(ClientConfig config)
     : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
@@ -2150,8 +2150,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version,
-                 received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any

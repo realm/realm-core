@@ -210,8 +210,8 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& l)
-        : logger{l}
+    HTTPParserBase(util::Logger& logger)
+        : logger{logger}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.

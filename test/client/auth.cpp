@@ -299,10 +299,6 @@ private:
     void handle_http_request(const util::HTTPResponse&, std::error_code);
 };
 
-std::string Client::make_http_host(bool auth_ssl, const std::string& auth_address, const port_type& auth_port)
-{
-    return util::format("%1://%2:%3", auth_ssl ? "https" : "http", auth_address, auth_port);
-}
 
 Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id, Config config)
     : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
@@ -310,7 +306,7 @@ Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std
     , m_auth_ssl{auth_ssl}
     , m_auth_address{std::move(auth_address)}
     , m_auth_port{auth_port}
-    , m_http_host{make_http_host(auth_ssl, auth_address, auth_port)} // Throws
+    , m_http_host{util::make_http_host(auth_ssl, auth_address, auth_port)} // Throws
     , m_max_number_of_connections{config.max_number_of_connections}
     , m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
