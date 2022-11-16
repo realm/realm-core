@@ -7,6 +7,7 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/sort_descriptor.hpp>
 #include <realm/transaction.hpp>
 
 #include <fstream>
@@ -25,19 +26,31 @@ static void enumerate_strings(realm::SharedRealm realm, double threshold)
             continue;
         bool found_str_col = false;
         t->for_each_public_column([&](realm::ColKey col_key) {
-            if (col_key.get_type() == realm::col_type_String) {
+            if (col_key.get_type() == realm::col_type_String && !col_key.is_collection()) {
                 found_str_col = true;
-                realm::util::format(std::cout, "\tcolumn '%1' contains: ", t->get_column_name(col_key));
-                size_t uniques = t->get_num_unique_values(col_key);
-                size_t num_compressible = table_size - uniques;
-                double utilization = num_compressible / table_size;
-                realm::util::format(std::cout, "%1 unique values (%2%%) ", uniques, utilization * 100);
+                realm::util::format(std::cout, "\tcolumn '%1' ", t->get_column_name(col_key));
                 if (t->is_enumerated(col_key)) {
                     std::cout << "[already enumerated]\n";
                 }
-                else if (utilization >= threshold / 100) {
+                else if (threshold <= 0) {
                     std::cout << "[converting]\n";
                     t->enumerate_string_column(col_key);
+                }
+                else if (threshold <= 100) {
+                    std::unique_ptr<realm::DescriptorOrdering> distinct =
+                        std::make_unique<realm::DescriptorOrdering>();
+                    distinct->append_distinct(realm::DistinctDescriptor({{col_key}}));
+                    size_t uniques = t->where().set_ordering(std::move(distinct)).count();
+                    size_t num_compressible = table_size - uniques;
+                    double utilization = num_compressible / table_size;
+                    realm::util::format(std::cout, "contains %1 unique values (%2%%) ", uniques, utilization * 100);
+                    if (utilization >= threshold / 100) {
+                        std::cout << "[converting]\n";
+                        t->enumerate_string_column(col_key);
+                    }
+                    else {
+                        std::cout << "[skipping due to threshold]\n";
+                    }
                 }
                 else {
                     std::cout << "[skipping due to threshold]\n";
@@ -71,8 +84,7 @@ int main(int argc, const char* argv[])
                     curr_arg++;
                 }
                 else {
-                    realm::util::format(std::cout, "File name '%1' for threshold '%2'%%\n", argv[curr_arg],
-                                        threshold);
+                    realm::util::format(std::cout, "File name '%1' for threshold %2%%\n", argv[curr_arg], threshold);
 
                     realm::Realm::Config config;
                     config.path = argv[curr_arg];
