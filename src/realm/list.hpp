@@ -355,6 +355,7 @@ public:
     }
 
     ObjKey get(size_t ndx) const;
+    ObjKey get_unresolved(size_t ndx) const;
     size_t find_first(const ObjKey&) const;
     void insert(size_t ndx, ObjKey value);
     ObjKey set(size_t ndx, ObjKey value);
@@ -365,6 +366,8 @@ public:
         // FIXME: Should this add to the end of the unresolved list?
         insert(size(), value);
     }
+
+    size_t real_size() const;
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
@@ -933,6 +936,12 @@ inline size_t LnkLst::size() const
     return m_list.size() - num_unresolved();
 }
 
+inline size_t LnkLst::real_size() const
+{
+    update_if_needed();
+    return m_list.size();
+}
+
 inline bool LnkLst::is_null(size_t ndx) const
 {
     update_if_needed();
@@ -1083,6 +1092,15 @@ inline ObjKey LnkLst::get(size_t ndx) const
         throw std::out_of_range("Index out of range");
     }
     return m_list.m_tree->get(virtual2real(ndx));
+}
+
+inline ObjKey LnkLst::get_unresolved(size_t ndx) const
+{
+    const auto current_size = real_size();
+    if (ndx >= current_size) {
+        throw std::out_of_range("Index out of range");
+    }
+    return m_list.m_tree->get(ndx);
 }
 
 inline size_t LnkLst::find_first(const ObjKey& key) const

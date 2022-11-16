@@ -360,6 +360,59 @@ RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_prope
     });
 }
 
+RLM_API bool realm_is_linked_object_resolved(realm_object_t* object, realm_property_key_t key)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto obj = object->obj();
+        auto table = obj.get_table();
+
+        auto col_key = ColKey(key);
+        table->check_column(col_key);
+
+        if (col_key.is_list()) {
+            auto ll = obj.get_linklist(col_key);
+            return ll.has_unresolved();
+        }
+
+        return !obj.is_unresolved(col_key);
+    });
+}
+
+RLM_API realm_list_t* realm_get_unresolved_linked_objects(realm_object_t* object, realm_property_key_t key)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto obj = object->obj();
+        auto table = obj.get_table();
+
+        auto col_key = ColKey(key);
+        table->check_column(col_key);
+
+        auto list = new realm_list_t{List{}};
+
+        if (col_key.is_list()) {
+            auto ll = obj.get_linklist(col_key);
+            if (ll.has_unresolved()) {
+                auto unresolved_list = ll.get_unresolved_list();
+                for (const auto& ndx : unresolved_list) {
+                    list->add(table->get_primary_key(ll.get_unresolved(ndx)));
+                }
+            }
+            return list;
+        }
+
+        // TODO: We probably need something similar for sets.
+
+        if (obj.is_unresolved(col_key)) {
+            list->add(table->get_primary_key(obj.get_unfiltered_link(col_key)));
+        }
+        return list;
+    });
+}
+
 RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {

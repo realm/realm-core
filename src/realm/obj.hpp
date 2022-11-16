@@ -393,8 +393,11 @@ private:
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
     // Return number of backlinks from a specific backlink column
     size_t get_backlink_cnt(ColKey backlink_col) const;
+
+public:
     ObjKey get_unfiltered_link(ColKey col_key) const;
 
+private:
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>

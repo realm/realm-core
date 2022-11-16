@@ -530,6 +530,13 @@ public:
         return m_unresolved.size() != 0;
     }
 
+    /// Return the list of tombstones.
+    std::vector<size_t> get_unresolved_list() const noexcept
+    {
+        update_if_needed();
+        return m_unresolved;
+    }
+
     using Interface::get_target_table;
 
 protected:

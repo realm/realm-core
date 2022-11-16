@@ -1611,6 +1611,20 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
 RLM_API realm_object_t* realm_get_linked_object(realm_object_t*, realm_property_key_t);
 
 /**
+ * Check if the object linked by the given property is resolved.
+ *
+ * @return True if the object is resolved.
+ */
+RLM_API bool realm_is_linked_object_resolved(realm_object_t*, realm_property_key_t);
+
+/**
+ * Return the primary key values of the unresolved objects linked by the given property.
+ *
+ * @return A list of primary key values of the unresolved objects.
+ */
+RLM_API realm_list_t* realm_get_unresolved_linked_objects(realm_object_t*, realm_property_key_t);
+
+/**
  * Serializes an object to json and returns it as string. Serializes a single level of properties only.
  *
  * @return a json-serialized representation of the object.
