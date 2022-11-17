@@ -8,6 +8,7 @@
 #include <realm/history.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/sort_descriptor.hpp>
+#include <realm/table_view.hpp>
 #include <realm/transaction.hpp>
 
 #include <fstream>
@@ -40,10 +41,10 @@ static void enumerate_strings(realm::SharedRealm realm, double threshold)
                     std::unique_ptr<realm::DescriptorOrdering> distinct =
                         std::make_unique<realm::DescriptorOrdering>();
                     distinct->append_distinct(realm::DistinctDescriptor({{col_key}}));
-                    size_t uniques = t->where().set_ordering(std::move(distinct)).count();
+                    size_t uniques = t->where().count(*distinct.get());
                     size_t num_compressible = table_size - uniques;
-                    double utilization = num_compressible / table_size;
-                    realm::util::format(std::cout, "contains %1 unique values (%2%%) ", uniques, utilization * 100);
+                    double utilization = num_compressible / double(table_size);
+                    realm::util::format(std::cout, "contains %1 unique values (%2%%) ", uniques, utilization * 100.0);
                     if (utilization >= threshold / 100) {
                         std::cout << "[converting]\n";
                         t->enumerate_string_column(col_key);
@@ -104,6 +105,7 @@ int main(int argc, const char* argv[])
                     enumerate_strings(realm, threshold);
                     realm->compact();
                     std::cout << std::endl;
+                    return 0;
                 }
             }
         }
