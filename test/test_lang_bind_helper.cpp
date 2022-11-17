@@ -4916,10 +4916,24 @@ TEST(LangBindHelper_RollbackToInitialState2)
     trans->rollback();
 }
 
-TEST(LangBindHelper_Compact)
+// non-concurrent because we test the filesystem which may
+// be used by other tests at the same time otherwise
+NONCONCURRENT_TEST(LangBindHelper_Compact)
 {
     SHARED_GROUP_TEST_PATH(path);
     size_t N = 100;
+    std::string dir_path = File::parent_dir(path);
+    dir_path = dir_path.empty() ? "." : dir_path;
+    auto dir_has_tmp_compaction = [&dir_path]() -> size_t {
+        DirScanner dir(dir_path);
+        std::string name;
+        while (dir.next(name)) {
+            if (name.find("tmp_compaction_space") != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
@@ -4936,9 +4950,13 @@ TEST(LangBindHelper_Compact)
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
+        CHECK(File::exists(dir_path));
+        CHECK(File::is_dir(dir_path));
+        CHECK(!dir_has_tmp_compaction());
     }
     {
         CHECK_EQUAL(true, sg->compact());
+        CHECK(!dir_has_tmp_compaction());
     }
     {
         ReadTransaction r(sg);
@@ -4953,6 +4971,7 @@ TEST(LangBindHelper_Compact)
     }
     {
         CHECK_EQUAL(true, sg->compact());
+        CHECK(!dir_has_tmp_compaction());
     }
 }
 

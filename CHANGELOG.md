@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fetching a user's profile while the user logs out would result in an assertion failure. ([PR #6017](https://github.com/realm/realm-core/issues/5571), since v11.0.3)
+* Removed the ".tmp_compaction_space" file being left over after compacting a Realm on Windows. ([#6002](https://github.com/realm/realm-core/issues/6002), since Windows support for compact was added).
 * Restore fallback to full barrier when F_BARRIERSYNC is not available on Apple platforms. ([PR #6033](https://github.com/realm/realm-core/pull/6033), since v12.12.0)
 * Validation of Queries constructed by the Fluent QueryBuilder was missing. ([#6034](https://github.com/realm/realm-core/issues/6034), since v12.7.0)
  
@@ -48,6 +49,7 @@
 -----------
 
 ### Internals
+* Removed `<realm/util/parent_dir.*pp>` and moved `parent_dir` to be part of `File`.
 * Fix `BPlusTreeInner::verify()` ([#5974](https://github.com/realm/realm-core/pull/5974)).
 * Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
 * Defer converting Realm files from streaming form until after we've validated the version ([PR #5987](https://github.com/realm/realm-core/pull/5987)).

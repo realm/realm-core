@@ -25,7 +25,6 @@
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/parent_dir.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/safe_int_ops.hpp>
