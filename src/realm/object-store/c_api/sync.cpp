@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/object-store/c_api/realm.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -995,6 +996,17 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
                                        error_message};
     auto err = sync_error_to_error_code(sync_error);
     SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
+}
+
+RLM_API void
+realm_register_binding_callback_thread_observer(realm_callback_thread_observer_t* thread_observer) noexcept
+{
+    g_binding_callback_thread_observer = thread_observer;
+}
+
+RLM_API void realm_unregister_binding_callback_thread_observer() noexcept
+{
+    g_binding_callback_thread_observer = nullptr;
 }
 
 } // namespace realm::c_api
