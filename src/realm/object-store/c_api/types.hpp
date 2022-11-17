@@ -752,7 +752,8 @@ struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollecti
     }
 };
 
-struct realm_callback_interface_thread_observer : public realm::BindingCallbackThreadObserver {};
+struct realm_callback_interface_thread_observer : public realm::BindingCallbackThreadObserver {
+};
 
 #endif // REALM_ENABLE_SYNC
 

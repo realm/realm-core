@@ -4009,11 +4009,13 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
 /**
-* Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread runs.
-* @param thread_observer a ptr to an implementation class that can receive these notifications. If nullptr is passed instead, this will have 
-* the effect of unregistering the callback.
-*/
-RLM_API void realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer) RLM_API_NOEXCEPT;
+ * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
+ * runs.
+ * @param thread_observer a ptr to an implementation class that can receive these notifications. If nullptr is passed
+ * instead, this will have the effect of unregistering the callback.
+ */
+RLM_API void realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer)
+    RLM_API_NOEXCEPT;
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
