@@ -1179,8 +1179,8 @@ TEST_CASE("C API", "[c_api]") {
             REQUIRE(TestingObj::get().done);
         };
         TestingObj::get().realm = realm;
-
-        realm_async_begin_write(
+        unsigned int transaction_id;
+        auto res = realm_async_begin_write(
             realm,
             [](void*) {
                 auto realm = TestingObj::get().realm;
@@ -1191,17 +1191,19 @@ TEST_CASE("C API", "[c_api]") {
                     },
                     &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
 
+                unsigned int transaction_id;
                 realm_async_commit(
                     realm,
                     [](void*, bool, const char*) {
                         TestingObj::get().done = true;
                     },
-                    nullptr, nullptr, false);
+                    nullptr, nullptr, false, &transaction_id);
             },
-            nullptr, nullptr, false);
+            nullptr, nullptr, false, &transaction_id);
 
         wait_for_done();
         CHECK(TestingObj::get().realm_refresh_callback_called);
+        CHECK(res);
     }
 
     SECTION("realm async refresh - main use case") {

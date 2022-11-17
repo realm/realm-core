@@ -1071,15 +1071,16 @@ RLM_API bool realm_rollback(realm_t*);
 /**
  * start a new write transaction asynchronously for the realm passed as argument.
  */
-RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t,
-                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                             bool notify_only);
+RLM_API bool realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free, bool notify_only,
+                                     unsigned int* transaction_id);
 
 /**
  * commit a transaction asynchronously for the realm passed as argument.
  */
-RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, bool allow_grouping);
+RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t, realm_userdata_t userdata,
+                                realm_free_userdata_func_t userdata_free, bool allow_grouping,
+                                unsigned int* transaction_id);
 
 /**
  * Cancel the transaction referenced by the token passed as argument and set the optional boolean flag in order to
