@@ -66,8 +66,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
         if (m_sync_client)
             return;
 
-        // create a new logger and pass it along to App - if the logger_factory is updated
-        // later, a new logger will be created at that time.
+        // create a new logger - if the logger_factory is updated later, a new
+        // logger will be created at that time.
         do_make_logger();
 
         {
@@ -278,17 +278,15 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
     util::CheckedLockGuard lock(m_mutex);
     m_config.logger_factory = std::move(factory);
 
-    // create a new logger, if needed, and pass it along to app
-    // The only time a default StderrorLogger will be created twice is when a logger_factory
-    // was not set in configure() and this function is called with an empty logger_factory
+    if (m_sync_client)
+        throw std::logic_error("Cannot set the logger_factory after creating the sync client");
+
+    // Create a new logger using the new factory
     do_make_logger();
 }
 
 void SyncManager::do_make_logger()
 {
-    if (m_sync_client)
-        throw std::logic_error("Cannot set the logger_factory after creating the sync client");
-
     if (m_config.logger_factory) {
         m_logger_ptr = m_config.logger_factory(m_config.log_level);
     }
