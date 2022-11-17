@@ -62,9 +62,9 @@ public:
         return Realm::Internal::get_db(*shared_realm);
     }
 
-    static void begin_read(SharedRealm const& shared_realm, VersionID version)
+    static void begin_read(SharedRealm const& shared_realm, VersionID version, bool load_full_schema_additive = false)
     {
-        Realm::Internal::begin_read(*shared_realm, version);
+        Realm::Internal::begin_read(*shared_realm, version, load_full_schema_additive);
     }
 };
 
@@ -354,7 +354,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
         TestHelper::begin_read(old_realm, old_version);
-        // REQUIRE(old_realm->schema().size() == 1);  //NICO going to fail. Tmp commented...
+        REQUIRE(old_realm->schema().size() == 1);
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {

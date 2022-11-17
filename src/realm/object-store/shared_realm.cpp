@@ -111,8 +111,9 @@ Group& Realm::read_group()
 Transaction& Realm::transaction()
 {
     verify_open();
-    if (!m_transaction)
+    if (!m_transaction) {
         begin_read(m_frozen_version.value_or(VersionID{}));
+    }
     return *m_transaction;
 }
 
@@ -138,17 +139,17 @@ std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
     return realm.m_coordinator->m_db;
 }
 
-void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id, bool load_full_schema_additive)
 {
-    realm.begin_read(version_id);
+    realm.begin_read(version_id, load_full_schema_additive);
 }
 
-void Realm::begin_read(VersionID version_id)
+void Realm::begin_read(VersionID version_id, bool load_full_schema_additive)
 {
     REALM_ASSERT(!m_transaction);
     m_transaction = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
-    read_schema_from_group_if_needed();
+    read_schema_from_group_if_needed(load_full_schema_additive);
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -221,7 +222,7 @@ void Realm::set_schema(Schema const& reference, Schema schema)
     notify_schema_changed();
 }
 
-void Realm::read_schema_from_group_if_needed()
+void Realm::read_schema_from_group_if_needed(bool load_full_schema_additive)
 {
     if (m_config.immutable()) {
         REALM_ASSERT(m_transaction);
@@ -239,7 +240,8 @@ void Realm::read_schema_from_group_if_needed()
     m_schema_version = ObjectStore::get_schema_version(group);
     schema = ObjectStore::schema_from_group(group);
 
-    load_schema_for_version_if_needed(current_version, schema);
+    if (load_full_schema_additive)
+        load_schema_for_version_if_needed(current_version, schema);
 
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);

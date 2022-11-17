@@ -486,7 +486,7 @@ public:
         }
 
         static std::shared_ptr<DB>& get_db(Realm& realm);
-        static void begin_read(Realm&, VersionID);
+        static void begin_read(Realm&, VersionID, bool = false);
     };
 
 private:
@@ -538,7 +538,7 @@ private:
     bool m_async_commit_barrier_requested = false;
     util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
 
-    void begin_read(VersionID);
+    void begin_read(VersionID, bool load_full_schema_additive = true);
     bool do_refresh();
     void do_begin_transaction();
     void do_invalidate();
@@ -550,7 +550,7 @@ private:
 
     // Ensure that m_schema and m_schema_version match that of the current
     // version of the file
-    void read_schema_from_group_if_needed();
+    void read_schema_from_group_if_needed(bool load_full_schema_additive = true);
 
     // check if current transaction version is lower than last transaction version for the latest cached schema.
     // In case this is happening and we have opened realm in additive mode, we load the cached schema.
