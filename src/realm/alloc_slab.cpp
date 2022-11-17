@@ -1300,7 +1300,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         free_lengths.init_from_ref(free_sizes_ref);
         size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
         size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
-
         do_refresh({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
                     {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
 
@@ -1337,19 +1336,27 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
             ref_type cur_start = cur_freelist_posistions.get(current_ndx);
             ref_type cur_end = cur_start + cur_freelist_lengths.get(current_ndx);
-            if (cur_start > prev_end) {
+            if (cur_start >= prev_end) {
                 allocations.push_back(RefRange{prev_start, prev_end});
                 ++previous_ndx;
             }
-            else if (cur_start > prev_start) {
-                allocations.push_back(RefRange{prev_start, cur_start});
-                ++previous_ndx;
+            else if (cur_start >= prev_start) {
+                if (cur_start != prev_start) {
+                    allocations.push_back(RefRange{prev_start, cur_start});
+                }
                 if (cur_end < prev_end) {
                     allocations.push_back(RefRange{cur_end, prev_end});
                     ++current_ndx;
                 }
+                else if (cur_end == prev_end) {
+                    ++current_ndx;
+                    ++previous_ndx;
+                }
+                else { // cur_end > prev_end
+                    ++previous_ndx;
+                }
             }
-            else if (cur_end < prev_end) {
+            else if (cur_end <= prev_start) {
                 ++current_ndx;
             }
             else if (cur_end < prev_end) {
@@ -1376,6 +1383,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             allocations.push_back(RefRange{prev_start, prev_end});
             ++previous_ndx;
         }
+
+        allocations.push_back(RefRange{0, 12}); // slot-selector etc.
 
         do_refresh(allocations);
 

@@ -319,7 +319,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     auto should_retry = [&]() -> bool {
         // if we do not observe identical data or iv within several sequential reads then
         // this is a multiprocess reader starvation scenario so keep trying until we get a match
-        return retry_count <= 5 || retry_count - num_identical_reads > 1;
+        return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);
     };
 
     while (size > 0) {
@@ -451,7 +451,7 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noe
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
-        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
+        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 28) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
