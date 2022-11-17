@@ -964,7 +964,7 @@ void Table::enumerate_string_column(ColKey col_key)
     check_column(col_key);
     size_t column_ndx = colkey2spec_ndx(col_key);
     ColumnType type = col_key.get_type();
-    if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
+    if (type == col_type_String && !col_key.is_collection() && !m_spec.is_string_enum_type(column_ndx)) {
         m_clusters.enumerate_string_column(col_key);
     }
 }
