@@ -59,7 +59,6 @@ typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
-typedef struct realm_callback_thread_observer realm_callback_thread_observer_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 
@@ -4009,18 +4008,6 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
-/**
- * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread runs.
- * @param thread_observer a ptr to an implementation class that can receive these notifications. If NULL is passed instead this will have 
- * the same effect fo unregistering the object.
- */
-RLM_API void realm_register_binding_callback_thread_observer(realm_callback_thread_observer_t* thread_observer) RLM_API_NOEXCEPT;
-
-/**
- * Stop receiving notifications for the object store thread
- */
-RLM_API void realm_unregister_binding_callback_thread_observer() RLM_API_NOEXCEPT;
-
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
@@ -4239,4 +4226,6 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         const realm_mongodb_find_one_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
+
+
 #endif // REALM_H
