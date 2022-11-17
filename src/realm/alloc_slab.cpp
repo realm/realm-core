@@ -1493,6 +1493,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
             current_size += b.size;
         }
         if (new_file_size > current_size) {
+            std::lock_guard<std::mutex> lock(m_mapping_mutex);
             m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, current_size);
         }
         m_virtual_file_size = new_file_size;
