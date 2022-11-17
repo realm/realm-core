@@ -1097,39 +1097,79 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 }
 
 TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app]") {
-    FLXSyncTestHarness harness("flx_bad_query");
+    static std::optional<FLXSyncTestHarness> harness;
+    if (!harness) {
+        harness.emplace("flx_bad_query");
+    }
 
-    harness.do_with_new_realm([&](SharedRealm realm) {
-        auto table = realm->read_group().get_table("class_TopLevel");
-        auto bad_col_key = table->get_column_key("non_queryable_field");
-        auto good_col_key = table->get_column_key("queryable_str_field");
+    auto create_subscription = [&](SharedRealm realm, StringData table_name, StringData column_name,
+                                   auto make_query) {
+        auto table = realm->read_group().get_table(table_name);
+        auto queryable_field = table->get_column_key(column_name);
+        auto new_query = realm->get_active_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(make_query(Query(table), queryable_field));
+        return std::move(new_query).commit();
+    };
 
-        Query new_query_a(table);
-        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
-        new_query_a.equal(bad_col_key, "bar");
-        new_subs.insert_or_assign(new_query_a);
-        auto subs = std::move(new_subs).commit();
-        auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-        CHECK(!sub_res.is_ok());
-        if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
-            sub_res.get_status().reason().find(
-                "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-            FAIL(sub_res.get_status().reason());
-        }
+    SECTION("Good query after bad query") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            CHECK(!sub_res.is_ok());
+            if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+                sub_res.get_status().reason().find(
+                    "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
+                FAIL(sub_res.get_status().reason());
+            }
 
-        CHECK(realm->get_active_subscription_set().version() == 0);
-        CHECK(realm->get_latest_subscription_set().version() == 1);
+            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(realm->get_latest_subscription_set().version() == 1);
 
-        Query new_query_b(table);
-        new_query_b.equal(good_col_key, "foo");
-        new_subs = realm->get_active_subscription_set().make_mutable_copy();
-        new_subs.insert_or_assign(new_query_b);
-        subs = std::move(new_subs).commit();
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            subs = create_subscription(realm, "class_TopLevel", "queryable_str_field", [](auto q, auto c) {
+                return q.equal(c, "foo");
+            });
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-        CHECK(realm->get_active_subscription_set().version() == 2);
-        CHECK(realm->get_latest_subscription_set().version() == 2);
-    });
+            CHECK(realm->get_active_subscription_set().version() == 2);
+            CHECK(realm->get_latest_subscription_set().version() == 2);
+        });
+    }
+
+    SECTION("Bad query after bad query") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto sync_session = realm->sync_session();
+            sync_session->close();
+
+            auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+            auto subs2 = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
+                return q.equal(c, "bar");
+            });
+
+            sync_session->revive_if_needed();
+
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            auto sub_res2 = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            CHECK(!sub_res.is_ok());
+            if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+                sub_res.get_status().reason().find(
+                    "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
+                FAIL(sub_res.get_status().reason());
+            }
+
+            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(realm->get_latest_subscription_set().version() == 2);
+        });
+    }
+
+    // Add new sections before this
+    SECTION("teardown") {
+        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
+        harness.reset();
+    }
 }
 
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
