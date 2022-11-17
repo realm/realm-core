@@ -197,6 +197,7 @@ void PendingBootstrapStore::clear()
     auto tr = m_db->start_write();
     auto bootstrap_table = tr->get_table(m_table);
     bootstrap_table->clear();
+    m_has_pending = false;
     tr->commit();
 }
 
@@ -253,11 +254,37 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
         parsed_changeset.last_integrated_local_version =
             cur_changeset.get<int64_t>(m_changeset_last_integrated_client_version);
         parsed_changeset.data = BinaryData(uncompressed_buffer.data(), uncompressed_buffer.size());
+        bytes_so_far += parsed_changeset.data.size();
         ret.changesets.push_back(std::move(parsed_changeset));
     }
-    ret.remaining = changeset_list.size() - ret.changesets.size();
+    ret.remaining_changesets = changeset_list.size() - ret.changesets.size();
 
     return ret;
+}
+
+PendingBootstrapStore::PendingBatchStats PendingBootstrapStore::pending_stats()
+{
+    auto tr = m_db->start_read();
+    auto bootstrap_table = tr->get_table(m_table);
+    if (bootstrap_table->is_empty()) {
+        return {};
+    }
+
+    REALM_ASSERT(bootstrap_table->size() == 1);
+
+    auto bootstrap_obj = bootstrap_table->get_object(0);
+    auto changeset_list = bootstrap_obj.get_linklist(m_changesets);
+
+    PendingBatchStats stats;
+    stats.query_version = bootstrap_obj.get<int64_t>(m_query_version);
+    stats.pending_changesets = changeset_list.size();
+    changeset_list.for_each([&](Obj& cur_changeset) {
+        stats.pending_changeset_bytes +=
+            static_cast<size_t>(cur_changeset.get<int64_t>(m_changeset_original_changeset_size));
+        return IteratorControl::AdvanceToNext;
+    });
+
+    return stats;
 }
 
 void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t count)

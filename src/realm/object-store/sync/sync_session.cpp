@@ -402,27 +402,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         std::move(fresh_mut_sub)
             .commit()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .then([=, weak_self = weak_from_this()](sync::SubscriptionSet::State) {
-                auto pf = util::make_promise_future<void>();
-                sync_session->wait_for_download_completion([=, promise = std::move(pf.promise)](Status s) mutable {
-                    auto strong_self = weak_self.lock();
-                    if (!strong_self) {
-                        return promise.set_error({ErrorCodes::RuntimeError,
-                                                  "SyncSession was destroyed before download could be completed"});
-                    }
-
-                    if (!s.is_ok()) {
-                        return promise.set_error(
-                            {ErrorCodes::RuntimeError,
-                             util::format("Error waiting for download completion for fresh realm (code: %1): %2",
-                                          s.code(), s.reason())});
-                    }
-
-                    promise.emplace_value();
-                });
-                return std::move(pf.future);
-            })
-            .get_async([=, weak_self = weak_from_this()](Status s) {
+            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
                 // Keep the sync session alive while it's downloading, but then close
                 // it immediately
                 sync_session->close();
@@ -431,7 +411,8 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                         strong_self->handle_fresh_realm_downloaded(db, none, server_requests_action);
                     }
                     else {
-                        strong_self->handle_fresh_realm_downloaded(nullptr, s.reason(), server_requests_action);
+                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status().reason(),
+                                                                   server_requests_action);
                     }
                 }
             });
@@ -747,6 +728,7 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = sync_config.ssl_verify_callback;
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
+    session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
                                                     anchor = weak_from_this()](const SyncClientHookData& data) {

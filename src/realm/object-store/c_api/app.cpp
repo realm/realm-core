@@ -575,23 +575,23 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
     });
 }
 
-RLM_API bool realm_app_call_function(
-    const realm_app_t* app, const realm_user_t* user, const char* function_name, const char* serialized_ejson_payload,
-    void (*callback)(realm_userdata_t userdata, const char* serialized_ejson_response, const realm_app_error_t*),
-    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
+                                     const char* serialized_ejson_payload, realm_return_string_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      util::Optional<bson::Bson>&& bson, util::Optional<AppError> error) {
+                      const std::string* reply, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
                 callback(userdata.get(), nullptr, &c_error);
             }
             else {
-                callback(userdata.get(), bson->toJson().c_str(), nullptr);
+                callback(userdata.get(), reply->c_str(), nullptr);
             }
         };
-        (*app)->call_function(*user, function_name, parse_ejson_array(serialized_ejson_payload), std::move(cb));
+        (*app)->call_function(*user, function_name, serialized_ejson_payload, /*service_name=*/std::nullopt,
+                              std::move(cb));
         return true;
     });
 }

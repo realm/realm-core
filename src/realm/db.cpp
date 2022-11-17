@@ -648,7 +648,7 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
+void DB::open(const std::string& path, bool no_create_file, const DBOptions& options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -1046,6 +1046,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                                                     path);
                 }
 
+                bool need_file_format_upgrade =
+                    current_file_format_version < target_file_format_version && top_ref != 0;
+                if (!options.allow_file_format_upgrade && (need_hist_schema_upgrade || need_file_format_upgrade)) {
+                    throw FileFormatUpgradeRequired(m_db_path);
+                }
+
+                alloc.convert_from_streaming_form(top_ref);
+
                 if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
@@ -1197,7 +1205,7 @@ void DB::open(BinaryData buffer, bool take_ownership)
         m_alloc.own_buffer();
 }
 
-void DB::open(Replication& repl, const std::string& file, const DBOptions options)
+void DB::open(Replication& repl, const std::string& file, const DBOptions& options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -1357,6 +1365,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
+        m_alloc.convert_from_streaming_form(top_ref);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
         SharedInfo* r_info = m_reader_map.get_addr();
@@ -2270,14 +2279,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                     out.commit(new_top_ref); // Throws
                 }
                 else {
-                    out.flush_all_mappings();
+                    out.sync_all_mappings();
                 }
                 break;
             case Durability::MemOnly:
                 // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually flush the data to disk
-                // (the OS may do so opportinisticly, or when swapping). So in this
-                // mode the file on disk may very likely be in an invalid state.
+                // the shared memory. So we never actually sync the data to disk
+                // (the OS may do so opportinisticly, or when swapping).
+                // however, we still need to flush any private caches into the buffer cache
+                out.flush_all_mappings();
                 break;
         }
         size_t new_file_size = out.get_file_size();
@@ -2515,21 +2525,21 @@ public:
 };
 } // namespace
 
-DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
+DBRef DB::create(const std::string& file, bool no_create, const DBOptions& options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
 
-DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options)
+DBRef DB::create(Replication& repl, const std::string& file, const DBOptions& options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, file, options);
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions options)
+DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions& options)
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);

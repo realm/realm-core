@@ -78,14 +78,15 @@ void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::millisecon
     });
 }
 
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
+void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms,
+                             std::chrono::milliseconds sleep_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
     while (!condition()) {
         if (std::chrono::steady_clock::now() - wait_start > max_ms) {
             throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
         }
-        millisleep(1);
+        std::this_thread::sleep_for(sleep_ms);
     }
 }
 
@@ -340,22 +341,23 @@ static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const App
     app::MongoClient remote_client = user->mongo_client("BackingDB");
     app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
     app::MongoCollection object_coll = db[schema_name];
-    uint64_t count_external = 0;
 
     timed_sleeping_wait_for(
         [&]() -> bool {
-            if (count_external == 0) {
-                object_coll.count(filter_bson, [&](uint64_t count, util::Optional<app::AppError> error) {
-                    REQUIRE(!error);
-                    count_external = count;
-                });
-            }
-            if (count_external == 0) {
-                millisleep(2000); // don't spam the server too much
-            }
-            return count_external > 0;
+            auto pf = util::make_promise_future<uint64_t>();
+            object_coll.count(filter_bson, [promise = std::move(pf.promise)](
+                                               uint64_t count, util::Optional<app::AppError> error) mutable {
+                REQUIRE(!error);
+                if (error) {
+                    promise.set_error({ErrorCodes::RuntimeError, error->reason()});
+                }
+                else {
+                    promise.emplace_value(count);
+                }
+            });
+            return pf.future.get() > 0;
         },
-        std::chrono::minutes(15));
+        std::chrono::minutes(15), std::chrono::milliseconds(100));
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -376,6 +378,17 @@ struct BaasClientReset : public TestClientReset {
                      *(partition_value.end() - 1) == '"');
         partition_value = partition_value.substr(1, partition_value.size() - 2);
         Partition partition = {app_session.config.partition_key.name, partition_value};
+
+        // There is a race in PBS where if initial sync is still in-progress while you're creating the initial
+        // object below, you may end up creating it in your local realm, uploading it, have the translator process
+        // the upload, then initial sync the processed object, and then send it back to you as an erase/create
+        // object instruction.
+        //
+        // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
+        // state.
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
@@ -427,6 +440,10 @@ struct BaasClientReset : public TestClientReset {
         if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
             app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         }
+
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);

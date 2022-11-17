@@ -4775,6 +4775,52 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
+TEST_CASE("results: public name declared") {
+    InMemoryTestFile config;
+    // config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {
+             {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "public_value"},
+         }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
+
+    realm->begin_transaction();
+    for (int i = 0; i < 8; ++i) {
+        table->create_object().set(col, (i + 2) % 4);
+    }
+    realm->commit_transaction();
+    Results r(realm, table);
+
+    SECTION("sorted") {
+        auto sorted = r.sort({{"public_value", true}});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 6);
+        REQUIRE_ORDER(sorted.limit(8), 2, 6, 3, 7, 0, 4, 1, 5);
+        REQUIRE_ORDER(sorted.limit(100), 2, 6, 3, 7, 0, 4, 1, 5);
+    }
+
+    SECTION("distinct") {
+        auto sorted = r.distinct({"public_value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 0);
+        REQUIRE_ORDER(sorted.limit(2), 0, 1);
+        REQUIRE_ORDER(sorted.limit(8), 0, 1, 2, 3);
+
+        sorted = r.sort({{"public_value", true}}).distinct({"public_value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 3);
+        REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
+    }
+}
+
 TEST_CASE("notifications: objects with PK recreated") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
