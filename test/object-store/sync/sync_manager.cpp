@@ -669,7 +669,8 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             File::try_remove(DB::get_core_file(realm_path_3, DB::CoreFileType::Log));
             util::try_remove_dir_recursive(DB::get_core_file(realm_path_3, DB::CoreFileType::Management));
             // remove write permissions of the parent directory so that removing realm3 will fail
-            std::string realm3_dir = get_parent_directory(realm_path_3);
+            std::string realm3_dir = File::parent_dir(realm_path_3);
+            realm3_dir = realm3_dir.empty() ? "." : realm3_dir;
             int original_perms = get_permissions(realm3_dir);
             realm::chmod(realm3_dir, original_perms & (~0b010000000)); // without owner_write
             // run the actions

@@ -39,7 +39,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/platform_info.hpp>
-#include <realm/util/parent_dir.hpp>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -180,23 +179,6 @@ long get_num_open_files()
 #endif
     return -1;
 }
-
-/*
-void fix_test_libexec_path(const char* argv_0)
-{
-    std::string path;
-    if (const char* str = getenv("UNITTEST_LIBEXEC_PATH")) {
-        path = str;
-    }
-    else {
-        std::string test_dir = util::parent_dir(argv_0);
-        std::string root_dir = util::File::resolve("..",  test_dir);
-        std::string src_dir  = util::File::resolve("src", root_dir);
-        path = util::File::resolve("realm", src_dir);
-    }
-    set_test_libexec_path(path);
-}
-*/
 
 void set_random_seed()
 {

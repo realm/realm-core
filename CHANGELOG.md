@@ -2,15 +2,18 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add a way to register a thread observer listener in the C API. ([PR #6040](https://github.com/realm/realm-core/pull/6040))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fetching a user's profile while the user logs out would result in an assertion failure. ([PR #6017](https://github.com/realm/realm-core/issues/5571), since v11.0.3)
+* Removed the ".tmp_compaction_space" file being left over after compacting a Realm on Windows. ([#6002](https://github.com/realm/realm-core/issues/6002), since Windows support for compact was added).
 * Restore fallback to full barrier when F_BARRIERSYNC is not available on Apple platforms. ([PR #6033](https://github.com/realm/realm-core/pull/6033), since v12.12.0)
+* Validation of Queries constructed by the Fluent QueryBuilder was missing. ([#6034](https://github.com/realm/realm-core/issues/6034), since v12.7.0)
 
 ### Breaking changes
 * `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
+* Better error handling for `realm_async_begin_write` and `realm_async_commit`. ([#PR6039](https://github.com/realm/realm-core/pull/6039))
 * Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr` ([PR #5980](https://github.com/realm/realm-core/pull/5980))
 * `util::RootLogger` has been replaced with `util::Logger`
 
@@ -48,6 +51,7 @@
 -----------
 
 ### Internals
+* Removed `<realm/util/parent_dir.*pp>` and moved `parent_dir` to be part of `File`.
 * Fix `BPlusTreeInner::verify()` ([#5974](https://github.com/realm/realm-core/pull/5974)).
 * Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
 * Defer converting Realm files from streaming form until after we've validated the version ([PR #5987](https://github.com/realm/realm-core/pull/5987)).
