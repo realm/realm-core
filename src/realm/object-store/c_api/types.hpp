@@ -24,6 +24,9 @@
 
 #include <stdexcept>
 #include <string>
+#include <iostream>
+#include <bit>
+#include <bitset>
 
 namespace realm::c_api {
 
@@ -106,15 +109,27 @@ struct PropertyTypeMismatch : std::logic_error {
 //// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrapC {
+    static std::atomic<uint64_t> live_objects;
+    static std::atomic<uint64_t> deadOrAlive_objects;
+
     static constexpr uint64_t s_cookie_value = 0xdeadbeefdeadbeef;
     uint64_t cookie;
     WrapC()
         : cookie(s_cookie_value)
     {
+        ++deadOrAlive_objects;
+        auto c = live_objects++;
+        if (std::has_single_bit(c)) {
+            std::cout << "WrapC - Live objects: " << c << "/" << deadOrAlive_objects.load() << std::endl;
+        }
     }
     virtual ~WrapC()
     {
         cookie = 0;
+        auto c = --live_objects;
+        if (std::has_single_bit(c)) {
+            std::cout << "~WrapC - Live objects: " << c << "/" << deadOrAlive_objects.load() << std::endl;
+        }
     }
 
     virtual WrapC* clone() const

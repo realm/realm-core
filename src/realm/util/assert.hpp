@@ -57,7 +57,7 @@
 #define REALM_ASSERT_DEBUG_EX(condition, ...) static_cast<void>(sizeof bool(condition))
 #endif
 
-// Becase the assert is used in noexcept methods, it's a bad idea to allocate
+// Because the assert is used in noexcept methods, it's a bad idea to allocate
 // buffer space for the message so therefore we must pass it to terminate which
 // will 'cerr' it for us without needing any buffer
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)

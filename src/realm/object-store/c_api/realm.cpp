@@ -18,6 +18,8 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
 
 namespace realm::c_api {
 
+std::atomic<uint64_t> WrapC::live_objects{0};
+std::atomic<uint64_t> WrapC::deadOrAlive_objects{0};
 
 RLM_API bool realm_get_version_id(const realm_t* realm, bool* out_found, realm_version_id_t* out_version)
 {

@@ -24,6 +24,7 @@
 #include <mutex>
 #include <map>
 #include <atomic>
+#include <iostream>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -108,6 +109,8 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     : ref_end(r)
     , size(s)
 {
+    std::cout << "SlabAlloc::Slab::Slab(ref_type r, size_t s) ref_end = " << ref_end << " size = " << size
+              << std::endl;
     total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
     addr = static_cast<char*>(util::mmap_anon(size));
 #if REALM_ENABLE_ALLOC_SET_ZERO
@@ -117,6 +120,7 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
 
 SlabAlloc::Slab::~Slab()
 {
+    std::cout << "SlabAlloc::Slab::~Slab() ref_end = " << ref_end << " size = " << size << " " << this << std::endl;
     total_slab_allocated.fetch_sub(size, std::memory_order_relaxed);
     if (addr)
         util::munmap(addr, size);

@@ -20,6 +20,8 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <algorithm>
+#include <iostream>
+#include <bit>
 
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
@@ -38,6 +40,9 @@ namespace {
 /// is not a problem, as there is no way to modify it, so it will
 /// remain zero.
 class DefaultAllocator : public realm::Allocator {
+    std::atomic<uint64_t> m_max_allocs{0};
+    std::atomic<uint64_t> m_num_allocs{0};
+
 public:
     DefaultAllocator()
     {
@@ -56,6 +61,11 @@ public:
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr + size, 0);
 #endif
+        m_max_allocs++;
+        auto c = m_num_allocs++;
+        if (std::has_single_bit(c)) {
+            std::cout << "DefaultAllocator::do_alloc - Allocated " << c << "/" << m_max_allocs.load() << " objects" << std::endl;
+        }
         return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
@@ -78,6 +88,11 @@ public:
 
     void do_free(ref_type, char* addr) override
     {
+        auto c = --m_num_allocs;
+        if (std::has_single_bit(c)) {
+            std::cout << "DefaultAllocator::do_free - Allocated " << c << "/" << m_max_allocs.load() << " objects" << std::endl;
+        }
+
         ::free(addr);
     }
 
