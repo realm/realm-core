@@ -100,7 +100,6 @@ set(UTIL_SOURCES
     util/json_parser.cpp
     util/load_file.cpp
     util/misc_ext_errors.cpp
-    util/parent_dir.cpp
     util/random.cpp
     util/resource_limits.cpp
     util/substitute.cpp
@@ -281,7 +280,6 @@ set(REALM_NOINST_HEADERS
     util/json_parser.hpp
     util/load_file.hpp
     util/network_ssl.hpp
-    util/parent_dir.hpp
     util/platform_info.hpp
     util/quote.hpp
     util/random.hpp
@@ -321,6 +319,9 @@ set_target_properties(Storage PROPERTIES
 )
 
 target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+if(REALM_USE_FAST_LINKER)
+    target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
+endif()
 
 target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
