@@ -42,6 +42,7 @@
 #endif
 
 #include <realm/exceptions.hpp>
+#include <realm/unicode.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -1042,13 +1043,12 @@ void File::sync()
 void File::barrier()
 {
 #if REALM_PLATFORM_APPLE
-    // If F_BARRIERSYNC is not suppported (this is known on exFAT) we don't fallback to sync().
-    // This is not longer needed becasue msync already guarantees that the pages are going to be
-    // flushed on disk.
-    ::fcntl(m_fd, F_BARRIERFSYNC);
-#else
-    sync();
+    if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
+        return;
+        // If fcntl fails, we fallback to full sync.
+        // This is known to occur on exFAT which does not support F_BARRIERSYNC.
 #endif
+    sync();
 }
 
 #ifndef _WIN32
@@ -1654,6 +1654,21 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 #endif
 }
 
+std::string File::parent_dir(const std::string& path)
+{
+#if REALM_HAVE_STD_FILESYSTEM
+    namespace fs = std::filesystem;
+    return fs::path(path).parent_path().string(); // Throws
+#else
+    auto is_sep = [](char c) -> bool {
+        return c == '/' || c == '\\';
+    };
+    auto it = std::find_if(path.rbegin(), path.rend(), is_sep);
+    while (it != path.rend() && is_sep(*it))
+        ++it;
+    return path.substr(0, path.rend() - it);
+#endif
+}
 
 bool File::for_each(const std::string& dir_path, ForEachHandler handler)
 {

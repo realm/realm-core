@@ -1353,7 +1353,9 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         m_alloc.detach();
 
 #ifdef _WIN32
+        // can't rename to existing file on Windows
         util::File::copy(tmp_path, m_db_path);
+        util::File::remove(tmp_path);
 #else
         util::File::move(tmp_path, m_db_path);
 #endif
