@@ -3862,9 +3862,10 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_o
                                          realm_userdata_t userdata,
                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
-RLM_API realm_callback_open_task_token_t* realm_async_open_task_register_download_progress_notifier(
-    realm_async_open_task_t*, realm_sync_progress_func_t, realm_userdata_t userdata,
-    realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+RLM_API realm_callback_open_task_token_t*
+realm_async_open_task_register_download_progress_notifier(realm_async_open_task_t*, realm_sync_progress_func_t,
+                                                          realm_userdata_t userdata,
+                                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 /**
  * Get the sync session for a specific realm.
  *
