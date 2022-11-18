@@ -1102,13 +1102,21 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         harness.emplace("flx_bad_query");
     }
 
-    auto create_subscription = [&](SharedRealm realm, StringData table_name, StringData column_name,
-                                   auto make_query) {
+    auto create_subscription = [](SharedRealm realm, StringData table_name, StringData column_name, auto make_query) {
         auto table = realm->read_group().get_table(table_name);
         auto queryable_field = table->get_column_key(column_name);
         auto new_query = realm->get_active_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(make_query(Query(table), queryable_field));
         return std::move(new_query).commit();
+    };
+
+    auto check_status = [](auto status) {
+        CHECK(!status.is_ok());
+        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+            status.get_status().reason().find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
+                std::string::npos) {
+            FAIL(status.get_status().reason());
+        }
     };
 
     SECTION("Good query after bad query") {
@@ -1117,12 +1125,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
                 return q.equal(c, "bar");
             });
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-            CHECK(!sub_res.is_ok());
-            if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
-                sub_res.get_status().reason().find(
-                    "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-                FAIL(sub_res.get_status().reason());
-            }
+            check_status(sub_res);
 
             CHECK(realm->get_active_subscription_set().version() == 0);
             CHECK(realm->get_latest_subscription_set().version() == 1);
@@ -1152,13 +1155,11 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
             sync_session->revive_if_needed();
 
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-            auto sub_res2 = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-            CHECK(!sub_res.is_ok());
-            if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
-                sub_res.get_status().reason().find(
-                    "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
-                FAIL(sub_res.get_status().reason());
-            }
+            auto sub_res2 =
+                subs2.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+
+            check_status(sub_res);
+            check_status(sub_res2);
 
             CHECK(realm->get_active_subscription_set().version() == 0);
             CHECK(realm->get_latest_subscription_set().version() == 2);
