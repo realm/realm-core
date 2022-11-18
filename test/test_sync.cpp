@@ -1665,12 +1665,10 @@ TEST(Sync_HTTP404NotFound)
 {
     TEST_DIR(server_dir);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -1688,7 +1686,7 @@ TEST(Sync_HTTP404NotFound)
     util::HTTPRequest request;
     request.path = "/not-found";
 
-    HTTPRequestClient client(logger, endpoint, request);
+    HTTPRequestClient client(*(test_context.logger), endpoint, request);
     client.fetch_response();
 
     server.stop();
@@ -1771,12 +1769,10 @@ TEST(Sync_HTTP_ContentLength)
 {
     TEST_DIR(server_dir);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -2330,7 +2326,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = test_context.logger;
+    util::Logger& logger = *(test_context.logger);
 
     logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
                 number_of_transactions);
@@ -2393,7 +2389,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = test_context.logger;
+    util::Logger& logger = *(test_context.logger);
 
     logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
                 number_of_transactions);
@@ -2969,10 +2965,8 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger client_logger("Client: ", logger);
     Client::Config config;
-    config.logger = &client_logger;
+    config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     config.reconnect_mode = ReconnectMode::testing;
     Client client(config);
 
@@ -2984,9 +2978,9 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
         StringData pem{pem_data, pem_size};
-        logger.info("server_address = %1, server_port = %2, pem =\n%3\n, "
-                    " preverify_ok = %4, depth = %5",
-                    server_address, server_port, pem, preverify_ok, depth);
+        test_context.logger->info("server_address = %1, server_port = %2, pem =\n%3\n, "
+                                  " preverify_ok = %4, depth = %5",
+                                  server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
             client.stop();
         return true;
@@ -3126,10 +3120,8 @@ TEST(Sync_UploadDownloadProgress_1)
         std::mutex mutex;
         std::condition_variable cond_var;
 
-        util::Logger& logger = test_context.logger;
-        util::PrefixLogger client_logger("Client: ", logger);
         Client::Config config;
-        config.logger = &client_logger;
+        config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
 
@@ -3375,14 +3367,10 @@ TEST(Sync_UploadDownloadProgress_3)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    util::PrefixLogger client_logger("Client: ", logger);
-
     std::string server_address = "localhost";
 
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
     server_config.listen_address = server_address;
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -3404,7 +3392,7 @@ TEST(Sync_UploadDownloadProgress_3)
     }
 
     Client::Config client_config;
-    client_config.logger = &client_logger;
+    client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
 
@@ -3686,12 +3674,8 @@ TEST(Sync_UploadDownloadProgress_6)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger server_logger("Server: ", logger);
-    util::PrefixLogger client_logger("Client: ", logger);
-
     Server::Config server_config;
-    server_config.logger = &server_logger;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
     server_config.listen_address = "localhost";
     server_config.listen_port = "";
     server_config.tcp_no_delay = true;
@@ -3708,7 +3692,7 @@ TEST(Sync_UploadDownloadProgress_6)
     });
 
     Client::Config client_config;
-    client_config.logger = &client_logger;
+    client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     Client client(client_config);
@@ -3768,7 +3752,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
 
     TEST_CLIENT_DB(db);
     Client::Config config;
-    config.logger = &test_context.logger;
+    config.logger = test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
     Client client{config};
     Session session_1{client, db, nullptr};
@@ -5033,7 +5017,7 @@ TEST(Sync_ServerSideModify_Randomize)
 
     ReadTransaction rt_1{db_1};
     ReadTransaction rt_2{db_2};
-    CHECK(compare_groups(rt_1, rt_2, test_context.logger));
+    CHECK(compare_groups(rt_1, rt_2, *(test_context.logger)));
 }
 
 
@@ -5060,12 +5044,11 @@ TEST_IF(Sync_SSL_Certificates, false)
 
     size_t num_servers = sizeof(server_address) / sizeof(server_address[0]);
 
-    util::Logger& logger = test_context.logger;
-    util::PrefixLogger client_logger("Client: ", logger);
+    auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
 
     for (size_t i = 0; i < num_servers; ++i) {
         Client::Config client_config;
-        client_config.logger = &client_logger;
+        client_config.logger = client_logger;
         client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
 
@@ -5088,7 +5071,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
-                client_logger.debug(
+                client_logger->debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
                     error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
@@ -5274,8 +5257,6 @@ TEST_IF(Sync_Issue2104, false)
 {
     TEST_DIR(dir);
 
-    util::Logger& logger = test_context.logger;
-
     // Save a snapshot of the server Realm file.
     std::string realm_path = "issue_2104_server.realm";
     std::string realm_path_copy = util::File::resolve("issue_2104.realm", dir);
@@ -5460,7 +5441,8 @@ TEST_IF(Sync_Issue2104, false)
     VersionInfo version_info;
     bool backup_whole_realm;
     _impl::ServerHistory::IntegrationResult result;
-    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result, logger);
+    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result,
+                                        *(test_context.logger));
 }
 
 
@@ -6359,7 +6341,6 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     SHARED_GROUP_TEST_PATH(path);
     ClientReplication repl;
     auto local_db = realm::DB::create(repl, path);
-    auto& logger = test_context.logger;
     auto& history = repl.get_history();
     history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
 
@@ -6374,7 +6355,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
         realm::util::SimpleNoCopyInputStream changeset_stream(unparsed_changeset);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
-        logger.info("changeset at version %1: %2", last_version, parsed_changeset);
+        test_context.logger->info("changeset at version %1: %2", last_version, parsed_changeset);
         last_version_observed = last_version;
         return parsed_changeset;
     };

@@ -9,15 +9,15 @@
 namespace realm {
 namespace util {
 
-class TimestampStderrLogger : public RootLogger {
+class TimestampStderrLogger : public Logger {
 public:
     using Precision = TimestampFormatter::Precision;
     using Config = TimestampFormatter::Config;
 
-    explicit TimestampStderrLogger(Config = {});
+    explicit TimestampStderrLogger(Config = {}, Level = Level::info);
 
 protected:
-    void do_log(Logger::Level, const std::string& message) override;
+    void do_log(Logger::Level, const std::string& message) final;
 
 private:
     TimestampFormatter m_formatter;

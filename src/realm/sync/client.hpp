@@ -11,7 +11,6 @@
 
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/logger.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/subscriptions.hpp>
 

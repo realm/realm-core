@@ -21,6 +21,6 @@
 
 #include <realm/util/logger.hpp>
 
-int test_all(realm::util::Logger* = nullptr);
+int test_all(const std::shared_ptr<realm::util::Logger>& logger = nullptr);
 
 #endif // REALM_TEST_TEST_ALL_HPP
