@@ -224,6 +224,10 @@ public:
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column);
 
+    virtual std::string validate()
+    {
+        return m_child ? m_child->validate() : "";
+    }
 
     ParentNode(const ParentNode& from);
 
@@ -2140,6 +2144,25 @@ public:
         }
 
         return index;
+    }
+
+    std::string validate() override
+    {
+        if (m_conditions.size() == 0)
+            return "Missing both arguments of OR";
+        if (m_conditions.size() == 1)
+            return "Missing argument of OR";
+        std::string s;
+        if (m_child != 0)
+            s = m_child->validate();
+        if (s != "")
+            return s;
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            s = m_conditions[i]->validate();
+            if (s != "")
+                return s;
+        }
+        return "";
     }
 
     std::unique_ptr<ParentNode> clone() const override

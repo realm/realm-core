@@ -35,7 +35,6 @@
 #include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
-#include <realm/util/parent_dir.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
