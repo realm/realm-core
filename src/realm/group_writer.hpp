@@ -22,6 +22,7 @@
 #include <cstdint> // unint8_t etc
 #include <utility>
 #include <map>
+#include <vector>
 
 #include <realm/alloc.hpp>
 #include <realm/array.hpp>

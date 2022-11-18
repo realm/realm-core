@@ -138,8 +138,27 @@ public:
     friend class InterprocessCondVar;
 
     void lock() noexcept;
+
+    template <class Func>
+    void lock(Func) noexcept
+    {
+        lock();
+    }
+
     bool try_lock() noexcept;
+
+    template <class Func>
+    bool try_lock(Func) noexcept
+    {
+        return try_lock();
+    }
+
     void unlock() noexcept;
+
+    bool is_valid() const noexcept
+    {
+        return true;
+    }
 
 protected:
 #ifdef _WIN32
@@ -355,8 +374,8 @@ public:
 
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) noexcept;
-    template <class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
+    template <class M, class Func>
+    void wait(M& m, Func recover_func, const struct timespec* tp = nullptr);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -719,8 +738,8 @@ inline void CondVar::wait(LockGuard& l) noexcept
 #endif
 }
 
-template <class Func>
-inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+template <class M, class Func>
+inline void CondVar::wait(M& m, Func recover_func, const struct timespec* tp)
 {
     int r;
 
@@ -755,21 +774,23 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 
     handle_wait_error(r);
 
-    try {
-        recover_func(); // Throws
-        m.mark_as_consistent();
-        // If we get this far, the protected memory has been
-        // brought back into a consistent state, and the mutex has
-        // been notified aboit this. This means that we can safely
-        // enter the applications critical section.
-    }
-    catch (...) {
-        // Unlocking without first calling mark_as_consistent()
-        // means that the mutex enters the "not recoverable"
-        // state, which will cause all future attempts at locking
-        // to fail.
-        m.unlock();
-        throw;
+    if constexpr (std::is_same_v<M, RobustMutex>) {
+        try {
+            recover_func(); // Throws
+            m.mark_as_consistent();
+            // If we get this far, the protected memory has been
+            // brought back into a consistent state, and the mutex has
+            // been notified aboit this. This means that we can safely
+            // enter the applications critical section.
+        }
+        catch (...) {
+            // Unlocking without first calling mark_as_consistent()
+            // means that the mutex enters the "not recoverable"
+            // state, which will cause all future attempts at locking
+            // to fail.
+            m.unlock();
+            throw;
+        }
     }
 }
 

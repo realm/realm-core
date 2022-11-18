@@ -33,13 +33,16 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#if REALM_ENABLE_FILE_SYSTEM
 // Enable this only on platforms where it might be needed
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
 #define REALM_ROBUST_MUTEX_EMULATION 1
 #else
 #define REALM_ROBUST_MUTEX_EMULATION 0
 #endif
-
+#else
+#define REALM_ROBUST_MUTEX_EMULATION 0
+#endif
 namespace realm::util {
 
 // fwd decl to support friend decl below
@@ -84,13 +87,16 @@ public:
     InterprocessMutex(const InterprocessMutex&) = delete;
     InterprocessMutex& operator=(const InterprocessMutex&) = delete;
 
+#if REALM_ENABLE_FILE_SYSTEM
 #if REALM_ROBUST_MUTEX_EMULATION || defined(_WIN32)
     struct SharedPart {
     };
 #else
     using SharedPart = RobustMutex;
 #endif
-
+#else
+    using SharedPart = Mutex;
+#endif
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// elsewhere.
