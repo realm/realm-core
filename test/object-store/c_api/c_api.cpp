@@ -590,16 +590,16 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     properties.push_back(link_set);
     properties.push_back(link_dict);
 
-    // realm_property_info_t mixed{
-    //     "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
-    //     "",      "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
-    // };
+    realm_property_info_t mixed{
+        "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
+        "",      "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
+    };
     // realm_property_info_t mixed_list{
     //     "mixed_list", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_LIST,
     //     "",           "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
     // };
 
-    // properties.push_back(mixed);
+    properties.push_back(mixed);
     // properties.push_back(mixed_list);
 
     return properties;
@@ -1865,6 +1865,7 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["object_id"], object_id, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["uuid"], uuid, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["mixed"], integer, false));
 
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_int"], integer, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_bool"], boolean, false));
@@ -1902,6 +1903,8 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(rlm_val_eq(value, object_id));
             CHECK(realm_get_value(obj1.get(), foo_properties["uuid"], &value));
             CHECK(rlm_val_eq(value, uuid));
+            CHECK(realm_get_value(obj1.get(), foo_properties["mixed"], &value));
+            CHECK(rlm_val_eq(value, integer));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_int"], &value));
             CHECK(rlm_val_eq(value, integer));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_bool"], &value));
@@ -1936,6 +1939,7 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_decimal"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_object_id"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_uuid"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["mixed"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["link"], null, false));
             });
 
@@ -1958,6 +1962,8 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_object_id"], &value));
             CHECK(rlm_val_eq(value, null));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_uuid"], &value));
+            CHECK(rlm_val_eq(value, null));
+            CHECK(realm_get_value(obj1.get(), foo_properties["mixed"], &value));
             CHECK(rlm_val_eq(value, null));
             CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, null));
