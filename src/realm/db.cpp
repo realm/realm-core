@@ -1534,11 +1534,11 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
             from = m_last_encryption_page_reader->m_version;
         }
 
+        auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
         std::vector<VersionedTopRef> read_locks = m_version_manager->get_versions_from(from, to.version);
 
         alloc.refresh_pages_for_versions(read_locks);
 
-        auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full);
         m_version_manager->release_read_lock(*m_last_encryption_page_reader);
         m_last_encryption_page_reader = tmp_rl;
     }

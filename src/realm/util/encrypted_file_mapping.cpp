@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
+#include <chrono>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
