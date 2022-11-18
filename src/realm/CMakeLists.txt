@@ -319,6 +319,9 @@ set_target_properties(Storage PROPERTIES
 )
 
 target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+if(REALM_USE_FAST_LINKER)
+    target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
+endif()
 
 target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
