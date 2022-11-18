@@ -370,6 +370,8 @@ typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
+typedef struct realm_callback_open_task_token realm_callback_open_task_token_t;
+typedef struct realm_callback_sync_session_token realm_callback_sync_session_token_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
@@ -3860,11 +3862,9 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_o
                                          realm_userdata_t userdata,
                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
-RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
+RLM_API realm_callback_open_task_token_t* realm_async_open_task_register_download_progress_notifier(
     realm_async_open_task_t*, realm_sync_progress_func_t, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
-                                                                         uint64_t token) RLM_API_NOEXCEPT;
 /**
  * Get the sync session for a specific realm.
  *
@@ -3937,19 +3937,11 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, con
 /**
  * Register a callback that will be invoked every time the session's connection state changes.
  *
- * @return A token value that can be used to unregiser the callback.
+ * @return a pointer to the token objec.
  */
-RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
+RLM_API realm_callback_sync_session_token_t* realm_sync_session_register_connection_state_change_callback(
     realm_sync_session_t*, realm_sync_connection_state_changed_func_t, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
-/**
- * Unregister a callback that will be invoked every time the session's connection state changes.
- * @param session ptr to a valid sync session
- * @param token the token returned by `realm_sync_session_register_connection_state_change_callback`
- */
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
-                                                                            uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session reports progress.
@@ -3959,20 +3951,11 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
  *                     Otherwise, the number of downloaded or uploaded bytes will always be reported
  *                     relative to the number of downloadable or uploadable bytes at the point in time
  *                     when the notifier was registered.
- * @return A token value that can be used to unregiser the notifier.
+ * @return A ptr to a token object.
  */
-RLM_API uint64_t realm_sync_session_register_progress_notifier(
+RLM_API realm_callback_sync_session_token_t* realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
-
-/**
- * Unregister a callback that will be invoked every time the session reports progress.
- * @param session ptr to a valid sync session
- * @param token the token returned by `realm_sync_session_register_progress_notifier`
- */
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session,
-                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.

@@ -842,7 +842,7 @@ RLM_API void realm_async_open_task_cancel(realm_async_open_task_t* task) noexcep
     (*task)->cancel();
 }
 
-RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
+RLM_API realm_callback_open_task_token_t* realm_async_open_task_register_download_progress_notifier(
     realm_async_open_task_t* task, realm_sync_progress_func_t notifier, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -850,13 +850,7 @@ RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
                                                                                            uint64_t transferrable) {
         notifier(userdata.get(), transferred, transferrable);
     };
-    return (*task)->register_download_progress_notifier(std::move(cb));
-}
-
-RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t* task,
-                                                                         uint64_t token) noexcept
-{
-    (*task)->unregister_download_progress_notifier(token);
+    return new realm_callback_open_task_token_t{task, (*task)->register_download_progress_notifier(std::move(cb))};
 }
 
 RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t* realm) noexcept
@@ -911,7 +905,7 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char*
     });
 }
 
-RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
+RLM_API realm_callback_sync_session_token_t* realm_sync_session_register_connection_state_change_callback(
     realm_sync_session_t* session, realm_sync_connection_state_changed_func_t callback, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -920,33 +914,22 @@ RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
             callback(userdata.get(), realm_sync_connection_state_e(old_state),
                      realm_sync_connection_state_e(new_state));
         };
-    return (*session)->register_connection_change_callback(std::move(cb));
+    auto token = (*session)->register_connection_change_callback(std::move(cb));
+    return new realm_callback_sync_session_token_t{session, token};
 }
 
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
-                                                                            uint64_t token) noexcept
-{
-    (*session)->unregister_connection_change_callback(token);
-}
-
-RLM_API uint64_t realm_sync_session_register_progress_notifier(realm_sync_session_t* session,
-                                                               realm_sync_progress_func_t notifier,
-                                                               realm_sync_progress_direction_e direction,
-                                                               bool is_streaming, realm_userdata_t userdata,
-                                                               realm_free_userdata_func_t userdata_free) noexcept
+RLM_API realm_callback_sync_session_token_t* realm_sync_session_register_progress_notifier(
+    realm_sync_session_t* session, realm_sync_progress_func_t notifier, realm_sync_progress_direction_e direction,
+    bool is_streaming, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
         [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
                                                                                      uint64_t transferrable) {
             notifier(userdata.get(), transferred, transferrable);
         };
-    return (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
-                                                  is_streaming);
-}
-
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session, uint64_t token) noexcept
-{
-    (*session)->unregister_progress_notifier(token);
+    auto token = (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
+                                                        is_streaming);
+    return new realm_callback_sync_session_token_t{session, token};
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,

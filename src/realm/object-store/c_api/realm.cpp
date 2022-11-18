@@ -1,5 +1,8 @@
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 #include "realm.hpp"
+
 
 realm_callback_token_realm::~realm_callback_token_realm()
 {
@@ -14,6 +17,18 @@ realm_callback_token_schema::~realm_callback_token_schema()
 realm_refresh_callback_token::~realm_refresh_callback_token()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
+}
+
+realm_callback_open_task_token::~realm_callback_open_task_token()
+{
+    if (task)
+        (*task)->unregister_download_progress_notifier(token);
+}
+
+realm_callback_sync_session_token::~realm_callback_sync_session_token()
+{
+    if (session)
+        (*session)->unregister_connection_change_callback(token);
 }
 
 namespace realm::c_api {
