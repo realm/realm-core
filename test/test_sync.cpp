@@ -6188,7 +6188,7 @@ TEST(Sync_Dictionary_Links)
         auto dict = foo.get_dictionary(col_dict);
 
         CHECK_EQUAL(dict.size(), 2);
-        CHECK((*dict.find("a")).second.is_unresolved_link());
+        CHECK((*dict.find("a")).second.is_null());
 
         CHECK(dict.find("b") != dict.end());
     });
@@ -6211,7 +6211,7 @@ TEST(Sync_Dictionary_Links)
         auto dict = foo.get_dictionary(col_dict);
 
         CHECK_EQUAL(dict.size(), 2);
-        CHECK((*dict.find("a")).second.is_unresolved_link());
+        CHECK((*dict.find("a")).second.is_null());
 
         CHECK(dict.find("b") != dict.end());
         CHECK((*dict.find("b")).second == Mixed{b.get_link()});

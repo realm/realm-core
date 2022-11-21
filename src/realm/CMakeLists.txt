@@ -26,7 +26,6 @@ set(REALM_SOURCES
     collection.cpp
     cluster_tree.cpp
     error_codes.cpp
-    table_cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
     dictionary.cpp
@@ -60,6 +59,7 @@ set(REALM_SOURCES
     obj_list.cpp
     object_id.cpp
     table_view.cpp
+    tokenizer.cpp
     transaction.cpp
     sort_descriptor.cpp
     status.cpp
@@ -149,7 +149,6 @@ set(REALM_INSTALL_HEADERS
     db_options.hpp
     decimal128.hpp
     dictionary.hpp
-    dictionary_cluster_tree.hpp
     disable_sync_to_disk.hpp
     error_codes.hpp
     exceptions.hpp
@@ -184,7 +183,6 @@ set(REALM_INSTALL_HEADERS
     status_with.hpp
     string_data.hpp
     table.hpp
-    table_cluster_tree.hpp
     table_ref.hpp
     table_view.hpp
     transaction.hpp

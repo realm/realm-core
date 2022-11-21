@@ -198,6 +198,8 @@ public:
         REALM_UNREACHABLE();
     }
 
+    void migrate();
+
 private:
     // Friend because it needs access to `m_tree` in the implementation of
     // `ObjCollectionBase::get_mutable_tree()`.
@@ -419,6 +421,8 @@ template <>
 void Set<Mixed>::do_erase(size_t);
 template <>
 void Set<Mixed>::do_clear();
+template <>
+void Set<Mixed>::migrate();
 
 /// Compare set elements.
 ///
@@ -465,17 +469,23 @@ struct SetElementLessThan<Mixed> {
         //   the rank is as follows:
         //       boolean
         //       numeric
-        //       string/binary
+        //       string
+        //       binary
         //       Timestamp
         //       ObjectId
         //       UUID
         //       TypedLink
         //       Link
         //
-        // The current Mixed::compare_utf8 function implements these rules. If that
-        // function is changed we should either implement the rules here or
-        // upgrade all Set<Mixed> columns.
-
+        // The current Mixed::compare function implements these rules except when comparing
+        // string and binary. If that function is changed we should either implement the rules
+        // here or upgrade all Set<Mixed> columns.
+        if (a.is_type(type_String) && b.is_type(type_Binary)) {
+            return true;
+        }
+        if (a.is_type(type_Binary) && b.is_type(type_String)) {
+            return false;
+        }
         return a.compare(b) < 0;
     }
 };
@@ -489,6 +499,12 @@ struct SetElementEquals<Mixed> {
 
         // See comments above
 
+        if (a.is_type(type_String) && b.is_type(type_Binary)) {
+            return false;
+        }
+        if (a.is_type(type_Binary) && b.is_type(type_String)) {
+            return false;
+        }
         return a.compare(b) == 0;
     }
 };
