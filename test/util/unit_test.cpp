@@ -410,13 +410,11 @@ private:
 };
 
 
-class IntraTestLogger : private Logger::LevelThreshold, public util::Logger {
+class IntraTestLogger : public Logger {
 public:
-    IntraTestLogger(util::Logger& base_logger, Level threshold)
-        : util::Logger::LevelThreshold()
-        , util::Logger(static_cast<util::Logger::LevelThreshold&>(*this))
+    IntraTestLogger(Logger& base_logger, Level threshold)
+        : util::Logger(threshold)
         , m_base_logger(base_logger)
-        , m_level_threshold(threshold)
     {
     }
 
@@ -427,12 +425,6 @@ public:
 
 private:
     Logger& m_base_logger;
-    const Level m_level_threshold;
-
-    Level get() const noexcept override final
-    {
-        return m_level_threshold;
-    }
 };
 
 
@@ -463,10 +455,10 @@ public:
     int num_ended_threads = 0;
     int last_thread_to_end = -1;
 
-    SharedContextImpl(const TestList& tests, int repetitions, int threads, util::Logger& l, Reporter& r, bool aof,
-                      util::Logger::Level itll)
-        : SharedContext(tests, repetitions, threads, l)
-        , reporter(r)
+    SharedContextImpl(const TestList& tests, int repetitions, int threads, util::Logger& logger, Reporter& reporter,
+                      bool aof, util::Logger::Level itll)
+        : SharedContext(tests, repetitions, threads, logger)
+        , reporter(reporter)
         , abort_on_failure(aof)
         , intra_test_log_level(itll)
     {
@@ -476,7 +468,7 @@ public:
 
 class TestList::ThreadContextImpl : public ThreadContext {
 public:
-    IntraTestLogger intra_test_logger;
+    std::shared_ptr<Logger> intra_test_logger;
     SharedContextImpl& shared_context;
 
     // Each instance of this type is only used on one thread spawned by the
@@ -491,7 +483,7 @@ public:
 
     ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger)
         : ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.report_logger)
-        , intra_test_logger(ThreadContext::report_logger, sc.intra_test_log_level)
+        , intra_test_logger(std::make_shared<IntraTestLogger>(ThreadContext::report_logger, sc.intra_test_log_level))
         , shared_context(sc)
     {
     }
@@ -537,8 +529,7 @@ bool TestList::run(Config config)
     if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    std::unique_ptr<Logger> fallback_logger;
-    util::Logger* root_logger;
+    std::shared_ptr<util::Logger> root_logger;
     if (config.logger) {
         root_logger = config.logger;
     }
@@ -547,14 +538,13 @@ bool TestList::run(Config config)
             util::TimestampStderrLogger::Config config;
             config.precision = util::TimestampStderrLogger::Precision::milliseconds;
             config.format = "%FT%T";
-            fallback_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config)); // Throws
+            root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
-            fallback_logger = std::make_unique<util::StderrLogger>(); // Throws
+            root_logger = std::make_shared<util::StderrLogger>(); // Throws
         }
-        root_logger = &*fallback_logger;
     }
-    util::ThreadSafeLogger shared_logger(*root_logger);
+    util::ThreadSafeLogger shared_logger(root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -616,10 +606,8 @@ bool TestList::run(Config config)
                                      config.abort_on_failure, config.intra_test_log_level);
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
-    std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
-    loggers.reset(new std::unique_ptr<util::Logger>[ num_threads ]);
+    std::vector<std::unique_ptr<util::Logger>> loggers(num_threads);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
-        std::unique_ptr<util::Logger> logger;
         std::ostringstream formatter;
         formatter.imbue(std::locale::classic());
         formatter << num_threads;
@@ -654,8 +642,7 @@ bool TestList::run(Config config)
         thread_context.nonconcur_run();
     }
     else {
-        std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
-        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[ num_threads ]);
+        std::vector<std::unique_ptr<ThreadContextImpl>> thread_contexts(num_threads);
         for (int i = 0; i < num_threads; ++i)
             thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
 
@@ -1049,23 +1036,22 @@ void SimpleReporter::begin(const TestContext& context)
         return;
 
     const TestDetails& details = context.test_details;
-    util::Logger& logger = context.thread_context.report_logger;
     auto format =
         context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: Begin %3" : "%1:%2: Begin %3#%4";
-    logger.info(format, details.file_name, details.line_number, details.test_name, context.recurrence_index + 1);
+    context.thread_context.report_logger.info(format, details.file_name, details.line_number, details.test_name,
+                                              context.recurrence_index + 1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file, long line, const std::string& message)
 {
     const TestDetails& details = context.test_details;
-    util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: ERROR in %3: %5"
                                                                              : "%1:%2: ERROR in %3#%4: %5";
     auto msg = util::format(format, file, line, details.test_name, context.recurrence_index + 1, message);
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }
-    logger.info(msg.c_str());
+    context.thread_context.report_logger.info(msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -1074,8 +1060,7 @@ void SimpleReporter::thread_end(const ThreadContext& context)
         return;
 
     if (context.shared_context.num_threads > 1) {
-        util::Logger& logger = context.report_logger;
-        logger.info("End of thread");
+        context.report_logger.info("End of thread");
     }
 }
 

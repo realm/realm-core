@@ -44,9 +44,6 @@ public:
 AuthErrorCategory g_auth_error_category;
 
 
-util::StderrLogger g_fallback_logger;
-
-
 std::string to_json(const std::string& str)
 {
     for (char ch : str) {
@@ -304,7 +301,7 @@ private:
 
 
 Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id, Config config)
-    : logger{config.logger ? *config.logger : g_fallback_logger}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
     , m_service{} // Throws
     , m_auth_ssl{auth_ssl}
     , m_auth_address{std::move(auth_address)}
@@ -318,7 +315,7 @@ Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std
     , m_app_request_path{m_request_base_path + "/app/" + app_id} // Throws
     , m_keep_running_timer{m_service}
 {
-    logger.info("Auth client started for server: [%1]:%2'", auth_address, auth_port);
+    logger_ptr->info("Auth client started for server: [%1]:%2'", auth_address, auth_port);
 
     util::seed_prng_nondeterministically(m_random);
     start_keep_running_timer();
@@ -456,7 +453,7 @@ void Client::schedule_requests()
 // Request
 
 Client::Request::Request(Client& client, std::int_fast64_t request_counter)
-    : logger{client.logger}
+    : logger{*(client.logger_ptr)}
     , m_client{client}
     , m_request_counter{request_counter}
     , m_wait_timer{client.get_service()}
@@ -603,7 +600,7 @@ void Client::Request::initiate_ssl_handshake()
     }
 
     m_ssl_stream.emplace(*m_socket, *m_ssl_context, Stream::client); // Throws
-    m_ssl_stream->set_logger(&logger);
+    m_ssl_stream->set_logger(m_client.logger_ptr.get());
     m_ssl_stream->set_host_name(m_client.m_auth_address); // Throws
     if (m_client.m_verify_servers_ssl_certificate) {
         m_ssl_stream->set_verify_mode(VerifyMode::peer); // Throws

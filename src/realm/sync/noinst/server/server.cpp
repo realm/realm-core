@@ -104,8 +104,6 @@ namespace {
 enum class SchedStatus { done = 0, pending, in_progress };
 
 
-util::StderrLogger g_fallback_logger;
-
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 {
     if (str.size() > cutoff) {
@@ -752,6 +750,7 @@ public:
 
     util::Mutex last_client_accesses_mutex;
 
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     util::network::Service& get_service() noexcept
@@ -893,8 +892,8 @@ public:
             _impl::parse_virtual_path(m_root_dir, virt_path); // Throws
         REALM_ASSERT(virt_path_components.is_valid);
 
-        _impl::make_dirs(m_root_dir, virt_path);  // Throws
-        m_realm_names.insert(virt_path);          // Throws
+        _impl::make_dirs(m_root_dir, virt_path); // Throws
+        m_realm_names.insert(virt_path);         // Throws
         {
             bool disable_sync_to_disk = m_config.disable_sync_to_disk;
             file.reset(new ServerFile(*this, m_file_access_cache, virt_path, virt_path_components.real_realm_path,
@@ -1126,7 +1125,7 @@ public:
         return m_remote_endpoint;
     }
 
-    util::Logger& websocket_get_logger() noexcept final override
+    util::Logger& websocket_get_logger() noexcept final
     {
         return logger;
     }
@@ -3625,7 +3624,7 @@ void ServerFile::finalize_work_stage_1()
         if (i != m_identified_sessions.end()) {
             Session& sess = *i->second;
             SyncConnection& conn = sess.get_connection();
-            conn.protocol_error(error_2, &sess);           // Throws
+            conn.protocol_error(error_2, &sess); // Throws
         }
         const IntegratableChangesetList& list = m_changesets_from_downstream[client_file_ident];
         std::size_t num_changesets = list.changesets.size();
@@ -3759,7 +3758,8 @@ void Worker::stop() noexcept
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger{config.logger ? *config.logger : g_fallback_logger}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
     , m_root_dir{root_dir} // Throws
@@ -3822,7 +3822,7 @@ void ServerImpl::start()
             logger.info("%1: No", lead_text); // Throws
         }
     }
-    logger.info("Log level: %1", logger.level_threshold.get()); // Throws
+    logger.info("Log level: %1", logger.get_level_threshold()); // Throws
     {
         const char* lead_text = "Disable sync to disk";
         if (m_config.disable_sync_to_disk) {
@@ -3847,7 +3847,7 @@ void ServerImpl::start()
     logger.info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
     logger.info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
     logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
-    logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
+    logger.debug("Authorization header name: %1", m_config.authorization_header_name);     // Throws
 
     m_transformer = make_transformer(); // Throws
 
@@ -3987,7 +3987,7 @@ void ServerImpl::initiate_accept()
             handle_accept(ec);
     };
     bool is_ssl = bool(m_ssl_context);
-    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                 // Throws
+    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                            // Throws
     m_acceptor.async_accept(m_next_http_conn->get_socket(), m_next_http_conn_endpoint, std::move(handler)); // Throws
 }
 
@@ -4438,8 +4438,9 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
 
 void SyncConnection::bad_session_ident(const char* message_type, session_ident_type session_ident)
 {
-    logger.error("Bad session identifier in %1 message, session_ident = %2", message_type, session_ident); // Throws
-    protocol_error(ProtocolError::bad_session_ident);                                                      // Throws
+    logger.error("Bad session identifier in %1 message, session_ident = %2", message_type,
+                 session_ident);                      // Throws
+    protocol_error(ProtocolError::bad_session_ident); // Throws
 }
 
 
