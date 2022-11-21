@@ -19,16 +19,14 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-realm_callback_open_task_token::~realm_callback_open_task_token()
+realm_async_open_task_progress_notification_token::~realm_async_open_task_progress_notification_token()
 {
-    if (task)
-        (*task)->unregister_download_progress_notifier(token);
+    task->unregister_download_progress_notifier(token);
 }
 
-realm_callback_sync_session_token::~realm_callback_sync_session_token()
+realm_sync_session_connection_state_notification_token::~realm_sync_session_connection_state_notification_token()
 {
-    if (session)
-        (*session)->unregister_connection_change_callback(token);
+    session->unregister_connection_change_callback(token);
 }
 
 namespace realm::c_api {

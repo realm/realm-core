@@ -474,25 +474,26 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
-struct realm_callback_open_task_token : realm::c_api::WrapC {
-    realm_callback_open_task_token(realm_async_open_task_t* task, uint64_t token)
+struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
+    realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
         : task(task)
         , token(token)
     {
     }
-    ~realm_callback_open_task_token();
-    realm_async_open_task_t* task;
+    ~realm_async_open_task_progress_notification_token();
+    std::shared_ptr<realm::AsyncOpenTask> task;
     uint64_t token;
 };
 
-struct realm_callback_sync_session_token : realm::c_api::WrapC {
-    realm_callback_sync_session_token(realm_sync_session_t* session, uint64_t token)
+struct realm_sync_session_connection_state_notification_token : realm::c_api::WrapC {
+    realm_sync_session_connection_state_notification_token(std::shared_ptr<realm::SyncSession> session,
+                                                           uint64_t token)
         : session(session)
         , token(token)
     {
     }
-    ~realm_callback_sync_session_token();
-    realm_sync_session_t* session;
+    ~realm_sync_session_connection_state_notification_token();
+    std::shared_ptr<realm::SyncSession> session;
     uint64_t token;
 };
 
