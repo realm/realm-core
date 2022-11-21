@@ -193,6 +193,10 @@ public:
     {
         init(alloc, ref);
     }
+    bool is_inner_bptree_node() const
+    {
+        return realm::NodeHeader::get_is_inner_bptree_node_from_header(m_header);
+    }
     void init(realm::Allocator& alloc, uint64_t ref)
     {
         Node::init(alloc, ref);
@@ -266,6 +270,7 @@ public:
             }
             if (size() > 7) {
                 // Must be a Core-6 file.
+                m_clusters.init(alloc, get_ref(2));
                 m_opposite_table.init(alloc, get_ref(7));
             }
             if (size() > 11) {
@@ -284,6 +289,25 @@ public:
         return m_column_names.get_string(i);
     }
     void print_columns(const Group&) const;
+    size_t get_size(realm::Allocator& alloc) const
+    {
+        size_t ret = 0;
+        if (m_clusters.valid()) {
+            if (m_clusters.is_inner_bptree_node()) {
+                ret = size_t(m_clusters.get_val(2));
+            }
+            else {
+                if (uint64_t key_ref = m_clusters.get_ref(0)) {
+                    auto header = alloc.translate(key_ref);
+                    ret = realm::NodeHeader::get_size_from_header(header);
+                }
+                else {
+                    ret = m_clusters.get_val(0);
+                }
+            }
+        }
+        return ret;
+    }
 
 private:
     size_t get_subspec_ndx_after(size_t column_ndx) const noexcept
@@ -310,6 +334,7 @@ private:
     Array m_column_subspecs;
     Array m_column_colkeys;
     Array m_opposite_table;
+    Array m_clusters;
     realm::ColKey m_pk_col;
     realm::Table::Type m_table_type = realm::Table::Type::TopLevel;
 };
@@ -320,7 +345,7 @@ public:
         : Array(alloc, ref)
         , m_alloc(alloc)
     {
-        m_valid &= (size() <= 11);
+        m_valid &= (size() <= 12);
         if (valid()) {
             m_file_size = get_val(2);
             current_logical_file_size = m_file_size;
@@ -333,6 +358,11 @@ public:
             }
             if (size() > 8) {
                 m_history.init(alloc, get_ref(8));
+            }
+            if (size() > 11) {
+                auto ref = get_ref(11);
+                if (ref)
+                    m_evacuation_info.init(alloc, ref);
             }
         }
     }
@@ -388,6 +418,24 @@ public:
     {
         return int(get_val(10));
     }
+    void print_evacuation_info(std::ostream& ostr) const
+    {
+        if (m_evacuation_info.valid()) {
+            ostr << "Evacuation limit: " << size_t(m_evacuation_info.get_val(0));
+            if (m_evacuation_info.get_val(1)) {
+                ostr << " Scan done" << std::endl;
+            }
+            else {
+                ostr << " Progress: [";
+                for (size_t i = 2; i < m_evacuation_info.size(); i++) {
+                    if (i > 2)
+                        ostr << ',';
+                    ostr << m_evacuation_info.get_val(i);
+                }
+                ostr << "]" << std::endl;
+            }
+        }
+    }
     unsigned get_nb_tables() const
     {
         return m_table_names.size();
@@ -413,6 +461,7 @@ private:
     Array m_free_list_positions;
     Array m_free_list_sizes;
     Array m_free_list_versions;
+    Array m_evacuation_info;
     Array m_history;
 };
 
@@ -464,6 +513,9 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
 {
     if (g.valid()) {
         ostr << "Logical file size: " << human_readable(g.get_file_size()) << std::endl;
+        if (g.size() > 11) {
+            g.print_evacuation_info(ostr);
+        }
         if (g.size() > 6) {
             ostr << "Current version: " << g.get_current_version() << std::endl;
             ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
@@ -539,8 +591,10 @@ void Group::print_schema() const
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            std::cout << "    " << i << ": " << get_table_name(i) << std::endl;
-            get_table(i).print_columns(*this);
+            Table table = get_table(i);
+            std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table.get_size(m_alloc)
+                      << std::endl;
+            table.print_columns(*this);
         }
     }
 }
@@ -626,6 +680,12 @@ std::vector<Entry> Group::get_allocated_nodes() const
         history = get_nodes(m_alloc, get_ref(8));
         std::cout << "History size: " << human_readable(get_size(history)) << std::endl;
         consolidate_lists(all_nodes, history);
+    }
+
+    if (size() > 11) {
+        std::vector<Entry> evac_info;
+        evac_info = get_nodes(m_alloc, get_ref(11));
+        consolidate_lists(all_nodes, evac_info);
     }
 
     return all_nodes;
@@ -781,7 +841,7 @@ void RealmFile::free_list_info() const
     auto end = free_list.end();
     while (it != end) {
         std::cout << "    0x" << std::hex << it->start << "..0x" << it->start + it->length << ", " << std::dec
-                  << it->version << std::endl;
+                  << it->length << ", " << it->version << std::endl;
         total_free_list_size += it->length;
         if (it->version != 0) {
             pinned_free_list_size += it->length;

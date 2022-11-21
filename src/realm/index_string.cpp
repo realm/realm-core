@@ -29,6 +29,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/unicode.hpp>
+#include <realm/tokenizer.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -48,11 +49,6 @@ DataType ClusterColumn::get_data_type() const
 {
     const Table* table = m_cluster_tree->get_owning_table();
     return table->get_column_type(m_column_key);
-}
-
-bool ClusterColumn::is_nullable() const
-{
-    return m_column_key.get_attrs().test(col_attr_Nullable);
 }
 
 Mixed ClusterColumn::get_value(ObjKey key) const
@@ -217,6 +213,11 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         if (ref & 1) {
             int64_t key_value = int64_t(ref >> 1);
 
+            if (column.is_fulltext()) {
+                result_ref.payload = key_value;
+                return first ? key_value : (get_count ? 1 : FindRes_single);
+            }
+
             Mixed a = column.get_value(ObjKey(key_value));
             if (a == value) {
                 result_ref.payload = key_value;
@@ -231,6 +232,13 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, ref_type(ref));
+            if (column.is_fulltext()) {
+                result_ref.payload = ref;
+                result_ref.start_ndx = 0;
+                result_ref.end_ndx = sub.size();
+                return FindRes_column;
+            }
+
             return from_list<method>(value, result_ref, sub, column);
         }
 
@@ -609,7 +617,7 @@ size_t IndexArray::index_string_count(Mixed value, const ClusterColumn& column) 
     return to_size_t(index_string<index_Count>(value, unused, column));
 }
 
-IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
+std::unique_ptr<IndexArray> StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     std::unique_ptr<IndexArray> top(new IndexArray(alloc)); // Throws
@@ -625,12 +633,7 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     top->add(values.get_ref());              // first entry in refs points to offsets
 
-    return top.release();
-}
-
-ref_type StringIndex::create_empty(Allocator& alloc)
-{
-    return StringIndex(ClusterColumn(nullptr, {}), alloc).get_ref(); // Throws
+    return top;
 }
 
 void StringIndex::set_target(const ClusterColumn& target_column) noexcept
@@ -951,6 +954,28 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     m_array->insert(ndx + 1, ref);
 }
 
+// This method reconstructs the string inserted in the search index based on a string
+// that matches so far and the last key (only works if complete strings are stored in the index)
+static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+{
+    if (key == 0)
+        return StringData();
+
+    size_t rest_len = 4;
+    char* k = reinterpret_cast<char*>(&key);
+    if (k[0] == 'X')
+        rest_len = 3;
+    else if (k[1] == 'X')
+        rest_len = 2;
+    else if (k[2] == 'X')
+        rest_len = 1;
+    else if (k[3] == 'X')
+        rest_len = 0;
+
+    REALM_ASSERT(offset + rest_len <= new_string.size());
+
+    return StringData(new_string.data(), offset + rest_len);
+}
 
 bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value,
                               bool noextend)
@@ -963,19 +988,32 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
     get_child(*m_array, 0, keys);
     REALM_ASSERT(m_array->size() == keys.size() + 1);
 
+    // If we are keeping the complete string in the index
+    // we want to know if this is the last part
+    bool is_at_string_end = offset + 4 >= index_data.size();
+
     size_t ins_pos = keys.lower_bound_int(key);
+    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
+
     if (ins_pos == keys.size()) {
         if (noextend)
             return false;
 
         // When key is outside current range, we can just add it
         keys.add(key);
-        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
-        m_array->add(shifted);
+        if (!m_target_column.is_fulltext() || is_at_string_end) {
+            int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+            m_array->add(shifted);
+        }
+        else {
+            // create subindex for rest of string
+            StringIndex subindex(m_target_column, m_array->get_alloc());
+            subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
+            m_array->add(subindex.get_ref());
+        }
         return true;
     }
 
-    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
     key_type k = key_type(keys.get(ins_pos));
 
     // If key is not present we add it at the correct location
@@ -984,8 +1022,16 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
             return false;
 
         keys.insert(ins_pos, key);
-        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
-        m_array->insert(ins_pos_refs, shifted);
+        if (!m_target_column.is_fulltext() || is_at_string_end) {
+            int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+            m_array->insert(ins_pos_refs, shifted);
+        }
+        else {
+            // create subindex for rest of string
+            StringIndex subindex(m_target_column, m_array->get_alloc());
+            subindex.insert_with_offset(obj_key, index_data, value, offset + 4);
+            m_array->insert(ins_pos_refs, subindex.get_ref());
+        }
         return true;
     }
 
@@ -997,7 +1043,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
         ObjKey obj_key2 = ObjKey(int64_t(slot_value >> 1));
-        Mixed v2 = get(obj_key2);
+        Mixed v2 = m_target_column.is_fulltext() ? reconstruct_string(offset, key, index_data) : get(obj_key2);
         if (v2 == value) {
             // Strings are equal but this is not a list.
             // Create a list and add both rows.
@@ -1044,20 +1090,27 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
-        SortedListComparator slc(m_target_column);
         IntegerColumn::const_iterator it_end = sub.cend();
-        IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
+        IntegerColumn::const_iterator lower = it_end;
 
-        bool value_exists_in_list = false;
-        if (lower != it_end) {
-            Mixed lower_value = get(ObjKey(*lower));
-            if (lower_value == value) {
-                value_exists_in_list = true;
+        auto value_exists_in_list = [&]() {
+            if (m_target_column.is_fulltext()) {
+                return reconstruct_string(offset, key, index_data) == value.get_string();
             }
-        }
+            SortedListComparator slc(m_target_column);
+            lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
+
+            if (lower != it_end) {
+                Mixed lower_value = get(ObjKey(*lower));
+                if (lower_value == value) {
+                    return true;
+                }
+            }
+            return false;
+        };
 
         // If we found the value in this list, add the duplicate to the list.
-        if (value_exists_in_list) {
+        if (value_exists_in_list()) {
             insert_to_existing_list_at_lower(obj_key, value, sub, lower);
         }
         else {
@@ -1068,14 +1121,15 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
             // point and insert into the existing list.
             ObjKey key_of_any_dup = ObjKey(sub.get(0));
             StringConversionBuffer buffer;
-            StringData index_data_2 = get(key_of_any_dup).get_index_data(buffer);
+            StringData index_data_2 = m_target_column.is_fulltext() ? reconstruct_string(offset, key, index_data)
+                                                                    : get(key_of_any_dup).get_index_data(buffer);
             if (index_data == index_data_2 || suboffset > s_max_offset) {
                 insert_to_existing_list(obj_key, value, sub);
             }
             else {
 #ifdef REALM_DEBUG
                 bool contains_only_duplicates = true;
-                if (sub.size() > 1) {
+                if (!m_target_column.is_fulltext() && sub.size() > 1) {
                     ObjKey first_key = ObjKey(sub.get(0));
                     ObjKey last_key = ObjKey(sub.back());
                     auto first = get(first_key);
@@ -1109,6 +1163,91 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 Mixed StringIndex::get(ObjKey key) const
 {
     return m_target_column.get_value(key);
+}
+
+void StringIndex::erase(ObjKey key)
+{
+    StringConversionBuffer buffer;
+    std::string_view value{(get(key).get_index_data(buffer))};
+    if (m_target_column.is_fulltext()) {
+        auto words = Tokenizer::get_instance()->reset(value).get_all_tokens();
+        for (auto& w : words) {
+            erase_string(key, w);
+        }
+    }
+    else {
+        erase_string(key, value);
+    }
+}
+
+void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData value) const
+{
+    InternalFindResult res;
+    REALM_ASSERT(result.empty());
+
+    auto tokenizer = Tokenizer::get_instance();
+    tokenizer->reset({value.data(), value.size()});
+    while (tokenizer->next()) {
+        auto token = tokenizer->get_token();
+        FindRes res1 = find_all_no_copy(StringData{token.data(), token.size()}, res);
+        if (res1 == FindRes_not_found) {
+            result.clear();
+            return;
+        }
+        else if (res1 == FindRes_column) {
+            IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
+
+            if (result.empty()) {
+                for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
+                    result.emplace_back(indexes.get(i));
+                }
+            }
+            else {
+                auto r = result.begin();
+                size_t m = res.start_ndx;
+
+                // only keep intersection
+                while (r != result.end() && m < res.end_ndx) {
+                    auto key_val = indexes.get(m);
+                    if (r->value < key_val) {
+                        r = result.erase(r); // remove if match is not in new set
+                    }
+                    else if (r->value > key_val) {
+                        ++m; // ignore new matches
+                    }
+                    else {
+                        ++r;
+                        ++m;
+                    }
+                }
+                while (r != result.end()) {
+                    result.erase(r);
+                    ++r;
+                }
+            }
+
+            if (result.empty())
+                return;
+        }
+        else if (res1 == FindRes_single) {
+            // merge in single res
+            if (result.empty()) {
+                result.emplace_back(res.payload);
+            }
+            else {
+                ObjKey key(res.payload);
+                auto pos = std::lower_bound(result.begin(), result.end(), key);
+                if (pos != result.end() && key == *pos) {
+                    result.clear();
+                    result.push_back(key);
+                }
+                else {
+                    result.clear();
+                    return;
+                }
+            }
+        }
+    }
 }
 
 void StringIndex::clear()
@@ -1196,12 +1335,9 @@ void StringIndex::do_delete(ObjKey obj_key, StringData index_data, size_t offset
     }
 }
 
-void StringIndex::erase(ObjKey key)
+void StringIndex::erase_string(ObjKey key, StringData value)
 {
-    StringConversionBuffer buffer;
-    StringData index_data = get(key).get_index_data(buffer);
-
-    do_delete(key, index_data, 0);
+    do_delete(key, value, 0);
 
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {
@@ -1300,6 +1436,87 @@ bool StringIndex::is_empty() const
     return m_array->size() == 1; // first entry in refs points to offsets
 }
 
+template <>
+void StringIndex::insert<StringData>(ObjKey key, StringData value)
+{
+    StringConversionBuffer buffer;
+
+    if (this->m_target_column.is_fulltext()) {
+        auto words = Tokenizer::get_instance()->reset(std::string_view(value)).get_all_tokens();
+
+        for (auto& word : words) {
+            Mixed m(word);
+            insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+        }
+    }
+    else {
+        Mixed m(value);
+        insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+    }
+}
+
+template <>
+void StringIndex::set<StringData>(ObjKey key, StringData new_value)
+{
+    StringConversionBuffer buffer;
+    Mixed old_value = get(key);
+    Mixed new_value2 = Mixed(new_value);
+
+    if (this->m_target_column.is_fulltext()) {
+        auto tokenizer = Tokenizer::get_instance();
+        StringData old_string = old_value.get_index_data(buffer);
+        std::set<std::string> old_words;
+
+        if (old_string.size() > 0) {
+            tokenizer->reset({old_string.data(), old_string.size()});
+            old_words = tokenizer->get_all_tokens();
+        }
+
+        tokenizer->reset({new_value.data(), new_value.size()});
+        auto new_words = tokenizer->get_all_tokens();
+
+        auto w1 = old_words.begin();
+        auto w2 = new_words.begin();
+
+        // Do a diff, deleting words no longer present and
+        // inserting new words
+        while (w1 != old_words.end() && w2 != new_words.end()) {
+            if (*w1 < *w2) {
+                erase_string(key, *w1);
+                ++w1;
+            }
+            else if (*w2 < *w1) {
+                Mixed m(*w2);
+                insert_with_offset(key, m.get_index_data(buffer), m, 0);
+                ++w2;
+            }
+            else {
+                ++w1;
+                ++w2;
+            }
+        }
+        while (w1 != old_words.end()) {
+            erase_string(key, *w1);
+            ++w1;
+        }
+        while (w2 != new_words.end()) {
+            Mixed m(*w2);
+            insert_with_offset(key, m.get_index_data(buffer), m, 0);
+
+            ++w2;
+        }
+    }
+    else {
+        if (REALM_LIKELY(new_value2 != old_value)) {
+            // We must erase this row first because erase uses find_first which
+            // might find the duplicate if we insert before erasing.
+            erase(key); // Throws
+
+            auto index_data = new_value2.get_index_data(buffer);
+            insert_with_offset(key, index_data, new_value2, 0); // Throws
+        }
+    }
+}
 
 void StringIndex::node_add_key(ref_type ref)
 {

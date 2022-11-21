@@ -122,7 +122,6 @@ public:
     }
 
     void upgrade_file_format(int target_file_format_version);
-    void check_consistency() REQUIRES(!m_async_mutex);
 
     /// Task oriented/async interface for continuous transactions.
     // true if this transaction already holds the write mutex
@@ -180,7 +179,7 @@ private:
     }
 
     template <class O>
-    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
+    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool) REQUIRES(!db->m_mutex);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept REQUIRES(!m_async_mutex);
     void initialize_replication();
@@ -188,6 +187,9 @@ private:
     void replicate(Transaction* dest, Replication& repl) const;
     void complete_async_commit();
     void acquire_write_lock() REQUIRES(!m_async_mutex);
+
+    void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit);
+    void close_read_with_lock() REQUIRES(!m_async_mutex, db->m_mutex);
 
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
@@ -443,8 +445,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 template <class O>
 inline bool Transaction::internal_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
-    DB::ReadLockInfo new_read_lock;
-    db->grab_read_lock(new_read_lock, version_id); // Throws
+    DB::ReadLockInfo new_read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);

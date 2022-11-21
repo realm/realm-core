@@ -1527,7 +1527,7 @@ The reason we use this map pattern is that we can exit the link-tree-traversal a
 found the first link that points to key '5'. Other solutions could be a std::vector<ColKey> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
-class LinkMap {
+class LinkMap final {
 public:
     LinkMap() = default;
     LinkMap(ConstTableRef table, std::vector<ColKey> columns)
@@ -1591,7 +1591,7 @@ public:
 
     void collect_dependencies(std::vector<TableKey>& tables) const;
 
-    virtual std::string description(util::serializer::SerialisationState& state) const;
+    std::string description(util::serializer::SerialisationState& state) const;
 
     ObjKey get_unary_link_or_not_found(size_t index) const
     {
@@ -1735,7 +1735,7 @@ public:
         return m_column_key.get_attrs().test(col_attr_Nullable);
     }
 
-    LinkMap get_link_map() const
+    const LinkMap& get_link_map() const
     {
         return m_link_map;
     }
@@ -2079,6 +2079,9 @@ public:
         : SimpleQuerySupport(other)
     {
     }
+
+    Query fulltext(StringData sd) const;
+
     using SimpleQuerySupport::size;
 
     // Columns<String> == Columns<String>
@@ -3050,7 +3053,6 @@ public:
     ColumnDictionaryKey(ColumnDictionaryKey const& other)
         : Columns<Dictionary>(other)
         , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
     {
         init_key(other.m_key);
     }
@@ -3059,7 +3061,6 @@ private:
     Mixed m_key;
     std::string m_buffer;
     std::vector<std::string> m_prop_list;
-    ObjKey m_objkey;
 
     void init_key(Mixed key_value);
 };
@@ -3336,7 +3337,7 @@ public:
                     const Obj obj = m_columns_collection.m_link_map.get_target_table()->get_object(links[t]);
                     auto dict = obj.get_dictionary(m_columns_collection.m_column_key);
                     if (dict.size() > 0) {
-                        destination.set(t, do_dictionary_agg(*dict.m_clusters));
+                        destination.set(t, do_dictionary_agg(dict));
                     }
                     else {
                         set_value_for_empty_dictionary(destination, t);
@@ -3344,12 +3345,10 @@ public:
                 }
             }
             else {
-                if (m_columns_collection.m_leaf_ptr->get(index)) {
+                if (auto ref = m_columns_collection.m_leaf_ptr->get(index)) {
                     Allocator& alloc = m_columns_collection.get_base_table()->get_alloc();
-                    DictionaryClusterTree dict_cluster(static_cast<Array*>(m_columns_collection.m_leaf_ptr),
-                                                       *m_dictionary_key_type, alloc, index);
-                    dict_cluster.init_from_parent();
-                    destination.set(0, do_dictionary_agg(dict_cluster));
+                    Dictionary dict(alloc, m_columns_collection.m_column_key, to_ref(ref));
+                    destination.set(0, do_dictionary_agg(dict));
                 }
                 else {
                     set_value_for_empty_dictionary(destination, 0);
@@ -3415,19 +3414,19 @@ private:
         }
     }
 
-    Mixed do_dictionary_agg(const DictionaryClusterTree& dict_cluster)
+    Mixed do_dictionary_agg(const Dictionary& dict)
     {
         if constexpr (std::is_same_v<Operation, aggregate_operations::Maximum<Mixed>>) {
-            return dict_cluster.max();
+            return *dict.do_max();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Minimum<Mixed>>) {
-            return dict_cluster.min();
+            return *dict.do_min();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Average<Mixed>>) {
-            return dict_cluster.avg(nullptr, get_type());
+            return *dict.do_avg();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
-            return dict_cluster.sum(nullptr, get_type());
+            return *dict.do_sum();
         }
         REALM_UNREACHABLE();
     }

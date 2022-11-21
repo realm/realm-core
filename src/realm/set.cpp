@@ -242,6 +242,28 @@ void Set<Mixed>::do_clear()
     }
 }
 
+template <>
+void Set<Mixed>::migrate()
+{
+    // We should just move all string values to be before the binary values
+    size_t first_binary = size();
+    for (size_t n = 0; n < size(); n++) {
+        if (m_tree->get(n).is_type(type_Binary)) {
+            first_binary = n;
+            break;
+        }
+    }
+
+    for (size_t n = first_binary; n < size(); n++) {
+        if (m_tree->get(n).is_type(type_String)) {
+            m_tree->insert(first_binary, Mixed());
+            m_tree->swap(n + 1, first_binary);
+            m_tree->erase(n + 1);
+            first_binary++;
+        }
+    }
+}
+
 void LnkSet::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links

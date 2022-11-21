@@ -23,6 +23,29 @@
 
 ----------------------------------------------
 
+# 13.0.0 Release notes
+
+### Enhancements
+* The realm file will be shrunk if the larger file size is no longer needed. (PR [#5755](https://github.com/realm/realm-core/pull/5755))
+* Full text index supported at Core level. The words stored in the index will be converted to lower case and diacritics will be removed. The index will support Basic Latin and Latin-1 Supplement characters. All others will be ignored. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
+* Most of the file growth caused by version pinning is eliminated. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
+
+### Fixed
+* Set<Mixed> consider string and binary data equivalent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
+
+### Breaking changes
+* File format version bumped. If realm file contains any objects with Set<Mixed> or Dictionary properties, the file will go through an upgrade process.
+* The layout of the lock-file has changed, the lock file format version is bumped and all participants in a multiprocess scenario needs to be up to date so they expect the same format. This requires an update of Studio. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+-----------
+
+### Internals
+* Encoding of Dictionary in the realm file has changed. This will change the order of the elements, so if any tests depend on the order, those must be revised.
+
+----------------------------------------------
+
 # 12.13.0 Release notes
 
 ### Enhancements
@@ -34,7 +57,7 @@
 * Restore fallback to full barrier when F_BARRIERSYNC is not available on Apple platforms. ([PR #6033](https://github.com/realm/realm-core/pull/6033), since v12.12.0)
 * Validation of Queries constructed by the Fluent QueryBuilder was missing. ([#6034](https://github.com/realm/realm-core/issues/6034), since v12.7.0)
 * Allow setting values on a Mixed property through the C API ([#5985](https://github.com/realm/realm-core/issues/5985), since v10.5.0)
-
+ 
 ### Breaking changes
 * `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
 * Better error handling for `realm_async_begin_write` and `realm_async_commit`. ([#PR6039](https://github.com/realm/realm-core/pull/6039))
@@ -107,6 +130,7 @@
 * CompensatingWriteErrorInfo reported string primary keys as boolean values instead ([PR #5938](https://github.com/realm/realm-core/pull/5938), since the introduction of CompensatingWriteErrorInfo in 12.1.0).
 * Fix a use-after-free if the last external reference to an encrypted Realm was closed between when a client reset error was received and when the download of the new Realm began. ([PR #5949](https://github.com/realm/realm-core/pull/5949), since 12.4.0).
 * Fixed an assertion failure during client reset with recovery when recovering a list operation on an embedded object that has a link column in the path prefix to the list from the top level object. ([PR #5957](https://github.com/realm/realm-core/issues/5957), since introduction of automatic recovery in v11.16.0).
+* IN Query fails if left operator is a TypedLink ([5946](https://github.com/realm/realm-core/issues/5946), since v10.5.2)
 
 ### Breaking changes
 * Rename RealmConfig::automatic_handle_backlicks_in_migrations to RealmConfig::automatically_handle_backlinks_in_migrations ([PR #5897](https://github.com/realm/realm-core/pull/5897)).
@@ -138,7 +162,6 @@
 * Changed the behaviour of creating a collection of non-nullable Mixed type to throw a descriptive error message rather than asserting in debug mode. ([#5894](https://github.com/realm/realm-core/issues/5894), since the introduction of the Mixed type).
 * Fix a use-after-free when a sync session is closed and the app is destroyed at the same time ([#5752](https://github.com/realm/realm-core/issues/5752), since v11.5.2).
 * Fix Http transport doesn't correctly preserve the request body ([#5890](https://github.com/realm/realm-core/issues/5890), since 12.8.0).
-* IN Query fails if left operator is a TypedLink ([5946](https://github.com/realm/realm-core/issues/5946), since v10.5.2)
 
 ### Breaking changes
 * Removed breaking callback changes for `GenericNetworkTransport::send_request_to_server()` ([PR #5898](https://github.com/realm/realm-core/pull/5898)).
