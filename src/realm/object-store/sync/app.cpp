@@ -233,16 +233,20 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport);
 
-    if (m_config.platform.empty()) {
-        throw std::runtime_error("You must specify the Platform in App::Config");
+    if (m_config.device.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config::device");
     }
 
-    if (m_config.platform_version.empty()) {
-        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    if (m_config.device.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config::device");
     }
 
-    if (m_config.sdk_version.empty()) {
-        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    if (m_config.device.sdk.empty()) {
+        throw std::runtime_error("You must specify the SDK Name in App::Config::device");
+    }
+
+    if (m_config.device.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config::device");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client

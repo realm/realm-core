@@ -57,15 +57,28 @@ class App : public std::enable_shared_from_this<App>,
             public Subscribable<App> {
 public:
     struct Config {
+        // Information about the device where the app is running
+        struct DeviceInfo {
+            std::string platform;         // required, originally App::Config::platform
+            std::string platform_version; // required,  originally App::Config::platform_version
+            std::string sdk_version;      // required, originally App::Config::sdk_version
+            std::string sdk;              // required,
+            std::string cpu_arch;
+            // device_id is stored with the user configuration
+            std::string device_name;
+            std::string device_version;
+            std::string framework_name;
+            std::string framework_version;
+            // core_version is populated by Sync when the device info is sent
+        };
+
         std::string app_id;
         std::shared_ptr<GenericNetworkTransport> transport;
         util::Optional<std::string> base_url;
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
-        std::string platform;
-        std::string platform_version;
-        std::string sdk_version;
+        DeviceInfo device;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead

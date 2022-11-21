@@ -258,24 +258,34 @@ std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
 }
 
-namespace {
 void set_app_config_defaults(app::App::Config& app_config,
                              const std::shared_ptr<app::GenericNetworkTransport>& transport)
 {
     if (!app_config.transport)
         app_config.transport = transport;
-    if (app_config.platform.empty())
-        app_config.platform = "Object Store Test Platform";
-    if (app_config.platform_version.empty())
-        app_config.platform_version = "Object Store Test Platform Version";
-    if (app_config.sdk_version.empty())
-        app_config.sdk_version = "SDK Version";
+    if (app_config.device.platform.empty())
+        app_config.device.platform = "Object Store Test Platform";
+    if (app_config.device.platform_version.empty())
+        app_config.device.platform_version = "Object Store Test Platform Version";
+    if (app_config.device.sdk_version.empty())
+        app_config.device.sdk_version = "SDK Version";
+    if (app_config.device.sdk.empty())
+        app_config.device.sdk = "SDK Name";
+    if (app_config.device.cpu_arch.empty())
+        app_config.device.cpu_arch = "CPU Arch";
+    if (app_config.device.device_name.empty())
+        app_config.device.device_name = "Device Name";
+    if (app_config.device.device_version.empty())
+        app_config.device.device_version = "Device Version";
+    if (app_config.device.framework_name.empty())
+        app_config.device.framework_name = "Framework Name";
+    if (app_config.device.framework_version.empty())
+        app_config.device.framework_version = "Framework Version";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
     if (!app_config.local_app_version)
         app_config.local_app_version.emplace("A Local App Version");
 }
-} // anonymous namespace
 
 // MARK: - TestAppSession
 

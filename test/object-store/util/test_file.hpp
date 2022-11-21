@@ -274,6 +274,9 @@ inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
 std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
+void set_app_config_defaults(app::App::Config& app_config,
+                             const std::shared_ptr<app::GenericNetworkTransport>& transport);
+
 #endif // REALM_ENABLE_SYNC
 
 #endif
