@@ -573,12 +573,19 @@ void App::attach_auth_options(BsonDocument& body)
         options["appVersion"] = *m_config.local_app_version;
     }
 
-    log_debug("App: version info: platform: %1  version: %1 - sdk version: %3 - core version: %4", m_config.platform,
-              m_config.platform_version, m_config.sdk_version, REALM_VERSION_STRING);
+    log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
+              m_config.device.platform, m_config.device.platform_version, m_config.device.sdk_version,
+              REALM_VERSION_STRING);
     options["appId"] = m_config.app_id;
-    options["platform"] = m_config.platform;
-    options["platformVersion"] = m_config.platform_version;
-    options["sdkVersion"] = m_config.sdk_version;
+    options["platform"] = m_config.device.platform;
+    options["platformVersion"] = m_config.device.platform_version;
+    options["sdk"] = m_config.device.sdk;
+    options["sdkVersion"] = m_config.device.sdk_version;
+    options["cpuArch"] = m_config.device.cpu_arch;
+    options["deviceName"] = m_config.device.device_name;
+    options["deviceVersion"] = m_config.device.device_version;
+    options["frameworkName"] = m_config.device.framework_name;
+    options["frameworkVersion"] = m_config.device.framework_version;
     options["coreVersion"] = REALM_VERSION_STRING;
 
     body["options"] = BsonDocument({{"device", options}});
