@@ -17,7 +17,7 @@ using port_type = sync::port_type;
 
 // TODO figure out what belongs on config and what belongs on endpoint.
 struct EZConfig {
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> logger;
     std::mt19937_64& random;
     util::network::Service& service;
     std::string user_agent;
@@ -97,6 +97,7 @@ public:
     EZSocketFactory(EZConfig config)
         : m_config(config)
     {
+        REALM_ASSERT(m_config.logger); // Make sure the logger is valid
     }
 
     EZSocketFactory(EZSocketFactory&&) = delete;

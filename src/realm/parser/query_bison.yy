@@ -100,6 +100,7 @@ using namespace realm::query_parser;
 %token <std::string> BEGINSWITH "beginswith"
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
+%token <std::string> TEXT "fulltext"
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
 %token <std::string> IN "in"
@@ -165,6 +166,7 @@ compare
                                 }
     | expr relational expr      { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
     | value stringop value      { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $3); }
+    | value TEXT value          { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, CompareNode::TEXT, $3); }
     | value stringop CASE value {
                                     auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
@@ -319,6 +321,7 @@ id
     | ASCENDING                 { $$ = $1; }
     | DESCENDING                { $$ = $1; }
     | IN                        { $$ = $1; }
+    | TEXT                      { $$ = $1; }
 %%
 
 void

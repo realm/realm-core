@@ -374,11 +374,19 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
-    std::unique_ptr<util::Logger> m_logger;
+    std::shared_ptr<util::Logger> m_logger_ptr;
 
+    /// m_Logger_ptr is not set until the first call to one of these functions.
+    /// If configure() not been called, a logger will not be available yet.
+    /// @returns true if the logger was set, otherwise false.
+    bool init_logger();
+    /// These helpers prevent all the checks for if(m_logger_ptr) throughout the
+    /// code.
+    bool would_log(util::Logger::Level level);
     template <class... Params>
-    void log(const char* message, Params&&... params);
-    bool would_log();
+    void log_debug(const char* message, Params&&... params);
+    template <class... Params>
+    void log_error(const char* message, Params&&... params);
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.

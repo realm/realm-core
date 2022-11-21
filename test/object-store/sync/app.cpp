@@ -2025,8 +2025,7 @@ static void set_app_config_defaults(app::App::Config& app_config,
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
-    auto logger = std::make_unique<util::StderrLogger>();
-    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    auto logger = std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
 

@@ -33,10 +33,9 @@
 #include <realm/table_ref.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
-#include <realm/table_cluster_tree.hpp>
+#include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
-#include <realm/index_string.hpp>
 
 // Only set this to one when testing the code paths that exercise object ID
 // hash collisions. It artificially limits the "optimistic" local ID to use
@@ -61,6 +60,7 @@ class ColKeys;
 struct GlobalKey;
 class LinkChain;
 class Subexpr;
+class StringIndex;
 
 struct Link {
 };
@@ -202,7 +202,11 @@ public:
     /// \param col_key The key of a column of the table.
 
     bool has_search_index(ColKey col_key) const noexcept;
-    void add_search_index(ColKey col_key);
+    void add_search_index(ColKey col_key, IndexType type = IndexType::General);
+    void add_fulltext_index(ColKey col_key)
+    {
+        add_search_index(col_key, IndexType::Fulltext);
+    }
     void remove_search_index(ColKey col_key);
 
     void enumerate_string_column(ColKey col_key);
@@ -335,7 +339,7 @@ public:
     }
 
     void clear();
-    using Iterator = TableClusterTree::Iterator;
+    using Iterator = ClusterTree::Iterator;
     Iterator begin() const;
     Iterator end() const;
     void remove_object(const Iterator& it)
@@ -430,6 +434,8 @@ public:
     TableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     TableView find_all_null(ColKey col_key) const;
+
+    TableView find_all_fulltext(ColKey col_key, StringData value) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     TableView get_sorted_view(ColKey col_key, bool ascending = true) const;
@@ -688,8 +694,8 @@ private:
         m_alloc.refresh_ref_translation();
     }
     Spec m_spec;                                    // 1st slot in m_top
-    TableClusterTree m_clusters;                    // 3rd slot in m_top
-    std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top
+    ClusterTree m_clusters;                         // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
     TableKey m_key;                                 // 4th slot in m_top
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
@@ -719,6 +725,7 @@ private:
     bool migrate_objects(); // Returns true if there are no links to migrate
     void migrate_links();
     void finalize_migration(ColKey pk_col_key);
+    void migrate_sets_and_dictionaries();
 
     /// Disable copying assignment.
     ///
@@ -747,7 +754,7 @@ private:
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
-    void do_add_search_index(ColKey col_key);
+    void do_add_search_index(ColKey col_key, IndexType type);
 
     bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
@@ -864,7 +871,6 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
-    friend class TableClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
     friend class LnkLst;
@@ -1176,46 +1182,6 @@ inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
     return m_spec.get_dictionary_key_type(spec_ndx);
 }
 
-
-inline Table::Table(Allocator& alloc)
-    : m_alloc(alloc)
-    , m_top(m_alloc)
-    , m_spec(m_alloc)
-    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
-    , m_index_refs(m_alloc)
-    , m_opposite_table(m_alloc)
-    , m_opposite_column(m_alloc)
-    , m_repl(&g_dummy_replication)
-    , m_own_ref(this, alloc.get_instance_version())
-{
-    m_spec.set_parent(&m_top, top_position_for_spec);
-    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
-    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
-    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-
-    ref_type ref = create_empty_table(m_alloc); // Throws
-    ArrayParent* parent = nullptr;
-    size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent, true, false);
-}
-
-inline Table::Table(Replication* const* repl, Allocator& alloc)
-    : m_alloc(alloc)
-    , m_top(m_alloc)
-    , m_spec(m_alloc)
-    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
-    , m_index_refs(m_alloc)
-    , m_opposite_table(m_alloc)
-    , m_opposite_column(m_alloc)
-    , m_repl(repl)
-    , m_own_ref(this, alloc.get_instance_version())
-{
-    m_spec.set_parent(&m_top, top_position_for_spec);
-    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
-    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
-    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-    m_cookie = cookie_created;
-}
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)
 {

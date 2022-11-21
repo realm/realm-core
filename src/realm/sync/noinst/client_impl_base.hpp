@@ -115,6 +115,7 @@ public:
     static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
     static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
 
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     ClientImpl(ClientConfig);
@@ -307,7 +308,8 @@ public:
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
 
-    util::PrefixLogger logger;
+    std::shared_ptr<util::Logger> logger_ptr;
+    util::Logger& logger;
 
     ClientImpl& get_client() noexcept;
     ReconnectInfo get_reconnect_info() const noexcept;
@@ -599,7 +601,8 @@ class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
-    util::PrefixLogger logger;
+    std::shared_ptr<util::Logger> logger_ptr;
+    util::Logger& logger;
 
     ClientImpl& get_client() noexcept;
     Connection& get_connection() noexcept;
@@ -1326,7 +1329,8 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
 }
 
 inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger{make_logger_prefix(ident), conn.logger} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
+    , logger{*logger_ptr}
     , m_conn{conn}
     , m_ident{ident}
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
