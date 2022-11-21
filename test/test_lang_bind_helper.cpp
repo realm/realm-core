@@ -1409,7 +1409,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
         // queue.put(lw);
     }
     queue.close();
-    deleter.join();
+    // deleter.join();
 }
 
 TEST(LangBindHelper_AdvanceReadTransact_InsertLink)

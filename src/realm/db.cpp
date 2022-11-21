@@ -1537,7 +1537,6 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
         auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
         std::vector<VersionedTopRef> read_locks = m_version_manager->get_versions_from(from, to.version);
 
-        auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
         alloc.refresh_pages_for_versions(read_locks);
 
         m_version_manager->release_read_lock(*m_last_encryption_page_reader);
