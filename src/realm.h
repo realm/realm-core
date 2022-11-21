@@ -3559,9 +3559,6 @@ typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata,
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
-typedef void (*realm_sync_session_state_changed_func_t)(realm_userdata_t userdata,
-                                                        realm_sync_session_state_e old_state,
-                                                        realm_sync_session_state_e new_state);
 typedef void (*realm_sync_progress_func_t)(realm_userdata_t userdata, uint64_t transferred_bytes,
                                            uint64_t total_bytes);
 typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm_sync_session_t*,
