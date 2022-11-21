@@ -1392,9 +1392,9 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // later deletion.
     util::Thread deleter;
     ConcurrentQueue<LnkLstPtr> queue(buffer_size);
-    deleter.start([&] {
-        deleter_thread(queue);
-    });
+    // deleter.start([&] {
+    //     deleter_thread(queue);
+    // });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
         int ndx = random.draw_int_mod(table_size);
@@ -1406,7 +1406,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
             lw->add(t_keys[ndx]);
             rt->commit_and_continue_as_read();
         }
-        queue.put(lw);
+        // queue.put(lw);
     }
     queue.close();
     deleter.join();
@@ -3341,8 +3341,8 @@ static void signal_handler(int signal)
 NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
                       !running_with_asan && !running_with_tsan && !running_with_valgrind)
 {
-    const int write_process_count = 7;
-    const int read_process_count = 3;
+    const int write_process_count = 70;
+    const int read_process_count = 30;
 
     int readpids[read_process_count];
     int writepids[write_process_count];

@@ -330,7 +330,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     return m_map_windows[0].get();
 }
 
-#define REALM_ALLOC_DEBUG 0
+#define REALM_ALLOC_DEBUG 1
 #if REALM_ALLOC_DEBUG
 #define ALLOC_DBG_COUT(args)                                                                                         \
     {                                                                                                                \
@@ -636,8 +636,8 @@ ref_type GroupWriter::write_group()
     ALLOC_DBG_COUT("  Freelist size after allocations: " << m_size_map.size() << std::endl);
     // We now back-date (if possible) any blocks freed in versions which
     // are becoming unreachable.
-    if (m_any_new_unreachables)
-        backdate();
+    // if (m_any_new_unreachables)
+    //    backdate();
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
@@ -745,6 +745,8 @@ ref_type GroupWriter::write_group()
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
+    m_free_lengths.ensure_minimum_width(value_4);   // Throws
+    // m_free_versions.ensure_minimum_width(); // Throws
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -787,6 +789,14 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
     REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
 
+    ALLOC_DBG_COUT("  Placed free pos array at      " << free_positions_ref << std::endl);
+    ALLOC_DBG_COUT("  Placed free size array at     " << free_sizes_ref << std::endl);
+    ALLOC_DBG_COUT("  Placed free versions array at " << free_versions_ref << std::endl);
+    ALLOC_DBG_COUT("  Placed top (group) array at   " << top_ref << std::endl);
+    ALLOC_DBG_COUT("  Arrays used " << free_positions_size + free_sizes_size + free_versions_size + top_byte_size
+                                    << " bytes" << std::endl);
+    ALLOC_DBG_COUT("  Adjusting freelist at index " << reserve_ndx << " [ " << value_8 << ", " << value_9 << " ]"
+                                                    << std::endl);
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
     m_free_space_size += rest;

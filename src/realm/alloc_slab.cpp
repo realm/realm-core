@@ -1252,6 +1252,7 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
     rebuild_translations(replace_last_mapping, old_num_mappings);
 }
 
+// first read lock must be for current version (one that is fully available)
 void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
                                            util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
@@ -1265,6 +1266,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             this->refresh_encrypted_pages(ranges);
         }
     };
+
+    // Refresh Group array for all versions
     RefRanges ranges;
     for (auto version : read_locks) {
         ranges.push_back(RefRange{version.top_ref, version.top_ref + Group::s_group_max_size + Array::header_size});
@@ -1286,6 +1289,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             // A file on streaming format has no freelist info.
             continue;
         }
+
+        // Refresh and read in free-list
         REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
                         read_lock.top_ref, read_lock.version);
         REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,
@@ -1384,7 +1389,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             ++previous_ndx;
         }
 
-        allocations.push_back(RefRange{0, 12}); // slot-selector etc.
+        allocations.push_back(RefRange{0, 24}); // slot-selector etc.
 
         do_refresh(allocations);
 

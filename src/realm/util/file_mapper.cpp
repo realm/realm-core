@@ -230,7 +230,7 @@ static void ensure_reclaimer_thread_runs()
     if (reclaimer_thread == nullptr) {
         reclaimer_thread = std::make_unique<std::thread>([] {
             while (!reclaimer_shutdown) {
-                reclaim_pages();
+                // reclaim_pages();
                 millisleep(1000);
             }
         });
