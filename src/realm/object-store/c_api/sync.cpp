@@ -29,7 +29,19 @@
 #include "types.hpp"
 #include "util.hpp"
 
+
+realm_async_open_task_progress_notification_token::~realm_async_open_task_progress_notification_token()
+{
+    task->unregister_download_progress_notifier(token);
+}
+
+realm_sync_session_connection_state_notification_token::~realm_sync_session_connection_state_notification_token()
+{
+    session->unregister_connection_change_callback(token);
+}
+
 namespace realm::c_api {
+
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
