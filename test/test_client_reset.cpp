@@ -27,7 +27,7 @@ TEST(ClientReset_NoLocalChanges)
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
 
-    util::Logger& logger = test_context.logger;
+    auto& logger = *(test_context.logger);
 
     const std::string server_path = "/data";
 
@@ -395,7 +395,7 @@ TEST(ClientReset_ThreeClients)
     SHARED_GROUP_TEST_PATH(path_2);
     SHARED_GROUP_TEST_PATH(path_3);
 
-    util::Logger& logger = test_context.logger;
+    auto& logger = *(test_context.logger);
 
     const std::string server_path = "/data";
 

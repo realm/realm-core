@@ -1,15 +1,41 @@
-# NEXT MAJOR RELEASE
+# NEXT RELEASE
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
+* Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed wrong assertion on query error that could result in a crash. ([#6038](https://github.com/realm/realm-core/issues/6038), since v11.7.0)
+* Freelist may be corrupted if compaction was initiated ([#6054](https://github.com/realm/realm-core/pull/6054), since v13.0.0)
+
+### Breaking changes
+* Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr` ([PR #5980](https://github.com/realm/realm-core/pull/5980))
+* `util::RootLogger` has been replaced with `util::Logger`
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Update logger references in primary Sync/ObjectStore classes to use `shared_ptr` ([#5983](https://github.com/realm/realm-core/issues/5983))
+
+----------------------------------------------
+
+# 13.0.0 Release notes
+
+### Enhancements
 * The realm file will be shrunk if the larger file size is no longer needed. (PR [#5755](https://github.com/realm/realm-core/pull/5755))
-* Full text index supported. The words stored in the index will be converted to lower case and diacritics will be removed. The index will support Basic Latin and Latin-1 Supplement characters. All others will be ignored. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
+* Full text index supported at Core level. The words stored in the index will be converted to lower case and diacritics will be removed. The index will support Basic Latin and Latin-1 Supplement characters. All others will be ignored. (PR [#5872](https://github.com/realm/realm-core/pull/5872))
+* Most of the file growth caused by version pinning is eliminated. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
 
 ### Fixed
 * Set<Mixed> consider string and binary data equivalent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
 
 ### Breaking changes
-* File format version bumped. File will be upgraded if it contains any Set<Mixed> or any Dictionary.
+* File format version bumped. If realm file contains any objects with Set<Mixed> or Dictionary properties, the file will go through an upgrade process.
 * The layout of the lock-file has changed, the lock file format version is bumped and all participants in a multiprocess scenario needs to be up to date so they expect the same format. This requires an update of Studio. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
 
 ### Compatibility
@@ -18,6 +44,58 @@
 
 ### Internals
 * Encoding of Dictionary in the realm file has changed. This will change the order of the elements, so if any tests depend on the order, those must be revised.
+
+----------------------------------------------
+
+# 12.13.0 Release notes
+
+### Enhancements
+* Add a way to register a thread observer listener in the C API. ([PR #6040](https://github.com/realm/realm-core/pull/6040))
+
+### Fixed
+* Fetching a user's profile while the user logs out would result in an assertion failure. ([PR #6017](https://github.com/realm/realm-core/issues/5571), since v11.0.3)
+* Removed the ".tmp_compaction_space" file being left over after compacting a Realm on Windows. ([#6002](https://github.com/realm/realm-core/issues/6002), since Windows support for compact was added).
+* Restore fallback to full barrier when F_BARRIERSYNC is not available on Apple platforms. ([PR #6033](https://github.com/realm/realm-core/pull/6033), since v12.12.0)
+* Validation of Queries constructed by the Fluent QueryBuilder was missing. ([#6034](https://github.com/realm/realm-core/issues/6034), since v12.7.0)
+* Allow setting values on a Mixed property through the C API ([#5985](https://github.com/realm/realm-core/issues/5985), since v10.5.0)
+ 
+### Breaking changes
+* `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
+* Better error handling for `realm_async_begin_write` and `realm_async_commit`. ([#PR6039](https://github.com/realm/realm-core/pull/6039))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+----------------------------------------------
+
+# 12.12.0 Release notes
+
+### Enhancements
+* App::call_function now supports taking and receiving ejson strings, bypassing parsing/serialization in core. ([#4182](https://github.com/realm/realm-core/issues/4182))
+* Flexible sync will now wait for the server to have sent all pending history after a bootstrap before marking a subscription as Complete. ([#5795](https://github.com/realm/realm-core/pull/5795))
+* Add typedef for realm_app_call_function callbacks. ([#5996](https://github.com/realm/realm-core/pull/5996))
+* Expose List::move on C api as realm_list_move. ([#6032](https://github.com/realm/realm-core/pull/6032))
+
+### Fixed
+* Fix a race condition which could result in "operation cancelled" errors being delivered to async open callbacks rather than the actual sync error which caused things to fail ([PR #5968](https://github.com/realm/realm-core/pull/5968), since the introduction of async open).
+* The name of one of the RLM_SYNC_BOOTSTRAPPING enum member in the C api was updated to match the naming convention of the other members in the enum.
+* Fix `Results.distinct(keypaths)` and `Results.sort(keypaths)` not correctly handling keypaths names for properties that have a public/private(column) property name ([PR #5952](https://github.com/realm/realm-core/pull/5952).
+* Bootstraps will not be applied in a single write transaction - they will be applied 1MB of changesets at a time, or as configured by the SDK ([#5999](https://github.com/realm/realm-core/pull/5999), since v12.0.0).
+* Fix database corruption and encryption issues on apple platforms, reported in several bugs listed in the PR. ([PR #5993](https://github.com/realm/realm-core/pull/5993), since v11.8.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Removed `<realm/util/parent_dir.*pp>` and moved `parent_dir` to be part of `File`.
+* Fix `BPlusTreeInner::verify()` ([#5974](https://github.com/realm/realm-core/pull/5974)).
+* Updated install_baas stitch support libraries to 4.4.17 ([#5989](https://github.com/realm/realm-core/issues/5989))
+* Defer converting Realm files from streaming form until after we've validated the version ([PR #5987](https://github.com/realm/realm-core/pull/5987)).
 
 ----------------------------------------------
 

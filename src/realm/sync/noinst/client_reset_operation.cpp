@@ -38,8 +38,8 @@ ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT_RELEASE(m_mode != ClientResyncMode::Manual);
-    logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
-                 m_mode, m_recovery_is_allowed);
+    m_logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
+                   m_mode, m_recovery_is_allowed);
 }
 
 std::string ClientResetOperation::get_fresh_path_for(const std::string& path)

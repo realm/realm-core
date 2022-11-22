@@ -334,7 +334,7 @@ public:
         /// to util::Logger::Level::info. The log level threshold selected for a
         /// specified base logger will be ignored. The specified base logger
         /// does not have to be thread safe.
-        util::Logger* logger = nullptr;
+        std::shared_ptr<util::Logger> logger;
 
         /// The log level threshold to use for the intra test loggers
         /// (TestContext::logger).
@@ -489,7 +489,7 @@ public:
     /// use inside the associated unit test. The log level of this logger is
     /// specified via TestList::Config::intra_test_log_level. See also
     /// ThreadContext::report_logger.
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> logger;
 
     bool check_cond(bool cond, const char* file, long line, const char* macro_name, const char* cond_text);
 
@@ -940,7 +940,7 @@ inline TestBase::TestBase(TestContext& context)
 template <class... Params>
 inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
+    test_context.logger->info(message, std::forward<Params>(params)...); // Throws
 }
 
 

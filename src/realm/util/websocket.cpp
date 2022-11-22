@@ -276,6 +276,7 @@ size_t make_frame(bool fin, int opcode, bool mask, const char* payload, size_t p
 //
 class FrameReader {
 public:
+    // FrameReader is owned by a websocket, so a shared_ptr is not needed
     util::Logger& logger;
 
     char* delivery_buffer = nullptr;
@@ -724,6 +725,7 @@ public:
 
 private:
     websocket::Config& m_config;
+    // websocket is owned by the server or websocket factory, so a shared_ptr isn't needed
     util::Logger& m_logger;
     FrameReader m_frame_reader;
 

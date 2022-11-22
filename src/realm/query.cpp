@@ -1621,6 +1621,20 @@ void* Query::query_thread(void* arg)
 
 #endif // REALM_MULTITHREADQUERY
 
+std::string Query::validate() const
+{
+    if (!m_groups.size())
+        return "";
+
+    if (error_code != "") // errors detected by QueryInterface
+        return error_code;
+
+    if (!root_node())
+        return "Syntax error";
+
+    return root_node()->validate(); // errors detected by QueryEngine
+}
+
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     std::string description;

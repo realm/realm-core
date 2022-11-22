@@ -43,14 +43,6 @@ using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
-
-namespace {
-
-util::StderrLogger g_fallback_logger;
-
-} // unnamed namespace
-
-
 bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                       port_type& port, std::string& path) const
 {
@@ -104,7 +96,8 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger{config.logger ? *config.logger : g_fallback_logger}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
     , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
@@ -120,7 +113,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
     , m_socket_factory(util::websocket::EZConfig{
-          logger,
+          logger_ptr,
           m_random,
           m_service,
           get_user_agent_string(),
@@ -1845,8 +1838,7 @@ void Session::send_upload_message()
                  uploadable_changesets.size()); // Throws
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
-    ClientProtocol::UploadMessageBuilder upload_message_builder =
-        protocol.make_upload_message_builder(logger); // Throws
+    ClientProtocol::UploadMessageBuilder upload_message_builder = protocol.make_upload_message_builder(); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
         logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
