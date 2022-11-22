@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
+* Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
