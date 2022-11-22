@@ -1,6 +1,7 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
 
+
 realm_callback_token_realm::~realm_callback_token_realm()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
