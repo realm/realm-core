@@ -333,7 +333,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     std::vector<SchemaChange> changes;
 
     // Add missing tables
-    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && !existing && !orphans.count(target->name)) {
             changes.emplace_back(schema_change::AddTable{target});
         }
@@ -343,8 +343,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
         }
     });
 
-    // // Modify columns
-    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
+    // Modify columns
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && existing) {
             ::compare(*existing, *target, changes);
         }
@@ -356,8 +356,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
         // nothing for tables in existing but not target
     });
 
-    // // Detect embedded table changes last, in case column property changes affect link counts
-    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
+    // Detect embedded table changes last, in case column property changes affect link counts
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (existing && target && existing->table_type != target->table_type) {
             changes.emplace_back(schema_change::ChangeTableType{target, &existing->table_type, &target->table_type});
         }
