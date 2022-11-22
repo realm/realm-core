@@ -81,12 +81,11 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     , m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        m_transaction = coordinator->begin_read();
-        read_schema_from_group_if_needed();
+        m_transaction = coordinator->begin_read(version.value_or(VersionID{}));
+        read_schema_from_group_if_needed(m_config.is_schema_additive());
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
     }
-
     m_coordinator = std::move(coordinator);
 }
 
@@ -139,17 +138,17 @@ std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
     return realm.m_coordinator->m_db;
 }
 
-void Realm::Internal::begin_read(Realm& realm, VersionID version_id, bool load_full_schema_additive)
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id, bool is_schema_additive)
 {
-    realm.begin_read(version_id, load_full_schema_additive);
+    realm.begin_read(version_id, is_schema_additive);
 }
 
-void Realm::begin_read(VersionID version_id, bool load_full_schema_additive)
+void Realm::begin_read(VersionID version_id, bool is_schema_additive)
 {
     REALM_ASSERT(!m_transaction);
     m_transaction = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
-    read_schema_from_group_if_needed(load_full_schema_additive);
+    read_schema_from_group_if_needed(is_schema_additive);
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -222,7 +221,7 @@ void Realm::set_schema(Schema const& reference, Schema schema)
     notify_schema_changed();
 }
 
-void Realm::read_schema_from_group_if_needed(bool load_full_schema_additive)
+void Realm::read_schema_from_group_if_needed(bool is_schema_additive)
 {
     if (m_config.immutable()) {
         REALM_ASSERT(m_transaction);
@@ -236,7 +235,6 @@ void Realm::read_schema_from_group_if_needed(bool load_full_schema_additive)
     auto schema = m_schema;
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
-
     if (m_schema_transaction_version == current_version)
         return;
 
@@ -244,7 +242,7 @@ void Realm::read_schema_from_group_if_needed(bool load_full_schema_additive)
     m_schema_version = ObjectStore::get_schema_version(group);
     schema = ObjectStore::schema_from_group(group);
 
-    if (load_full_schema_additive)
+    if (is_schema_additive)
         load_schema_for_version_if_needed(current_version, schema);
 
     if (m_coordinator)

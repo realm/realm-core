@@ -62,9 +62,9 @@ public:
         return Realm::Internal::get_db(*shared_realm);
     }
 
-    static void begin_read(SharedRealm const& shared_realm, VersionID version, bool load_full_schema_additive = false)
+    static void begin_read(SharedRealm const& shared_realm, VersionID version, bool is_schema_additive = false)
     {
-        Realm::Internal::begin_read(*shared_realm, version, load_full_schema_additive);
+        Realm::Internal::begin_read(*shared_realm, version, is_schema_additive);
     }
 };
 
