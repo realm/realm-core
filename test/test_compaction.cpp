@@ -113,7 +113,7 @@ TEST(Compaction_WhileGrowing)
     tr->commit_and_continue_as_read();
     // Now there should be room for compaction
 
-    auto n = 20; // Ensure that test will end
+    auto n = 50; // Ensure that test will end
     do {
         tr->promote_to_write();
         tr->commit_and_continue_as_read();
