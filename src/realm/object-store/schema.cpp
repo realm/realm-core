@@ -284,12 +284,12 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
     }
 }
 
-template <typename T, typename U, typename Func>
-std::vector<ObjectSchema> Schema::zip_matching(T&& a, U&& b, Func&& func, bool is_schema_additive) noexcept
+template <typename Func>
+std::vector<ObjectSchema> Schema::zip_matching(Schema const& a, Schema const& b, Func&& func, bool is_schema_additive)
 {
     std::vector<ObjectSchema> different_classes;
     size_t i = 0, j = 0;
-    auto add_missing_classes = [&different_classes, &is_schema_additive](const ObjectSchema& o) {
+    auto add_missing_classes = [&different_classes, &is_schema_additive](ObjectSchema const& o) {
         if (is_schema_additive)
             different_classes.push_back(o);
     };
@@ -333,7 +333,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     std::vector<SchemaChange> changes;
 
     // Add missing tables
-    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
         if (target && !existing && !orphans.count(target->name)) {
             changes.emplace_back(schema_change::AddTable{target});
         }
@@ -343,8 +343,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
         }
     });
 
-    // Modify columns
-    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+    // // Modify columns
+    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
         if (target && existing) {
             ::compare(*existing, *target, changes);
         }
@@ -356,8 +356,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
         // nothing for tables in existing but not target
     });
 
-    // Detect embedded table changes last, in case column property changes affect link counts
-    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+    // // Detect embedded table changes last, in case column property changes affect link counts
+    zip_matching(target_schema, *this, [&](ObjectSchema const* target, ObjectSchema const* existing) {
         if (existing && target && existing->table_type != target->table_type) {
             changes.emplace_back(schema_change::ChangeTableType{target, &existing->table_type, &target->table_type});
         }
@@ -366,16 +366,16 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other, bool allow_complete_schema_view) noexcept
+void Schema::copy_keys_from(Schema const& other, bool is_schema_additive)
 {
     auto other_classes = zip_matching(
         *this, other,
-        [&](ObjectSchema* existing, const ObjectSchema* other) {
+        [&](ObjectSchema const* existing, ObjectSchema const* other) {
             if (!existing || !other)
                 return;
-            update_or_append_properties(existing, other, allow_complete_schema_view);
+            update_or_append_properties(const_cast<ObjectSchema*>(existing), other, is_schema_additive);
         },
-        allow_complete_schema_view);
+        is_schema_additive);
 
     if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
@@ -383,24 +383,17 @@ void Schema::copy_keys_from(realm::Schema const& other, bool allow_complete_sche
     }
 }
 
-void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSchema* other,
-                                         bool allow_complete_schema_view)
+void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSchema* other, bool is_schema_additive)
 {
-    std::vector<Property> unmatched_properties;
     existing->table_key = other->table_key;
     for (auto& current_prop : other->persisted_properties) {
         auto target_prop = existing->property_for_name(current_prop.name);
         if (target_prop) {
             target_prop->column_key = current_prop.column_key;
         }
-        else if (allow_complete_schema_view) {
-            unmatched_properties.push_back(current_prop);
+        else if (is_schema_additive) {
+            existing->persisted_properties.push_back(current_prop);
         }
-    }
-
-    if (allow_complete_schema_view) {
-        existing->persisted_properties.insert(existing->persisted_properties.end(), unmatched_properties.begin(),
-                                              unmatched_properties.end());
     }
 }
 

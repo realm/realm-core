@@ -135,7 +135,7 @@ struct RealmConfig {
     {
         return schema_mode == SchemaMode::ReadOnly;
     }
-    bool allow_complete_schema_view() const
+    bool is_schema_additive() const
     {
         return schema_mode == SchemaMode::AdditiveExplicit || schema_mode == SchemaMode::AdditiveDiscovered ||
                schema_mode == SchemaMode::ReadOnly;

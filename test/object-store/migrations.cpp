@@ -473,8 +473,6 @@ TEST_CASE("migration: Automatic") {
             };
             auto schema2 = add_property(schema1, "object", {"col2", PropertyType::Int});
             REQUIRE_MIGRATION_NEEDED(*realm, schema1, schema2, "Property 'object.col2' has been added.");
-            auto schema = realm->schema();
-            REQUIRE(schema.size() == 1);
         }
 
         SECTION("remove property from existing object schema") {

@@ -151,7 +151,7 @@ public:
     std::vector<SchemaChange> compare(Schema const&, SchemaMode = SchemaMode::Automatic,
                                       bool include_removals = false) const;
 
-    void copy_keys_from(Schema const&, bool allow_complete_schema_view = false) noexcept;
+    void copy_keys_from(Schema const&, bool is_schema_additive = false);
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
     friend bool operator!=(Schema const& a, Schema const& b) noexcept
@@ -167,9 +167,9 @@ public:
     using base::size;
 
 private:
-    template <typename T, typename U, typename Func>
-    static std::vector<ObjectSchema> zip_matching(T&& a, U&& b, Func&& func,
-                                                  bool is_schema_additive = false) noexcept;
+    template <typename Func>
+    static std::vector<ObjectSchema> zip_matching(Schema const& a, Schema const& b, Func&& func,
+                                                  bool is_schema_additive = false);
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
     // append missing properties and update matching properties for schema
