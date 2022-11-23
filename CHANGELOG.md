@@ -2,11 +2,32 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.1.0 Release notes
+
+### Enhancements
 * The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
 * Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed wrong assertion on query error that could result in a crash. ([#6038](https://github.com/realm/realm-core/issues/6038), since v11.7.0)
 * Freelist may be corrupted if compaction was initiated ([#6054](https://github.com/realm/realm-core/pull/6054), since v13.0.0)
 
@@ -16,7 +37,7 @@
 * `util::RootLogger` has been replaced with `util::Logger`
 
 ### Compatibility
-* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 -----------
 

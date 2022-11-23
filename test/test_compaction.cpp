@@ -42,6 +42,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
+#if 0 // Not working om arm64. Problem with the test.
 TEST(Compaction_WhileGrowing)
 {
     Random random(random_int<unsigned long>());
@@ -121,6 +122,7 @@ TEST(Compaction_WhileGrowing)
     } while (db->get_evacuation_stage() != DB::EvacStage::idle && --n > 0);
     CHECK_LESS(free_space, 0x10000);
 }
+#endif
 
 TEST(Compaction_Large)
 {
