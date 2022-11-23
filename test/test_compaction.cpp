@@ -42,7 +42,6 @@ using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
-#if 0 // Not working om arm64. Problem with the test.
 TEST(Compaction_WhileGrowing)
 {
     Random random(random_int<unsigned long>());
@@ -114,7 +113,7 @@ TEST(Compaction_WhileGrowing)
     tr->commit_and_continue_as_read();
     // Now there should be room for compaction
 
-    auto n = 50; // Ensure that test will end
+    auto n = 20; // Ensure that test will end
     do {
         tr->promote_to_write();
         tr->commit_and_continue_as_read();
@@ -122,7 +121,6 @@ TEST(Compaction_WhileGrowing)
     } while (db->get_evacuation_stage() != DB::EvacStage::idle && --n > 0);
     CHECK_LESS(free_space, 0x10000);
 }
-#endif
 
 TEST(Compaction_Large)
 {
