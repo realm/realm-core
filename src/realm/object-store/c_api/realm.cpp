@@ -365,7 +365,7 @@ realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback
         };
 
     auto& instance = realm::c_api::CBindingThreadObserver::create();
-    instance.set(thread_create, thread_destroyed, error);
+    instance.set(std::move(thread_create), std::move(thread_destroyed), std::move(error));
     g_binding_callback_thread_observer = &instance;
     return new realm_thread_observer_token_t();
 }
