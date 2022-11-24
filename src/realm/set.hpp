@@ -480,8 +480,11 @@ struct SetElementLessThan<Mixed> {
         // The current Mixed::compare function implements these rules except when comparing
         // string and binary. If that function is changed we should either implement the rules
         // here or upgrade all Set<Mixed> columns.
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return true;
+        if (a.is_type(type_String)) {
+            if (b.is_type(type_String))
+                return a.get_string() < b.get_string();
+            if (b.is_type(type_Binary))
+                return true;
         }
         if (a.is_type(type_Binary) && b.is_type(type_String)) {
             return false;

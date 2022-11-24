@@ -124,10 +124,11 @@ TEST(Set_Mixed)
                                   25,
                                   56.f,
                                   88.,
-                                  "Hello, World!",
+                                  "ådsel", // Carrion
                                   "æbler", // Apples
                                   "ørken", // Dessert
-                                  "ådsel", // Carrion
+                                  "Amazing!",
+                                  "Hello, world!",
                                   Timestamp(1, 2),
                                   ObjectId::gen(),
                                   UUID("01234567-9abc-4def-9012-3456789abcde"),
@@ -140,20 +141,12 @@ TEST(Set_Mixed)
         set.insert(ref_values[i]);
     }
     std::vector<Mixed> actuals;
-    std::for_each(set.begin(), set.end(), [&actuals](auto v) {
-        actuals.push_back(v);
-    });
-    CHECK(ref_values == actuals);
-    actuals.clear();
 
     // Sets of Mixed can be sorted. Should sort according to the comparison rules defined for Mixed, which
     // currently
     set.sort(indices);
     std::transform(begin(indices), end(indices), std::back_inserter(actuals), [&](size_t index) {
         return set.get(index);
-    });
-    std::sort(begin(ref_values), end(ref_values), [](auto v1, auto v2) {
-        return v1 < v2;
     });
     CHECK(ref_values == actuals);
 }
