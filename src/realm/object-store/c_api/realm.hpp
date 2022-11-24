@@ -63,4 +63,47 @@ private:
     CallbackRegistry<const Schema&> m_schema_changed_callbacks;
 };
 
+class CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
+public:
+    using ThreadCallback = util::UniqueFunction<void()>;
+    using ErrorCallback = util::UniqueFunction<void(const char*)>;
+
+    static CBindingThreadObserver& create()
+    {
+        static CBindingThreadObserver instance;
+        return instance;
+    }
+
+    void set(ThreadCallback&& on_create, ThreadCallback&& on_destroy, ErrorCallback&& on_error)
+    {
+        m_create_callback = std::move(on_create);
+        m_destroy_callback = std::move(on_destroy);
+        m_error_callback = std::move(on_error);
+    }
+
+    void did_create_thread() override
+    {
+        if (m_create_callback)
+            m_create_callback();
+    }
+
+    void will_destroy_thread() override
+    {
+        if (m_destroy_callback)
+            m_destroy_callback();
+    }
+
+    void handle_error(std::exception const& e) override
+    {
+        if (m_error_callback)
+            m_error_callback(e.what());
+    }
+
+private:
+    CBindingThreadObserver() = default;
+    ThreadCallback m_create_callback;
+    ThreadCallback m_destroy_callback;
+    ErrorCallback m_error_callback;
+};
+
 } // namespace realm::c_api
