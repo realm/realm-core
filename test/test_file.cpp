@@ -272,9 +272,13 @@ TEST(File_MultipleWriters)
             realm::util::encryption_read_barrier(map1, i, 1);
             ++map1.get_addr()[i];
             realm::util::encryption_write_barrier(map1, i);
+            // required due to switch to write-invalidate caching
+            map1.flush();
             realm::util::encryption_read_barrier(map2, i, 1);
             ++map2.get_addr()[i];
             realm::util::encryption_write_barrier(map2, i);
+            // required due to switch to write-invalidate caching
+            map2.flush();
         }
     }
 

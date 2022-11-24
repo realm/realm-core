@@ -1637,7 +1637,7 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
-        start();
+        // start();
     }
     ~PageRefresher()
     {

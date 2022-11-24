@@ -267,8 +267,11 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         // Remap file if it has grown, and update refs in underlying node structure.
         // A writer already has the latest encrypted pages (assumes serialized commits)
         // so no need to refresh_encrypted_mappings here.
+        auto new_versionID = VersionID{version, new_read_lock.m_reader_idx};
+        m_alloc.update_reader_view(m_read_lock.m_file_size, db.get(), new_versionID); // Throws
+
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
-        return VersionID{version, new_read_lock.m_reader_idx};
+        return new_versionID;
     }
     catch (...) {
         // In case of failure, further use of the transaction for reading is unsafe

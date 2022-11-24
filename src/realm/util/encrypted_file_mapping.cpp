@@ -292,7 +292,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     auto retry_start_time = std::chrono::steady_clock::now();
     size_t num_identical_reads = 1;
     auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
-        constexpr auto max_retry_period = std::chrono::seconds(20);
+        constexpr auto max_retry_period = std::chrono::seconds(2);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
         if (elapsed > max_retry_period) {
             auto str = util::format("Reader starvation detected after %1 seconds (retry_count=%2, from=%3, size=%4)",
@@ -647,9 +647,8 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missin
             }
         }
     }
-    if (is_not(m_page_state[local_page_ndx], UpToDate | RefetchRequired))
+    if (is_not(m_page_state[local_page_ndx], UpToDate))
         m_num_decrypted++;
-    clear(m_page_state[local_page_ndx], RefetchRequired);
     set(m_page_state[local_page_ndx], UpToDate);
 }
 
@@ -667,7 +666,6 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
                     // trigger a refetch.
                     if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
                         clear(m->m_page_state[local_page_ndx], UpToDate);
-                        set(m->m_page_state[local_page_ndx], RefetchRequired);
                     }
                 }
             }
@@ -686,6 +684,12 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && m->contains_page(page_ndx_in_file)) {
             size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
+            // Experiment - write-invalidate instead of write-update
+            if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) {
+                REALM_ASSERT(is_not(m->m_page_state[shadow_local_page_ndx], Dirty | Writable));
+                clear(m->m_page_state[shadow_local_page_ndx], UpToDate);
+            }
+            /*
             if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) { // only keep up to data pages up to date
                 memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset, page_addr(local_page_ndx) + begin_offset,
                        end_offset - begin_offset);
@@ -693,6 +697,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
             else {
                 m->mark_outdated(shadow_local_page_ndx);
             }
+            */
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
@@ -792,9 +797,9 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 
     auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
         PageState& ps = m_page_state[page_ndx];
-        if (is(ps, UpToDate | RefetchRequired)) {
+        if (is(ps, UpToDate)) {
             if (is_not(ps, Touched) && is_not(ps, Dirty) && is_not(ps, Writable)) {
-                clear(ps, UpToDate | RefetchRequired);
+                clear(ps, UpToDate);
                 reclaim_page(page_ndx);
                 m_num_decrypted--;
                 done_some_work();

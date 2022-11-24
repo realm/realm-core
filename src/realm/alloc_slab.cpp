@@ -1255,6 +1255,7 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
 void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
                                            util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
+    refresh_all_encrypted_pages();
     // FIXME: don't refresh the same page more than once!
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
     auto do_refresh = [&](const RefRanges& ranges) {

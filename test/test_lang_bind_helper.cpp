@@ -3341,8 +3341,8 @@ static void signal_handler(int signal)
 NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
                       !running_with_asan && !running_with_tsan && !running_with_valgrind)
 {
-    const int write_process_count = 7;
-    const int read_process_count = 3;
+    const int write_process_count = 70;
+    const int read_process_count = 30;
 
     int readpids[read_process_count];
     int writepids[write_process_count];
