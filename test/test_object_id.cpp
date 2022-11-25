@@ -20,6 +20,7 @@
 #include <realm/array_fixed_bytes.hpp>
 #include <chrono>
 
+#include "realm/object_id.hpp"
 #include "test.hpp"
 
 
@@ -63,9 +64,9 @@ TEST(ObjectId_Array)
     ArrayObjectId arr(Allocator::get_default());
     arr.create();
 
-    arr.add({str0});
-    arr.add({str1});
-    arr.insert(1, {str2});
+    arr.add(ObjectId{str0});
+    arr.add(ObjectId{str1});
+    arr.insert(1, ObjectId{str2});
 
     ObjectId id2(str2);
     CHECK_EQUAL(arr.get(0), ObjectId(str0));
@@ -97,9 +98,9 @@ TEST(ObjectId_ArrayNull)
     ArrayObjectIdNull arr(Allocator::get_default());
     arr.create();
 
-    arr.add({str0});
-    arr.add({str1});
-    arr.insert(1, {str2});
+    arr.add(ObjectId{str0});
+    arr.add(ObjectId{str1});
+    arr.insert(1, ObjectId{str2});
     ObjectId id2(str2);
     CHECK(!arr.is_null(0));
     CHECK_EQUAL(arr.get(0), ObjectId(str0));
@@ -146,10 +147,10 @@ TEST(ObjectId_ArrayNullMove)
 
     auto get_value_for_ndx = [&](size_t ndx) -> util::Optional<ObjectId> {
         if (ndx % 3 == 0) {
-            return {str0};
+            return ObjectId{str0};
         }
         else if (ndx % 3 == 1) {
-            return {str1};
+            return ObjectId{str1};
         }
         else {
             return util::none;
@@ -162,8 +163,8 @@ TEST(ObjectId_ArrayNullMove)
 
     ArrayObjectIdNull arr1(Allocator::get_default());
     arr1.create();
-    arr1.add({str0});
-    arr1.add({str1});
+    arr1.add(ObjectId{str0});
+    arr1.add(ObjectId{str1});
     arr1.add(util::none);
     arr.move(arr1, 0);
 
@@ -411,7 +412,11 @@ TEST(ObjectId_Distinct)
     DBRef db = DB::create(path);
 
     {
-        std::vector<ObjectId> ids{"000004560000000000170232", "000004560000000000170233", "000004550000000000170232"};
+        std::vector<ObjectId> ids{
+            ObjectId("000004560000000000170232"),
+            ObjectId("000004560000000000170233"),
+            ObjectId("000004550000000000170232"),
+        };
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
         auto col_id = table->add_column(type_ObjectId, "id", true);
