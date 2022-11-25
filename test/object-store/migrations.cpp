@@ -2581,8 +2581,8 @@ TEST_CASE("migration: Additive") {
         REQUIRE_NOTHROW(realm->refresh());
         auto schema_diff = schema.compare(realm->schema());
         REQUIRE(schema_diff.size() == 1);
-        REQUIRE( schema_diff ==
-            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
@@ -2603,8 +2603,8 @@ TEST_CASE("migration: Additive") {
         REQUIRE_NOTHROW(realm->refresh());
         auto schema_diff = schema.compare(realm->schema());
         REQUIRE(schema_diff.size() == 1);
-        REQUIRE( schema_diff ==
-            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
@@ -2624,8 +2624,8 @@ TEST_CASE("migration: Additive") {
         realm = Realm::get_shared_realm(config);
         schema_diff = schema.compare(realm->schema());
         REQUIRE(schema_diff.size() == 1);
-        REQUIRE( schema_diff ==
-            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
