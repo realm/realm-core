@@ -744,7 +744,7 @@ inline int64_t Array::back() const noexcept
 inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG(m_has_refs);
+    REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
     int64_t v = get(ndx);
     return to_ref(v);
 }

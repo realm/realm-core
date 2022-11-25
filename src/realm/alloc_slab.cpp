@@ -798,8 +798,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
         if (top_ref) {
             // Get the expected file size by looking up logical file size stored in top array
-            constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
-            constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
+            constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
             size_t top_page_base = top_ref & ~(page_size() - 1);
             size_t top_offset = top_ref - top_page_base;
             size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
@@ -808,7 +807,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             auto top_header = map_top.get_addr() + top_offset;
             auto top_data = NodeHeader::get_data_from_header(top_header);
             auto w = NodeHeader::get_width_from_header(top_header);
-            auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
+            auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
             expected_size = round_up_to_page_size(logical_size);
         }
     }
@@ -1267,7 +1266,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     };
     RefRanges ranges;
     for (auto version : read_locks) {
-        ranges.push_back(RefRange{version.top_ref, version.top_ref + Group::s_group_max_size + Array::header_size});
+        ranges.push_back(
+            RefRange{version.top_ref, version.top_ref + Array::header_size + (Group::s_group_max_size * 8)});
     }
     do_refresh(ranges);
 
@@ -1282,6 +1282,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         Array top_array(*this), free_positions(*this), free_lengths(*this);
         top_array.init_from_ref(read_lock.top_ref);
+        auto actual_version = top_array.get_as_ref_or_tagged(Group::s_version_ndx).get_as_int();
+        REALM_ASSERT_EX(actual_version == read_lock.version, actual_version, read_lock.version, read_lock.top_ref);
         if (top_array.size() <= Group::s_free_pos_ndx) {
             // A file on streaming format has no freelist info.
             continue;
@@ -1298,15 +1300,21 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
         free_positions.init_from_ref(free_positions_ref);
         free_lengths.init_from_ref(free_sizes_ref);
+        REALM_ASSERT_EX(free_positions.is_attached(), free_positions_ref, read_lock.version, read_lock.top_ref);
+        REALM_ASSERT_EX(free_lengths.is_attached(), free_sizes_ref, read_lock.version, read_lock.top_ref);
         size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
         size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
         do_refresh({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
                     {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
-
+        // FIXME: verify versions list here for integrity?
         // we can now access this freelist version's pos and lengths
-        Array cur_freelist_posistions(*this), cur_freelist_lengths(*this);
-        cur_freelist_posistions.init_from_ref(free_positions_ref);
+        Array cur_freelist_positions(*this), cur_freelist_lengths(*this);
+        cur_freelist_positions.init_from_ref(free_positions_ref);
         cur_freelist_lengths.init_from_ref(free_sizes_ref);
+        REALM_ASSERT_EX(cur_freelist_positions.size() == cur_freelist_lengths.size(), cur_freelist_positions.size(),
+                        cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, pos_bytes_to_refresh,
+                        sizes_bytes_to_refresh, read_lock.version, read_lock.top_ref);
+
         if (!processed_first_version) {
             processed_first_version = true;
             prev_freelist_positions.init_from_ref(free_positions_ref);
@@ -1316,56 +1324,112 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
         RefRanges allocations;
 
+        auto combine_contiguous_entries = [](size_t& ndx, ref_type& end, Array& positions, Array& sizes,
+                                             size_t freelist_length) {
+            for (size_t i = ndx + 1; i < freelist_length; ++i) {
+                ref_type next_pos = positions.get(i);
+                if (end == next_pos) {
+                    end = next_pos + sizes.get(i);
+                    ++ndx;
+                }
+                else {
+                    return;
+                }
+            }
+        };
+
         // Assumes freelists are in sorted order and are minimal contiguous ranges.
         // find allocations by walking through differences
         size_t previous_ndx = 0;
         size_t current_ndx = 0;
         const size_t prev_freelist_size = prev_freelist_positions.size();
-        const size_t cur_freelist_size = cur_freelist_posistions.size();
-        REALM_ASSERT_3(prev_freelist_positions.size(), ==, prev_freelist_lengths.size());
-        REALM_ASSERT_3(cur_freelist_posistions.size(), ==, cur_freelist_lengths.size());
+        const size_t cur_freelist_size = cur_freelist_positions.size();
         while (previous_ndx < prev_freelist_size && current_ndx < cur_freelist_size) {
-            REALM_ASSERT_EX(previous_ndx < prev_freelist_positions.size(), previous_ndx,
-                            prev_freelist_positions.size());
-            REALM_ASSERT_EX(previous_ndx < prev_freelist_lengths.size(), previous_ndx, prev_freelist_lengths.size());
-            REALM_ASSERT_EX(current_ndx < cur_freelist_posistions.size(), current_ndx,
-                            cur_freelist_posistions.size());
-            REALM_ASSERT_EX(current_ndx < cur_freelist_lengths.size(), current_ndx, cur_freelist_lengths.size());
-
             ref_type prev_start = prev_freelist_positions.get(previous_ndx);
             ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
-            ref_type cur_start = cur_freelist_posistions.get(current_ndx);
+            ref_type cur_start = cur_freelist_positions.get(current_ndx);
             ref_type cur_end = cur_start + cur_freelist_lengths.get(current_ndx);
+            combine_contiguous_entries(previous_ndx, prev_end, prev_freelist_positions, prev_freelist_lengths,
+                                       prev_freelist_size);
+            combine_contiguous_entries(current_ndx, cur_end, cur_freelist_positions, cur_freelist_lengths,
+                                       cur_freelist_size);
+
+#ifdef REALM_DEBUG
+            if (previous_ndx + 1 < prev_freelist_size) {
+                size_t start = prev_freelist_positions.get(previous_ndx + 1);
+                size_t end = start + prev_freelist_lengths.get(previous_ndx + 1);
+                REALM_ASSERT_EX(prev_end < start, prev_start, prev_end, start, end);
+            }
+            if (current_ndx + 1 < cur_freelist_size) {
+                size_t start = cur_freelist_positions.get(current_ndx + 1);
+                size_t end = start + cur_freelist_lengths.get(current_ndx + 1);
+                REALM_ASSERT_EX(cur_end < start, cur_start, prev_end, start, end);
+            }
+#endif // REALM_DEBUG
+            auto add_alloc_for_remainder_of_block = [&]() {
+                if (current_ndx + 1 < cur_freelist_size) {
+                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + 1);
+                    if (next_cur_start < prev_end) {
+                        //     -------
+                        //  ----  --
+                        //      ++
+                        allocations.push_back(RefRange{cur_end, next_cur_start});
+                        ++current_ndx;
+                        return;
+                    }
+                }
+                //    -----
+                // ------
+                //       ++
+                allocations.push_back(RefRange{cur_end, prev_end});
+                ++previous_ndx;
+                ++current_ndx;
+            };
+
             if (cur_start >= prev_end) {
+                // ----
+                //       ----
+                // ++++
                 allocations.push_back(RefRange{prev_start, prev_end});
                 ++previous_ndx;
             }
             else if (cur_start >= prev_start) {
-                if (cur_start != prev_start) {
+                if (cur_start != prev_start && (allocations.empty() || allocations.back().end < cur_start)) {
+                    // ----
+                    //  ---
+                    // +
                     allocations.push_back(RefRange{prev_start, cur_start});
                 }
                 if (cur_end < prev_end) {
-                    allocations.push_back(RefRange{cur_end, prev_end});
-                    ++current_ndx;
+                    // ----
+                    //  --
+                    //    +
+                    add_alloc_for_remainder_of_block();
                 }
                 else if (cur_end == prev_end) {
+                    // ----
+                    //  ---
                     ++current_ndx;
                     ++previous_ndx;
                 }
                 else { // cur_end > prev_end
+                    // ----
+                    // -------
                     ++previous_ndx;
                 }
             }
             else if (cur_end <= prev_start) {
+                //       ----
+                // ----
                 ++current_ndx;
             }
             else if (cur_end < prev_end) {
-                allocations.push_back(RefRange{cur_end, prev_end});
-                ++previous_ndx;
-                ++current_ndx;
+                add_alloc_for_remainder_of_block();
             }
             else {
                 // current block is equal to or contains the previous block
+                //  ----
+                // ------
                 REALM_ASSERT_EX(cur_start <= prev_start && cur_end >= prev_end, cur_start, cur_end, prev_start,
                                 prev_end);
                 ++previous_ndx;
@@ -1383,8 +1447,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             allocations.push_back(RefRange{prev_start, prev_end});
             ++previous_ndx;
         }
-
-        allocations.push_back(RefRange{0, 12}); // slot-selector etc.
 
         do_refresh(allocations);
 

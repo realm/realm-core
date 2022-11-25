@@ -470,13 +470,17 @@ TEST(Alloc_EncryptionPageRefresher)
     constexpr size_t top_array_size = 12;         // s_group_max_size
     constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
     constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
+    constexpr size_t top_array_version_ndx = 6;   // s_version_ndx
     constexpr size_t total_size = 50;
 
-    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges allocations, size_t total_size, Array& top) {
+    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges allocations, size_t total_size, Array& top,
+                                            size_t version) {
         RefRanges free_space;
         size_t last_alloc = 0;
         for (auto& allocation : allocations) {
-            free_space.push_back({last_alloc, allocation.begin});
+            if (allocation.begin != last_alloc) {
+                free_space.push_back({last_alloc, allocation.begin});
+            }
             last_alloc = allocation.end;
         }
         if (last_alloc < total_size) {
@@ -494,12 +498,13 @@ TEST(Alloc_EncryptionPageRefresher)
         }
         top.set_as_ref(top_array_free_pos_ndx, free_positions.get_ref());
         top.set_as_ref(top_array_free_size_ndx, free_sizes.get_ref());
+        top.set(top_array_version_ndx, RefOrTagged::make_tagged(version));
     };
     auto add_expected_refreshes_for_arrays = [](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
                                                 RefRanges& to_refresh) {
         for (auto& v : top_refs) {
             // all top refs up to the max top ref size
-            to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size + top_array_size});
+            to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size + (top_array_size * 8)});
             // the ref + header size of free_pos and free_size
             Array top(alloc), pos(alloc), sizes(alloc);
             top.init_from_ref(v.top_ref);
@@ -520,9 +525,10 @@ TEST(Alloc_EncryptionPageRefresher)
         std::vector<VersionedTopRef> top_refs;
         size_t version_dummy = 0;
         for (auto& v : versions) {
+            version_dummy++;
             Array top(alloc);
-            make_top_ref_with_allocations(alloc, v, total_size, top);
-            top_refs.push_back({top.get_ref(), ++version_dummy});
+            make_top_ref_with_allocations(alloc, v, total_size, top, version_dummy);
+            top_refs.push_back({top.get_ref(), version_dummy});
         }
         add_expected_refreshes_for_arrays(alloc, top_refs, expected_diffs);
         RefRanges actual_allocations;
@@ -569,6 +575,18 @@ TEST(Alloc_EncryptionPageRefresher)
 
     allocated_blocks = {{{5, 10}, {20, 30}}, {{10, 20}}};
     expected_diff = {{10, 20}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 10}, {10, 20}, {20, 30}}, {{7, 10}, {10, 25}, {35, 40}}};
+    expected_diff = {{35, 40}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{0, 5}, {40, 45}}, {{0, 10}, {15, 20}, {25, 30}, {35, 50}}};
+    expected_diff = {{5, 10}, {15, 20}, {25, 30}, {35, 40}, {45, 50}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{0, 5}, {10, 15}, {20, 25}, {30, 35}}, {{0, 5}, {35, 50}}};
+    expected_diff = {{35, 50}};
     check_range_refreshes(allocated_blocks, expected_diff);
 }
 

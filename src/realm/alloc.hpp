@@ -434,7 +434,7 @@ inline int_fast64_t from_ref(ref_type v) noexcept
 inline ref_type to_ref(int_fast64_t v) noexcept
 {
     // Check that v is divisible by 8 (64-bit aligned).
-    REALM_ASSERT_DEBUG(v % 8 == 0);
+    REALM_ASSERT_DEBUG_EX(v % 8 == 0, v);
 
     // C++11 standard, paragraph 4.7.2 [conv.integral]:
     // If the destination type is unsigned, the resulting value is the least unsigned integer congruent to the source
@@ -586,7 +586,7 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
             return translate_less_critical(ref_translation_ptr, ref);
         }
     }
-    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890);
+    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890, ref, idx);
     return nullptr;
 }
 
