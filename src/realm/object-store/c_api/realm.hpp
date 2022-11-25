@@ -81,19 +81,19 @@ public:
         m_error_callback = std::move(on_error);
     }
 
-    void did_create_thread() override
+    virtual void did_create_thread() override
     {
         if (m_create_callback)
             m_create_callback();
     }
 
-    void will_destroy_thread() override
+    virtual void will_destroy_thread() override
     {
         if (m_destroy_callback)
             m_destroy_callback();
     }
 
-    void handle_error(std::exception const& e) override
+    virtual void handle_error(std::exception const& e) override
     {
         if (m_error_callback)
             m_error_callback(e.what());
