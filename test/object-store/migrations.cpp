@@ -2567,6 +2567,9 @@ TEST_CASE("migration: Additive") {
     }
 
     SECTION("add new columns from different SG") {
+        using vec = std::vector<SchemaChange>;
+        using namespace schema_change;
+
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2576,13 +2579,19 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() != schema);
+        auto schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE( schema_diff ==
+            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
     }
 
     SECTION("opening new Realms uses the correct schema after an external change") {
+        using vec = std::vector<SchemaChange>;
+        using namespace schema_change;
+
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2592,7 +2601,10 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() != schema);
+        auto schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE( schema_diff ==
+            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
@@ -2610,7 +2622,10 @@ TEST_CASE("migration: Additive") {
         // In case of additive schemas, changes to an external realm are on purpose
         // propagated between different realm instances.
         realm = Realm::get_shared_realm(config);
-        REQUIRE(realm->schema() != schema);
+        schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE( schema_diff ==
+            vec{(AddProperty{&*schema.find("object"), &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);

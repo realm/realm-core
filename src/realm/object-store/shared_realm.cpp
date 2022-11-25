@@ -231,8 +231,6 @@ void Realm::read_schema_from_group_if_needed(bool is_schema_additive)
         }
         return;
     }
-
-    auto schema = m_schema;
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
     if (m_schema_transaction_version == current_version)
@@ -240,7 +238,7 @@ void Realm::read_schema_from_group_if_needed(bool is_schema_additive)
 
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
-    schema = ObjectStore::schema_from_group(group);
+    auto schema = ObjectStore::schema_from_group(group);
 
     if (is_schema_additive)
         load_schema_for_version_if_needed(current_version, schema);
