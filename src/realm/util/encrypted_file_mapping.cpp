@@ -663,8 +663,28 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
             if (m->contains_page(page_ndx)) {
                 size_t local_page_ndx = page_ndx - m->m_first_page;
                 if (is(m->m_page_state[local_page_ndx], UpToDate)) {
-                    // if we hit a concurrent write it takes priority and we cannot
-                    // trigger a refetch.
+                    // if we collide with a concurrent write (state Writable) we cannot mark
+                    // the page for refresh. If we did, it might be refreshed and any partial
+                    // write would be lost.
+                    // Same goes for an already written page (state Dirty).
+                    // However: The reader triggering the mark for refresh is doing so before
+                    // the write has completed (or the page would have been flushed and in UpToDate state),
+                    // so the reader cannot be meant to see the write. The write may be to the same
+                    // page, but it cannot be to the part of the page that the reader requests.
+                    // - the real problem: we may need to refresh this page due to an earlier
+                    //   write which the reader *must* see, but collide with a later writer which
+                    // we must not overwrite.
+                    //
+                    // Does the following argument save the day?
+                    // Every writer to a page must have refreshed that page as part of executing
+                    // a read barrier. This, it the writer must have done while holding the write
+                    // lock. Consequently the page must already have been refreshed up to the version
+                    // which a reader is requesting. The reader may have deferred mark for request,
+                    // but it actually does not need it.
+                    // a) there must be a read_barrier for every write_barrier
+                    // b) the writer mush have marked pages for refresh up till latest version,
+                    // c) it must have done so while holding the write lock
+                    // Are a/b/c fullfilled?  Are they sufficient?
                     if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
                         clear(m->m_page_state[local_page_ndx], UpToDate);
                         set(m->m_page_state[local_page_ndx], RefetchRequired);
