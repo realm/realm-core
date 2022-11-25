@@ -20,6 +20,7 @@
 
 #include <realm/object-store/c_api/util.hpp>
 #include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/binding_callback_thread_observer.hpp>
 
 namespace realm::c_api {
 
@@ -81,19 +82,19 @@ public:
         m_error_callback = std::move(on_error);
     }
 
-    virtual void did_create_thread() override
+    void did_create_thread() override
     {
         if (m_create_callback)
             m_create_callback();
     }
 
-    virtual void will_destroy_thread() override
+    void will_destroy_thread() override
     {
         if (m_destroy_callback)
             m_destroy_callback();
     }
 
-    virtual void handle_error(std::exception const& e) override
+    void handle_error(std::exception const& e) override
     {
         if (m_error_callback)
             m_error_callback(e.what());
