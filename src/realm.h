@@ -61,7 +61,7 @@ typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
-typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata); 
+typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata);
 typedef void (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
 
 /* Accessor types */
@@ -4000,15 +4000,14 @@ RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_e
  * runs.
  * @param on_thread_create callback invoked when the object store thread is created
  * @param on_thread_destroy callback invoked when the object store thread is destroyed
- * @param on_error callback invoked to signal to the listener that some error has occured. 
+ * @param on_error callback invoked to signal to the listener that some error has occured.
  * @return a token that has to be released in order to stop receiving notifications
  */
-RLM_API realm_thread_observer_token_t* realm_set_binding_callback_thread_observer(
-    realm_on_object_store_thread_callback_t on_thread_create,
-    realm_on_object_store_thread_callback_t on_thread_destroy, 
-    realm_on_object_store_error_callback_t on_error,
-    realm_userdata_t,
-    realm_free_userdata_func_t free_userdata);
+RLM_API realm_thread_observer_token_t*
+realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
+                                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t,
+                                           realm_free_userdata_func_t free_userdata);
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
