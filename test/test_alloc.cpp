@@ -471,7 +471,7 @@ TEST(Alloc_EncryptionPageRefresher)
     constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
     constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
     constexpr size_t top_array_version_ndx = 6;   // s_version_ndx
-    constexpr size_t total_size = 50;
+    constexpr size_t total_size = 50;             // an arbitrary fake file size cap
 
     auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges allocations, size_t total_size, Array& top,
                                             size_t version) {
@@ -587,6 +587,35 @@ TEST(Alloc_EncryptionPageRefresher)
 
     allocated_blocks = {{{0, 5}, {10, 15}, {20, 25}, {30, 35}}, {{0, 5}, {35, 50}}};
     expected_diff = {{35, 50}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    // 3 versions
+    allocated_blocks = {{{0, 5}, {30, 50}}, {{0, 20}, {35, 50}}, {{0, 25}, {27, 50}}};
+    expected_diff = {{5, 25}, {27, 35}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{10, 15}, {30, 35}}, {{20, 25}}, {{5, 40}}};
+    expected_diff = {{5, 40}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{5, 40}}, {{10, 15}, {30, 35}}, {{20, 25}}};
+    expected_diff = {{20, 25}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{}, {{20, 40}}, {{15, 45}}};
+    expected_diff = {{15, 45}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{}, {{20, 40}}, {{25, 45}}};
+    expected_diff = {{20, 45}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{}, {{20, 40}}, {}, {{25, 30}, {32, 35}}};
+    expected_diff = {{20, 40}};
+    check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{}, {{20, 40}}, {}, {{25, 30}, {32, 35}}, {{15, 25}, {35, 45}}};
+    expected_diff = {{15, 45}};
     check_range_refreshes(allocated_blocks, expected_diff);
 }
 

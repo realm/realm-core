@@ -1274,6 +1274,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     Array prev_freelist_positions(*this);
     Array prev_freelist_lengths(*this);
     bool processed_first_version = false;
+    RefRanges allocations;
     for (auto& read_lock : read_locks) {
         if (read_lock.top_ref == 0) {
             // a top_ref of zero can happen if the lock was requested on an empty Realm
@@ -1325,8 +1326,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             prev_freelist_lengths.init_from_ref(free_sizes_ref);
             continue;
         }
-
-        RefRanges allocations;
 
         auto combine_contiguous_entries = [](size_t& ndx, ref_type& end, Array& positions, Array& sizes,
                                              size_t freelist_length) {
@@ -1452,11 +1451,32 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             ++previous_ndx;
         }
 
-        do_refresh(allocations);
-
         prev_freelist_positions.init_from_ref(free_positions_ref);
         prev_freelist_lengths.init_from_ref(free_sizes_ref);
     }
+
+    // combine adjacent ranges
+    std::sort(allocations.begin(), allocations.end(), [](const RefRange& a, const RefRange& b) {
+        return a.begin < b.begin;
+    });
+    for (auto it = allocations.begin(); it != allocations.end();) {
+        auto it_next = it + 1;
+        if (it_next != allocations.end() && it_next->begin <= it->end) {
+            REALM_ASSERT_DEBUG_EX(it_next->begin >= it->begin, it->begin, it->end, it_next->begin, it_next->end);
+            if (it_next->end <= it->end) {
+                allocations.erase(it_next); // next fits entirely inside current; delete next
+                continue;
+            }
+            else if (it_next->end > it->end) {
+                it->end = it_next->end; // expand current and delete next
+                allocations.erase(it_next);
+                continue;
+            }
+        }
+        ++it;
+    }
+
+    do_refresh(allocations);
 }
 
 void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
