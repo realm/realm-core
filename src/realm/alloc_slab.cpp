@@ -1282,6 +1282,10 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         Array top_array(*this), free_positions(*this), free_lengths(*this);
         top_array.init_from_ref(read_lock.top_ref);
+        if (top_array.size() < Group::s_version_ndx) {
+            // a file on streaming format may not contain versioning info
+            continue;
+        }
         auto actual_version = top_array.get_as_ref_or_tagged(Group::s_version_ndx).get_as_int();
         REALM_ASSERT_EX(actual_version == read_lock.version, actual_version, read_lock.version, read_lock.top_ref);
         if (top_array.size() <= Group::s_free_pos_ndx) {
