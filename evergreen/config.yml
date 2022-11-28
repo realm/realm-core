@@ -216,7 +216,7 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/baas-work-dir/baas_server.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/baas_server.log'
+      remote_file: '${github_repo}/${branch_name}/${task_id}/${execution}/baas_server.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -227,7 +227,7 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/install_baas_output.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
+      remote_file: '${github_repo}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -486,7 +486,7 @@ tasks:
       aws_secret: '${artifacts_aws_secret_key}'
       local_files_include_filter:
         - realm-core/bloaty-results/*.csv
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      remote_file: '${github_repo}/${branch_name}/${task_id}/${execution}/bloaty-results-'
       bucket: mciuploads
       permissions: public-read
       content_type: text/csv
@@ -497,7 +497,7 @@ tasks:
       aws_secret: '${artifacts_aws_secret_key}'
       local_files_include_filter:
         - realm-core/bloaty-results/*.txt
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      remote_file: '${github_repo}/${branch_name}/${task_id}/${execution}/bloaty-results-'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -508,7 +508,7 @@ tasks:
       aws_secret: '${artifacts_aws_secret_key}'
       local_files_include_filter:
         - realm-core/bloaty-results/*.json
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      remote_file: '${github_repo}/${branch_name}/${task_id}/${execution}/bloaty-results-'
       bucket: mciuploads
       permissions: public-read
       content_type: application/json
