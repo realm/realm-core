@@ -449,10 +449,12 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(std::string{realm_config_get_fifo_path(config.get())} == "test_path.FIFO");
         }
     }
+
+#if REALM_ENABLE_SYNC
     SECTION("realm_app_config_t") {
+        // realm_http_transport is not defined if REALM_ENABLE_SYNC is not set
         auto http_transport = realm_http_transport(nullptr);
         auto app_config = cptr(realm_app_config_new("some_app_id", &http_transport));
-
 
 #if REALM_ENABLE_AUTH_TESTS
         SECTION("realm_app_config_t with transport") {
@@ -472,7 +474,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(app_config->app_id == "app_id_123");
             CHECK(app_config->transport == nullptr);
         }
-#endif
+#endif //REALM_ENABLE_AUTH_TESTS
 
         SECTION("realm_app_config_set_base_url()") {
             realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
@@ -539,6 +541,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(app_config->device.framework_version == "some_framework_version");
         }
     }
+#endif // REALM_ENABLE_SYNC
 }
 
 namespace {
