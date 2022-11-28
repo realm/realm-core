@@ -449,6 +449,84 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(std::string{realm_config_get_fifo_path(config.get())} == "test_path.FIFO");
         }
     }
+    SECTION("realm_app_config_t") {
+        auto http_transport = realm_http_transport(nullptr);
+        auto app_config = cptr(realm_app_config_new("some_app_id", &http_transport));
+
+        SECTION("realm_app_config_t with transport") {
+            std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<SynchronousTestTransport>();
+            auto http_transport = realm_http_transport(transport);
+            app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
+            CHECK(app_config.get() != nullptr);
+            CHECK(app_config->app_id == "app_id_123");
+            CHECK(app_config->transport == transport);
+        }
+
+        SECTION("realm_app_config_set_base_url()") {
+            realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
+            CHECK(app_config->base_url == "https://path/to/app");
+        }
+
+        SECTION("realm_app_config_set_local_app_name()") {
+            realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
+            CHECK(app_config->local_app_name == "some_app_name");
+        }
+
+        SECTION("realm_app_config_set_local_app_version()") {
+            realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
+            CHECK(app_config->local_app_version == "some_app_version");
+        }
+
+        SECTION("realm_app_config_set_default_request_timeout()") {
+            realm_app_config_set_default_request_timeout(app_config.get(), 2500);
+            CHECK(app_config->default_request_timeout_ms == 2500);
+        }
+
+        SECTION("realm_app_config_set_platform()") {
+            realm_app_config_set_platform(app_config.get(), "some_platform_name");
+            CHECK(app_config->device.platform == "some_platform_name");
+        }
+
+        SECTION("realm_app_config_set_platform_version()") {
+            realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
+            CHECK(app_config->device.platform_version == "some_platform_version");
+        }
+
+        SECTION("realm_app_config_set_sdk_version()") {
+            realm_app_config_set_sdk_version(app_config.get(), "some_sdk_version");
+            CHECK(app_config->device.sdk_version == "some_sdk_version");
+        }
+
+        SECTION("realm_app_config_set_sdk()") {
+            realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
+            CHECK(app_config->device.sdk == "some_sdk_name");
+        }
+
+        SECTION("realm_app_config_set_cpu_arch()") {
+            realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
+            CHECK(app_config->device.cpu_arch == "some_cpu_arch");
+        }
+
+        SECTION("realm_app_config_set_device_name()") {
+            realm_app_config_set_device_name(app_config.get(), "some_device_name");
+            CHECK(app_config->device.device_name == "some_device_name");
+        }
+
+        SECTION("realm_app_config_set_device_version()") {
+            realm_app_config_set_device_version(app_config.get(), "some_device_version");
+            CHECK(app_config->device.device_version == "some_device_version");
+        }
+
+        SECTION("realm_app_config_set_framework_name()") {
+            realm_app_config_set_framework_name(app_config.get(), "some_framework_name");
+            CHECK(app_config->device.framework_name == "some_framework_name");
+        }
+
+        SECTION("realm_app_config_set_framework_version()") {
+            realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
+            CHECK(app_config->device.framework_version == "some_framework_version");
+        }
+    }
 }
 
 namespace {
