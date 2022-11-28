@@ -486,7 +486,7 @@ public:
         }
 
         static std::shared_ptr<DB>& get_db(Realm& realm);
-        static void begin_read(Realm&, VersionID, bool = false);
+        static void begin_read(Realm&, VersionID, bool = true);
     };
 
 private:

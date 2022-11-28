@@ -353,7 +353,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
         // must retain 'rt' until after opening for reading at that version
-        TestHelper::begin_read(old_realm, old_version);
+        TestHelper::begin_read(old_realm, old_version, false);
         rt = nullptr;
         REQUIRE(old_realm->schema().size() == 1);
     }
