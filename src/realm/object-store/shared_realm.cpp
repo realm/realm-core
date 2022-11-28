@@ -82,7 +82,7 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_transaction = coordinator->begin_read(version.value_or(VersionID{}));
-        read_schema_from_group_if_needed(m_config.is_schema_additive());
+        read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
     }
@@ -138,17 +138,17 @@ std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
     return realm.m_coordinator->m_db;
 }
 
-void Realm::Internal::begin_read(Realm& realm, VersionID version_id, bool load_schema_from_latest_version)
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 {
-    realm.begin_read(version_id, load_schema_from_latest_version);
+    realm.begin_read(version_id);
 }
 
-void Realm::begin_read(VersionID version_id, bool load_schema_from_latest_version)
+void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_transaction);
     m_transaction = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
-    read_schema_from_group_if_needed(m_config.is_schema_additive() && load_schema_from_latest_version);
+    read_schema_from_group_if_needed();
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -221,7 +221,7 @@ void Realm::set_schema(Schema const& reference, Schema schema)
     notify_schema_changed();
 }
 
-void Realm::read_schema_from_group_if_needed(bool load_schema_from_latest_version)
+void Realm::read_schema_from_group_if_needed()
 {
     if (m_config.immutable()) {
         REALM_ASSERT(m_transaction);
@@ -239,9 +239,6 @@ void Realm::read_schema_from_group_if_needed(bool load_schema_from_latest_versio
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
-
-    if (load_schema_from_latest_version)
-        load_schema_from_cached_version_if_needed(current_version, schema);
 
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
@@ -262,22 +259,6 @@ void Realm::read_schema_from_group_if_needed(bool load_schema_from_latest_versio
     }
     notify_schema_changed();
 }
-
-void Realm::load_schema_from_cached_version_if_needed(uint64_t current_tr_version, Schema& schema)
-{
-    if (m_coordinator) {
-        Schema local_schema;
-        uint64_t schema_version;
-        uint64_t transaction_version;
-        const auto schema_exist = m_coordinator->get_cached_schema(local_schema, schema_version, transaction_version);
-        if (schema_exist && transaction_version > current_tr_version) {
-            schema = local_schema;
-            m_schema_transaction_version = transaction_version;
-            m_schema_version = schema_version;
-        }
-    }
-}
-
 
 bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_changes)
 {
