@@ -574,8 +574,8 @@ void App::attach_auth_options(BsonDocument& body)
     }
 
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
-              m_config.device.platform, m_config.device.platform_version, m_config.device.sdk_version,
-              REALM_VERSION_STRING);
+              m_config.device.platform, m_config.device.platform_version, m_config.device.sdk,
+              m_config.device.sdk_version, REALM_VERSION_STRING);
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.device.platform;
     options["platformVersion"] = m_config.device.platform_version;
