@@ -453,6 +453,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         auto http_transport = realm_http_transport(nullptr);
         auto app_config = cptr(realm_app_config_new("some_app_id", &http_transport));
 
+
+#if REALM_ENABLE_AUTH_TESTS
         SECTION("realm_app_config_t with transport") {
             std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<SynchronousTestTransport>();
             auto http_transport = realm_http_transport(transport);
@@ -461,6 +463,16 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(app_config->app_id == "app_id_123");
             CHECK(app_config->transport == transport);
         }
+#else
+        // SynchronousTestTransport is not available if SYNC is not enabled
+        SECTION("realm_app_config_t with transport") {
+            auto http_transport = realm_http_transport(nullptr);
+            app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
+            CHECK(app_config.get() != nullptr);
+            CHECK(app_config->app_id == "app_id_123");
+            CHECK(app_config->transport == nullptr);
+        }
+#endif
 
         SECTION("realm_app_config_set_base_url()") {
             realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
