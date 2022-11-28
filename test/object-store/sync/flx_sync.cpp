@@ -225,9 +225,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            auto it = mut_subs.find(query_foo);
-            CHECK(it != mut_subs.end());
-            mut_subs.erase(it);
+            CHECK(mut_subs.erase(query_foo));
             Query new_query_bar(table);
             new_query_bar.equal(col_key, "bar");
             mut_subs.insert_or_assign(new_query_bar);
@@ -380,7 +378,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     auto count_queries_with_str = [](sync::SubscriptionSet subs, std::string_view str) {
         size_t count = 0;
         for (auto sub : subs) {
-            if (sub.query_string().find(str) != std::string::npos) {
+            if (sub.query_string.find(str) != std::string::npos) {
                 ++count;
             }
         }
@@ -1241,7 +1239,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
-        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     }
 
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
@@ -1710,7 +1708,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
-        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     };
 
     auto mutate_realm = [&] {

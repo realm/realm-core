@@ -507,41 +507,41 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
 RLM_API realm_object_id_t realm_sync_subscription_id(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->id());
+    return to_capi(subscription->id);
 }
 
 RLM_API realm_string_t realm_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->name());
+    return to_capi(subscription->name ? "" : *subscription->name);
 }
 
 RLM_API realm_string_t
 realm_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->object_class_name());
+    return to_capi(subscription->object_class_name);
 }
 
 RLM_API realm_string_t
 realm_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->query_string());
+    return to_capi(subscription->query_string);
 }
 
 RLM_API realm_timestamp_t
 realm_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->created_at());
+    return to_capi(subscription->created_at);
 }
 
 RLM_API realm_timestamp_t
 realm_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->updated_at());
+    return to_capi(subscription->updated_at);
 }
 
 RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t* config,
@@ -654,10 +654,10 @@ realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t* su
                                      const char* name) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(name);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(name);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t(*it);
+    return new realm_flx_sync_subscription_t(*ptr);
 }
 
 RLM_API realm_flx_sync_subscription_t*
@@ -666,10 +666,10 @@ realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*
 {
     REALM_ASSERT(subscription_set != nullptr);
     auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
-    auto it = subscription_set->find(realm_query);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(realm_query);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t{*it};
+    return new realm_flx_sync_subscription_t{*ptr};
 }
 
 RLM_API realm_flx_sync_subscription_t*
@@ -690,10 +690,10 @@ realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t* s
 {
     REALM_ASSERT(subscription_set != nullptr);
     auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
-    auto it = subscription_set->find(realm_query);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(realm_query);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t(*it);
+    return new realm_flx_sync_subscription_t(*ptr);
 }
 
 RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t* subscription_set)
@@ -762,7 +762,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
     *erased = false;
     return wrap_err([&] {
         auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
-            return from_capi(*id) == sub.id();
+            return from_capi(*id) == sub.id;
         });
         if (it != subscription_set->end()) {
             subscription_set->erase(it);
@@ -778,10 +778,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_su
     REALM_ASSERT(subscription_set != nullptr && name != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(name); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(name);
         return true;
     });
 }
@@ -793,10 +790,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
     *erased = false;
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
-        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(realm_query);
         return true;
     });
 }
@@ -808,10 +802,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     *erased = false;
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
-        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(realm_query);
         return true;
     });
 }
