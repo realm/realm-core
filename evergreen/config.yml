@@ -42,6 +42,7 @@ functions:
           set -o errexit
           set -o verbose
 
+
           if [ -d cmake_vars ]; then
               rm cmake_vars/*.txt
           fi
