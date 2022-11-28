@@ -474,7 +474,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(app_config->app_id == "app_id_123");
             CHECK(app_config->transport == nullptr);
         }
-#endif //REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_AUTH_TESTS
 
         SECTION("realm_app_config_set_base_url()") {
             realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
