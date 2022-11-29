@@ -269,6 +269,7 @@ set(REALM_NOINST_HEADERS
     util/circular_buffer.hpp
     util/cli_args.hpp
     util/client_websocket.hpp
+    util/client_eventloop.hpp
     util/default_websocket.hpp
     util/demangle.hpp
     util/enum.hpp

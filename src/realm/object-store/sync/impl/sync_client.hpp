@@ -23,6 +23,7 @@
 
 #include <thread>
 
+#include <realm/object-store/binding_callback_thread_observer.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/impl/network_reachability.hpp>
 
@@ -69,11 +70,13 @@ struct SyncClient {
             }
         })
     {
+        m_client.set_eventloop_observer(g_binding_callback_thread_observer);
         m_client.start();
         if (!m_reachability_observer.start_observing())
             m_logger.error("Failed to set up network reachability observer");
 #else
     {
+        m_client.set_eventloop_observer(g_binding_callback_thread_observer);
         m_client.start();
         static_cast<void>(weak_sync_manager);
 #endif

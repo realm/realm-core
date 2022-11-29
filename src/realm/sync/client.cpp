@@ -1724,6 +1724,11 @@ void Client::add_test_setup(util::UniqueFunction<void()>&& setup_func)
     m_impl->add_test_setup(std::move(setup_func));
 }
 
+void Client::set_eventloop_observer(util::EventLoopObserver* observer)
+{
+    m_impl->set_eventloop_observer(observer);
+}
+
 void Client::start()
 {
     m_impl->start();

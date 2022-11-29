@@ -153,29 +153,7 @@ ClientImpl::ClientImpl(ClientConfig config)
 
     m_event_loop = m_socket_factory->create_event_loop();
     REALM_ASSERT(m_event_loop != nullptr);
-    m_event_loop->register_event_loop_observer(util::websocket::EventLoopClient::EventLoopObserver{
-        [this]() { // starting event_loop
-            logger.trace("EventLoop: started");
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->did_create_thread();
-            }
-        },
-        [this]() { // stopping event_loop
-            logger.trace("EventLoop: stopped");
-            if (m_stop_promise) {
-                // If sync_start() is waiting, free it now...
-                m_stop_promise->emplace_value();
-            }
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->will_destroy_thread();
-            }
-        },
-        [this](std::exception const& e) { // event_loop error
-            logger.error("EventLoop: exception occurred: %1", e.what());
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->handle_error(e);
-            }
-        }});
+    m_event_loop->register_event_loop_observer(this);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -225,6 +203,38 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
     return out.str();                                     // Throws
 }
 
+// This method is called just before the eventloop thread is started
+void ClientImpl::did_create_thread()
+{
+    logger.trace("EventLoop started");
+    if (m_event_loop_observer) {
+        m_event_loop_observer->did_create_thread();
+    }
+}
+
+
+// This method is called just before the eventloop thread is being destroyed
+void ClientImpl::will_destroy_thread()
+{
+    logger.trace("EventLoop stopped");
+    // If sync_start() is waiting, free it now...
+    if (m_stop_promise) {
+        m_stop_promise->emplace_value();
+    }
+    if (m_event_loop_observer) {
+        m_event_loop_observer->will_destroy_thread();
+    }
+}
+
+
+// This method is called with any exception thrown by the event loop thread
+void ClientImpl::handle_error(std::exception const& e)
+{
+    logger.error("EventLoop exception occurred: %1", e.what());
+    if (m_event_loop_observer) {
+        m_event_loop_observer->handle_error(e);
+    }
+}
 
 void Connection::activate()
 {

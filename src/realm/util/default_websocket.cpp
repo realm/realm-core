@@ -12,9 +12,9 @@ namespace {
 class DefaultWebSocketImpl final : public WebSocket, public websocket::Config {
 public:
     DefaultWebSocketImpl(const std::string& user_agent_string, const std::shared_ptr<util::Logger>& logger,
-                         std::shared_ptr<DefaultEventLoopClient>& event_loop, WebSocketObserver& observer,
+                         std::shared_ptr<DefaultServiceClient>& event_loop, WebSocketObserver& observer,
                          Endpoint&& endpoint)
-        : WebSocket(user_agent_string)
+        : m_user_agent(user_agent_string)
         , m_logger_ptr{logger}
         , m_logger{*m_logger_ptr}
         , m_event_loop(event_loop)
@@ -108,9 +108,10 @@ private:
     void initiate_pong_timeout();
     void handle_pong_timeout();
 
+    std::string m_user_agent;
     std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
-    std::shared_ptr<DefaultEventLoopClient> m_event_loop;
+    std::shared_ptr<DefaultServiceClient> m_event_loop;
     WebSocketObserver& m_observer;
     const Endpoint m_endpoint;
     std::mt19937_64 m_random;
@@ -360,76 +361,6 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 }
 } // namespace
 
-void DefaultEventLoopClient::stop()
-{
-    // Need to release the lock for the join
-    util::CheckedUniqueLock lock(m_mutex);
-    if (m_state == State::NotStarted || m_state == State::Running) {
-        update_state(State::Stopping);
-        m_service.stop();
-        // In case stop() was called from the event loop thread, wait to join the thread
-        // until the event loop is destructed
-    }
-}
-
-void DefaultEventLoopClient::update_state(State new_state)
-{
-    switch (m_state) {
-        case State::NotStarted: // NotStarted -> any state other than NotStarted
-            if (new_state != State::NotStarted)
-                m_state = new_state;
-            break;
-        case State::Running: // Running -> Stopping or Stopped
-            if (new_state == State::Stopping || new_state == State::Stopped)
-                m_state = new_state;
-            break;
-        case State::Stopping: // Stopping -> Stopped
-            if (new_state == State::Stopped)
-                m_state = new_state;
-            break;
-        case State::Stopped: // Stopped -> not allowed
-            break;
-    }
-}
-
-// If the service thread is not running, make sure it has been started
-bool DefaultEventLoopClient::ensure_service_is_running()
-{
-    util::CheckedLockGuard lock(m_mutex);
-    if (m_state == State::NotStarted) {
-        if (m_thread == nullptr) {
-            m_thread = std::make_unique<std::thread>([this]() mutable {
-                if (m_observer && m_observer->starting_event_loop) {
-                    (*m_observer->starting_event_loop)();
-                }
-                auto will_destroy_thread = util::make_scope_exit([this]() noexcept {
-                    if (m_observer && m_observer->stopping_event_loop) {
-                        (*m_observer->stopping_event_loop)();
-                    }
-                });
-                // If we're already stopped, exit thread
-                if (!is_stopped()) {
-                    thread_update_state(State::Running);
-                    try {
-                        m_service.run(); // Throws
-                    }
-                    catch (const std::exception& e) {
-                        if (m_observer && m_observer->event_loop_error) {
-                            (*m_observer->event_loop_error)(e);
-                        }
-                    }
-                }
-                thread_update_state(State::Stopped);
-                //}
-            });
-        }
-        // Return true to indicate the thread is in the process of being started
-        // The state will be updated once the thread is up and running
-        return true;
-    }
-    // Return true if the event loop is running
-    return m_state == State::Running;
-}
 
 std::unique_ptr<WebSocket> DefaultWebSocketFactory::connect(WebSocketObserver* observer, Endpoint&& endpoint)
 {

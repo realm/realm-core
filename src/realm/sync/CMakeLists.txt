@@ -26,6 +26,7 @@ set(SYNC_SOURCES
     ../util/network_ssl.cpp
     ../util/network.cpp
     ../util/websocket.cpp
+    ../util/default_eventloop.cpp
     ../util/default_websocket.cpp
 )
 
@@ -50,7 +51,9 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+    ../util/client_eventloop.hpp
     ../util/client_websocket.hpp
+    ../util/eventloop_observer.hpp
 )
 
 set(NOINST_HEADERS

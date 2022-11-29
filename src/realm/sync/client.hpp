@@ -10,6 +10,7 @@
 #include <string>
 
 #include <realm/util/buffer.hpp>
+#include <realm/util/eventloop_observer.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/subscriptions.hpp>
@@ -40,6 +41,11 @@ public:
     /// Add a test setup function that will be posted to the event loop and will run
     /// when the event loop thread is started. For testing only.
     void add_test_setup(util::UniqueFunction<void()>&&);
+
+    /// Set the event loop observer that is called when the event loop thread starts,
+    /// stops, or an exception is thrown. This function can only be called between the
+    /// time the event loop is created and start() is called.
+    void set_eventloop_observer(util::EventLoopObserver* observer);
 
     /// Start the internal event-loop of the client. At most one event loop may
     /// execute at any given time. This is a non-blocking call.

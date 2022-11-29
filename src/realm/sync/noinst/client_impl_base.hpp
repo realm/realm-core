@@ -12,11 +12,12 @@
 #include <list>
 
 #include <realm/binary_data.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/util/buffer_stream.hpp>
-#include <realm/util/logger.hpp>
 #include <realm/util/default_websocket.hpp>
-#include "realm/util/span.hpp"
+#include <realm/util/eventloop_observer.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/span.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -55,7 +56,7 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
-class ClientImpl {
+class ClientImpl : public util::EventLoopObserver {
 public:
     enum class ConnectionTerminationReason;
     class Connection;
@@ -126,6 +127,23 @@ public:
     /// when the event loop thread is started. For testing only.
     void add_test_setup(util::UniqueFunction<void()>&&);
 
+    /// Set the event loop observer that is called when the event loop thread starts,
+    /// stops, or an exception is thrown. This function can only be called between the
+    /// time the event loop is created and start() is called.
+    void set_eventloop_observer(util::EventLoopObserver* observer);
+
+    // @{
+    /// ClientImpl event loop observer functions for handling event loop events
+    // This method is called just before the thread is started
+    void did_create_thread() override;
+
+    // This method is called just before the thread is being destroyed
+    void will_destroy_thread() override;
+
+    // This method is called with any exception thrown by client.run().
+    void handle_error(std::exception const& e) override;
+    // @}
+
     // @{
     /// These call stop() and start() on the event loop respectively. If a promise is provided
     /// to start, it will be triggered when stop() is called.
@@ -172,6 +190,7 @@ private:
     const bool m_one_connection_per_session;
     util::websocket::EventLoopTrigger m_actualize_and_finalize;
     util::websocket::EventLoopTimer m_keep_running_timer;
+    util::EventLoopObserver* m_event_loop_observer = nullptr;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -1124,6 +1143,12 @@ inline auto ClientImpl::get_reconnect_mode() const noexcept -> ReconnectMode
 inline bool ClientImpl::is_dry_run() const noexcept
 {
     return m_dry_run;
+}
+
+inline void ClientImpl::set_eventloop_observer(util::EventLoopObserver* observer)
+{
+    REALM_ASSERT(m_event_loop && !m_event_loop->is_started());
+    m_event_loop_observer = observer;
 }
 
 inline util::websocket::EventLoopClient& ClientImpl::get_event_loop() noexcept
