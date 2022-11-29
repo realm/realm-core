@@ -2919,16 +2919,8 @@ NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
 
     const std::string test_dir = "/test-temp";
     DBOptions::set_sys_tmp_dir(test_dir);
-    CHECK(DBOptions::get_sys_tmp_dir().compare(test_dir) == 0);
-
-    // Without specifying the temp dir, sys_tmp_dir should be used.
-    DBOptions options;
-    CHECK(options.temp_dir.compare(test_dir) == 0);
-
-    // Should use the specified temp dir.
-    const std::string test_dir2 = "/test2-temp";
-    DBOptions options2(DBOptions::Durability::Full, nullptr, true, nullptr, test_dir2);
-    CHECK(options2.temp_dir.compare(test_dir2) == 0);
+    CHECK_EQUAL(DBOptions::get_sys_tmp_dir(), test_dir);
+    CHECK_EQUAL(DBOptions().temp_dir, test_dir);
 
     DBOptions::set_sys_tmp_dir(initial_system_dir);
 }

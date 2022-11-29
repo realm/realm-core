@@ -5903,4 +5903,34 @@ TEST(Table_AsymmetricObjects)
     tr->commit();
 }
 
+TEST(Table_FullTextIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(path);
+    ColKey col;
+
+    {
+        auto wt = db->start_write();
+
+        auto t = wt->add_table("foo");
+        col = t->add_column(type_String, "str");
+        t->add_fulltext_index(col);
+        auto index = t->get_search_index(col);
+        CHECK(index->is_fulltext_index());
+
+        t->create_object().set(col, "This is a test, with  spaces!");
+        t->create_object().set(col, "More testing, with normal spaces");
+        t->create_object().set(col, "ål, ø og æbler");
+
+        wt->commit();
+    }
+
+    auto rt = db->start_read();
+    auto t = rt->get_table("foo");
+    auto index = t->get_search_index(col);
+    CHECK(index->is_fulltext_index());
+    TableView res = t->find_all_fulltext(col, "spaces with");
+    CHECK_EQUAL(2, res.size());
+}
+
 #endif // TEST_TABLE

@@ -474,6 +474,10 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
+struct realm_thread_observer_token : realm::c_api::WrapC {
+    explicit realm_thread_observer_token() = default;
+    ~realm_thread_observer_token();
+};
 
 struct realm_callback_token : realm::c_api::WrapC {
 protected:
@@ -583,6 +587,29 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 };
 
 #if REALM_ENABLE_SYNC
+struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
+    realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
+        : task(task)
+        , token(token)
+    {
+    }
+    ~realm_async_open_task_progress_notification_token();
+    std::shared_ptr<realm::AsyncOpenTask> task;
+    uint64_t token;
+};
+
+struct realm_sync_session_connection_state_notification_token : realm::c_api::WrapC {
+    realm_sync_session_connection_state_notification_token(std::shared_ptr<realm::SyncSession> session,
+                                                           uint64_t token)
+        : session(session)
+        , token(token)
+    {
+    }
+    ~realm_sync_session_connection_state_notification_token();
+    std::shared_ptr<realm::SyncSession> session;
+    uint64_t token;
+};
+
 struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
     realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
         : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))

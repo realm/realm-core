@@ -807,6 +807,7 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
         // there's any old ones sitting on disk waiting to be uploaded.
         scan_for_realms_to_upload();
     });
+    session->revive_if_needed();
 }
 
 std::string AuditRealmPool::prefixed_partition(std::string const& partition)
@@ -1005,7 +1006,7 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     }
 
     if (!m_logger)
-        m_logger = audit_user->sync_manager()->make_logger();
+        m_logger = audit_user->sync_manager()->get_logger();
     if (!m_serializer)
         m_serializer = std::make_shared<AuditObjectSerializer>();
 

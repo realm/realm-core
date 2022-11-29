@@ -340,7 +340,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto& db = TestHelper::get_db(realm);
         auto rt = db->start_read();
         VersionID old_version = rt->get_version_of_current_transaction();
-        rt = nullptr;
         realm->close();
 
         config.schema = Schema{
@@ -353,7 +352,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
+        // must retain 'rt' until after opening for reading at that version
         TestHelper::begin_read(old_realm, old_version);
+        rt = nullptr;
         REQUIRE(old_realm->schema().size() == 1);
     }
 
@@ -847,7 +848,19 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 
     SECTION("cancels download and reports an error on auth error") {
-        SyncTestFile config(init_sync_manager.app(), "realm");
+        struct Transport : realm::app::GenericNetworkTransport {
+            void send_request_to_server(
+                const realm::app::Request&,
+                realm::util::UniqueFunction<void(const realm::app::Response&)>&& completion) override
+            {
+                completion(app::Response{403});
+            }
+        };
+        TestSyncManager::Config tsm_config;
+        tsm_config.transport = std::make_shared<Transport>();
+        TestSyncManager tsm(tsm_config);
+
+        SyncTestFile config(tsm.app(), "realm");
         config.sync_config->user->update_refresh_token(std::string(invalid_token));
         config.sync_config->user->update_access_token(std::move(invalid_token));
 
@@ -860,10 +873,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
+            REQUIRE_THROWS_WITH(std::rethrow_exception(error), "Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });
-        init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return called.load();
         });

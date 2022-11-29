@@ -84,7 +84,7 @@ public:
         /// logger is specified, the server will use an instance of
         /// util::StderrLogger with the log level threshold set to
         /// util::Logger::Level::info.
-        util::Logger* logger = nullptr;
+        std::shared_ptr<util::Logger> logger;
 
         /// A unique id of this server. Used in the backup protocol to tell
         /// slaves apart.

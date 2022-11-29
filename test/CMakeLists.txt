@@ -39,6 +39,7 @@ set(CORE_TEST_SOURCES
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_compaction.cpp
     test_db.cpp
     test_decimal128.cpp
     test_destroy_guard.cpp
@@ -186,6 +187,7 @@ if(REALM_ENABLE_SYNC)
         test_sync_auth.cpp
         test_sync_history_migration.cpp
         test_sync_subscriptions.cpp
+        test_sync_pending_bootstraps.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp

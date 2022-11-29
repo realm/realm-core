@@ -241,13 +241,8 @@ int main(int argc, const char** argv)
     CliFlag flx_sync_arg(arg_parser, "flx-sync", 'f');
     auto arg_results = arg_parser.parse(argc, argv);
 
-    std::unique_ptr<RootLogger> logger = std::make_unique<StderrLogger>(); // Throws
-    if (verbose_arg) {
-        logger->set_level_threshold(Logger::Level::all);
-    }
-    else {
-        logger->set_level_threshold(Logger::Level::error);
-    }
+    std::unique_ptr<Logger> logger =
+        std::make_unique<StderrLogger>(verbose_arg ? Logger::Level::all : Logger::Level::error);
 
     if (help_arg) {
         print_usage(arg_results.program_name);

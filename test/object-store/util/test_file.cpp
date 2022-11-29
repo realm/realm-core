@@ -171,11 +171,12 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
                    m_logger.reset(logger);
 #else
-                   m_logger.reset(new TestLogger());
+                   // Logging is disabled, use a NullLogger to prevent printing anything
+                   m_logger.reset(new util::NullLogger());
 #endif
 
                    sync::Server::Config config;
-                   config.logger = m_logger.get();
+                   config.logger = m_logger;
                    config.token_expiration_clock = this;
                    config.listen_address = "127.0.0.1";
                    config.disable_sync_to_disk = true;
@@ -333,11 +334,10 @@ TestAppSession::~TestAppSession()
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
+    : transport(config.transport ? config.transport : std::make_shared<Transport>(network_callback))
+    , m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    if (config.transport)
-        transport = config.transport;
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
 

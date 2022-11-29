@@ -73,7 +73,7 @@ struct SyncClientConfig {
     MetadataMode metadata_mode = MetadataMode::Encryption;
     util::Optional<std::vector<char>> custom_encryption_key;
 
-    using LoggerFactory = std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>;
+    using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
@@ -112,10 +112,11 @@ public:
     ~SyncManager();
 
     // Sets the log level for the Sync Client.
-    // The log level can only be set up until the point the Sync Client is created. This happens when the first
-    // Session is created.
+    // The log level can only be set up until the point the Sync Client is
+    // created (when the first Session is created) or an App operation is
+    // performed (e.g. log in).
     void set_log_level(util::Logger::Level) noexcept REQUIRES(!m_mutex);
-    void set_logger_factory(SyncClientConfig::LoggerFactory) noexcept REQUIRES(!m_mutex);
+    void set_logger_factory(SyncClientConfig::LoggerFactory) REQUIRES(!m_mutex);
 
     // Sets the application level user agent string.
     // This should have the format specified here:
@@ -233,8 +234,8 @@ public:
         return m_config;
     }
 
-    // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> make_logger() const REQUIRES(!m_mutex);
+    // Return the cached logger
+    const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
 
     SyncManager();
     SyncManager(const SyncManager&) = delete;
@@ -271,8 +272,8 @@ private:
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
-    // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> do_make_logger() const REQUIRES(m_mutex);
+    // internally create a new logger - used by configure() and set_logger_factory()
+    void do_make_logger() REQUIRES(m_mutex);
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;
@@ -281,9 +282,10 @@ private:
     std::vector<std::shared_ptr<SyncUser>> m_users GUARDED_BY(m_user_mutex);
     std::shared_ptr<SyncUser> m_current_user GUARDED_BY(m_user_mutex);
 
-    mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
+    mutable std::unique_ptr<_impl::SyncClient> m_sync_client GUARDED_BY(m_mutex);
 
     SyncClientConfig m_config GUARDED_BY(m_mutex);
+    mutable std::shared_ptr<util::Logger> m_logger_ptr GUARDED_BY(m_mutex);
 
     // Protects m_file_manager and m_metadata_manager
     mutable util::CheckedMutex m_file_system_mutex;

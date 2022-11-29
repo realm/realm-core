@@ -173,7 +173,7 @@ struct ClientConfig {
     /// client does not require a thread-safe logger, and it guarantees that
     /// all logging happens either on behalf of the constructor or on behalf
     /// of the invocation of run().
-    util::Logger* logger = nullptr;
+    std::shared_ptr<util::Logger> logger;
 
     /// Use ports 80 and 443 by default instead of 7800 and 7801
     /// respectively. Ideally, these default ports should have been made

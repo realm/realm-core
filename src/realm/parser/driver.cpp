@@ -20,13 +20,17 @@
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 #include "realm/sort_descriptor.hpp"
-#include <realm/decimal128.hpp>
-#include <realm/uuid.hpp>
+#include "realm/decimal128.hpp"
+#include "realm/uuid.hpp"
 #include "realm/util/base64.hpp"
+#include "realm/util/overload.hpp"
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
 #include "realm/parser/generated/query_flex.hpp"
+
+#include <external/mpark/variant.hpp>
+#include <stdexcept>
 
 using namespace realm;
 using namespace std::string_literals;
@@ -174,105 +178,115 @@ inline T string_to(const std::string& s)
 
 class MixedArguments : public query_parser::Arguments {
 public:
+    using Arg = mpark::variant<Mixed, std::vector<Mixed>>;
+
     MixedArguments(const std::vector<Mixed>& args)
         : Arguments(args.size())
-        , m_args([](const std::vector<Mixed>& list) -> std::vector<std::vector<Mixed>> {
-            std::vector<std::vector<Mixed>> ret;
-            for (const Mixed& m : list) {
-                ret.push_back({m});
+        , m_args([](const std::vector<Mixed>& args) -> std::vector<Arg> {
+            std::vector<Arg> ret;
+            ret.reserve(args.size());
+            for (const Mixed& m : args) {
+                ret.push_back(m);
             }
             return ret;
         }(args))
     {
     }
-    MixedArguments(const std::vector<std::vector<Mixed>>& args)
+    MixedArguments(const std::vector<Arg>& args)
         : Arguments(args.size())
         , m_args(args)
     {
     }
     bool bool_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<bool>();
+        return mixed_for_argument(n).get<bool>();
     }
     long long long_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<int64_t>();
+        return mixed_for_argument(n).get<int64_t>();
     }
     float float_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<float>();
+        return mixed_for_argument(n).get<float>();
     }
     double double_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<double>();
+        return mixed_for_argument(n).get<double>();
     }
     StringData string_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<StringData>();
+        return mixed_for_argument(n).get<StringData>();
     }
     BinaryData binary_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<BinaryData>();
+        return mixed_for_argument(n).get<BinaryData>();
     }
     Timestamp timestamp_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<Timestamp>();
+        return mixed_for_argument(n).get<Timestamp>();
     }
     ObjectId objectid_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjectId>();
+        return mixed_for_argument(n).get<ObjectId>();
     }
     UUID uuid_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<UUID>();
+        return mixed_for_argument(n).get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<Decimal128>();
+        return mixed_for_argument(n).get<Decimal128>();
     }
     ObjKey object_index_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjKey>();
+        return mixed_for_argument(n).get<ObjKey>();
     }
     ObjLink objlink_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjLink>();
+        return mixed_for_argument(n).get<ObjLink>();
     }
     std::vector<Mixed> list_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n);
+        return mpark::get<std::vector<Mixed>>(m_args[n]);
     }
     bool is_argument_null(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).size() == 0 || m_args.at(n)[0].is_null();
+        return visit(util::overload{
+                         [](const Mixed& m) {
+                             return m.is_null();
+                         },
+                         [](const std::vector<Mixed>&) {
+                             return false;
+                         },
+                     },
+                     m_args[n]);
     }
     bool is_argument_list(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).size() > 1;
+        static_assert(std::is_same_v<mpark::variant_alternative_t<1, Arg>, std::vector<Mixed>>);
+        return m_args[n].index() == 1;
     }
     DataType type_for_argument(size_t n)
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get_type();
+        return mixed_for_argument(n).get_type();
     }
 
 private:
-    const std::vector<std::vector<Mixed>> m_args;
+    const Mixed& mixed_for_argument(size_t n)
+    {
+        Arguments::verify_ndx(n);
+        if (is_argument_list(n)) {
+            throw std::invalid_argument(
+                util::format("Request for scalar argument at index %1 but a list was provided", n));
+        }
+
+        return mpark::get<Mixed>(m_args[n]);
+    }
+
+    const std::vector<Arg> m_args;
 };
 
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
@@ -670,6 +684,8 @@ Query StringOpsNode::visit(ParserDriver* drv)
                     return drv->m_base_table->where().contains(col_key, val, case_sensitive);
                 case CompareNode::LIKE:
                     return drv->m_base_table->where().like(col_key, val, case_sensitive);
+                case CompareNode::TEXT:
+                    return drv->m_base_table->where().fulltext(col_key, val);
             }
         }
         else if (right_type == type_Binary) {
@@ -698,6 +714,11 @@ Query StringOpsNode::visit(ParserDriver* drv)
                 return Query(std::unique_ptr<Expression>(new Compare<Contains>(std::move(right), std::move(left))));
             case CompareNode::LIKE:
                 return Query(std::unique_ptr<Expression>(new Compare<Like>(std::move(right), std::move(left))));
+            case CompareNode::TEXT: {
+                StringData val = right->get_mixed().get_string();
+                auto string_prop = dynamic_cast<Columns<StringData>*>(left.get());
+                return string_prop->fulltext(val);
+            }
         }
     }
     else {
@@ -1571,7 +1592,7 @@ std::string check_escapes(const char* str)
 
 } // namespace query_parser
 
-Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments) const
+Query Table::query(const std::string& query_string, const std::vector<MixedArguments::Arg>& arguments) const
 {
     MixedArguments args(arguments);
     return query(query_string, args, {});
@@ -1590,7 +1611,7 @@ Query Table::query(const std::string& query_string, const std::vector<Mixed>& ar
     return query(query_string, args, mapping);
 }
 
-Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
+Query Table::query(const std::string& query_string, const std::vector<MixedArguments::Arg>& arguments,
                    const query_parser::KeyPathMapping& mapping) const
 {
     MixedArguments args(arguments);
