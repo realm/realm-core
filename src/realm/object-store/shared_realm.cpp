@@ -236,6 +236,7 @@ void Realm::read_schema_from_group_if_needed()
     if (m_schema_transaction_version == current_version)
         return;
 
+    auto previous_transaction_version = m_schema_transaction_version;
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
@@ -252,6 +253,10 @@ void Realm::read_schema_from_group_if_needed()
             // The structure of the schema has changed, so replace our copy of the schema.
             m_schema = std::move(schema);
         }
+    }
+    else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
+        // no verification of schema changes when opening a past version of the schema
+        m_schema = std::move(schema);
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
