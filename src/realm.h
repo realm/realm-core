@@ -1121,7 +1121,7 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
  * @return True if the realm was successfully refreshed and no exceptions were
  *         thrown.
  */
-RLM_API bool realm_refresh(realm_t*);
+RLM_API bool realm_refresh(realm_t*, bool* did_refresh);
 
 /**
  * Produce a frozen view of this realm.

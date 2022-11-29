@@ -251,10 +251,15 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
 }
 
-RLM_API bool realm_refresh(realm_t* realm)
+RLM_API bool realm_refresh(realm_t* realm, bool* did_refresh)
 {
     return wrap_err([&]() {
-        (*realm)->refresh();
+        bool result = (*realm)->refresh();
+        if (did_refresh) {
+            *did_refresh = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
@@ -271,8 +276,12 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {
         auto& p = **realm;
-        if (did_compact)
-            *did_compact = p.compact();
+        bool result = p.compact();
+        if (did_compact) {
+            *did_compact = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
