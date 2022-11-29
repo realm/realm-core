@@ -3238,7 +3238,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
     auto b_col = tb->get_column_keys()[0];
     TableView tv = ta->where().greater(col, 100).find_all();
     const auto wait_start = std::chrono::steady_clock::now();
-    std::chrono::seconds max_wait_seconds = std::chrono::seconds(250);
+    std::chrono::seconds max_wait_seconds = std::chrono::seconds(1050);
     while (tc->size() == 0) {
         auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();
@@ -3256,13 +3256,36 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
 
 } // anonymous namespace
 
+struct EncryptedPageValidator {
+    EncryptedPageValidator(const std::string& path)
+    {
+        std::string validate_path = path + ".validate";
+        if (util::File::exists(validate_path)) {
+            util::File::remove(validate_path);
+        }
+        m_file.open(validate_path, util::File::Mode::mode_Write);
+        auto msg = util::format("Begin validation at %1\n", Timestamp(std::chrono::system_clock::now()));
+        m_file.write(msg.data(), msg.size());
+        m_file.sync();
+    }
+    ~EncryptedPageValidator()
+    {
+        util::File::remove(m_file.get_path());
+    }
 
-TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
+private:
+    util::File m_file;
+};
+
+
+ONLY(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
     const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
+
+    EncryptedPageValidator validator(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
@@ -3338,8 +3361,7 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
-                      !running_with_asan && !running_with_tsan && !running_with_valgrind)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3385,9 +3407,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
         REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
             {
+                util::format(std::cout, "Writer[%1](%2) starting.\n", getpid(), i);
                 std::unique_ptr<Replication> hist(make_in_realm_history());
                 DBRef sg = DB::create(*hist, path, DBOptions(key));
                 multiple_trackers_writer_thread(sg);
+                util::format(std::cout, "Writer[%1](%2) done.\n", getpid(), i);
             } // clean up sg before exit
             exit(0);
         }
@@ -3402,6 +3426,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess,
                 std::unique_ptr<Replication> hist(make_in_realm_history());
                 DBRef sg = DB::create(*hist, path, DBOptions(key));
                 multiple_trackers_reader_thread(test_context, sg);
+                util::format(std::cout, "Reader[%1] done.\n", i);
             } // clean up sg before exit
             exit(0);
         }

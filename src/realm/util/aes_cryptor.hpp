@@ -109,6 +109,10 @@ struct SharedFileInfo {
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
+#ifdef REALM_DEBUG
+    util::File validator;
+#endif
+
     SharedFileInfo(const uint8_t* key);
 };
 } // namespace realm::util

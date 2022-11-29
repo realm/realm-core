@@ -1301,11 +1301,35 @@ void GroupWriter::commit(ref_type new_top_ref)
     // window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
     //                                 sizeof(file_header.m_top_ref[slot_selector]));
     window->encryption_write_barrier(&file_header, sizeof file_header);
+#ifdef REALM_DEBUG
+    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
+    File validator;
+    if (File::exists(validator_path)) {
+        validator.open(validator_path, File::Mode::mode_Append);
+        validator.seek(validator.get_size());
+        auto msg = util::format("commit version %1, top_ref %2\n", m_current_version, new_top_ref);
+        validator.write(msg.data(), msg.size());
+    }
+#endif // REALM_DEBUG
     flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
         m_alloc.get_file().barrier();
     }
+
+#ifdef REALM_DEBUG
+    if (validator.is_attached()) {
+        std::string msg = "freelist: ";
+        for (size_t i = 0; i < m_free_positions.size(); ++i) {
+            ref_type pos = m_free_positions.get(i);
+            msg += util::format("{%1, %2}, ", pos, pos + m_free_lengths.get(i));
+        }
+        msg += "\n";
+        validator.write(msg.data(), msg.size());
+        validator.sync();
+    }
+#endif // REALM_DEBUG
+
     // Flip the slot selector bit.
     window->encryption_read_barrier(&file_header, sizeof file_header);
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;

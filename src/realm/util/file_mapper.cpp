@@ -563,6 +563,18 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         f.info->fd = fd;
         f.device = st.st_dev;
         f.inode = st.st_ino;
+#ifdef REALM_DEBUG
+
+        char file_path[PATH_MAX];
+        if (fcntl(fd, F_GETPATH, file_path) != -1) {
+            std::string validator_path(file_path, strnlen(file_path, PATH_MAX));
+            validator_path = validator_path + ".validate";
+            if (util::File::exists(validator_path)) {
+                f.info->validator.open(validator_path, util::File::Mode::mode_Append);
+            }
+        }
+
+#endif // REALM_DEBUG
 #endif
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above

@@ -876,6 +876,9 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_page_state.size();
+#ifdef REALM_DEBUG
+    uint64_t pages_written = 0;
+#endif
     for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
         if (is_not(m_page_state[local_page_ndx], Dirty)) {
             validate_page(local_page_ndx);
@@ -886,7 +889,25 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
         clear(m_page_state[local_page_ndx], Dirty);
+#ifdef REALM_DEBUG
+        if (page_ndx_in_file < 64) {
+            pages_written |= (1 << page_ndx_in_file);
+        }
+#endif
     }
+#ifdef REALM_DEBUG
+    if (pages_written > 0 && m_file.validator.is_attached()) {
+        m_file.validator.seek(m_file.validator.get_size());
+        auto msg = util::format("wrote pages: bitwise[%1] at indices: ", pages_written);
+        for (size_t i = 0; i < 64; ++i) {
+            if ((pages_written & (uint64_t(1) << i)) > 0) {
+                msg += util::format("%1%2", i == 0 ? "" : ", ", i);
+            }
+        }
+        msg += std::string("\n");
+        m_file.validator.write(msg.data(), msg.size());
+    }
+#endif // REALM_DEBUG
 
     validate();
 }
