@@ -71,11 +71,12 @@ class BaasRuleBuilder {
 public:
     using IncludePropCond = util::UniqueFunction<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
-                    const std::string& db_name)
+                    const std::string& db_name, bool is_flx_sync)
         : m_schema(schema)
         , m_partition_key(partition_key)
         , m_mongo_service_name(service_name)
         , m_mongo_db_name(db_name)
+        , m_is_flx_sync(is_flx_sync)
     {
     }
 
@@ -91,6 +92,7 @@ private:
     const Property& m_partition_key;
     const std::string& m_mongo_service_name;
     const std::string& m_mongo_db_name;
+    const bool m_is_flx_sync;
     nlohmann::json m_relationships;
     std::vector<std::string> m_current_path;
 };
@@ -181,7 +183,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
 
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     auto& prop_sub_obj = schema_json["properties"];
-    if (!prop_sub_obj.contains(m_partition_key.name)) {
+    if (!prop_sub_obj.contains(m_partition_key.name) && !m_is_flx_sync) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
@@ -1034,7 +1036,8 @@ AppSession create_app(const AppCreateConfig& config)
     // partition key, then add the rest of the properties. This ensures that the
     // targest of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname);
+    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
     for (const auto& obj_schema : config.schema) {
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);

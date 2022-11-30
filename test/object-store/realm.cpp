@@ -1095,12 +1095,6 @@ TEST_CASE("SharedRealm: convert") {
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
     }
 
-    SECTION("cannot convert from local realm to flx sync") {
-        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
-        auto local_realm = Realm::get_shared_realm(local_config1);
-        REQUIRE_THROWS(local_realm->convert(sync_config));
-    }
-
     SECTION("can copy a local realm to a local realm") {
         auto local_realm1 = Realm::get_shared_realm(local_config1);
         local_realm1->begin_transaction();
