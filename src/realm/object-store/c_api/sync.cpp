@@ -997,10 +997,4 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
 }
 
-RLM_API void
-realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer) noexcept
-{
-    g_binding_callback_thread_observer = thread_observer;
-}
-
 } // namespace realm::c_api
