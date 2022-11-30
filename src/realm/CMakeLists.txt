@@ -88,7 +88,7 @@ set(UTIL_SOURCES
     util/platform_info.cpp
     util/misc_errors.cpp
     util/serializer.cpp
-    util/sha_crypto.cpp
+    "$<$<NOT:$<BOOL:${EMSCRIPTEN}>>:util/sha_crypto.cpp>" # TODO need to find wasm impl of sha functions
     util/terminate.cpp
     util/time.cpp
     util/timestamp_formatter.cpp
@@ -358,7 +358,7 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 
@@ -367,12 +367,18 @@ if(TARGET ZLIB::ZLIB)
     target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
 elseif(APPLE)
     target_link_options(Storage PUBLIC "-lz")
+elseif(EMSCRIPTEN)
+    target_compile_options(Storage PUBLIC -sUSE_ZLIB=1)
 else()
     message(FATAL_ERROR "No zlib dependency defined")
 endif()
 
 if(APPLE)
     target_link_libraries(Storage PUBLIC "-lcompression")
+endif()
+
+if(EMSCRIPTEN)
+    target_compile_options(Storage PUBLIC -sUSE_PTHREADS)
 endif()
 
 install(TARGETS Storage EXPORT realm
