@@ -123,6 +123,9 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
     return make_runloop(nullptr);
 #elif REALM_ANDROID
     return make_alooper();
+#elif EMSCRIPTEN
+    // FIXME We don't need notification yet for WASM
+    return make_generic();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");

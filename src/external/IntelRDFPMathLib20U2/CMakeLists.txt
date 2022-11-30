@@ -22,6 +22,10 @@ if(MSVC)
     target_compile_options(Bid PUBLIC /W1 /sdl-)
 endif()
 
+if(EMSCRIPTEN)
+    target_compile_options(Bid PUBLIC -sUSE_PTHREADS)
+endif()
+
 # Note: checking for -Wfoo since unknown -Wno-foo flags are ignored.
 check_cxx_compiler_flag(-Wunused-but-set-variable HAVE-Wunused-but-set-variable)
 if(HAVE-Wunused-but-set-variable)

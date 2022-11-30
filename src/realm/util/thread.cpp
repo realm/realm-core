@@ -103,7 +103,7 @@ void Thread::set_name(const std::string& name)
 
 bool Thread::get_name(std::string& name) noexcept
 {
-#if (defined _GNU_SOURCE && !REALM_ANDROID) || REALM_PLATFORM_APPLE
+#if (defined _GNU_SOURCE && !REALM_ANDROID && !EMSCRIPTEN) || REALM_PLATFORM_APPLE
     const size_t max = 64;
     char name_2[max];
     pthread_t id = pthread_self();

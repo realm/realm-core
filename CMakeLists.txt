@@ -286,7 +286,7 @@ endif()
 # Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
-if(NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
     if(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
         # (see https://github.com/android/ndk/issues/1179)
