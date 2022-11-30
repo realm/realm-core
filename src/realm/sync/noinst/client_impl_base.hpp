@@ -1099,6 +1099,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 

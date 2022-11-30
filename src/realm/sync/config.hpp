@@ -135,6 +135,7 @@ enum class SyncClientHookEvent {
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
     BootstrapProcessed,
+    ErrorMessageReceived,
 };
 
 enum class SyncClientHookAction {
@@ -149,6 +150,7 @@ struct SyncClientHookData {
     int64_t query_version;
     sync::DownloadBatchState batch_state;
     size_t num_changesets;
+    const sync::ProtocolErrorInfo* error_info = nullptr;
 };
 
 struct SyncConfig {

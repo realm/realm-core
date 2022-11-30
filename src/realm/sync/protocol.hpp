@@ -237,6 +237,8 @@ struct ProtocolErrorInfo {
     bool client_reset_recovery_is_disabled = false;
     util::Optional<bool> should_client_reset;
     util::Optional<std::string> log_url;
+    version_type compensating_write_server_version = 0;
+    version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     util::Optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;

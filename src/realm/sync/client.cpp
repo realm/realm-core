@@ -875,6 +875,27 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
     m_wrapper.on_flx_sync_version_complete(version);
 }
 
+SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
+{
+    auto action = m_wrapper.m_debug_hook(data);
+    switch (action) {
+        case realm::SyncClientHookAction::SuspendWithRetryableError: {
+            if (data.event == SyncClientHookEvent::ErrorMessageReceived) {
+                return action;
+            }
+            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
+                                      true);
+            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+            auto err_processing_err = receive_error_message(err_info);
+            REALM_ASSERT(!err_processing_err);
+            return SyncClientHookAction::NoAction;
+        }
+        default:
+            return action;
+    }
+}
+
 SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const SyncProgress& progress,
                                                   int64_t query_version, DownloadBatchState batch_state,
                                                   size_t num_changesets)
@@ -890,20 +911,24 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.num_changesets = num_changesets;
     data.query_version = query_version;
 
-    auto action = m_wrapper.m_debug_hook(data);
-    switch (action) {
-        case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
-                                      true);
-            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+    return call_debug_hook(data);
+}
 
-            auto err_processing_err = receive_error_message(err_info);
-            REALM_ASSERT(!err_processing_err);
-            return SyncClientHookAction::NoAction;
-        }
-        default:
-            return action;
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
+{
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
     }
+
+    SyncClientHookData data;
+    data.event = event;
+    data.batch_state = DownloadBatchState::SteadyState;
+    data.progress = m_progress;
+    data.num_changesets = 0;
+    data.query_version = 0;
+    data.error_info = &error_info;
+
+    return call_debug_hook(data);
 }
 
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)

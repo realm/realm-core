@@ -308,6 +308,11 @@ public:
                             cwei.primary_key = sync::parse_base64_encoded_primary_key(pk);
                             info.compensating_writes.push_back(std::move(cwei));
                         }
+
+                        info.compensating_write_server_version =
+                            json.at("compensatingWriteServerVersion").get<int64_t>();
+                        info.compensating_write_rejected_client_version =
+                            json.at("rejectedClientVersion").get<int64_t>();
                     }
                 }
                 catch (const nlohmann::json::exception& e) {

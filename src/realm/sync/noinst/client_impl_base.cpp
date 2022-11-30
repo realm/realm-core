@@ -2305,6 +2305,8 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    auto hook_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+
     // Ignore the error because the connection is going to be closed.
     if (m_connection_to_close)
         return std::error_code{}; // Success
@@ -2326,7 +2328,8 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    if (!session_level_error_requires_suspend(error_code)) {
+    if (!session_level_error_requires_suspend(error_code) &&
+        hook_action != SyncClientHookAction::SuspendWithRetryableError) {
         on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
         return {}; // Success
     }

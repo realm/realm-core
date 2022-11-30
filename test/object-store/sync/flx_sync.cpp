@@ -2481,6 +2481,158 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     }
 }
 
+TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app]") {
+    AppCreateConfig::FLXSyncRole role;
+    role.name = "compensating_write_perms";
+    role.read = true;
+    role.write =
+        nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+    FLXSyncTestHarness::ServerSchema server_schema{
+        g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
+    FLXSyncTestHarness::Config harness_config("flx_bad_query", server_schema);
+    harness_config.reconnect_mode = ReconnectMode::testing;
+    FLXSyncTestHarness harness(std::move(harness_config));
+
+    auto test_obj_id_1 = ObjectId::gen();
+    auto test_obj_id_2 = ObjectId::gen();
+
+    create_user_and_log_in(harness.app());
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.cache = false;
+
+    {
+        auto error_received_pf = util::make_promise_future<void>();
+        config.sync_config->on_sync_client_event_hook =
+            [promise = util::CopyablePromiseHolder(std::move(error_received_pf.promise))](
+                std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+                if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                    return SyncClientHookAction::NoAction;
+                }
+                auto session = weak_session.lock();
+                REQUIRE(session);
+
+                auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+
+                if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                REQUIRE(error_code == sync::ProtocolError::compensating_write);
+                REQUIRE_FALSE(data.error_info->compensating_writes.empty());
+                promise.get_promise().emplace_value();
+
+                return SyncClientHookAction::SuspendWithRetryableError;
+            };
+
+        auto realm = Realm::get_shared_realm(config);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
+        std::move(new_query).commit();
+
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {"_id", test_obj_id_1},
+                           {"queryable_str_field", std::string{"foo"}},
+                       }));
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {"_id", test_obj_id_2},
+                           {"queryable_str_field", std::string{"baz"}},
+                       }));
+        realm->commit_transaction();
+
+        error_received_pf.future.get();
+        realm->sync_session()->shutdown_and_wait();
+        config.sync_config->on_sync_client_event_hook = {};
+    }
+
+    _impl::RealmCoordinator::clear_all_caches();
+
+    std::mutex errors_mutex;
+    std::vector<SyncError> errors;
+    std::vector<sync::ProtocolErrorInfo> error_infos;
+    sync::version_type last_seen_download_version = 0;
+
+    config.sync_config->on_sync_client_event_hook =
+        [&](std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+            auto session = weak_session.lock();
+            if (!session) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (data.event == SyncClientHookEvent::DownloadMessageIntegrated) {
+                std::lock_guard<std::mutex> lk(errors_mutex);
+                last_seen_download_version = data.progress.download.server_version;
+                return SyncClientHookAction::NoAction;
+            }
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            REQUIRE(error_code == sync::ProtocolError::compensating_write);
+            std::lock_guard<std::mutex> lk(errors_mutex);
+            error_infos.emplace_back(*data.error_info);
+            return SyncClientHookAction::NoAction;
+        };
+
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+        std::lock_guard<std::mutex> lk(errors_mutex);
+        errors.push_back(std::move(error));
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    {
+        std::lock_guard<std::mutex> lk(errors_mutex);
+
+        REQUIRE(errors.size() == 2);
+        auto& sync_error = errors.front();
+
+        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        auto& write_info = sync_error.compensating_writes_info[0];
+        CHECK(write_info.primary_key.is_type(type_ObjectId));
+        CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
+        CHECK(write_info.object_name == "TopLevel");
+        CHECK_THAT(write_info.reason,
+                   Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
+
+        sync_error = errors.back();
+        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        write_info = sync_error.compensating_writes_info[0];
+        REQUIRE(write_info.primary_key.is_type(type_ObjectId));
+        REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
+        REQUIRE(write_info.object_name == "TopLevel");
+        REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+    }
+    auto top_level_table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(top_level_table->is_empty());
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto top_level_table = realm->read_group().get_table("class_TopLevel");
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(top_level_table));
+        std::move(mut_subs).commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+        wait_for_advance(*realm);
+
+        REQUIRE(top_level_table->is_empty());
+    });
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
