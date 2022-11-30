@@ -186,7 +186,9 @@ private:
     //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
     std::vector<FreeSpaceEntry> m_under_evacuation;
-    std::multimap<size_t, size_t> m_size_map;
+    std::multimap<size_t, size_t> m_size_map; // now holds full pages
+    std::multimap<size_t, size_t>
+        m_opened_blocks; // holds blocks originally taken from m_size_map, from which allocation has been done
     std::vector<size_t> m_evacuation_progress;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 

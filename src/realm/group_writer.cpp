@@ -847,6 +847,7 @@ void GroupWriter::read_in_freelist()
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
     REALM_ASSERT_RELEASE_EX(m_free_versions.size() == limit, limit, m_free_versions.size());
+    auto page_shift = log2(page_size());
 
     if (limit) {
         auto limit_version = m_oldest_reachable_version;
@@ -872,8 +873,39 @@ void GroupWriter::read_in_freelist()
                     continue;
                 }
             }
-
-            free_in_file.emplace_back(ref, size, 0);
+            // entries which cover one or more whole pages have those pages available for allocation.
+            // chunks less than a full page remain locked.
+            auto first_page = ref >> page_shift;
+            auto last_page = (ref + size) >> page_shift;
+            if (first_page == last_page) {
+                // not a full page:
+                m_not_free_in_file.emplace_back(ref, size, 0);
+                continue;
+            }
+            auto starts_aligned = ref == (first_page << page_shift);
+            if (!starts_aligned) {
+                auto offset_into_page = ref - (first_page << page_shift);
+                REALM_ASSERT(offset_into_page < (1 << page_shift));
+                auto first_chunk_size = (1 << page_shift) - offset_into_page;
+                m_not_free_in_file.emplace_back(ref, first_chunk_size, 0);
+                // remaining block now starts at next page boundary:
+                ++first_page;
+                ref = first_page << page_shift;
+                size -= first_chunk_size;
+            }
+            auto ends_aligned = (ref + size) == (last_page << page_shift);
+            if (!ends_aligned) {
+                auto last_chunk_start = last_page << page_shift;
+                auto last_chunk_size = (ref + size) - last_chunk_start;
+                REALM_ASSERT(last_chunk_size < (1 << page_shift));
+                m_not_free_in_file.emplace_back(last_chunk_start, last_chunk_size, 0);
+                size -= last_chunk_size;
+            }
+            if (size > 0) {
+                // whole pages available
+                REALM_ASSERT(size == (last_page - first_page) << page_shift);
+                free_in_file.emplace_back(ref, size, 0);
+            }
         }
 
         // This will imply a copy-on-write
@@ -921,6 +953,9 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     size_t reserve_ndx = realm::npos;
 
     for (const auto& entry : m_size_map) {
+        free_in_file.emplace_back(entry.second, entry.first, 0);
+    }
+    for (const auto& entry : m_opened_blocks) {
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
 
