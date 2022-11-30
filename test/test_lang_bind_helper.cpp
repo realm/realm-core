@@ -3278,7 +3278,7 @@ private:
 };
 
 
-ONLY(LangBindHelper_ImplicitTransactions_MultipleTrackers)
+TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
     const int read_thread_count = 3;
@@ -3400,6 +3400,8 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
     else {
         test_util::waitpid_checked(pid, 0, "populate");
     }
+
+    EncryptedPageValidator validator(path);
 
     // intialization complete. Start writers:
     for (int i = 0; i < write_process_count; ++i) {

@@ -471,20 +471,28 @@ TEST(Alloc_EncryptionPageRefresher)
     constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
     constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
     constexpr size_t top_array_version_ndx = 6;   // s_version_ndx
-    constexpr size_t total_size = 50;             // an arbitrary fake file size cap
 
-    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges allocations, size_t total_size, Array& top,
-                                            size_t version) {
+    enum class RefsType { Allocations, Freelists };
+
+    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges refs, RefsType type, size_t total_size,
+                                            Array& top, size_t version) {
         RefRanges free_space;
-        size_t last_alloc = 0;
-        for (auto& allocation : allocations) {
-            if (allocation.begin != last_alloc) {
-                free_space.push_back({last_alloc, allocation.begin});
+        if (type == RefsType::Allocations) {
+            size_t last_alloc = 0;
+            for (auto& allocation : refs) {
+                if (allocation.begin != last_alloc) {
+                    free_space.push_back({last_alloc, allocation.begin});
+                }
+                last_alloc = allocation.end;
             }
-            last_alloc = allocation.end;
+            if (last_alloc < total_size) {
+                free_space.push_back({last_alloc, total_size});
+            }
         }
-        if (last_alloc < total_size) {
-            free_space.push_back({last_alloc, total_size});
+        else if (type == RefsType::Freelists) {
+            for (auto& block : refs) {
+                free_space.push_back({block.begin, block.end});
+            }
         }
         constexpr bool context_flag = false;
         top.create(Node::Type::type_HasRefs, context_flag, top_array_size, 0);
@@ -518,7 +526,8 @@ TEST(Alloc_EncryptionPageRefresher)
         }
     };
 
-    auto check_range_refreshes = [&](std::vector<RefRanges> versions, RefRanges expected_diffs) {
+    auto check_range_refreshes = [&](std::vector<RefRanges> versions, RefRanges expected_diffs, size_t file_size = 50,
+                                     RefsType type = RefsType::Allocations) {
         SlabAlloc alloc;
         alloc.attach_empty();
         CHECK(alloc.is_attached());
@@ -527,7 +536,7 @@ TEST(Alloc_EncryptionPageRefresher)
         for (auto& v : versions) {
             version_dummy++;
             Array top(alloc);
-            make_top_ref_with_allocations(alloc, v, total_size, top, version_dummy);
+            make_top_ref_with_allocations(alloc, v, type, file_size, top, version_dummy);
             top_refs.push_back({top.get_ref(), version_dummy});
         }
         add_expected_refreshes_for_arrays(alloc, top_refs, expected_diffs);
@@ -617,6 +626,56 @@ TEST(Alloc_EncryptionPageRefresher)
     allocated_blocks = {{}, {{20, 40}}, {}, {{25, 30}, {32, 35}}, {{15, 25}, {35, 45}}};
     expected_diff = {{15, 45}};
     check_range_refreshes(allocated_blocks, expected_diff);
+
+    allocated_blocks = {{{0, 128},
+                         {168, 168},
+                         {328, 328},
+                         {520, 768},
+                         {792, 968},
+                         {1048, 1048},
+                         {1808, 2352},
+                         {3464, 3464},
+                         {4008, 4768}},
+                        {{0, 96},
+                         {128, 288},
+                         {520, 560},
+                         {600, 680},
+                         {712, 752},
+                         {768, 768},
+                         {792, 928},
+                         {968, 1376},
+                         {1808, 1808},
+                         {2352, 3112},
+                         {4008, 4008},
+                         {4768, 4904}}};
+    expected_diff = {{128, 288}, {968, 1376}, {2352, 3112}, {4768, 4904}};
+    check_range_refreshes(allocated_blocks, expected_diff, 8192);
+
+    // diff by direct free list inputs
+    std::vector<RefRanges> free_lists;
+    free_lists = {{{96, 168},
+                   {328, 520},
+                   {560, 600},
+                   {680, 712},
+                   {752, 768},
+                   {768, 792},
+                   {928, 1048},
+                   {1808, 3056},
+                   {3056, 3464},
+                   {4008, 4856},
+                   {4856, 5616},
+                   {5616, 8192}},
+                  {{128, 168},
+                   {168, 328},
+                   {328, 520},
+                   {768, 792},
+                   {968, 1048},
+                   {1048, 1808},
+                   {2352, 3464},
+                   {3464, 4008},
+                   {4768, 8192}}};
+    expected_diff = {{96, 128}, {560, 600}, {680, 712}, {752, 768}, {928, 968}, {1808, 2352}, {4008, 4768}};
+    check_range_refreshes(free_lists, expected_diff, 8192, RefsType::Freelists);
 }
 
 #endif // TEST_ALLOC

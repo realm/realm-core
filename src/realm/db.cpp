@@ -285,7 +285,7 @@ struct VersionList {
                     REALM_ASSERT_EX(rc->count_live + rc->count_frozen + rc->count_full > 0, rc->count_live,
                                     rc->count_frozen, rc->count_full);
                 }
-                versions.push_back(VersionedTopRef{rc->current_top, rc->version});
+                versions.push_back(VersionedTopRef{rc->current_top, rc->version, rc->filesize});
             }
         }
         // begin and end versions must be found because this should be called with a read lock on both

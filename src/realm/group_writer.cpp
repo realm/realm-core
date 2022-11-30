@@ -1319,7 +1319,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
 #ifdef REALM_DEBUG
     if (validator.is_attached()) {
-        std::string msg = "freelist: ";
+        std::string msg = util::format("file size: %1, freelist: ", m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);
             msg += util::format("{%1, %2}, ", pos, pos + m_free_lengths.get(i));

@@ -82,6 +82,7 @@ using RefRanges = std::vector<RefRange>;
 struct VersionedTopRef {
     ref_type top_ref;
     uint_fast64_t version;
+    uint64_t file_size;
 };
 
 /// The common interface for Realm allocators.
