@@ -75,7 +75,7 @@ struct Endpoint {
     // SDK chooses not to support the related config options. This may be necessary when using websocket libraries
     // without low-level control.
     std::map<std::string, std::string> headers; // Only includes "custom" headers.
-    bool verify_servers_ssl_certificate; // If true, verify server ssl certificate when connecting
+    bool verify_servers_ssl_certificate;        // If true, verify server ssl certificate when connecting
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
     util::Optional<SyncConfig::ProxyConfig> proxy; // Send traffic through a network proxy

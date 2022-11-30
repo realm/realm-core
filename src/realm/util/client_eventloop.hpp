@@ -57,7 +57,6 @@ public:
         /// @brief Cancel the timer immediately. Does nothing if the timer has
         /// already expired.
         virtual void cancel() = 0;
-
     };
 
     /// @brief The trigger object used to activate the trigger callback handler.
