@@ -101,7 +101,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
                                                             const IncludePropCond& include_prop, bool clear_path)
 {
     nlohmann::json required = nlohmann::json::array();
-    nlohmann::json properties;
+    nlohmann::json properties = nlohmann::json::object();
     for (const auto& prop : obj_schema.persisted_properties) {
         if (include_prop && !include_prop(prop)) {
             continue;
@@ -189,7 +189,6 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
             schema_json["required"].push_back(m_partition_key.name);
         }
     }
-    std::string test = schema_json.dump();
     return {
         {"schema", schema_json},
         {"metadata", nlohmann::json::object({{"database", m_mongo_db_name},
