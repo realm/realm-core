@@ -564,7 +564,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         f.device = st.st_dev;
         f.inode = st.st_ino;
 #ifdef REALM_DEBUG
-
+#if REALM_PLATFORM_APPLE
         char file_path[PATH_MAX];
         if (fcntl(fd, F_GETPATH, file_path) != -1) {
             std::string validator_path(file_path, strnlen(file_path, PATH_MAX));
@@ -573,7 +573,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
                 f.info->validator.open(validator_path, util::File::Mode::mode_Append);
             }
         }
-
+#endif // REALM_PLATFORM_APPLE
 #endif // REALM_DEBUG
 #endif
 
