@@ -76,7 +76,7 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK(name.is_null());
         anon_sub_id = it->id;
 
-        std::move(out).commit();
+        out.commit();
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
@@ -128,7 +128,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_NOT(it == out.end());
 
         out.update_state(SubscriptionSet::State::Complete);
-        std::move(out).commit();
+        out.commit();
     }
 
     // Clone the completed set and update it to have a new query.
@@ -138,7 +138,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
         new_set.insert_or_assign("b sub", query_b);
-        std::move(new_set).commit();
+        new_set.commit();
 
         // Mutating a MutableSubscriptionSet that's already been committed should throw a LogicError
         CHECK_THROW(new_set_copy.clear(), LogicError);
@@ -167,7 +167,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     {
         auto latest_mutable = store->get_mutable_by_version(2);
         latest_mutable.update_state(SubscriptionSet::State::Complete);
-        std::move(latest_mutable).commit();
+        latest_mutable.commit();
     }
 
     // There should now only be one set, version 2, that is complete. Trying to get version 1 should throw an error.
@@ -230,7 +230,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         CHECK_EQUAL(it->object_class_name, "a");
         CHECK_EQUAL(it->query_string, query_b.get_description());
         CHECK_EQUAL(it->id, id_of_inserted);
-        std::move(out).commit();
+        out.commit();
     }
     {
         auto set = store->get_latest().make_mutable_copy();
@@ -288,17 +288,17 @@ TEST(Sync_SubscriptionStoreNotifications)
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     // This should complete immediately because transitioning to the Pending state happens when you commit.
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
@@ -323,7 +323,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Update the state to complete - skipping the bootstrapping phase entirely.
     sub_set = store->get_mutable_by_version(3);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
     // phase.
@@ -336,7 +336,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     sub_set = store->get_mutable_by_version(4);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Pending);
     CHECK(old_sub_set.error_str().is_null());
@@ -366,7 +366,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     sub_set = store->get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superseded);
     CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
@@ -386,12 +386,12 @@ TEST(Sync_SubscriptionStoreNotifications)
     // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
     // return a ready future.
     auto mut_set = store->get_latest().make_mutable_copy();
-    auto waitable_set = std::move(mut_set).commit();
+    auto waitable_set = mut_set.commit();
 
     {
         mut_set = store->get_mutable_by_version(waitable_set.version());
         mut_set.update_state(SubscriptionSet::State::Complete);
-        std::move(mut_set).commit();
+        mut_set.commit();
     }
 
     auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
@@ -457,24 +457,24 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     auto mut_sub_set = store->get_latest().make_mutable_copy();
-    auto sub_set = std::move(mut_sub_set).commit();
+    auto sub_set = mut_sub_set.commit();
     auto complete_set = sub_set.version();
 
     mut_sub_set = sub_set.make_mutable_copy();
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
     auto bootstrapping_set = sub_set.version();
 
     mut_sub_set = sub_set.make_mutable_copy();
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
     auto pending_set = sub_set.version();
 
     mut_sub_set = store->get_mutable_by_version(complete_set);
     mut_sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(mut_sub_set).commit();
+    mut_sub_set.commit();
 
     mut_sub_set = store->get_mutable_by_version(bootstrapping_set);
     mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    std::move(mut_sub_set).commit();
+    mut_sub_set.commit();
 
     auto pending_version = store->get_next_pending_version(0, DB::version_type{});
     CHECK(pending_version);
@@ -507,7 +507,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     auto mut_sub_set = store->get_latest().make_mutable_copy();
     mut_sub_set.insert_or_assign(query_a);
     mut_sub_set.insert_or_assign(query_b);
-    auto sub_set = std::move(mut_sub_set).commit();
+    auto sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
@@ -516,7 +516,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 
     mut_sub_set = sub_set.make_mutable_copy();
     mut_sub_set.erase(query_a);
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
@@ -525,7 +525,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 
     mut_sub_set = sub_set.make_mutable_copy();
     mut_sub_set.erase(query_b);
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);

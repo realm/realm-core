@@ -259,10 +259,7 @@ public:
     void update_state(State state, util::Optional<std::string_view> error_str = util::none);
 
     // This commits any changes to the subscription set and returns an this subscription set as an immutable view
-    // from after the commit.
-    //
-    // This must be called as an r-value, like this:
-    //     auto sub_set = std::move(mut_sub_set).commit();
+    // from after the commit. This MutableSubscriptionSet object must not be used after calling commit().
     SubscriptionSet commit();
 
 protected:
