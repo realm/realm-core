@@ -914,7 +914,7 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
-                    SECTION("changes to backlick are reported both to origin and destination object") {
+                    SECTION("changes to backlink are reported both to origin and destination object") {
                         Object object_origin2;
                         write([&] {
                             Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
