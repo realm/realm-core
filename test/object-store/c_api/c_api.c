@@ -236,7 +236,7 @@ int realm_c_api_tests(const char* file)
     bool did_refresh = false;
     assert(realm_refresh(realm, &did_refresh));
     CHECK_ERROR();
-    assert(did_refresh);
+    assert(!did_refresh);
 
     realm_object_create(realm, foo_info.key);
     realm_error_t err;
