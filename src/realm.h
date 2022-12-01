@@ -1120,8 +1120,7 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
  *
  * This calls `advance_read()` at the Core layer.
  *
- * @return True if the realm was successfully refreshed and no exceptions were
- *         thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
 RLM_API bool realm_refresh(realm_t*, bool* did_refresh);
 
@@ -1135,7 +1134,7 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 /**
  * Vacuum the free space from the realm file, reducing its file size.
  *
- * @return True if compaction was successful and no exceptions were thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
