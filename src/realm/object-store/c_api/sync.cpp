@@ -513,7 +513,7 @@ RLM_API realm_object_id_t realm_sync_subscription_id(const realm_flx_sync_subscr
 RLM_API realm_string_t realm_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->name ? "" : *subscription->name);
+    return to_capi(subscription->name ? *subscription->name : "");
 }
 
 RLM_API realm_string_t
