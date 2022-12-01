@@ -200,31 +200,19 @@ private:
         if (client.group->get_table(table_name))
             return;
 
-        if (table_name[6] % 2 == 1) {
-            // Every other table has a PK column.
-            bool is_string_pk = (table_name[6] == 'B');
-            if (m_trace) {
-                std::cerr << "sync::create_table_with_primary_key(*" << trace_client(client)
-                          << "->"
-                             "group, \""
-                          << table_name << "\",";
-                if (is_string_pk)
-                    std::cerr << "type_String";
-                else
-                    std::cerr << "type_Int";
-                std::cerr << ", \"pk\");\n";
-            }
-            client.group->add_table_with_primary_key(table_name, is_string_pk ? type_String : type_Int, "pk");
+        bool is_string_pk = (table_name[6] == 'B');
+        if (m_trace) {
+            std::cerr << "sync::create_table_with_primary_key(*" << trace_client(client)
+                      << "->"
+                         "group, \""
+                      << table_name << "\",";
+            if (is_string_pk)
+                std::cerr << "type_String";
+            else
+                std::cerr << "type_Int";
+            std::cerr << ", \"pk\");\n";
         }
-        else {
-            if (m_trace) {
-                std::cerr << "sync::create_table(*" << trace_client(client)
-                          << "->"
-                             "group, \""
-                          << table_name << "\");\n";
-            }
-            client.group->add_table(table_name);
-        }
+        client.group->add_table_with_primary_key(table_name, is_string_pk ? type_String : type_Int, "pk");
     }
 
     void erase_table(Peer& client)
@@ -469,37 +457,29 @@ private:
     {
         ColKey pk_col_key = client.selected_table->get_column_key("pk");
 
-        if (!pk_col_key) {
-            if (m_trace) {
-                std::cerr << trace_selected_table(client) << "->create_object();\n";
-            }
-            client.selected_table->create_object();
+        char string_buffer[2] = {0};
+        bool is_string_pk = (client.selected_table->get_column_type(pk_col_key) == type_String);
+        int_fast64_t pk_int = 0;
+        StringData pk_string;
+        if (is_string_pk) {
+            string_buffer[0] = 'a' + draw_int_max(25); // "a" to "z"
+            pk_string = StringData{string_buffer, 1};
         }
         else {
-            char string_buffer[2] = {0};
-            bool is_string_pk = (client.selected_table->get_column_type(pk_col_key) == type_String);
-            int_fast64_t pk_int = 0;
-            StringData pk_string;
-            if (is_string_pk) {
-                string_buffer[0] = 'a' + draw_int_max(25); // "a" to "z"
-                pk_string = StringData{string_buffer, 1};
-            }
-            else {
-                pk_int = draw_int_max(10); // Low number to ensure some collisions
-            }
-            if (m_trace) {
-                std::cerr << trace_selected_table(client) << "->create_object_with_primary_key(";
-                if (is_string_pk)
-                    std::cerr << "\"" << pk_string << "\"";
-                else
-                    std::cerr << pk_int;
-                std::cerr << ");\n";
-            }
-            if (is_string_pk)
-                client.selected_table->create_object_with_primary_key(pk_string);
-            else
-                client.selected_table->create_object_with_primary_key(pk_int);
+            pk_int = draw_int_max(10); // Low number to ensure some collisions
         }
+        if (m_trace) {
+            std::cerr << trace_selected_table(client) << "->create_object_with_primary_key(";
+            if (is_string_pk)
+                std::cerr << "\"" << pk_string << "\"";
+            else
+                std::cerr << pk_int;
+            std::cerr << ");\n";
+        }
+        if (is_string_pk)
+            client.selected_table->create_object_with_primary_key(pk_string);
+        else
+            client.selected_table->create_object_with_primary_key(pk_int);
     }
 
     void move_last_row_over(Peer& client)
