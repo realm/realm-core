@@ -43,6 +43,7 @@ functions:
           set -o verbose
 
 
+          echo "${hello_world|no dice!}"
           if [ -d cmake_vars ]; then
               rm cmake_vars/*.txt
           fi
