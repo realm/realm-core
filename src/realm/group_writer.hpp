@@ -186,13 +186,14 @@ private:
     //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
     std::vector<FreeSpaceEntry> m_under_evacuation;
-    std::multimap<size_t, size_t> m_size_map; // now holds full pages
-    std::multimap<size_t, size_t>
-        m_opened_blocks; // holds blocks originally taken from m_size_map, from which allocation has been done
+    std::multimap<size_t, size_t> m_page_map;    // now holds full pages
+    std::multimap<size_t, size_t> m_alloc_focus; // holds blocks which are preferred for allocation
     std::vector<size_t> m_evacuation_progress;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
     void read_in_freelist();
+    template <typename Func>
+    void filter_pages(Func func, size_t ref, size_t size);
     size_t recreate_freelist(size_t reserve_pos);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation

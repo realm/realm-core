@@ -575,7 +575,7 @@ ref_type GroupWriter::write_group()
                                 << std::endl);
 
     read_in_freelist();
-    // Now, 'm_size_map' holds all free elements candidate for recycling
+    // Now, 'm_page_map' holds all free elements candidate for recycling
 
     Array& top = m_group.m_top;
     ALLOC_DBG_COUT("  Allocating file space for data:" << std::endl);
@@ -632,8 +632,8 @@ ref_type GroupWriter::write_group()
             top.set(Group::s_evacuation_point_ndx, 0);
         }
     }
-
-    ALLOC_DBG_COUT("  Freelist size after allocations: " << m_size_map.size() << std::endl);
+    auto total_freelist_size = m_page_map.size() + m_alloc_focus.size();
+    ALLOC_DBG_COUT("  Freelist size after allocations: " << total_freelist_size << std::endl);
     // We now back-date (if possible) any blocks freed in versions which
     // are becoming unreachable.
     if (m_any_new_unreachables)
@@ -645,7 +645,7 @@ ref_type GroupWriter::write_group()
     // calculate an upper bound on the amount af space required for all of the
     // remaining arrays and allocate the space as one big chunk. This way we can
     // finalize the free-lists before writing them to the file.
-    size_t max_free_list_size = m_size_map.size();
+    size_t max_free_list_size = total_freelist_size;
 
     // We need to add to the free-list any space that was freed during the
     // current transaction, but to avoid clobering the previous version, we
@@ -838,6 +838,46 @@ ref_type GroupWriter::write_group()
     return top_ref;
 }
 
+template <typename Func>
+void GroupWriter::filter_pages(Func func, size_t ref, size_t size)
+{
+    // entries which cover one or more whole pages have those pages available for allocation.
+    // chunks less than a full page remain locked.
+    auto static page_shift = log2(page_size());
+    auto first_page = ref >> page_shift;
+    auto last_page = (ref + size) >> page_shift;
+    if (first_page == last_page) {
+        // not a full page:
+        m_not_free_in_file.emplace_back(ref, size, 0);
+        return;
+    }
+    auto starts_aligned = ref == (first_page << page_shift);
+    if (!starts_aligned) {
+        auto offset_into_page = ref - (first_page << page_shift);
+        REALM_ASSERT(offset_into_page < (1UL << page_shift));
+        auto first_chunk_size = (1 << page_shift) - offset_into_page;
+        m_not_free_in_file.emplace_back(ref, first_chunk_size, 0);
+        // remaining block now starts at next page boundary:
+        ++first_page;
+        ref = first_page << page_shift;
+        size -= first_chunk_size;
+    }
+    auto ends_aligned = (ref + size) == (last_page << page_shift);
+    if (!ends_aligned) {
+        // cut any partial page at the end
+        auto last_chunk_start = last_page << page_shift;
+        auto last_chunk_size = (ref + size) - last_chunk_start;
+        REALM_ASSERT(last_chunk_size < (1UL << page_shift));
+        m_not_free_in_file.emplace_back(last_chunk_start, last_chunk_size, 0);
+        size -= last_chunk_size;
+        // block now also ends at page boundary
+    }
+    if (size > 0) {
+        // whole pages available
+        REALM_ASSERT(size == (last_page - first_page) << page_shift);
+        func(ref, size);
+    }
+}
 
 void GroupWriter::read_in_freelist()
 {
@@ -847,7 +887,7 @@ void GroupWriter::read_in_freelist()
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
     REALM_ASSERT_RELEASE_EX(m_free_versions.size() == limit, limit, m_free_versions.size());
-    auto page_shift = log2(page_size());
+
 
     if (limit) {
         auto limit_version = m_oldest_reachable_version;
@@ -873,39 +913,11 @@ void GroupWriter::read_in_freelist()
                     continue;
                 }
             }
-            // entries which cover one or more whole pages have those pages available for allocation.
-            // chunks less than a full page remain locked.
-            auto first_page = ref >> page_shift;
-            auto last_page = (ref + size) >> page_shift;
-            if (first_page == last_page) {
-                // not a full page:
-                m_not_free_in_file.emplace_back(ref, size, 0);
-                continue;
-            }
-            auto starts_aligned = ref == (first_page << page_shift);
-            if (!starts_aligned) {
-                auto offset_into_page = ref - (first_page << page_shift);
-                REALM_ASSERT(offset_into_page < (1 << page_shift));
-                auto first_chunk_size = (1 << page_shift) - offset_into_page;
-                m_not_free_in_file.emplace_back(ref, first_chunk_size, 0);
-                // remaining block now starts at next page boundary:
-                ++first_page;
-                ref = first_page << page_shift;
-                size -= first_chunk_size;
-            }
-            auto ends_aligned = (ref + size) == (last_page << page_shift);
-            if (!ends_aligned) {
-                auto last_chunk_start = last_page << page_shift;
-                auto last_chunk_size = (ref + size) - last_chunk_start;
-                REALM_ASSERT(last_chunk_size < (1 << page_shift));
-                m_not_free_in_file.emplace_back(last_chunk_start, last_chunk_size, 0);
-                size -= last_chunk_size;
-            }
-            if (size > 0) {
-                // whole pages available
-                REALM_ASSERT(size == (last_page - first_page) << page_shift);
-                free_in_file.emplace_back(ref, size, 0);
-            }
+            filter_pages(
+                [&](size_t r, size_t s) {
+                    free_in_file.emplace_back(r, s, 0);
+                },
+                ref, size);
         }
 
         // This will imply a copy-on-write
@@ -939,23 +951,23 @@ void GroupWriter::read_in_freelist()
     merge_adjacent_entries_in_freelist(free_in_file);
     // Previous step produces - potentially - some entries with size of zero. These
     // entries will be skipped in the next step.
-    move_free_in_file_to_size_map(free_in_file, m_size_map);
+    move_free_in_file_to_size_map(free_in_file, m_page_map);
 }
 
 size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 {
     std::vector<FreeSpaceEntry> free_in_file;
     auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
-    auto nb_elements =
-        m_size_map.size() + m_not_free_in_file.size() + m_under_evacuation.size() + new_free_space.size();
+    auto nb_elements = m_page_map.size() + m_alloc_focus.size() + m_not_free_in_file.size() +
+                       m_under_evacuation.size() + new_free_space.size();
     free_in_file.reserve(nb_elements);
 
     size_t reserve_ndx = realm::npos;
 
-    for (const auto& entry : m_size_map) {
+    for (const auto& entry : m_page_map) {
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
-    for (const auto& entry : m_opened_blocks) {
+    for (const auto& entry : m_alloc_focus) {
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
 
@@ -1080,32 +1092,33 @@ size_t GroupWriter::get_free_space(size_t size)
     REALM_ASSERT_RELEASE_EX(!(chunk_size & 7), chunk_size);
 
     size_t rest = chunk_size - size;
-    m_size_map.erase(p);
+    m_alloc_focus.erase(p);
     if (rest > 0) {
         // Allocating part of chunk - this alway happens from the beginning
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
-        m_size_map.emplace(rest, chunk_pos + size);
+        m_alloc_focus.emplace(rest, chunk_pos + size);
     }
     return chunk_pos;
 }
 
-
+// returns iterator into m_alloc_focus
 inline GroupWriter::FreeListElement GroupWriter::split_freelist_chunk(FreeListElement it, size_t alloc_pos)
 {
     size_t start_pos = it->second;
     size_t chunk_size = it->first;
-    m_size_map.erase(it);
+    m_alloc_focus.erase(it);
     REALM_ASSERT_RELEASE_EX(alloc_pos > start_pos, alloc_pos, start_pos);
 
     REALM_ASSERT_RELEASE_EX(!(alloc_pos & 7), alloc_pos);
     size_t size_first = alloc_pos - start_pos;
     size_t size_second = chunk_size - size_first;
-    m_size_map.emplace(size_first, start_pos);
-    return m_size_map.emplace(size_second, alloc_pos);
+    m_alloc_focus.emplace(size_first, start_pos);
+    return m_alloc_focus.emplace(size_second, alloc_pos);
 }
 
+// returns iterator into m_alloc_focus
 GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element(FreeListElement it, size_t size)
 {
     SlabAlloc& alloc = m_group.m_alloc;
@@ -1116,7 +1129,7 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
     size_t start_pos = it->second;
     size_t alloc_pos = alloc.find_section_in_range(start_pos, chunk_size, size);
     if (alloc_pos == 0) {
-        return m_size_map.end();
+        return m_alloc_focus.end();
     }
     // we found a place - if it's not at the beginning of the chunk,
     // we split the chunk so that the allocation can be done from the
@@ -1129,39 +1142,54 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
     return it;
 }
 
+// must return iterator into m_alloc_focus
 GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(size_t size)
 {
-    auto it = m_size_map.lower_bound(size);
-    while (it != m_size_map.end()) {
+    auto it = m_alloc_focus.lower_bound(size);
+    while (it != m_alloc_focus.end()) {
         // Accept either a perfect match or a block that is twice the size. Tests have shown
         // that this is a good strategy.
         if (it->first == size || it->first >= 2 * size) {
             auto ret = search_free_space_in_free_list_element(it, size);
-            if (ret != m_size_map.end()) {
+            if (ret != m_alloc_focus.end()) {
                 return ret;
             }
             ++it;
         }
         else {
             // If block was too small, search for the first that is at least twice as big.
-            it = m_size_map.lower_bound(2 * size);
+            it = m_alloc_focus.lower_bound(2 * size);
         }
     }
-    // No match
-    return m_size_map.end();
+    // No match in focus - pick a range of whole pages, transfer them to the focus group and retry:
+    auto it_pages = m_page_map.lower_bound(size);
+    if (it_pages != m_page_map.end()) {
+        it = m_alloc_focus.emplace(it_pages->first, it_pages->second);
+        m_page_map.erase(it_pages);
+        return search_free_space_in_part_of_freelist(size);
+    }
+    return m_alloc_focus.end();
 }
 
 
+// must return iterator into m_alloc_focus!
 GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
 {
     auto chunk = search_free_space_in_part_of_freelist(size);
-    while (chunk == m_size_map.end()) {
+    while (chunk == m_alloc_focus.end()) {
         if (!m_under_evacuation.empty()) {
             // We have been too aggressive in setting the evacuation limit
             // Just give up
             // But first we will release all kept back elements
             for (auto& elem : m_under_evacuation) {
-                m_size_map.emplace(elem.size, elem.ref);
+                // This needs to take page boundaries into account
+                // REALM_ASSERT(false);
+                // m_page_map.emplace(elem.size, elem.ref);
+                filter_pages(
+                    [&](size_t r, size_t s) {
+                        m_page_map.emplace(s, r);
+                    },
+                    elem.ref, elem.size);
             }
             m_under_evacuation.clear();
             m_evacuation_limit = 0;
@@ -1182,6 +1210,7 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
 // Due to mmap constraints, the extension can not be guaranteed to
 // allow an allocation of the requested size, so multiple calls to
 // extend_free_space may be needed, before an allocation can succeed.
+// Returns iterator into m_alloc_focus!
 GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_size)
 {
     // We need to consider the "logical" size of the file here, and not the real
@@ -1244,7 +1273,7 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     size_t chunk_size = new_file_size - logical_file_size;
     REALM_ASSERT_RELEASE_EX(!(chunk_size & 7), chunk_size);
     REALM_ASSERT_RELEASE(chunk_size != 0);
-    auto it = m_size_map.emplace(chunk_size, logical_file_size);
+    auto it = m_alloc_focus.emplace(chunk_size, logical_file_size);
 
     // Update the logical file size
     m_logical_size = new_file_size;
