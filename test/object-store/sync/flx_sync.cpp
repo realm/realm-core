@@ -2559,36 +2559,49 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     _impl::RealmCoordinator::clear_all_caches();
 
     std::mutex errors_mutex;
-    std::vector<SyncError> errors;
-    std::vector<sync::ProtocolErrorInfo> error_infos;
-    sync::version_type last_seen_download_version = 0;
+    std::vector<std::pair<ObjectId, sync::version_type>> error_to_download_version;
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes;
+    sync::version_type download_version;
 
-    config.sync_config->on_sync_client_event_hook =
-        [&](std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
-            auto session = weak_session.lock();
-            if (!session) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            if (data.event == SyncClientHookEvent::DownloadMessageIntegrated) {
-                std::lock_guard<std::mutex> lk(errors_mutex);
-                last_seen_download_version = data.progress.download.server_version;
-                return SyncClientHookAction::NoAction;
-            }
-            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
-                return SyncClientHookAction::NoAction;
-            }
-
-            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
-            REQUIRE(error_code == sync::ProtocolError::compensating_write);
-            std::lock_guard<std::mutex> lk(errors_mutex);
-            error_infos.emplace_back(*data.error_info);
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
+                                                        const SyncClientHookData& data) mutable {
+        auto session = weak_session.lock();
+        if (!session) {
             return SyncClientHookAction::NoAction;
-        };
+        }
+
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+            if (data.event == SyncClientHookEvent::DownloadMessageReceived) {
+                download_version = data.progress.download.server_version;
+            }
+
+            return SyncClientHookAction::NoAction;
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        REQUIRE(error_code == sync::ProtocolError::compensating_write);
+        REQUIRE(!data.error_info->compensating_writes.empty());
+        std::lock_guard<std::mutex> lk(errors_mutex);
+        for (const auto& compensating_write : data.error_info->compensating_writes) {
+            error_to_download_version.emplace_back(compensating_write.primary_key.get_object_id(),
+                                                   data.error_info->compensating_write_server_version);
+        }
+
+        return SyncClientHookAction::NoAction;
+    };
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::lock_guard<std::mutex> lk(errors_mutex);
-        errors.push_back(std::move(error));
+        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
+                                              [&](const auto& pair) {
+                                                  return pair.first == compensating_write.primary_key.get_object_id();
+                                              });
+            REQUIRE(tracked_error != error_to_download_version.end());
+            CHECK(tracked_error->second <= download_version);
+            compensating_writes.push_back(compensating_write);
+        }
     };
 
     auto realm = Realm::get_shared_realm(config);
@@ -2599,38 +2612,23 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     {
         std::lock_guard<std::mutex> lk(errors_mutex);
 
-        REQUIRE(errors.size() == 2);
-        auto& sync_error = errors.front();
-
-        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
-        auto& write_info = sync_error.compensating_writes_info[0];
+        REQUIRE(compensating_writes.size() == 2);
+        auto& write_info = compensating_writes[0];
         CHECK(write_info.primary_key.is_type(type_ObjectId));
         CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
         CHECK(write_info.object_name == "TopLevel");
         CHECK_THAT(write_info.reason,
                    Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 
-        sync_error = errors.back();
-        REQUIRE(sync_error.error_code == make_error_code(sync::ProtocolError::compensating_write));
-        write_info = sync_error.compensating_writes_info[0];
+        write_info = compensating_writes[1];
         REQUIRE(write_info.primary_key.is_type(type_ObjectId));
         REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
         REQUIRE(write_info.object_name == "TopLevel");
-        REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+        REQUIRE(write_info.reason ==
+                util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
     }
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
-
-    harness.do_with_new_realm([&](SharedRealm realm) {
-        auto top_level_table = realm->read_group().get_table("class_TopLevel");
-        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-        mut_subs.insert_or_assign(Query(top_level_table));
-        std::move(mut_subs).commit().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-
-        wait_for_advance(*realm);
-
-        REQUIRE(top_level_table->is_empty());
-    });
 }
 
 } // namespace realm::app
