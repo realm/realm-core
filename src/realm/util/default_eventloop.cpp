@@ -227,20 +227,22 @@ bool DefaultServiceClientImpl::ensure_service_is_running()
                     if (m_observer) {
                         m_observer->will_destroy_thread();
                     }
+                    thread_update_state(State::Stopped);
                 });
                 // If we're already stopped, exit thread
                 if (!is_stopped()) {
                     thread_update_state(State::Running);
                     try {
                         m_service.run(); // Throws
+                        thread_update_state(State::Stopping);
                     }
                     catch (const std::exception& e) {
+                        thread_update_state(State::Stopping);
                         if (m_observer) {
                             m_observer->handle_error(e);
                         }
                     }
                 }
-                thread_update_state(State::Stopped);
                 //}
             });
         }

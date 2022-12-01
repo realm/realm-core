@@ -15,7 +15,6 @@
 #include <realm/util/platform_info.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -114,7 +113,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_event_loop{}                                      // Throws
-    , m_socket_factory(std::make_unique<util::websocket::DefaultWebSocketFactory>(get_user_agent_string(), logger_ptr))
+    , m_socket_factory(
+          std::make_unique<util::websocket::DefaultWebSocketFactory>(get_user_agent_string(), logger_ptr))
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{} // Throws
@@ -217,12 +217,16 @@ void ClientImpl::did_create_thread()
 void ClientImpl::will_destroy_thread()
 {
     logger.trace("EventLoop stopped");
-    // If sync_start() is waiting, free it now...
-    if (m_stop_promise) {
-        m_stop_promise->emplace_value();
-    }
     if (m_event_loop_observer) {
         m_event_loop_observer->will_destroy_thread();
+    }
+    // If sync_start() is waiting, free it now...
+    if (m_sync_start_promise) {
+        m_sync_start_promise->emplace_value();
+    }
+    // If ClientImpl::stop() is waiting, free it now...
+    if (m_stop_promise) {
+        m_stop_promise->emplace_value();
     }
 }
 

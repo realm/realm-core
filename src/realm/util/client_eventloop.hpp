@@ -61,9 +61,9 @@ public:
 
     /// @brief The trigger object used to activate the trigger callback handler.
     ///
-    /// This object provides a trigger mechanism to run a callback handler one or more times.
-    /// The trigger will remain registered and can be called multiple times until the Trigger
-    /// object is destroyed.
+    /// This object provides a trigger mechanism to run a callback handler one or
+    /// more times. The trigger will remain registered and can be called multiple
+    /// times until the Trigger object is destroyed.
     ///
     /// Create a subclass of this class that provides access to the underlying
     /// implementation for posting the handler function when trigger() is called.
@@ -95,7 +95,7 @@ public:
     ///
     /// Any future calls to post events or create timers or triggers will do
     /// nothing. Needs to support being called from within the event loop or any
-    /// other thread. Any existing timers must be cancelled with an error code
+    /// other thread. Any outstanding timers must be cancelled with an error code
     /// of util::error::operation_aborted so the handlers can properly clean up.
     /// Once stop() is called, the event loop will not be started again.
     virtual void stop() = 0;
@@ -105,8 +105,8 @@ public:
     /// @return true if start() has already been called, otherwise false.
     virtual bool is_started() = 0;
 
-    /// @brief Return true if the event loop has been stopped or is stopping, or return
-    /// false if the event loop has not been started yet or is currently
+    /// @brief Return true if the event loop has been stopped or is stopping, or
+    /// return false if the event loop has not been started yet or is currently
     /// running.
     ///
     /// @return true if stop() has been called, otherwise true

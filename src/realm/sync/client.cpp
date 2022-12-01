@@ -491,23 +491,27 @@ void ClientImpl::stop() noexcept
             return;
         m_stopped = true;
     }
-    get_event_loop().stop();
-    m_wait_or_client_stopped_cond.notify_all();
+    if (!get_event_loop().is_stopped()) {
+        auto [promise, future] = util::make_promise_future<void>();
+        m_stop_promise.emplace(std::move(promise));
+        get_event_loop().stop();
+        m_wait_or_client_stopped_cond.notify_all();
+        future.get(); // Wait for the event loop to stop processing events
+    }
 }
 
 
 void ClientImpl::start(std::optional<util::Promise<void>>&& promise)
 {
-    // Was stop() called before start?
-    if (!m_stopped) {
+    // Was stop() called before start or are we already started?
+    if (!m_stopped && !get_event_loop().is_started()) {
         if (promise) {
-            m_stop_promise.emplace(std::move(*promise));
+            m_sync_start_promise.emplace(std::move(*promise));
         }
         get_event_loop().start();
     }
     // Already shut down, don't start the event loop and just free the future
     else if (promise) {
-        get_event_loop().stop();  // invalidate event loop
         promise->emplace_value(); // Free the future event though the loop wasn't started
     }
 }
