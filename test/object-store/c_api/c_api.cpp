@@ -1134,7 +1134,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
-    SECTION("realm refresh registering callback outside transaction") {
+    SECTION("realm refresh registering without advancing transaction") {
         bool realm_refresh_callback_called = false;
         auto token = cptr(realm_add_realm_refresh_callback(
             realm,
@@ -1143,8 +1143,7 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
         realm_begin_write(realm);
-        realm_commit(realm);
-        CHECK_FALSE(realm_refresh_callback_called);
+        CHECK(realm_refresh_callback_called);
     }
 
     SECTION("realm refresh registering callback in transaction") {
