@@ -59,9 +59,10 @@ typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
-typedef struct realm_callback_interface_thread_observer realm_interface_callback_thread_observer_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
+typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata);
+typedef void (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -368,6 +369,7 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
+typedef struct realm_thread_observer_token realm_thread_observer_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
@@ -1118,10 +1120,9 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
  *
  * This calls `advance_read()` at the Core layer.
  *
- * @return True if the realm was successfully refreshed and no exceptions were
- *         thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
-RLM_API bool realm_refresh(realm_t*);
+RLM_API bool realm_refresh(realm_t*, bool* did_refresh);
 
 /**
  * Produce a frozen view of this realm.
@@ -1133,7 +1134,7 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 /**
  * Vacuum the free space from the realm file, reducing its file size.
  *
- * @return True if compaction was successful and no exceptions were thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
@@ -3991,16 +3992,21 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
  * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
  */
-RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
+RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
  * runs.
- * @param thread_observer a ptr to an implementation class that can receive these notifications. If nullptr is passed
- * instead, this will have the effect of unregistering the callback.
+ * @param on_thread_create callback invoked when the object store thread is created
+ * @param on_thread_destroy callback invoked when the object store thread is destroyed
+ * @param on_error callback invoked to signal to the listener that some error has occured.
+ * @return a token that has to be released in order to stop receiving notifications
  */
-RLM_API void realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer)
-    RLM_API_NOEXCEPT;
+RLM_API realm_thread_observer_token_t*
+realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
+                                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t,
+                                           realm_free_userdata_func_t free_userdata);
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
