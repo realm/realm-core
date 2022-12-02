@@ -220,11 +220,9 @@ void ClientImpl::will_destroy_thread()
     if (m_event_loop_observer) {
         m_event_loop_observer->will_destroy_thread();
     }
-    // If sync_start() is waiting, free it now...
-    if (m_sync_start_promise) {
-        m_sync_start_promise->emplace_value();
-    }
-    // If ClientImpl::stop() is waiting, free it now...
+
+    // If ClientImpl::stop() or sync_start() is waiting, free it now...
+    util::LockGuard lock{m_mutex};
     if (m_stop_promise) {
         m_stop_promise->emplace_value();
     }

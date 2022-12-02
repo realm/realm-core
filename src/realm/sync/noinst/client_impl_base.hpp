@@ -182,7 +182,6 @@ private:
     const std::string m_user_agent_string;
     std::shared_ptr<util::websocket::EventLoopClient> m_event_loop;
     std::optional<util::Promise<void>> m_stop_promise;
-    std::optional<util::Promise<void>> m_sync_start_promise;
     std::mt19937_64 m_random;
     std::unique_ptr<util::websocket::WebSocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;

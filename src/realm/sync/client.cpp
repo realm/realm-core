@@ -389,7 +389,8 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_with_event_loop_stopped = get_event_loop().is_stopped();
+    auto& event_loop = get_event_loop();
+    bool client_destroyed_with_event_loop_stopped = !event_loop.is_started() || event_loop.is_stopped();
     REALM_ASSERT_RELEASE(client_destroyed_with_event_loop_stopped);
 
     // Since no other thread is allowed to be accessing this client or any of
@@ -485,34 +486,44 @@ void ClientImpl::add_test_setup(util::UniqueFunction<void()>&& setup_func)
 
 void ClientImpl::stop() noexcept
 {
-    {
-        util::LockGuard lock{m_mutex};
-        if (m_stopped)
-            return;
-        m_stopped = true;
-    }
-    if (!get_event_loop().is_stopped()) {
+    util::UniqueLock lock{m_mutex};
+    if (m_stopped)
+        return;
+    m_stopped = true;
+
+    auto& event_loop = get_event_loop();
+    if (event_loop.is_started() && !event_loop.is_stopped() && !m_stop_promise) {
+        // Started and not waiting on a future, block until stop is complete
         auto [promise, future] = util::make_promise_future<void>();
         m_stop_promise.emplace(std::move(promise));
         get_event_loop().stop();
         m_wait_or_client_stopped_cond.notify_all();
-        future.get(); // Wait for the event loop to stop processing events
+        lock.unlock(); // Release the lock before waiting
+        future.get();  // Wait for the event loop to stop processing events
+    }
+    else {
+        // Make sure the event loop is stopped, even if it hasn't been started
+        get_event_loop().stop();
+        m_wait_or_client_stopped_cond.notify_all();
     }
 }
 
 
 void ClientImpl::start(std::optional<util::Promise<void>>&& promise)
 {
-    // Was stop() called before start or are we already started?
-    if (!m_stopped && !get_event_loop().is_started()) {
+    util::LockGuard lock{m_mutex};
+    // Was stop() already called?
+    if (!m_stopped && !get_event_loop().is_stopped()) {
         if (promise) {
-            m_sync_start_promise.emplace(std::move(*promise));
+            // Only one promise can wait for event loop to stop
+            REALM_ASSERT(!m_stop_promise);
+            m_stop_promise.emplace(std::move(*promise));
         }
         get_event_loop().start();
     }
-    // Already shut down, don't start the event loop and just free the future
     else if (promise) {
-        promise->emplace_value(); // Free the future event though the loop wasn't started
+        // Already shut down or shutting down, it's too late to wait
+        promise->emplace_value();
     }
 }
 
