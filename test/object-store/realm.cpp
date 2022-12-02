@@ -358,6 +358,38 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(old_realm->schema().size() == 1);
     }
 
+    SECTION("should read the proper schema from the file if realm is frozen") {
+        Realm::get_shared_realm(config);
+
+        config.schema = util::none;
+        config.schema_mode = SchemaMode::AdditiveExplicit;
+        config.schema_version = 0;
+
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 1);
+        realm->close();
+
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object1", {{"value", PropertyType::Int}}},
+        };
+        config.schema_version = 1;
+        realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 2);
+
+        config.schema = util::none;
+        auto old_realm = Realm::get_shared_realm(config);
+        old_realm->begin_transaction();
+        auto frozen_realm = old_realm->freeze();
+        REQUIRE(frozen_realm->is_frozen());
+        REQUIRE(realm->schema() == frozen_realm->schema());
+        auto table_obj = frozen_realm->read_group().get_table("class_object");
+        auto table_obj1 = frozen_realm->read_group().get_table("class_object1");
+        REQUIRE(table_obj);
+        REQUIRE(table_obj1);
+        old_realm->commit_transaction();
+    }
+
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
         SECTION("cached") {
         }
