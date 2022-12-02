@@ -1,3 +1,4 @@
+
 #include <realm/util/default_websocket.hpp>
 
 #include <realm/util/network.hpp>
@@ -83,16 +84,16 @@ public:
         // Lazy start the service until start() is called or the first operation is performed
     }
 
-    virtual ~DefaultServiceClientImpl() REQUIRES(!m_mutex)
+    virtual ~DefaultServiceClientImpl() REQUIRES(!m_state_mutex)
     {
+        // Make sure the thread is stopped and joined before destruction
         stop();
-        // Join the thread before destruction so stop() can be called within the event loop thread
         if (m_thread != nullptr && m_thread->joinable()) {
             m_thread->join();
         }
     }
 
-    void post(util::UniqueFunction<void()>&& handler) override REQUIRES(!m_mutex)
+    void post(util::UniqueFunction<void()>&& handler) override REQUIRES(!m_state_mutex)
     {
         if (!is_stopped()) {
             m_service.post(std::move(handler));
@@ -100,7 +101,7 @@ public:
     }
 
     std::unique_ptr<EventLoopClient::Trigger> create_trigger(util::UniqueFunction<void()>&& handler) override
-        REQUIRES(!m_mutex)
+        REQUIRES(!m_state_mutex)
     {
         if (!is_stopped()) {
             return std::make_unique<DefaultServiceClientImpl::Trigger>(m_service, std::move(handler));
@@ -108,33 +109,42 @@ public:
         return nullptr;
     }
 
-    bool is_started() override REQUIRES(!m_mutex)
+    bool is_started() override REQUIRES(!m_state_mutex)
     {
-        util::CheckedLockGuard lock(m_mutex);
+        util::CheckedLockGuard lock(m_state_mutex);
         return m_state != State::NotStarted;
     }
 
-    bool is_stopped() override REQUIRES(!m_mutex)
+    bool is_stopped() override REQUIRES(!m_state_mutex)
     {
-        util::CheckedLockGuard lock(m_mutex);
+        util::CheckedLockGuard lock(m_state_mutex);
         return m_state == State::Stopped || m_state == State::Stopping;
     }
 
-    void register_event_loop_observer(EventLoopObserver* observer) override REQUIRES(!m_mutex)
+    void register_event_loop_observer(EventLoopObserver* observer) override
+        REQUIRES(!m_state_mutex, !m_observer_mutex)
     {
-        util::CheckedLockGuard lock(m_mutex);
+        // Can unregister at any time, except in an observer function
+        if (observer == nullptr) {
+            util::CheckedLockGuard lock(m_observer_mutex);
+            m_observer = nullptr;
+            return;
+        }
+        // Can only register if the thread hasn't been started
+        util::CheckedLockGuard lock(m_state_mutex);
         if (m_state == State::NotStarted) {
+            util::CheckedLockGuard lock(m_observer_mutex);
             m_observer = observer;
         }
     }
 
-    void start() override REQUIRES(!m_mutex)
+    void start() override REQUIRES(!m_state_mutex)
     {
         // start() should not be called twice
         REALM_ASSERT(ensure_service_is_running());
     }
 
-    void stop() override REQUIRES(!m_mutex);
+    void stop() override REQUIRES(!m_state_mutex);
 
     util::network::Service& get_service() override
     {
@@ -144,7 +154,7 @@ public:
 private:
     std::unique_ptr<EventLoopClient::Timer>
     do_create_timer(std::chrono::milliseconds delay, util::UniqueFunction<void(std::error_code)>&& handler) override
-        REQUIRES(!m_mutex)
+        REQUIRES(!m_state_mutex)
     {
         if (!is_stopped()) {
             return Timer::async_wait(m_service, delay, std::move(handler));
@@ -155,20 +165,23 @@ private:
     // If the service thread is not running, make sure it has been started. There
     // must be something pending on the event loop at all times, otherwise, the
     // service.run() thread will exit prematurely.
-    bool ensure_service_is_running() REQUIRES(!m_mutex);
+    bool ensure_service_is_running() REQUIRES(!m_state_mutex);
 
-    void update_state(State new_state) REQUIRES(m_mutex);
+    void update_state(State new_state) REQUIRES(m_state_mutex);
 
     //@{
     // Thread Helper Functions
-    void thread_update_state(State new_state) REQUIRES(!m_mutex)
+    void thread_update_state(State new_state) REQUIRES(!m_state_mutex)
     {
-        util::CheckedLockGuard lock(m_mutex);
+        util::CheckedLockGuard lock(m_state_mutex);
         update_state(new_state);
     }
     //@}
 
-    util::CheckedMutex m_mutex;
+    // Used when checking or setting state
+    util::CheckedMutex m_state_mutex;
+    // Only used when registering an observer or calling an observer callback function
+    util::CheckedMutex m_observer_mutex;
     std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
     // The original util::network::Service object that used to live in client_impl
@@ -176,15 +189,15 @@ private:
     // The event loop thread that calls Service->run()
     std::unique_ptr<std::thread> m_thread;
     // The event loop can only be started once, it cannot be restarted later
-    State m_state GUARDED_BY(m_mutex);
+    State m_state GUARDED_BY(m_state_mutex);
     // Optional observer for passing along event loop thread state
-    EventLoopObserver* m_observer = nullptr;
+    EventLoopObserver* m_observer GUARDED_BY(m_observer_mutex) = nullptr;
 };
 
 void DefaultServiceClientImpl::stop()
 {
     // Need to release the lock for the join
-    util::CheckedUniqueLock lock(m_mutex);
+    util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state == State::NotStarted || m_state == State::Running) {
         update_state(State::Stopping);
         m_service.stop();
@@ -216,16 +229,22 @@ void DefaultServiceClientImpl::update_state(State new_state)
 // If the service thread is not running, make sure it has been started
 bool DefaultServiceClientImpl::ensure_service_is_running()
 {
-    util::CheckedLockGuard lock(m_mutex);
+    util::CheckedLockGuard lock(m_state_mutex);
     if (m_state == State::NotStarted) {
         if (m_thread == nullptr) {
             m_thread = std::make_unique<std::thread>([this]() mutable {
-                if (m_observer) {
-                    m_observer->did_create_thread();
+                {
+                    util::CheckedLockGuard lock(m_observer_mutex);
+                    if (m_observer) {
+                        m_observer->did_create_thread();
+                    }
                 }
                 auto will_destroy_thread = util::make_scope_exit([this]() noexcept {
-                    if (m_observer) {
-                        m_observer->will_destroy_thread();
+                    {
+                        util::CheckedLockGuard lock(m_observer_mutex);
+                        if (m_observer) {
+                            m_observer->will_destroy_thread();
+                        }
                     }
                     thread_update_state(State::Stopped);
                 });
@@ -238,8 +257,11 @@ bool DefaultServiceClientImpl::ensure_service_is_running()
                     }
                     catch (const std::exception& e) {
                         thread_update_state(State::Stopping);
-                        if (m_observer) {
-                            m_observer->handle_error(e);
+                        {
+                            util::CheckedLockGuard lock(m_observer_mutex);
+                            if (m_observer) {
+                                m_observer->handle_error(e);
+                            }
                         }
                     }
                 }

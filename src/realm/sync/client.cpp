@@ -392,6 +392,7 @@ ClientImpl::~ClientImpl()
     auto& event_loop = get_event_loop();
     bool client_destroyed_with_event_loop_stopped = !event_loop.is_started() || event_loop.is_stopped();
     REALM_ASSERT_RELEASE(client_destroyed_with_event_loop_stopped);
+    event_loop.register_event_loop_observer(nullptr); // Unregister as the eventloop observer
 
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
