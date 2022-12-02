@@ -3145,7 +3145,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
-    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+    realm_app_void_completion_func_t callback, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Creates a user API key that can be used to authenticate as the current user.
