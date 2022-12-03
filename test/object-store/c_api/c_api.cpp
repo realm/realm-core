@@ -615,11 +615,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         auto test_app = std::make_shared<app::App>(*app_config);
         auto credentials = app::AppCredentials::anonymous();
+        // Verify the values above are included in the login request
         test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
                                                            realm::util::Optional<realm::app::AppError> error) {
-            if (error) {
-                std::cerr << "ERROR: " << error->message << std::endl;
-            }
             CHECK(!error);
         });
     }
