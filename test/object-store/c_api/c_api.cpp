@@ -15,6 +15,7 @@
 #include <cstring>
 #include <numeric>
 #include <thread>
+#include <iostream>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
@@ -22,6 +23,7 @@
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
+#include <realm/object-store/sync/app_utils.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #endif
@@ -246,6 +248,119 @@ CPtr<T> clone_cptr(const T* ptr)
         }                                                                                                            \
     } while (false);
 
+#if REALM_ENABLE_AUTH_TESTS
+class CApiUnitTestTransport : public app::GenericNetworkTransport {
+    std::string m_provider_type;
+
+public:
+    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
+        : m_provider_type(provider_type)
+    {
+        profile_0 = nlohmann::json({{"name", "profile_0_name"},
+                                    {"first_name", "profile_0_first_name"},
+                                    {"last_name", "profile_0_last_name"},
+                                    {"email", "profile_0_email"},
+                                    {"picture_url", "profile_0_picture_url"},
+                                    {"gender", "profile_0_gender"},
+                                    {"birthday", "profile_0_birthday"},
+                                    {"min_age", "profile_0_min_age"},
+                                    {"max_age", "profile_0_max_age"}});
+    }
+
+    void set_provider_type(const std::string& provider_type)
+    {
+        m_provider_type = provider_type;
+    }
+
+    const std::string access_token =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2Rldklk"
+        "IjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoi"
+        "NWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+    const std::string user_id = "awelfkewjfewkefkeafj";
+    const std::string identity_0_id = "eflkjf393flkj33fjf3";
+    const std::string identity_1_id = "aewfjklewfwoifejjef";
+    nlohmann::json profile_0;
+
+
+private:
+    void handle_profile(const app::Request&, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        std::string response =
+            nlohmann::json({{"user_id", user_id},
+                            {"identities",
+                             {{{"id", identity_0_id}, {"provider_type", m_provider_type}, {"provider_id", "lol"}},
+                              {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
+                            {"data", profile_0}})
+                .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+    void handle_login(const app::Request& request, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        CHECK(request.method == app::HttpMethod::post);
+        auto item = app::AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
+        // Verify against
+        CHECK(nlohmann::json::parse(request.body)["options"] ==
+              nlohmann::json({{"device",
+                               {{"appId", "app_id_123"},
+                                {"appVersion", "some_app_version"},
+                                {"platform", "some_platform_name"},
+                                {"platformVersion", "some_platform_version"},
+                                {"sdk", "some_sdk_name"},
+                                {"sdkVersion", "some_sdk_version"},
+                                {"cpuArch", "some_cpu_arch"},
+                                {"deviceName", "some_device_name"},
+                                {"deviceVersion", "some_device_version"},
+                                {"frameworkName", "some_framework_name"},
+                                {"frameworkVersion", "some_framework_version"},
+                                {"coreVersion", REALM_VERSION_STRING}}}}));
+
+        CHECK(request.timeout_ms == 60000);
+
+        std::string response = nlohmann::json({{"access_token", access_token},
+                                               {"refresh_token", access_token},
+                                               {"user_id", user_id},
+                                               {"device_id", "Panda Bear"}})
+                                   .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+    void handle_location(const app::Request&, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        std::string response = nlohmann::json({{"deployment_model", "this"},
+                                               {"hostname", "field"},
+                                               {"ws_hostname", "shouldn't"},
+                                               {"location", "matter"}})
+                                   .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (request.url.find("/login") != std::string::npos) {
+            handle_login(request, std::move(completion));
+        }
+        else if (request.url.find("/profile") != std::string::npos) {
+            handle_profile(request, std::move(completion));
+        }
+        else if (request.url.find("/location") != std::string::npos && request.method == app::HttpMethod::get) {
+            handle_location(request, std::move(completion));
+        }
+        else {
+            completion(app::Response{200, 0, {}, "something arbitrary"});
+        }
+    }
+};
+#endif // REALM_ENABLE_AUTH_TESTS
+
 TEST_CASE("C API (C)", "[c_api]") {
     TestFile file;
     CHECK(realm_c_api_tests(file.path.c_str()) == 0);
@@ -450,98 +565,65 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         }
     }
 
-#if REALM_ENABLE_SYNC
-    SECTION("realm_app_config_t") {
-        // realm_http_transport is not defined if REALM_ENABLE_SYNC is not set
-        auto http_transport = realm_http_transport(nullptr);
-        auto app_config = cptr(realm_app_config_new("some_app_id", &http_transport));
-
 #if REALM_ENABLE_AUTH_TESTS
-        SECTION("realm_app_config_t with transport") {
-            std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<SynchronousTestTransport>();
-            auto http_transport = realm_http_transport(transport);
-            app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
-            CHECK(app_config.get() != nullptr);
-            CHECK(app_config->app_id == "app_id_123");
-            CHECK(app_config->transport == transport);
-        }
-#else
-        // SynchronousTestTransport is not available if SYNC is not enabled
-        SECTION("realm_app_config_t with transport") {
-            auto http_transport = realm_http_transport(nullptr);
-            app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
-            CHECK(app_config.get() != nullptr);
-            CHECK(app_config->app_id == "app_id_123");
-            CHECK(app_config->transport == nullptr);
-        }
-#endif // REALM_ENABLE_AUTH_TESTS
+    SECTION("realm_app_config_t") {
+        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        auto http_transport = realm_http_transport(transport);
+        auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
+        CHECK(app_config.get() != nullptr);
+        CHECK(app_config->app_id == "app_id_123");
+        CHECK(app_config->transport == transport);
 
-        SECTION("realm_app_config_set_base_url()") {
-            realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
-            CHECK(app_config->base_url == "https://path/to/app");
-        }
+        realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
+        CHECK(app_config->base_url == "https://path/to/app");
 
-        SECTION("realm_app_config_set_local_app_name()") {
-            realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
-            CHECK(app_config->local_app_name == "some_app_name");
-        }
+        realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
+        CHECK(app_config->local_app_name == "some_app_name");
 
-        SECTION("realm_app_config_set_local_app_version()") {
-            realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
-            CHECK(app_config->local_app_version == "some_app_version");
-        }
+        realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
+        CHECK(app_config->local_app_version == "some_app_version");
 
-        SECTION("realm_app_config_set_default_request_timeout()") {
-            realm_app_config_set_default_request_timeout(app_config.get(), 2500);
-            CHECK(app_config->default_request_timeout_ms == 2500);
-        }
+        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
+        CHECK(app_config->default_request_timeout_ms == 2500);
 
-        SECTION("realm_app_config_set_platform()") {
-            realm_app_config_set_platform(app_config.get(), "some_platform_name");
-            CHECK(app_config->device.platform == "some_platform_name");
-        }
+        realm_app_config_set_platform(app_config.get(), "some_platform_name");
+        CHECK(app_config->device_info.platform == "some_platform_name");
 
-        SECTION("realm_app_config_set_platform_version()") {
-            realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
-            CHECK(app_config->device.platform_version == "some_platform_version");
-        }
+        realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
+        CHECK(app_config->device_info.platform_version == "some_platform_version");
 
-        SECTION("realm_app_config_set_sdk_version()") {
-            realm_app_config_set_sdk_version(app_config.get(), "some_sdk_version");
-            CHECK(app_config->device.sdk_version == "some_sdk_version");
-        }
+        realm_app_config_set_sdk_version(app_config.get(), "some_sdk_version");
+        CHECK(app_config->device_info.sdk_version == "some_sdk_version");
 
-        SECTION("realm_app_config_set_sdk()") {
-            realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
-            CHECK(app_config->device.sdk == "some_sdk_name");
-        }
+        realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
+        CHECK(app_config->device_info.sdk == "some_sdk_name");
 
-        SECTION("realm_app_config_set_cpu_arch()") {
-            realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
-            CHECK(app_config->device.cpu_arch == "some_cpu_arch");
-        }
+        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
+        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
 
-        SECTION("realm_app_config_set_device_name()") {
-            realm_app_config_set_device_name(app_config.get(), "some_device_name");
-            CHECK(app_config->device.device_name == "some_device_name");
-        }
+        realm_app_config_set_device_name(app_config.get(), "some_device_name");
+        CHECK(app_config->device_info.device_name == "some_device_name");
 
-        SECTION("realm_app_config_set_device_version()") {
-            realm_app_config_set_device_version(app_config.get(), "some_device_version");
-            CHECK(app_config->device.device_version == "some_device_version");
-        }
+        realm_app_config_set_device_version(app_config.get(), "some_device_version");
+        CHECK(app_config->device_info.device_version == "some_device_version");
 
-        SECTION("realm_app_config_set_framework_name()") {
-            realm_app_config_set_framework_name(app_config.get(), "some_framework_name");
-            CHECK(app_config->device.framework_name == "some_framework_name");
-        }
+        realm_app_config_set_framework_name(app_config.get(), "some_framework_name");
+        CHECK(app_config->device_info.framework_name == "some_framework_name");
 
-        SECTION("realm_app_config_set_framework_version()") {
-            realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
-            CHECK(app_config->device.framework_version == "some_framework_version");
-        }
+        realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
+        CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        auto test_app = std::make_shared<app::App>(*app_config);
+        auto credentials = app::AppCredentials::anonymous();
+        test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
+                                                           realm::util::Optional<realm::app::AppError> error) {
+            if (error) {
+                std::cerr << "ERROR: " << error->message << std::endl;
+            }
+            CHECK(!error);
+        });
     }
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_ENABLE_AUTH_TESTS
 }
 
 namespace {

@@ -263,24 +263,24 @@ void set_app_config_defaults(app::App::Config& app_config,
 {
     if (!app_config.transport)
         app_config.transport = transport;
-    if (app_config.device.platform.empty())
-        app_config.device.platform = "Object Store Test Platform";
-    if (app_config.device.platform_version.empty())
-        app_config.device.platform_version = "Object Store Test Platform Version";
-    if (app_config.device.sdk_version.empty())
-        app_config.device.sdk_version = "SDK Version";
-    if (app_config.device.sdk.empty())
-        app_config.device.sdk = "SDK Name";
-    if (app_config.device.cpu_arch.empty())
-        app_config.device.cpu_arch = "CPU Arch";
-    if (app_config.device.device_name.empty())
-        app_config.device.device_name = "Device Name";
-    if (app_config.device.device_version.empty())
-        app_config.device.device_version = "Device Version";
-    if (app_config.device.framework_name.empty())
-        app_config.device.framework_name = "Framework Name";
-    if (app_config.device.framework_version.empty())
-        app_config.device.framework_version = "Framework Version";
+    if (app_config.device_info.platform.empty())
+        app_config.device_info.platform = "Object Store Test Platform";
+    if (app_config.device_info.platform_version.empty())
+        app_config.device_info.platform_version = "Object Store Test Platform Version";
+    if (app_config.device_info.sdk_version.empty())
+        app_config.device_info.sdk_version = "SDK Version";
+    if (app_config.device_info.sdk.empty())
+        app_config.device_info.sdk = "SDK Name";
+    if (app_config.device_info.cpu_arch.empty())
+        app_config.device_info.cpu_arch = "CPU Arch";
+    if (app_config.device_info.device_name.empty())
+        app_config.device_info.device_name = "Device Name";
+    if (app_config.device_info.device_version.empty())
+        app_config.device_info.device_version = "Device Version";
+    if (app_config.device_info.framework_name.empty())
+        app_config.device_info.framework_name = "Framework Name";
+    if (app_config.device_info.framework_version.empty())
+        app_config.device_info.framework_version = "Framework Version";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
     if (!app_config.local_app_version)
