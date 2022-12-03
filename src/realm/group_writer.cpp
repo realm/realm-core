@@ -579,6 +579,15 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     ALLOC_DBG_COUT("  Allocating file space for data:" << std::endl);
+#ifdef REALM_DEBUG
+    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
+    if (File::exists(validator_path)) {
+        File validator(validator_path, File::Mode::mode_Append);
+        validator.seek(validator.get_size());
+        auto msg = util::format("commit version %1 start\n", m_current_version);
+        validator.write(msg.data(), msg.size());
+    }
+#endif // REALM_DEBUG
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
     // as they are going to change along the way.) If free space is available in
@@ -1309,16 +1318,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     // window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
     //                                 sizeof(file_header.m_top_ref[slot_selector]));
     window->encryption_write_barrier(&file_header, sizeof file_header);
-#ifdef REALM_DEBUG
-    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
-    File validator;
-    if (File::exists(validator_path)) {
-        validator.open(validator_path, File::Mode::mode_Append);
-        validator.seek(validator.get_size());
-        auto msg = util::format("commit version %1, top_ref %2\n", m_current_version, new_top_ref);
-        validator.write(msg.data(), msg.size());
-    }
-#endif // REALM_DEBUG
     flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
@@ -1326,8 +1325,13 @@ void GroupWriter::commit(ref_type new_top_ref)
     }
 
 #ifdef REALM_DEBUG
-    if (validator.is_attached()) {
-        std::string msg = util::format("file size: %1, freelist: ", m_logical_size);
+    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
+    if (File::exists(validator_path)) {
+        File validator(validator_path, File::Mode::mode_Append);
+        validator.seek(validator.get_size());
+        std::string msg =
+            util::format("commit version %1 end, top_ref %2, file size: %3 has freelist: ", m_current_version,
+                         new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);
             msg += util::format("{%1, %2}, ", pos, pos + m_free_lengths.get(i));
