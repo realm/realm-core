@@ -9,7 +9,6 @@
 * None.
  
 ### Breaking changes
-* ObjectId constructor made explicit, so no more implicit conversions from const char* or array of 12 bytes. It now accepts a StringData. ([#6059](https://github.com/realm/realm-core/pull/6059))
 * FLX Subscription API reworked to better match SDK consumption patterns ([#6065](https://github.com/realm/realm-core/pull/6065)). Not all changes are breaking, but listing them all here together.
   * `Subscription` is now a plain struct with public fields rather than getter functions
     * `has_name()` and `name()` were merged into a single `optional<string> name` field
@@ -26,6 +25,22 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 13.1.1 Release notes
+
+### Fixed
+* Not possible to open an encrypted file on a device with a page size bigger than the one on which the file was produced. ([#8030](https://github.com/realm/realm-swift/issues/8030), since v12.11.0)
+* Fixed `realm_refresh` so it uses an argument value for the refresh result and returns any error conditions as return value. ([#6068](https://github.com/realm/realm-core/pull/6068), since  v10.4.0)
+* Fixed `realm_compact` to actually do the compaction even if the caller did not provide a `did_compact` argument. ([#6068](https://github.com/realm/realm-core/pull/6068), since v12.7.0)
+* Fixed `realm_add_realm_refresh_callback` and notify immediately that there is not transaction snapshot to advance to. ([#6075](https://github.com/realm/realm-core/issues/6075), since v12.6.0)
+ 
+### Breaking changes
+* ObjectId constructor made explicit, so no more implicit conversions from const char* or array of 12 bytes. It now accepts a StringData. ([#6059](https://github.com/realm/realm-core/pull/6059))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 
