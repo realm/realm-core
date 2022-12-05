@@ -930,6 +930,14 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
 
+                        // nullify a backlink
+                        write([&] {
+                            object_origin2.set_property_value(d, "link", std::any());
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+
                         // remove a backlink
                         write([&] {
                             table_origin->remove_object(object_origin2.obj().get_key());
