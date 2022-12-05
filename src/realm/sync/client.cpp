@@ -1036,7 +1036,7 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 void SessionWrapper::on_flx_sync_version_complete(int64_t version)
@@ -1085,7 +1085,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
     mut_subs.update_state(new_state);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
@@ -1484,7 +1484,7 @@ void SessionWrapper::on_download_completion()
                              m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
         mutable_subs.update_state(SubscriptionSet::State::Complete);
-        std::move(mutable_subs).commit();
+        mutable_subs.commit();
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
