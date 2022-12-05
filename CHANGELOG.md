@@ -10,6 +10,14 @@
  
 ### Breaking changes
 * ObjectId constructor made explicit, so no more implicit conversions from const char* or array of 12 bytes. It now accepts a StringData. ([#6059](https://github.com/realm/realm-core/pull/6059))
+* FLX Subscription API reworked to better match SDK consumption patterns ([#6065](https://github.com/realm/realm-core/pull/6065)). Not all changes are breaking, but listing them all here together.
+  * `Subscription` is now a plain struct with public fields rather than getter functions
+    * `has_name()` and `name()` were merged into a single `optional<string> name` field
+  * `SubscriptionSet` now uses the same types for `iterator` and `const_iterator` since neither was intended to support direct mutability
+  * `SubscriptionSet::get_state_change_notification()` now offers a callback-taking overload
+  * `SubscriptionSet::find()` overloads now return `const Subscription*` with `nullptr` to signal not-found, rather than an at-end iterator
+  * `SubscriptionSet::erase()` now has overloads taking a `StringData name` or a `Query`. Both return a bool to indicate if anything was found and removed.
+  * `SubscriptionSet::commit()` is no longer `&&`-qualified. This means you no longer need to `std::move()` the set when calling it.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
