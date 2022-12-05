@@ -1134,7 +1134,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(realm_changed_callback_called);
     }
 
-    SECTION("realm refresh registering without advancing transaction") {
+    SECTION("realm refresh registering while not in transaction") {
         bool realm_refresh_callback_called = false;
         auto token = cptr(realm_add_realm_refresh_callback(
             realm,
@@ -1143,10 +1143,11 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
         realm_begin_write(realm);
-        CHECK(realm_refresh_callback_called);
+        realm_commit(realm);
+        CHECK_FALSE(realm_refresh_callback_called);
     }
 
-    SECTION("realm refresh registering callback in transaction") {
+    SECTION("realm refresh registering callback in transaction but on the same version") {
         bool realm_refresh_callback_called = false;
         realm_begin_write(realm);
         auto token = cptr(realm_add_realm_refresh_callback(
@@ -1156,53 +1157,7 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
         realm_commit(realm);
-        CHECK(realm_refresh_callback_called);
-    }
-
-    SECTION("realm refresh async pending") {
-        struct TestingObj {
-            static TestingObj& get()
-            {
-                static TestingObj obj;
-                return obj;
-            }
-            bool done{false};
-            bool realm_refresh_callback_called{false};
-            realm_t* realm{nullptr};
-        };
-
-        auto wait_for_done = [&]() {
-            util::EventLoop::main().run_until([&] {
-                return TestingObj::get().done;
-            });
-            REQUIRE(TestingObj::get().done);
-        };
-        TestingObj::get().realm = realm;
-        unsigned int transaction_id;
-        auto res = realm_async_begin_write(
-            realm,
-            [](void*) {
-                auto realm = TestingObj::get().realm;
-                auto token_refresh = cptr(realm_add_realm_refresh_callback(
-                    realm,
-                    [](void* userdata) {
-                        *reinterpret_cast<bool*>(userdata) = true;
-                    },
-                    &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
-
-                unsigned int transaction_id;
-                realm_async_commit(
-                    realm,
-                    [](void*, bool, const char*) {
-                        TestingObj::get().done = true;
-                    },
-                    nullptr, nullptr, false, &transaction_id);
-            },
-            nullptr, nullptr, false, &transaction_id);
-
-        wait_for_done();
-        CHECK(TestingObj::get().realm_refresh_callback_called);
-        CHECK(res);
+        CHECK_FALSE(realm_refresh_callback_called);
     }
 
     SECTION("realm async refresh - main use case") {
@@ -1210,7 +1165,9 @@ TEST_CASE("C API", "[c_api]") {
         auto config = make_config(test_file.path.c_str(), false);
         auto realm2 = cptr(realm_open(config.get()));
 
+        realm_begin_write(realm);
         realm_begin_read(realm2.get());
+        realm_commit(realm);
 
         auto token = cptr(realm_add_realm_refresh_callback(
             realm2.get(),
@@ -1219,12 +1176,8 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
 
-
-        realm_begin_write(realm);
-        realm_commit(realm);
-
-
         realm_refresh(realm2.get(), nullptr);
+        REQUIRE(token);
         CHECK(realm_refresh_callback_called);
     }
 
@@ -1233,20 +1186,19 @@ TEST_CASE("C API", "[c_api]") {
         auto config = make_config(test_file.path.c_str(), false);
         auto realm2 = cptr(realm_open(config.get()));
 
+        realm_begin_write(realm);
         realm_begin_read(realm2.get());
+        realm_commit(realm);
 
         auto f = [](void* userdata) {
             auto ptr = reinterpret_cast<std::atomic_int*>(userdata);
             ptr->fetch_add(1);
         };
         auto token1 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
-
         auto token2 = cptr(realm_add_realm_refresh_callback(realm2.get(), f, &counter, [](void*) {}));
-
-        realm_begin_write(realm);
-        realm_commit(realm);
-
         realm_refresh(realm2.get(), nullptr);
+        REQUIRE(token1);
+        REQUIRE(token2);
         CHECK(counter.load() == 2);
     }
 
@@ -1267,7 +1219,7 @@ TEST_CASE("C API", "[c_api]") {
             &realm_refresh_callback_called, [](void*) {}));
 
         realm_refresh(realm, nullptr);
-        CHECK(!realm_refresh_callback_called);
+        CHECK_FALSE(realm_refresh_callback_called);
     }
 
     SECTION("realm refresh read transaction frozen - register on frozen realm") {
@@ -1288,7 +1240,7 @@ TEST_CASE("C API", "[c_api]") {
 
         realm_refresh(realm, nullptr);
         CHECK(token == nullptr);
-        CHECK(!realm_refresh_callback_called);
+        CHECK_FALSE(realm_refresh_callback_called);
     }
 
     SECTION("schema is set after opening") {
