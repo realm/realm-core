@@ -584,7 +584,7 @@ ref_type GroupWriter::write_group()
     if (File::exists(validator_path)) {
         File validator(validator_path, File::Mode::mode_Append);
         validator.seek(validator.get_size());
-        auto msg = util::format("commit version %1 start\n", m_current_version);
+        auto msg = util::format("commit start version %1\n", m_current_version);
         validator.write(msg.data(), msg.size());
     }
 #endif // REALM_DEBUG
@@ -1330,7 +1330,7 @@ void GroupWriter::commit(ref_type new_top_ref)
         File validator(validator_path, File::Mode::mode_Append);
         validator.seek(validator.get_size());
         std::string msg =
-            util::format("commit version %1 end, top_ref %2, file size: %3 has freelist: ", m_current_version,
+            util::format("commit end version %1, top_ref %2, file size: %3 has freelist: ", m_current_version,
                          new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);

@@ -1259,7 +1259,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #ifdef REALM_DEBUG
     uint64_t computed_pages_for_refresh = 0;
     const size_t page_size = util::page_size();
-    std::string debug_allocs = "top refs: ";
+    std::string debug_allocs;
     File validator;
     if (get_file().is_attached()) {
         std::string validator_path = get_file().get_path() + ".validate";
@@ -1294,18 +1294,20 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
 #endif // REALM_DEBUG
     };
-    RefRanges ranges;
-    for (auto version : read_locks) {
-        if (version.version == read_locks.begin()->version)
-            continue; // the begin version pages are known to be up to date
-        ranges.push_back(
-            RefRange{version.top_ref, version.top_ref + Array::header_size + (Group::s_group_max_size * 8)});
-    }
-    do_refresh(ranges);
 
-#if REALM_DEBUG
-    debug_allocs += " free pos/sizes: ";
-#endif
+    auto load_array = [&do_refresh, &read_locks](Array& array, ref_type ref, const VersionedTopRef& read_version) {
+        // the begin version is known to have up to date pages since it is the current version
+        const bool first_version = (read_version.version == read_locks.begin()->version);
+        if (!first_version) {
+            do_refresh({{ref, ref + NodeHeader::header_size}});
+        }
+        array.init_from_ref(ref);
+        REALM_ASSERT_EX(array.is_attached(), ref, read_version.version, read_version.top_ref);
+        if (!first_version) {
+            size_t bytes_to_refresh = NodeHeader::get_byte_size_from_header(array.get_header());
+            do_refresh({{ref, ref + bytes_to_refresh}});
+        }
+    };
 
     Array prev_freelist_positions(*this);
     Array prev_freelist_lengths(*this);
@@ -1315,54 +1317,37 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
     for (auto& read_lock : read_locks) {
         if (read_lock.top_ref == 0) {
-            // a top_ref of zero can happen if the lock was requested on an empty Realm
+            // a top_ref of zero can happen if the lock was requested on an empty/initial Realm
             // this also means that there is nothing to refresh there, so skip it
             continue;
         }
-        Array top_array(*this), free_positions(*this), free_lengths(*this);
-        top_array.init_from_ref(read_lock.top_ref);
-        if (top_array.size() < Group::s_version_ndx) {
-            // a file on streaming format may not contain versioning info
+#ifdef REALM_DEBUG
+        debug_allocs += util::format("version %1 top ref, free positions and free sizes: ", read_lock.version);
+#endif
+
+        Array top_array(*this), cur_freelist_positions(*this), cur_freelist_lengths(*this);
+        load_array(top_array, read_lock.top_ref, read_lock);
+        static_assert(Group::s_free_pos_ndx < Group::s_free_size_ndx, "use the lowest index");
+        if (top_array.size() < Group::s_version_ndx || top_array.size() <= Group::s_free_pos_ndx) {
+            // a file on streaming format may not contain versioning info or a freelist
             continue;
         }
         auto actual_version = top_array.get_as_ref_or_tagged(Group::s_version_ndx).get_as_int();
         REALM_ASSERT_EX(actual_version == read_lock.version, actual_version, read_lock.version, read_lock.top_ref);
-        if (top_array.size() <= Group::s_free_pos_ndx) {
-            // A file on streaming format has no freelist info.
-            continue;
-        }
-        REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
-                        read_lock.top_ref, read_lock.version);
         REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,
                         read_lock.top_ref, read_lock.version);
 
         ref_type free_positions_ref = top_array.get_as_ref(Group::s_free_pos_ndx);
         ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
-        if (read_lock.version != read_locks.begin()->version) {
-            // the first version's pages are known to be up to date already
-            do_refresh({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
-                        {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
-        }
+        load_array(cur_freelist_positions, top_array.get_as_ref(Group::s_free_pos_ndx), read_lock);
+        load_array(cur_freelist_lengths, top_array.get_as_ref(Group::s_free_size_ndx), read_lock);
 
-        free_positions.init_from_ref(free_positions_ref);
-        free_lengths.init_from_ref(free_sizes_ref);
-        REALM_ASSERT_EX(free_positions.is_attached(), free_positions_ref, read_lock.version, read_lock.top_ref);
-        REALM_ASSERT_EX(free_lengths.is_attached(), free_sizes_ref, read_lock.version, read_lock.top_ref);
-        size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
-        size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
-        if (read_lock.version != read_locks.begin()->version) {
-            // the first version's pages are known to be up to date already
-            do_refresh({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
-                        {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
-        }
-        // FIXME: verify versions list here for integrity?
-        // we can now access this freelist version's pos and lengths
-        Array cur_freelist_positions(*this), cur_freelist_lengths(*this);
         cur_freelist_positions.init_from_ref(free_positions_ref);
         cur_freelist_lengths.init_from_ref(free_sizes_ref);
         REALM_ASSERT_EX(cur_freelist_positions.size() == cur_freelist_lengths.size(), cur_freelist_positions.size(),
-                        cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, pos_bytes_to_refresh,
-                        sizes_bytes_to_refresh, read_lock.version, read_lock.top_ref);
+                        cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, read_lock.version,
+                        read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
+                        (--read_locks.end())->version);
 
         if (!processed_first_version) {
             processed_first_version = true;
@@ -1435,8 +1420,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                                        cur_freelist_lengths, cur_freelist_size);
 
             auto add_alloc_for_remainder_of_block = [&]() {
-                if (current_ndx + 1 < cur_freelist_size) {
-                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + 1);
+                if (current_ndx + cur_increment < cur_freelist_size) {
+                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + cur_increment);
                     if (next_cur_start < prev_end) {
                         //     -------
                         //  ----  --
@@ -1566,18 +1551,19 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                 did_skip_begin_version = true;
                 continue;
             }
-            std::string prefix = util::format("commit version %1 start", read_lock.version);
-            std::string suffix = util::format("commit version %1 end", read_lock.version);
+            std::string prefix = util::format("commit start version %1", read_lock.version);
+            std::string suffix = util::format("commit end version %1", read_lock.version);
             size_t prefix_ndx = buffer.find(prefix);
             size_t suffix_ndx = buffer.find(suffix);
-            while (prefix_ndx == buffer.npos) {
-                size_t last_commit = buffer.rfind("commit version");
+            while (prefix_ndx == buffer.npos || suffix_ndx == buffer.npos) {
+                size_t last_commit = buffer.rfind("commit start version");
                 REALM_ASSERT(last_commit != buffer.npos);
                 file_read_pos += last_commit;
                 validator.seek(file_read_pos);
                 buffer.assign(buffer_size, 0);
                 bytes_read = validator.read(buffer.data(), buffer_size);
                 prefix_ndx = buffer.find(prefix);
+                suffix_ndx = buffer.find(suffix);
                 if (bytes_read < buffer_size) {
                     REALM_ASSERT(prefix_ndx != buffer.npos);
                 }

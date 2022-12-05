@@ -510,12 +510,18 @@ TEST(Alloc_EncryptionPageRefresher)
     };
     auto add_expected_refreshes_for_arrays = [](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
                                                 RefRanges& to_refresh) {
+        bool skip_first = true;
         for (auto& v : top_refs) {
+            if (skip_first) {
+                skip_first = false;
+                continue;
+            }
             // all top refs up to the max top ref size
-            to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size + (top_array_size * 8)});
+            to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size});
             // the ref + header size of free_pos and free_size
             Array top(alloc), pos(alloc), sizes(alloc);
             top.init_from_ref(v.top_ref);
+            to_refresh.push_back({top.get_ref(), top.get_ref() + top.get_byte_size()});
             pos.init_from_ref(top.get_as_ref(top_array_free_pos_ndx));
             sizes.init_from_ref(top.get_as_ref(top_array_free_size_ndx));
             to_refresh.push_back({pos.get_ref(), pos.get_ref() + Array::header_size});
@@ -676,6 +682,43 @@ TEST(Alloc_EncryptionPageRefresher)
                    {4768, 8192}}};
     expected_diff = {{96, 128}, {560, 600}, {680, 712}, {752, 768}, {928, 968}, {1808, 2352}, {4008, 4768}};
     check_range_refreshes(free_lists, expected_diff, 8192, RefsType::Freelists);
+
+    free_lists = {{{96, 152},
+                   {168, 272},
+                   {272, 376},
+                   {408, 464},
+                   {464, 520},
+                   {1336, 1744},
+                   {1744, 2152},
+                   {2328, 3208},
+                   {3208, 3968},
+                   {3968, 4144},
+                   {4144, 4904},
+                   {5664, 6568},
+                   {7328, 8128},
+                   {8128, 8328},
+                   {8328, 8528},
+                   {8528, 16384}},
+                  {{96, 152},
+                   {152, 168},
+                   {272, 376},
+                   {376, 408},
+                   {464, 520},
+                   {560, 600},
+                   {680, 712},
+                   {752, 792},
+                   {928, 1336},
+                   {1336, 1744},
+                   {2152, 2328},
+                   {3088, 4144},
+                   {4144, 4904},
+                   {5664, 6568},
+                   {6568, 7328},
+                   {7328, 8328},
+                   {8328, 8528},
+                   {8728, 16384}}};
+    expected_diff = {{168, 272}, {408, 464}, {1744, 2152}, {2328, 3088}, {8528, 8728}};
+    check_range_refreshes(free_lists, expected_diff, 16384, RefsType::Freelists);
 }
 
 #endif // TEST_ALLOC
