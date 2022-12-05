@@ -16,8 +16,8 @@
   * `SubscriptionSet` now uses the same types for `iterator` and `const_iterator` since neither was intended to support direct mutability
   * `SubscriptionSet::get_state_change_notification()` now offers a callback-taking overload
   * `SubscriptionSet::find()` overloads now return `const Subscription*` with `nullptr` to signal not-found, rather than an at-end iterator
-  * `SubscriptionSet::erase()` now has overloads taking a `StringData name` or a `Query`. Both return a bool to indicate if anything was found and removed.
-  * `SubscriptionSet::commit()` is no longer `&&`-qualified. This means you no longer need to `std::move()` the set when calling it.
+  * `MutableSubscriptionSet::erase()` now has overloads taking a `StringData name` or a `Query`. Both return a bool to indicate if anything was found and removed.
+  * `MutableSubscriptionSet::commit()` is no longer `&&`-qualified. This means you no longer need to `std::move()` the set when calling it.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
