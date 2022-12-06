@@ -115,6 +115,7 @@ public:
     static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
     static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
     static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
+    static constexpr milliseconds_type default_error_timeout = 10000;           // 10 seconds
 
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
@@ -954,7 +955,9 @@ private:
     std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
-    bool m_connection_to_close;
+    // The timer will be constructed on demand, and will be destroyed when an ERROR message is received from the
+    // server.
+    SyncSocketProvider::SyncTimer m_wait_for_error_timer;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1478,7 +1481,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
-    m_connection_to_close                 = false;
     m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
