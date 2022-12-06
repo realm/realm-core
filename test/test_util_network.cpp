@@ -7,6 +7,7 @@
 
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/network.hpp>
+#include "realm/sync/noinst/event_loop_trigger.hpp"
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
@@ -1941,7 +1942,7 @@ TEST(Network_Trigger_Basics)
     auto func = [&] {
         was_triggered = true;
     };
-    network::Trigger trigger{service, std::move(func)};
+    realm::sync::EventLoopTrigger<network::Service> trigger(service, std::move(func));
     trigger.trigger();
     service.run();
     CHECK(was_triggered);
@@ -1960,9 +1961,9 @@ TEST(Network_Trigger_Basics)
 
     // Check that retriggering from triggered function works
     realm::util::UniqueFunction<void()> func_2;
-    network::Trigger trigger_2{service, [&] {
-                                   func_2();
-                               }};
+    realm::sync::EventLoopTrigger<network::Service> trigger_2{service, [&] {
+                                                                  func_2();
+                                                              }};
     was_triggered = false;
     bool was_triggered_twice = false;
     func_2 = [&] {
@@ -1985,7 +1986,7 @@ TEST(Network_Trigger_Basics)
         auto func_3 = [&] {
             was_triggered = true;
         };
-        network::Trigger trigger_3{service, std::move(func_3)};
+        realm::sync::EventLoopTrigger<network::Service> trigger_3{service, std::move(func_3)};
         trigger_3.trigger();
     }
     service.run();
@@ -2000,8 +2001,8 @@ TEST(Network_Trigger_Basics)
     auto func_5 = [&] {
         was_triggered_5 = true;
     };
-    network::Trigger trigger_4{service, std::move(func_4)};
-    network::Trigger trigger_5{service, std::move(func_5)};
+    realm::sync::EventLoopTrigger<network::Service> trigger_4{service, std::move(func_4)};
+    realm::sync::EventLoopTrigger<network::Service> trigger_5{service, std::move(func_5)};
     trigger_4.trigger();
     trigger_5.trigger();
     service.run();
@@ -2022,7 +2023,7 @@ TEST(Network_Trigger_ThreadSafety)
         if (flag)
             ++n_2;
     };
-    network::Trigger trigger{service, std::move(func)};
+    realm::sync::EventLoopTrigger<network::Service> trigger(service, std::move(func));
     ThreadWrapper thread;
     thread.start([&] {
         service.run();

@@ -1600,14 +1600,13 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name}
     , m_custom_http_headers{custom_http_headers}
 {
-    auto handler = [this] {
+    m_on_idle = EventLoopTrigger<util::network::Service>(client.get_service(), [this] {
         REALM_ASSERT(m_activated);
         if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
             on_idle(); // Throws
             // Connection object may be destroyed now.
         }
-    };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    }); // Throws
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept

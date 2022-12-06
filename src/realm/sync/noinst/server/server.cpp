@@ -9,6 +9,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
+#include <realm/sync/noinst/event_loop_trigger.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
@@ -1091,11 +1092,10 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         util::network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        m_send_trigger = EventLoopTrigger<util::network::Service>(service, [this] {
             if (!m_is_sending)
                 send_next_message(); // Throws
-        };
-        m_send_trigger = util::network::Trigger{service, std::move(handler)}; // Throws
+        });                          // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1334,7 +1334,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    util::network::Trigger m_send_trigger;
+    EventLoopTrigger<util::network::Service> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 

@@ -21,6 +21,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/event_loop_trigger.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
@@ -165,7 +166,8 @@ private:
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    util::network::Trigger m_actualize_and_finalize;
+
+    EventLoopTrigger<util::network::Service> m_actualize_and_finalize;
     util::network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -506,7 +508,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    util::network::Trigger m_on_idle;
+    EventLoopTrigger<util::network::Service> m_on_idle;
 
     // activate() has been called
     bool m_activated = false;

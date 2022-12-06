@@ -184,7 +184,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     auto handler = [this] {
         actualize_and_finalize_session_wrappers(); // Throws
     };
-    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
+    m_actualize_and_finalize = EventLoopTrigger<util::network::Service>{get_service(), std::move(handler)}; // Throws
 
     start_keep_running_timer(); // Throws
 }

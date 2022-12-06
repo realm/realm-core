@@ -1520,26 +1520,6 @@ public:
         }
     }
 
-    void trigger_exec(TriggerExecOperBase& op) noexcept
-    {
-        {
-            LockGuard lock{m_mutex};
-            if (op.m_in_use)
-                return;
-            op.m_in_use = true;
-            bind_ptr<TriggerExecOperBase> op_2{&op}; // Increment use count
-            LendersOperPtr op_3{op_2.release()};
-            m_completed_operations_2.push_back(std::move(op_3));
-        }
-        io_reactor.interrupt();
-    }
-
-    void reset_trigger_exec(TriggerExecOperBase& op) noexcept
-    {
-        LockGuard lock{m_mutex};
-        op.m_in_use = false;
-    }
-
     void add_completed_oper(LendersOperPtr op) noexcept
     {
         m_completed_operations.push_back(std::move(op));
@@ -1790,18 +1770,6 @@ void Service::do_post(PostOperConstr constr, std::size_t size, void* cookie)
 void Service::recycle_post_oper(Impl& impl, PostOperBase* op) noexcept
 {
     impl.recycle_post_oper(op);
-}
-
-
-void Service::trigger_exec(Impl& impl, TriggerExecOperBase& op) noexcept
-{
-    impl.trigger_exec(op);
-}
-
-
-void Service::reset_trigger_exec(Impl& impl, TriggerExecOperBase& op) noexcept
-{
-    impl.reset_trigger_exec(op);
 }
 
 
