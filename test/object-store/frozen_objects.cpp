@@ -377,8 +377,8 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
 #ifdef REALM_DEBUG
     constexpr int num_pending_transactions = 10;
-    constexpr int num_iterations = 100;
-    constexpr int num_objects = 5;
+    constexpr int num_iterations = 10000;
+    constexpr int num_objects = 500;
 #else
     constexpr int num_pending_transactions = 100;
     constexpr int num_iterations = 10000;
@@ -401,17 +401,21 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     config.schema_version = 1;
     config.automatic_change_notifications = true;
     config.cache = false;
-    config.schema = Schema{
-        {"table", {{"value", PropertyType::Int}, {"link", PropertyType::Object | PropertyType::Nullable, "table"}}}};
+    config.schema = Schema{{"table",
+                            {{"value", PropertyType::Int},
+                             {"str", PropertyType::String},
+                             {"link", PropertyType::Object | PropertyType::Nullable, "table"}}}};
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_table");
     auto table_key = table->get_key();
     auto col = table->get_column_key("value");
     auto link_col = table->get_column_key("link");
+    auto str_col = table->get_column_key("str");
     realm->begin_transaction();
     for (int j = 0; j < num_objects; ++j) {
         auto o = table->create_object(ObjKey(j));
         o.set(col, j);
+        o.set(str_col, std::to_string(j));
         o.set(link_col, o.get_key());
     }
     realm->commit_transaction();
@@ -459,7 +463,9 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
             realm->begin_transaction();
             auto key = ObjKey((unsigned)random_int() % num_objects);
             auto o = table->get_object(key);
-            o.set(col, o.get<Int>(col) + j + 42);
+            auto v = o.get<Int>(col) + j + 42;
+            o.set(col, v);
+            o.set(str_col, std::to_string(v));
             int link = (unsigned)random_int() % num_objects;
             o.set(link_col, ObjKey(link));
             realm->commit_transaction();
