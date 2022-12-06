@@ -139,8 +139,6 @@ void wait_for_advance(Realm& realm)
 
 void wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
 {
-// TODO: Re-enable it in RCORE-1241.
-#if 0
     timed_sleeping_wait_for(
         [&]() -> bool {
             auto errors = app_session.admin_api.get_errors(app_session.server_app_id);
@@ -150,11 +148,7 @@ void wait_for_error_to_persist(const AppSession& app_session, const std::string&
             }
             return it != errors.end();
         },
-        std::chrono::minutes(10));
-#else
-    static_cast<void>(app_session);
-    static_cast<void>(err);
-#endif
+        std::chrono::minutes(1));
 }
 } // namespace
 
