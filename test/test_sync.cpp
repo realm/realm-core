@@ -785,12 +785,10 @@ struct ExpectChangesetError {
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
-        CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
-        CHECK(ec.category() == client_error_category());
+        CHECK_EQUAL(ec, ProtocolError::bad_changeset);
+        CHECK(ec.category() == protocol_error_category());
         CHECK(error_info->is_fatal());
-        CHECK_EQUAL(error_info->message,
-                    "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
-                        expected_error);
+        CHECK_EQUAL(error_info->message, expected_error);
         fixture.stop();
     }
 };
@@ -843,8 +841,7 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
             ColKey col_ndx = table->add_column(type_String, "column");
             table->create_object_with_primary_key(2).set(col_ndx, "Hello, World!");
         },
-        "Property 'column' in class 'foo' is of type Int on one side and type String on the other.",
-        "Property 'column' in class 'foo' is of type String on one side and type Int on the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -864,7 +861,7 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
             table->create_object_with_primary_key(2).set<int64_t>(col_ndx, 123);
         },
-        "Property 'column' in class 'foo' is nullable on one side and not on the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -882,8 +879,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             TableRef target = wt.get_group().add_table_with_primary_key("class_baz", type_Int, "id");
             table->add_column(*target, "column");
         },
-        "Link property 'column' in class 'foo' points to class 'bar' on one side and to 'baz' on the other.",
-        "Link property 'column' in class 'foo' points to class 'baz' on one side and to 'bar' on the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -897,8 +893,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "b");
         },
-        "'foo' has primary key 'a' on one side, but primary key 'b' on the other.",
-        "'foo' has primary key 'b' on one side, but primary key 'a' on the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -912,8 +907,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_String, "a");
         },
-        "'foo' has primary key 'a', which is of type Int on one side and type String on the other.",
-        "'foo' has primary key 'a', which is of type String on one side and type Int on the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -929,7 +923,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
             bool nullable = true;
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "a", nullable);
         },
-        "'foo' has primary key 'a', which is nullable on one side, but not the other.");
+        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
 }
 
 
@@ -5691,67 +5685,6 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
     });
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
-}
-
-
-TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    TEST_CLIENT_DB(db_2);
-
-    // Verify that if a client fails to integrate a downloaded changeset, then
-    // it will keep failing during future attempts. This test once failed due to
-    // https://jira.mongodb.org/browse/RSYNC-48.
-
-    TEST_DIR(dir);
-    fixtures::ClientServerFixture fixture{dir, test_context};
-    fixture.start();
-
-    // Introduce a changeset into the server-side Realm
-    {
-        fixtures::RealmFixture realm{fixture, path_1, "/test"};
-        realm.nonempty_transact();
-        realm.wait_for_upload_complete_or_client_stopped();
-    }
-
-    // Launch a client with `simulate_integration_error` set to true, and make
-    // it download that changeset. Then check that it fails at least two times.
-    bool failed_once = false;
-    bool failed_twice = false;
-    using ConnectionState = ConnectionState;
-    using ErrorInfo = Session::ErrorInfo;
-    std::mutex mx;
-    std::condition_variable cv;
-    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-        if (state != ConnectionState::disconnected)
-            return;
-        REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        CHECK_EQUAL(Client::Error::bad_changeset, ec);
-        CHECK(is_fatal);
-        if (!failed_once) {
-            failed_once = true;
-            fixture.cancel_reconnect_delay();
-        }
-        else {
-            std::unique_lock<std::mutex> lk(mx);
-            failed_twice = true;
-            fixture.stop();
-            cv.notify_one();
-        }
-    };
-    Session::Config config;
-    config.simulate_integration_error = true;
-    Session session = fixture.make_session(db_2, std::move(config));
-    session.set_connection_state_change_listener(listener);
-    fixture.bind_session(session, "/test");
-    using namespace std::chrono_literals;
-    std::unique_lock<std::mutex> lk(mx);
-    bool completed_within_time_limit = cv.wait_for(lk, 1s, [&] {
-        return failed_twice;
-    });
-    CHECK(completed_within_time_limit);
 }
 
 template <typename T>
