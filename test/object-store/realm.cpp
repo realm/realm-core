@@ -19,6 +19,8 @@
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <iostream>
+
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -358,36 +360,32 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(old_realm->schema().size() == 1);
     }
 
-    SECTION("should read the proper schema from the file if realm is frozen") {
-        Realm::get_shared_realm(config);
+    SECTION("should skip schema verification with mode additive and transaction version less than current version") {
 
-        config.schema = util::none;
+        auto realm1 = Realm::get_shared_realm(config);
+        auto& db1 = TestHelper::get_db(realm1);
+        auto rt1 = db1->start_read();
+        // grab the initial transaction version.
+        const auto version1 = rt1->get_version_of_current_transaction();
+        realm1->close();
+
+        // update the schema
         config.schema_mode = SchemaMode::AdditiveExplicit;
-        config.schema_version = 0;
-
-        auto realm = Realm::get_shared_realm(config);
-        REQUIRE(realm->schema().size() == 1);
-        realm->close();
-
         config.schema = Schema{
             {"object", {{"value", PropertyType::Int}}},
             {"object1", {{"value", PropertyType::Int}}},
         };
-        config.schema_version = 1;
-        realm = Realm::get_shared_realm(config);
-        REQUIRE(realm->schema().size() == 2);
+        auto realm2 = Realm::get_shared_realm(config);
 
-        config.schema = util::none;
-        auto old_realm = Realm::get_shared_realm(config);
-        old_realm->begin_transaction();
-        auto frozen_realm = old_realm->freeze();
-        REQUIRE(frozen_realm->is_frozen());
-        REQUIRE(realm->schema() == frozen_realm->schema());
-        auto table_obj = frozen_realm->read_group().get_table("class_object");
-        auto table_obj1 = frozen_realm->read_group().get_table("class_object1");
-        REQUIRE(table_obj);
-        REQUIRE(table_obj1);
-        old_realm->commit_transaction();
+        // no verification if the version chosen is less than the current transaction schema version.
+        TestHelper::begin_read(realm2, version1);
+        auto& group = realm2->read_group();
+        auto schema = realm2->schema();
+        REQUIRE(schema != config.schema);
+        auto table_obj = group.get_table("class_object");
+        auto table_obj1 = group.get_table("class_object1");
+        REQUIRE(table_obj);        // empty schema always has class_object
+        REQUIRE_FALSE(table_obj1); // class_object1 should not be present
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
