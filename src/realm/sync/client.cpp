@@ -815,9 +815,9 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            [&](const TransactionRef& tr, size_t count) {
-                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
-                bootstrap_store->pop_front_pending(tr, count);
+            [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
+                REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, changesets_applied.size());
             },
             get_transact_reporter());
         progress = *pending_batch.progress;

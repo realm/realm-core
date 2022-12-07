@@ -380,16 +380,6 @@ constexpr bool is_session_level_error(ProtocolError error)
     return int(error) >= 200 && int(error) <= 299;
 }
 
-constexpr bool session_level_error_requires_suspend(ProtocolError error)
-{
-    switch (error) {
-        case ProtocolError::compensating_write:
-            return false;
-        default:
-            return true;
-    }
-}
-
 inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action action)
 {
     switch (action) {
