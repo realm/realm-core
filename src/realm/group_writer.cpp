@@ -579,6 +579,15 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     ALLOC_DBG_COUT("  Allocating file space for data:" << std::endl);
+#ifdef REALM_DEBUG
+    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
+    if (File::exists(validator_path)) {
+        File validator(validator_path, File::Mode::mode_Append);
+        validator.seek(validator.get_size());
+        auto msg = util::format("commit start version %1\n", m_current_version);
+        validator.write(msg.data(), msg.size());
+    }
+#endif // REALM_DEBUG
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
     // as they are going to change along the way.) If free space is available in
@@ -766,16 +775,24 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_free_version_ndx, from_ref(free_versions_ref));            // Throws
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
 
-    if (m_evacuation_limit == 0 && m_backoff == 0) {
-        size_t used_space = m_logical_size - m_free_space_size;
-        // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
-        static constexpr size_t minimal_compaction_size = 0x100000;
-        // If we make the file too small, there is a big chance it will grow immediately afterwards
-        static constexpr size_t minimal_evac_limit = 0x10000;
-        if (m_logical_size >= minimal_compaction_size && m_free_space_size - m_locked_space_size > 2 * used_space) {
+    // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
+    static constexpr size_t minimal_compaction_size = 0x100000;
+    if (m_logical_size >= minimal_compaction_size && m_evacuation_limit == 0 && m_backoff == 0) {
+        // We might have allocated a bigger chunk than needed for the free lists, so if we
+        // add what we have reserved and subtract what was requested, we get a better measure
+        // for what will be free eventually. Also subtract the locked space as this is not
+        // actually free.
+        size_t free_space = m_free_space_size + reserve_size - max_free_space_needed - m_locked_space_size;
+        REALM_ASSERT(m_logical_size > free_space);
+        size_t used_space = m_logical_size - free_space;
+        if (free_space > 2 * used_space) {
             // Clean up potential
-            auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
+            auto limit = util::round_up_to_page_size(used_space + used_space / 2);
+
+            // If we make the file too small, there is a big chance it will grow immediately afterwards
+            static constexpr size_t minimal_evac_limit = 0x10000;
             m_evacuation_limit = std::max(minimal_evac_limit, limit);
+
             // From now on, we will only allocate below this limit
             // Save the limit in the file
             while (top.size() <= Group::s_evacuation_point_ndx) {
@@ -1365,16 +1382,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     // window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
     //                                 sizeof(file_header.m_top_ref[slot_selector]));
     window->encryption_write_barrier(&file_header, sizeof file_header);
-#ifdef REALM_DEBUG
-    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
-    File validator;
-    if (File::exists(validator_path)) {
-        validator.open(validator_path, File::Mode::mode_Append);
-        validator.seek(validator.get_size());
-        auto msg = util::format("commit version %1, top_ref %2\n", m_current_version, new_top_ref);
-        validator.write(msg.data(), msg.size());
-    }
-#endif // REALM_DEBUG
     flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
@@ -1382,8 +1389,13 @@ void GroupWriter::commit(ref_type new_top_ref)
     }
 
 #ifdef REALM_DEBUG
-    if (validator.is_attached()) {
-        std::string msg = util::format("file size: %1, freelist: ", m_logical_size);
+    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
+    if (File::exists(validator_path)) {
+        File validator(validator_path, File::Mode::mode_Append);
+        validator.seek(validator.get_size());
+        std::string msg =
+            util::format("commit end version %1, top_ref %2, file size: %3 has freelist: ", m_current_version,
+                         new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);
             msg += util::format("{%1, %2}, ", pos, pos + m_free_lengths.get(i));

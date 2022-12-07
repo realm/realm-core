@@ -1259,6 +1259,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #ifdef REALM_DEBUG
     uint64_t computed_pages_for_refresh = 0;
     const size_t page_size = util::page_size();
+    std::string debug_allocs;
     File validator;
     if (get_file().is_attached()) {
         std::string validator_path = get_file().get_path() + ".validate";
@@ -1266,6 +1267,17 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             validator.open(validator_path, File::Mode::mode_Read);
         }
     }
+    auto track_pages_bitwise = [&page_size, &debug_allocs](uint64_t& bitwise_pages, const RefRange& alloc) {
+        if (alloc.begin == alloc.end) {
+            return;
+        }
+        uint64_t computed_bits = 0;
+        for (size_t page = (alloc.begin / page_size); page <= ((alloc.end - 1) / page_size); ++page) {
+            computed_bits |= 1 << (page);
+        }
+        debug_allocs += util::format("[%1, %2, bits: %3], ", alloc.begin, alloc.end, computed_bits);
+        bitwise_pages |= computed_bits;
+    };
 #endif
     auto do_refresh = [&](const RefRanges& ranges) {
         if (REALM_UNLIKELY(refresh_hook)) {
@@ -1277,24 +1289,25 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #ifdef REALM_DEBUG
         if (validator.is_attached()) {
             for (auto& alloc : ranges) {
-                if (alloc.begin == alloc.end) {
-                    continue;
-                }
-                uint64_t pages_for_alloc = 0;
-                for (size_t page = (alloc.begin / page_size); page <= (alloc.end / page_size); ++page) {
-                    pages_for_alloc |= 1 << (page);
-                }
-                computed_pages_for_refresh |= pages_for_alloc;
+                track_pages_bitwise(computed_pages_for_refresh, alloc);
             }
         }
 #endif // REALM_DEBUG
     };
-    RefRanges ranges;
-    for (auto version : read_locks) {
-        ranges.push_back(
-            RefRange{version.top_ref, version.top_ref + Array::header_size + (Group::s_group_max_size * 8)});
-    }
-    do_refresh(ranges);
+
+    auto load_array = [&do_refresh, &read_locks](Array& array, ref_type ref, const VersionedTopRef& read_version) {
+        // the begin version is known to have up to date pages since it is the current version
+        const bool first_version = (read_version.version == read_locks.begin()->version);
+        if (!first_version) {
+            do_refresh({{ref, ref + NodeHeader::header_size}});
+        }
+        array.init_from_ref(ref);
+        REALM_ASSERT_EX(array.is_attached(), ref, read_version.version, read_version.top_ref);
+        if (!first_version) {
+            size_t bytes_to_refresh = NodeHeader::get_byte_size_from_header(array.get_header());
+            do_refresh({{ref, ref + bytes_to_refresh}});
+        }
+    };
 
     Array prev_freelist_positions(*this);
     Array prev_freelist_lengths(*this);
@@ -1304,48 +1317,37 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
     for (auto& read_lock : read_locks) {
         if (read_lock.top_ref == 0) {
-            // a top_ref of zero can happen if the lock was requested on an empty Realm
+            // a top_ref of zero can happen if the lock was requested on an empty/initial Realm
             // this also means that there is nothing to refresh there, so skip it
             continue;
         }
-        Array top_array(*this), free_positions(*this), free_lengths(*this);
-        top_array.init_from_ref(read_lock.top_ref);
-        if (top_array.size() < Group::s_version_ndx) {
-            // a file on streaming format may not contain versioning info
+#ifdef REALM_DEBUG
+        debug_allocs += util::format("version %1 top ref, free positions and free sizes: ", read_lock.version);
+#endif
+
+        Array top_array(*this), cur_freelist_positions(*this), cur_freelist_lengths(*this);
+        load_array(top_array, read_lock.top_ref, read_lock);
+        static_assert(Group::s_free_pos_ndx < Group::s_free_size_ndx, "use the lowest index");
+        if (top_array.size() < Group::s_version_ndx || top_array.size() <= Group::s_free_pos_ndx) {
+            // a file on streaming format may not contain versioning info or a freelist
             continue;
         }
         auto actual_version = top_array.get_as_ref_or_tagged(Group::s_version_ndx).get_as_int();
         REALM_ASSERT_EX(actual_version == read_lock.version, actual_version, read_lock.version, read_lock.top_ref);
-        if (top_array.size() <= Group::s_free_pos_ndx) {
-            // A file on streaming format has no freelist info.
-            continue;
-        }
-        REALM_ASSERT_EX(top_array.size() > Group::s_free_pos_ndx, top_array.size(), Group::s_free_pos_ndx,
-                        read_lock.top_ref, read_lock.version);
         REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,
                         read_lock.top_ref, read_lock.version);
 
         ref_type free_positions_ref = top_array.get_as_ref(Group::s_free_pos_ndx);
         ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
-        do_refresh({{free_positions_ref, free_positions_ref + NodeHeader::header_size},
-                    {free_sizes_ref, free_sizes_ref + NodeHeader::header_size}});
+        load_array(cur_freelist_positions, top_array.get_as_ref(Group::s_free_pos_ndx), read_lock);
+        load_array(cur_freelist_lengths, top_array.get_as_ref(Group::s_free_size_ndx), read_lock);
 
-        free_positions.init_from_ref(free_positions_ref);
-        free_lengths.init_from_ref(free_sizes_ref);
-        REALM_ASSERT_EX(free_positions.is_attached(), free_positions_ref, read_lock.version, read_lock.top_ref);
-        REALM_ASSERT_EX(free_lengths.is_attached(), free_sizes_ref, read_lock.version, read_lock.top_ref);
-        size_t pos_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_positions.get_header());
-        size_t sizes_bytes_to_refresh = NodeHeader::get_byte_size_from_header(free_lengths.get_header());
-        do_refresh({{free_positions_ref, free_positions_ref + pos_bytes_to_refresh},
-                    {free_sizes_ref, free_sizes_ref + sizes_bytes_to_refresh}});
-        // FIXME: verify versions list here for integrity?
-        // we can now access this freelist version's pos and lengths
-        Array cur_freelist_positions(*this), cur_freelist_lengths(*this);
         cur_freelist_positions.init_from_ref(free_positions_ref);
         cur_freelist_lengths.init_from_ref(free_sizes_ref);
         REALM_ASSERT_EX(cur_freelist_positions.size() == cur_freelist_lengths.size(), cur_freelist_positions.size(),
-                        cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, pos_bytes_to_refresh,
-                        sizes_bytes_to_refresh, read_lock.version, read_lock.top_ref);
+                        cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, read_lock.version,
+                        read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
+                        (--read_locks.end())->version);
 
         if (!processed_first_version) {
             processed_first_version = true;
@@ -1355,7 +1357,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             if (read_lock.version != read_locks[0].version) {
                 size_t arr_size = cur_freelist_positions.size();
                 // we skipped the first version so make sure to refresh all
-                REALM_ASSERT(arr_size > 0); // assumes the allocator does not allow for no free space
+                REALM_ASSERT(arr_size > 0); // assumes the allocator does not allow for a completely full file
                 allocations.push_back({0, ref_type(cur_freelist_positions.get(arr_size - 1)) +
                                               ref_type(cur_freelist_lengths.get(arr_size - 1))});
             }
@@ -1418,8 +1420,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                                        cur_freelist_lengths, cur_freelist_size);
 
             auto add_alloc_for_remainder_of_block = [&]() {
-                if (current_ndx + 1 < cur_freelist_size) {
-                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + 1);
+                if (current_ndx + cur_increment < cur_freelist_size) {
+                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + cur_increment);
                     if (next_cur_start < prev_end) {
                         //     -------
                         //  ----  --
@@ -1506,8 +1508,9 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     // Between the first and last version, the file size may have changed.
     // If it was expanded, the newly added pages should all be refreshed.
     // FIXME: If it was contracted, is there no need to refresh those extraneous end pages?
-    if (begin_file_size < read_locks[read_locks.size() - 1].file_size) {
-        allocations.push_back({begin_file_size + 1, read_locks[read_locks.size() - 1].file_size});
+    const uint64_t end_file_size = (--read_locks.end())->file_size;
+    if (begin_file_size < end_file_size) {
+        allocations.push_back({begin_file_size, end_file_size});
     }
 
     // combine adjacent ranges
@@ -1530,6 +1533,9 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         ++it;
     }
+#if REALM_DEBUG
+    debug_allocs += "allocations: ";
+#endif
     do_refresh(allocations);
 
 #ifdef REALM_DEBUG
@@ -1545,40 +1551,49 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                 did_skip_begin_version = true;
                 continue;
             }
-            std::string prefix = util::format("commit version %1, top_ref %2\nwrote pages: bitwise[",
-                                              read_lock.version, read_lock.top_ref);
-            size_t ndx = buffer.find(prefix);
-            while (ndx == buffer.npos) {
-                size_t last_commit = buffer.rfind("commit version");
+            std::string prefix = util::format("commit start version %1", read_lock.version);
+            std::string suffix = util::format("commit end version %1", read_lock.version);
+            size_t prefix_ndx = buffer.find(prefix);
+            size_t suffix_ndx = buffer.find(suffix);
+            while (prefix_ndx == buffer.npos || suffix_ndx == buffer.npos) {
+                size_t last_commit = buffer.rfind("commit start version");
                 REALM_ASSERT(last_commit != buffer.npos);
                 file_read_pos += last_commit;
                 validator.seek(file_read_pos);
                 buffer.assign(buffer_size, 0);
                 bytes_read = validator.read(buffer.data(), buffer_size);
-                ndx = buffer.find(prefix);
+                prefix_ndx = buffer.find(prefix);
+                suffix_ndx = buffer.find(suffix);
                 if (bytes_read < buffer_size) {
-                    REALM_ASSERT(ndx != buffer.npos);
+                    REALM_ASSERT(prefix_ndx != buffer.npos);
                 }
             }
+            std::string write_prefix = "wrote pages: bitwise[";
 
-            size_t end_ndx = buffer.find("]", ndx + prefix.size());
-            uint64_t pages = 0;
-            std::istringstream iss(buffer.substr(ndx + prefix.size(), end_ndx));
-            iss.imbue(std::locale::classic());
-            iss >> pages;
-            pages_across_all_versions |= pages;
+            size_t write_ndx = buffer.find(write_prefix, prefix_ndx + prefix.size());
+            while (write_ndx != buffer.npos && write_ndx < suffix_ndx) {
+                size_t end_ndx = buffer.find("]", write_ndx + write_prefix.size());
+                uint64_t pages = 0;
+                std::istringstream iss(buffer.substr(write_ndx + write_prefix.size(), end_ndx));
+                iss.imbue(std::locale::classic());
+                iss >> pages;
+                pages_across_all_versions |= pages;
+                write_ndx = buffer.find(write_prefix, end_ndx);
+            }
+        }
+        // if the file was extended, additional empty pages may not have been explicitly written, but they should be
+        // marked for refresh so add them on now.
+        if (begin_file_size < end_file_size) {
+            track_pages_bitwise(pages_across_all_versions, {begin_file_size, end_file_size});
         }
 
-        if (computed_pages_for_refresh < pages_across_all_versions) {
+        if (computed_pages_for_refresh != pages_across_all_versions) {
             util::format(std::cout,
                          "refresh error when advancing from version %1 through to %2. Expected %3, computed "
                          "%4\ncomputed allocations: ",
                          read_locks[0].version, read_locks[read_locks.size() - 1].version, pages_across_all_versions,
                          computed_pages_for_refresh);
-            for (auto& alloc : allocations) {
-                util::format(std::cout, "[%1, %2] ", alloc.begin, alloc.end);
-            }
-            std::cout << std::endl;
+            std::cout << debug_allocs << std::endl;
             std::cout << buffer.substr(0, bytes_read) << std::endl;
             REALM_ASSERT_3(computed_pages_for_refresh, ==, pages_across_all_versions);
         }

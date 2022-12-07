@@ -2,11 +2,34 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed `realm_refresh` so it uses an argument value for the refresh result and returns any error conditions as return value. ([#6068](https://github.com/realm/realm-core/pull/6068))
+* Fixed `realm_compact` to actually do the compaction even if the caller did not provide a `did_compact` argument.
+* Not possible to open an encrypted file on a device with a page size bigger than the one on which the file was produced. ([#8030](https://github.com/realm/realm-swift/issues/8030), since v12.11.0)
+ 
+### Breaking changes
+* ObjectId constructor made explicit, so no more implicit conversions from const char* or array of 12 bytes. It now accepts a StringData. ([#6059](https://github.com/realm/realm-core/pull/6059))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.1.0 Release notes
+
+### Enhancements
 * The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
 * Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed wrong assertion on query error that could result in a crash. ([#6038](https://github.com/realm/realm-core/issues/6038), since v11.7.0)
 * Freelist may be corrupted if compaction was initiated ([#6054](https://github.com/realm/realm-core/pull/6054), since v13.0.0)
 
@@ -15,7 +38,7 @@
 * `util::RootLogger` has been replaced with `util::Logger`
 
 ### Compatibility
-* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 -----------
 

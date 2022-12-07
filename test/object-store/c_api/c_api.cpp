@@ -1225,7 +1225,7 @@ TEST_CASE("C API", "[c_api]") {
         realm_commit(realm);
 
 
-        realm_refresh(realm2.get());
+        realm_refresh(realm2.get(), nullptr);
         CHECK(realm_refresh_callback_called);
     }
 
@@ -1247,7 +1247,7 @@ TEST_CASE("C API", "[c_api]") {
         realm_begin_write(realm);
         realm_commit(realm);
 
-        realm_refresh(realm2.get());
+        realm_refresh(realm2.get(), nullptr);
         CHECK(counter.load() == 2);
     }
 
@@ -1267,7 +1267,7 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
 
-        realm_refresh(realm);
+        realm_refresh(realm, nullptr);
         CHECK(!realm_refresh_callback_called);
     }
 
@@ -1287,7 +1287,7 @@ TEST_CASE("C API", "[c_api]") {
             },
             &realm_refresh_callback_called, [](void*) {}));
 
-        realm_refresh(realm);
+        realm_refresh(realm, nullptr);
         CHECK(token == nullptr);
         CHECK(!realm_refresh_callback_called);
     }
@@ -1392,7 +1392,7 @@ TEST_CASE("C API", "[c_api]") {
         checked(realm_begin_write(realm));
         f();
         checked(realm_commit(realm));
-        checked(realm_refresh(realm));
+        checked(realm_refresh(realm, nullptr));
     };
 
     bool found = false;
@@ -2201,7 +2201,7 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(checked(realm_set_value(obj1.get(), info_int.key, rlm_int_val(10), false)));
                 CHECK(checked(realm_set_value(obj2.get(), info_int.key, rlm_int_val(11), false)));
                 checked(realm_commit(realm));
-                checked(realm_refresh(realm));
+                checked(realm_refresh(realm, nullptr));
 
                 size_t count = 0;
                 realm_value_t arg_data[1] = {rlm_str_val("Test")};
@@ -2978,7 +2978,7 @@ TEST_CASE("C API", "[c_api]") {
                 auto require_change = [&]() {
                     auto token = cptr_checked(
                         realm_list_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
-                    checked(realm_refresh(realm));
+                    checked(realm_refresh(realm, nullptr));
                     return token;
                 };
 
@@ -3035,7 +3035,7 @@ TEST_CASE("C API", "[c_api]") {
                     realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
                     auto token = cptr_checked(realm_list_add_notification_callback(bars.get(), &state, nullptr,
                                                                                    &key_path_array, on_change));
-                    checked(realm_refresh(realm));
+                    checked(realm_refresh(realm, nullptr));
 
                     state.called = false;
                     write([&]() {
@@ -3497,7 +3497,7 @@ TEST_CASE("C API", "[c_api]") {
                 auto require_change = [&]() {
                     auto token = cptr_checked(
                         realm_set_add_notification_callback(strings.get(), &state, nullptr, nullptr, on_change));
-                    checked(realm_refresh(realm));
+                    checked(realm_refresh(realm, nullptr));
                     return token;
                 };
 
@@ -4014,7 +4014,7 @@ TEST_CASE("C API", "[c_api]") {
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
                         strings.get(), &state, nullptr, nullptr, on_change));
-                    checked(realm_refresh(realm));
+                    checked(realm_refresh(realm, nullptr));
                     return token;
                 };
 
@@ -4081,7 +4081,7 @@ TEST_CASE("C API", "[c_api]") {
             auto require_change = [&]() {
                 auto token =
                     cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr, on_change));
-                checked(realm_refresh(realm));
+                checked(realm_refresh(realm, nullptr));
                 return token;
             };
 
@@ -4126,7 +4126,7 @@ TEST_CASE("C API", "[c_api]") {
                 realm_key_path_array_t key_path_array = {1, key_path_origin_value};
                 auto token = cptr(
                     realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array, on_change));
-                checked(realm_refresh(realm));
+                checked(realm_refresh(realm, nullptr));
                 state.called = false;
                 write([&]() {
                     checked(realm_set_value(obj1.get(), foo_int_key, rlm_int_val(999), false));
@@ -4500,7 +4500,7 @@ TEST_CASE("C API: convert", "[c_api]") {
         CHECK(obj1);
         CHECK(checked(realm_set_value(obj1.get(), foo_str_col_key, rlm_str_val("Hello, World!"), false)));
         checked(realm_commit(realm));
-        checked(realm_refresh(realm));
+        checked(realm_refresh(realm, nullptr));
 
         size_t foo_count;
         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &foo_count)));
@@ -5124,7 +5124,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
 
         wait_for_download(*realm);
         {
-            realm_refresh(&c_wrap_realm);
+            realm_refresh(&c_wrap_realm, nullptr);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -5153,7 +5153,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         }
 
         {
-            realm_refresh(&c_wrap_realm);
+            realm_refresh(&c_wrap_realm, nullptr);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -5194,7 +5194,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         }
 
         {
-            realm_refresh(&c_wrap_realm);
+            realm_refresh(&c_wrap_realm, nullptr);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -5221,7 +5221,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         }
 
         {
-            realm_refresh(&c_wrap_realm);
+            realm_refresh(&c_wrap_realm, nullptr);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = std::numeric_limits<std::size_t>::max();
             realm_results_count(results, &count);
@@ -5276,7 +5276,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         }
 
         {
-            realm_refresh(&c_wrap_realm);
+            realm_refresh(&c_wrap_realm, nullptr);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = std::numeric_limits<std::size_t>::max();
             realm_results_count(results, &count);
