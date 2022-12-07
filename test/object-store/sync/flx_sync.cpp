@@ -2559,6 +2559,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     _impl::RealmCoordinator::clear_all_caches();
 
     std::mutex errors_mutex;
+    std::condition_variable new_compensating_write;
     std::vector<std::pair<ObjectId, sync::version_type>> error_to_download_version;
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes;
     sync::version_type download_version;
@@ -2591,7 +2592,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     };
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-        std::lock_guard<std::mutex> lk(errors_mutex);
+        std::unique_lock<std::mutex> lk(errors_mutex);
         REQUIRE(error.error_code == make_error_code(sync::ProtocolError::compensating_write));
         for (const auto& compensating_write : error.compensating_writes_info) {
             auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
@@ -2602,6 +2603,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
             CHECK(tracked_error->second <= download_version);
             compensating_writes.push_back(compensating_write);
         }
+        new_compensating_write.notify_one();
     };
 
     auto realm = Realm::get_shared_realm(config);
@@ -2609,24 +2611,25 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     wait_for_upload(*realm);
     wait_for_download(*realm);
 
-    {
-        std::lock_guard<std::mutex> lk(errors_mutex);
+    std::unique_lock<std::mutex> lk(errors_mutex);
+    new_compensating_write.wait_for(lk, std::chrono::seconds(30), [&] {
+        return compensating_writes.size() == 2;
+    });
 
-        REQUIRE(compensating_writes.size() == 2);
-        auto& write_info = compensating_writes[0];
-        CHECK(write_info.primary_key.is_type(type_ObjectId));
-        CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
-        CHECK(write_info.object_name == "TopLevel");
-        CHECK_THAT(write_info.reason,
-                   Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
+    REQUIRE(compensating_writes.size() == 2);
+    auto& write_info = compensating_writes[0];
+    CHECK(write_info.primary_key.is_type(type_ObjectId));
+    CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
+    CHECK(write_info.object_name == "TopLevel");
+    CHECK_THAT(write_info.reason,
+               Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 
-        write_info = compensating_writes[1];
-        REQUIRE(write_info.primary_key.is_type(type_ObjectId));
-        REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
-        REQUIRE(write_info.object_name == "TopLevel");
-        REQUIRE(write_info.reason ==
-                util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
-    }
+    write_info = compensating_writes[1];
+    REQUIRE(write_info.primary_key.is_type(type_ObjectId));
+    REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
+    REQUIRE(write_info.object_name == "TopLevel");
+    REQUIRE(write_info.reason ==
+            util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
 }
