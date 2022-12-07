@@ -1414,11 +1414,13 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
         return;
     }
 
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(
         std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
                        [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
                            return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
                        }));
+#endif
 
     auto changeset_it = changesets.begin();
     auto error_it = m_pending_compensating_write_errors.begin();
