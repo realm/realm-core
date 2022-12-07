@@ -24,11 +24,25 @@ public:
     virtual ~ParserNode();
 };
 
+/******************************** Query Nodes ********************************/
+
 class QueryNode : public ParserNode {
 public:
     ~QueryNode() override;
     virtual Query visit(ParserDriver*) = 0;
     virtual void canonicalize() {}
+};
+
+class TrueOrFalseNode : public QueryNode {
+public:
+    TrueOrFalseNode(bool type)
+        : true_or_false(type)
+    {
+    }
+    Query visit(ParserDriver*);
+
+protected:
+    bool true_or_false;
 };
 
 class LogicalNode : public QueryNode {
@@ -97,21 +111,7 @@ public:
     Query visit(ParserDriver*) override;
 };
 
-class CompareNode : public QueryNode {
-public:
-    static constexpr int EQUAL = 0;
-    static constexpr int NOT_EQUAL = 1;
-    static constexpr int GREATER = 2;
-    static constexpr int LESS = 3;
-    static constexpr int GREATER_EQUAL = 4;
-    static constexpr int LESS_EQUAL = 5;
-    static constexpr int BEGINSWITH = 6;
-    static constexpr int ENDSWITH = 7;
-    static constexpr int CONTAINS = 8;
-    static constexpr int LIKE = 9;
-    static constexpr int IN = 10;
-    static constexpr int TEXT = 11;
-};
+/****************************** Expression Nodes *****************************/
 
 class ExpressionNode : public ParserNode {
 public:
@@ -125,6 +125,8 @@ public:
     }
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
 };
+
+/******************************** Value Nodes ********************************/
 
 class ValueNode : public ExpressionNode {
 };
@@ -206,110 +208,6 @@ public:
 
 private:
     util::Optional<ExpressionComparisonType> m_comp_type;
-};
-
-class OperationNode : public ExpressionNode {
-public:
-    ExpressionNode* m_left;
-    ExpressionNode* m_right;
-    char m_op;
-    OperationNode(ExpressionNode* left, char op, ExpressionNode* right)
-        : m_left(left)
-        , m_right(right)
-        , m_op(op)
-    {
-    }
-    bool is_constant() final
-    {
-        return m_left->is_constant() && m_right->is_constant();
-    }
-    bool is_list() final
-    {
-        return m_left->is_list() || m_right->is_list();
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
-};
-
-class EqualityNode : public CompareNode {
-public:
-    std::vector<ExpressionNode*> values;
-    int op;
-    bool case_sensitive = true;
-
-    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
-        : op(t)
-    {
-        values.emplace_back(left);
-        values.emplace_back(right);
-    }
-    Query visit(ParserDriver*) override;
-};
-
-class RelationalNode : public CompareNode {
-public:
-    std::vector<ExpressionNode*> values;
-    int op;
-
-    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
-        : op(t)
-    {
-        values.emplace_back(left);
-        values.emplace_back(right);
-    }
-    Query visit(ParserDriver*) override;
-};
-
-class BetweenNode : public CompareNode {
-public:
-    ValueNode* prop;
-    ListNode* limits;
-
-    BetweenNode(ValueNode* left, ListNode* right)
-        : prop(left)
-        , limits(right)
-    {
-    }
-    Query visit(ParserDriver*) override;
-};
-
-class StringOpsNode : public CompareNode {
-public:
-    std::vector<ExpressionNode*> values;
-    int op;
-    bool case_sensitive = true;
-
-    StringOpsNode(ValueNode* left, int t, ValueNode* right)
-        : op(t)
-    {
-        values.emplace_back(left);
-        values.emplace_back(right);
-    }
-    Query visit(ParserDriver*) override;
-};
-
-class TrueOrFalseNode : public QueryNode {
-public:
-    TrueOrFalseNode(bool type)
-        : true_or_false(type)
-    {
-    }
-    Query visit(ParserDriver*);
-
-protected:
-    bool true_or_false;
-};
-
-class PostOpNode : public ParserNode {
-public:
-    enum OpType { SIZE, TYPE } op_type;
-    std::string op_name;
-
-    PostOpNode(std::string op_literal, OpType type)
-        : op_type(type)
-        , op_name(op_literal)
-    {
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
 };
 
 class PathNode : public ParserNode {
@@ -432,6 +330,119 @@ public:
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };
+
+class OperationNode : public ExpressionNode {
+public:
+    ExpressionNode* m_left;
+    ExpressionNode* m_right;
+    char m_op;
+    OperationNode(ExpressionNode* left, char op, ExpressionNode* right)
+        : m_left(left)
+        , m_right(right)
+        , m_op(op)
+    {
+    }
+    bool is_constant() final
+    {
+        return m_left->is_constant() && m_right->is_constant();
+    }
+    bool is_list() final
+    {
+        return m_left->is_list() || m_right->is_list();
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+};
+
+/******************************* Compare Nodes *******************************/
+
+class CompareNode : public QueryNode {
+public:
+    static constexpr int EQUAL = 0;
+    static constexpr int NOT_EQUAL = 1;
+    static constexpr int GREATER = 2;
+    static constexpr int LESS = 3;
+    static constexpr int GREATER_EQUAL = 4;
+    static constexpr int LESS_EQUAL = 5;
+    static constexpr int BEGINSWITH = 6;
+    static constexpr int ENDSWITH = 7;
+    static constexpr int CONTAINS = 8;
+    static constexpr int LIKE = 9;
+    static constexpr int IN = 10;
+    static constexpr int TEXT = 11;
+};
+
+class EqualityNode : public CompareNode {
+public:
+    std::vector<ExpressionNode*> values;
+    int op;
+    bool case_sensitive = true;
+
+    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
+        : op(t)
+    {
+        values.emplace_back(left);
+        values.emplace_back(right);
+    }
+    Query visit(ParserDriver*) override;
+};
+
+class RelationalNode : public CompareNode {
+public:
+    std::vector<ExpressionNode*> values;
+    int op;
+
+    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
+        : op(t)
+    {
+        values.emplace_back(left);
+        values.emplace_back(right);
+    }
+    Query visit(ParserDriver*) override;
+};
+
+class BetweenNode : public CompareNode {
+public:
+    ValueNode* prop;
+    ListNode* limits;
+
+    BetweenNode(ValueNode* left, ListNode* right)
+        : prop(left)
+        , limits(right)
+    {
+    }
+    Query visit(ParserDriver*) override;
+};
+
+class StringOpsNode : public CompareNode {
+public:
+    std::vector<ExpressionNode*> values;
+    int op;
+    bool case_sensitive = true;
+
+    StringOpsNode(ValueNode* left, int t, ValueNode* right)
+        : op(t)
+    {
+        values.emplace_back(left);
+        values.emplace_back(right);
+    }
+    Query visit(ParserDriver*) override;
+};
+
+/******************************** Other Nodes ********************************/
+
+class PostOpNode : public ParserNode {
+public:
+    enum OpType { SIZE, TYPE } op_type;
+    std::string op_name;
+
+    PostOpNode(std::string op_literal, OpType type)
+        : op_type(type)
+        , op_name(op_literal)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
+};
+
 
 class DescriptorNode : public ParserNode {
 public:
