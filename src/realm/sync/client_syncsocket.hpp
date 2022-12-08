@@ -29,6 +29,7 @@
 
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/span.hpp>
 
 namespace realm::sync {
 
