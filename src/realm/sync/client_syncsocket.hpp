@@ -43,17 +43,6 @@ struct Endpoint {
     std::string path;      // Includes access token in query.
     std::string protocols; // One or more websocket protocols, separated with ", "
     bool is_ssl;           // true if SSL should be used
-
-    /// The remaining fields are just pass through values from SyncConfig. They may
-    /// not be provided if the SDK chooses not to support the related config options.
-    /// These may be necessary when using websocket libraries without low-level
-    /// control. These items may be removed or converted to test only parameters
-    /// in the future.
-    std::map<std::string, std::string> headers; // Only includes "custom" headers.
-    bool verify_servers_ssl_certificate;        // If true, verify server ssl certs
-    util::Optional<std::string> ssl_trust_certificate_path;
-    std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
-    util::Optional<SyncConfig::ProxyConfig> proxy; // Send traffic through a proxy
 };
 
 
@@ -71,7 +60,10 @@ struct WebSocketInterface {
     /// will be called when the data has been sent successfully. The WebSocketOberver
     /// provided when the WebSocket was created will be called if any errors occur
     /// during the write operation.
-    virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
+    /// @param data A util::Span containing the data to be sent to the server.
+    /// @param handler The handler function to be called when the data has been sent
+    ///                successfully.
+    virtual void async_write_binary(util::Span<const char> data, util::UniqueFunction<void()>&& handler) = 0;
 };
 
 
@@ -98,15 +90,14 @@ public:
     /// is responsible for defragmenting fragmented messages internally and
     /// delivering a full message to the Sync Client.
     ///
-    /// @param data The message is delivered in this buffer. The buffer is only
-    ///             valid until the function returns.
-    /// @param size The number of bytes in the data buffer.
+    /// @param data A util::Span containing the data received from the server.
+    ///             The buffer is only valid until the function returns.
     ///
     /// @return bool designates whether the WebSocket object should continue
     ///         processing messages. The normal return value is true . False must
     ///         be returned if the websocket object has been destroyed during
     ///         execution of the function.
-    virtual bool websocket_binary_message_received(const char* data, size_t size) = 0;
+    virtual bool websocket_binary_message_received(util::Span<const char> data) = 0;
 
 
     /// Called whenever the WebSocket connection has been closed, either as a result
