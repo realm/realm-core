@@ -754,15 +754,15 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
 {
     bool is_keys = false;
-    std::string identifier = path->path_elems.back();
+    std::string identifier = path->path_elems.back().id;
     if (identifier[0] == '@') {
         if (identifier == "@values") {
             path->path_elems.pop_back();
-            identifier = path->path_elems.back();
+            identifier = path->path_elems.back().id;
         }
         else if (identifier == "@keys") {
             path->path_elems.pop_back();
-            identifier = path->path_elems.back();
+            identifier = path->path_elems.back().id;
             is_keys = true;
         }
         else if (identifier == "@links") {
@@ -775,12 +775,9 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     try {
         m_link_chain = path->visit(drv, comp_type);
         std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, identifier)};
-        if (index) {
+        if (!path->path_elems.back().index.is_null()) {
             if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
-                auto t = s->get_type();
-                auto idx = index->visit(drv, t);
-                Mixed key = idx->get_mixed();
-                subexpr = s->key(key).clone();
+                subexpr = s->key(path->path_elems.back().index).clone();
             }
         }
         if (is_keys) {
@@ -800,7 +797,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
             // If 'length' is the operator, the last id in the path must be the name
             // of a list property
             path->path_elems.pop_back();
-            auto& prop = path->path_elems.back();
+            std::string& prop = path->path_elems.back().id;
             std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
                 if (auto length_expr = list->get_element_length())
@@ -821,7 +818,7 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv, DataType)
                                        variable_name));
     }
     LinkChain lc = prop->path->visit(drv, prop->comp_type);
-    std::string identifier = prop->path->path_elems.back();
+    std::string identifier = prop->path->path_elems.back().id;
     identifier = drv->translate(lc, identifier);
 
     if (identifier.find("@links") == 0) {
@@ -1361,7 +1358,10 @@ LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparison
     LinkChain link_chain(drv->m_base_table, comp_type);
     auto end = path_elems.end() - 1;
     for (auto it = path_elems.begin(); it != end; ++it) {
-        std::string& raw_path_elem = *it;
+        if (!it->index.is_null()) {
+            throw InvalidQueryError("Index not supported");
+        }
+        std::string& raw_path_elem = it->id;
         auto path_elem = drv->translate(link_chain, raw_path_elem);
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
@@ -1471,6 +1471,24 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
+Mixed ParserDriver::get_arg(std::string i)
+{
+    size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
+    if (m_args.is_argument_null(arg_no) || m_args.is_argument_list(arg_no)) {
+        throw InvalidQueryError("Invalid index parameter");
+    }
+    auto type = m_args.type_for_argument(arg_no);
+    switch (type) {
+        case type_Int:
+            return int64_t(m_args.long_for_argument(arg_no));
+            break;
+        case type_String:
+            return m_args.string_for_argument(arg_no);
+            break;
+        default:
+            throw InvalidQueryError("Invalid index type");
+    }
+}
 
 auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<SubexprPtr, SubexprPtr>
 {

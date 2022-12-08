@@ -46,7 +46,8 @@
 # define YY_YY_GENERATED_QUERY_BISON_HPP_INCLUDED
 // "%code requires" blocks.
 
-  # include <string>
+  #include <string>
+  #include <realm/mixed.hpp>
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -65,6 +66,14 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
+    struct PathElem {
+        std::string id;
+        Mixed index;
+        PathElem() {}
+        PathElem(std::string s) : id(s) {}
+        PathElem(std::string s, Mixed i) : id(s), index(i) {}
+    };
+
   }
   using namespace realm::query_parser;
 
@@ -449,38 +458,41 @@ namespace yy {
       // list_content
       char dummy6[sizeof (ListNode*)];
 
+      // path_elem
+      char dummy7[sizeof (PathElem)];
+
       // path
-      char dummy7[sizeof (PathNode*)];
+      char dummy8[sizeof (PathNode*)];
 
       // post_op
-      char dummy8[sizeof (PostOpNode*)];
+      char dummy9[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy9[sizeof (PropertyNode*)];
+      char dummy10[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy10[sizeof (QueryNode*)];
+      char dummy11[sizeof (QueryNode*)];
 
       // subquery
-      char dummy11[sizeof (SubqueryNode*)];
+      char dummy12[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy12[sizeof (TrueOrFalseNode*)];
+      char dummy13[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy13[sizeof (ValueNode*)];
+      char dummy14[sizeof (ValueNode*)];
 
       // direction
-      char dummy14[sizeof (bool)];
+      char dummy15[sizeof (bool)];
 
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy15[sizeof (int)];
+      char dummy16[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -513,7 +525,7 @@ namespace yy {
       // "@type"
       // "key or value"
       // id
-      char dummy16[sizeof (std::string)];
+      char dummy17[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -695,12 +707,12 @@ namespace yy {
         SYM_60_ = 60,                            // '/'
         SYM_61_ = 61,                            // '('
         SYM_62_ = 62,                            // ')'
-        SYM_63_ = 63,                            // '['
-        SYM_64_ = 64,                            // ']'
-        SYM_65_ = 65,                            // '.'
-        SYM_66_ = 66,                            // ','
-        SYM_67_ = 67,                            // '{'
-        SYM_68_ = 68,                            // '}'
+        SYM_63_ = 63,                            // '.'
+        SYM_64_ = 64,                            // ','
+        SYM_65_ = 65,                            // '{'
+        SYM_66_ = 66,                            // '}'
+        SYM_67_ = 67,                            // '['
+        SYM_68_ = 68,                            // ']'
         SYM_YYACCEPT = 69,                       // $accept
         SYM_final = 70,                          // final
         SYM_query = 71,                          // query
@@ -730,7 +742,8 @@ namespace yy {
         SYM_relational = 95,                     // relational
         SYM_stringop = 96,                       // stringop
         SYM_path = 97,                           // path
-        SYM_id = 98                              // id
+        SYM_path_elem = 98,                      // path_elem
+        SYM_id = 99                              // id
       };
     };
 
@@ -793,6 +806,10 @@ namespace yy {
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.move< PathElem > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -959,6 +976,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const ListNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, PathElem&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const PathElem& v)
         : Base (t)
         , value (v)
       {}
@@ -1158,6 +1187,10 @@ switch (yykind)
         value.template destroy< ListNode* > ();
         break;
 
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.template destroy< PathElem > ();
+        break;
+
       case symbol_kind::SYM_path: // path
         value.template destroy< PathNode* > ();
         break;
@@ -1335,12 +1368,12 @@ switch (yykind)
                    || tok == 42
                    || tok == 47
                    || (40 <= tok && tok <= 41)
-                   || tok == 91
-                   || tok == 93
                    || tok == 46
                    || tok == 44
                    || tok == 123
-                   || tok == 125);
+                   || tok == 125
+                   || tok == 91
+                   || tok == 93);
 #endif
       }
 #if 201103L <= YY_CPLUSPLUS
@@ -2585,9 +2618,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 538,     ///< Last index in yytable_.
-      yynnts_ = 30,  ///< Number of nonterminal symbols.
-      yyfinal_ = 65 ///< Termination state number.
+      yylast_ = 551,     ///< Last index in yytable_.
+      yynnts_ = 31,  ///< Number of nonterminal symbols.
+      yyfinal_ = 66 ///< Termination state number.
     };
 
 
@@ -2611,15 +2644,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      61,    62,    59,    57,    66,    58,    65,    60,     2,     2,
+      61,    62,    59,    57,    64,    58,    63,    60,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    63,     2,    64,     2,     2,     2,     2,     2,     2,
+       2,    67,     2,    68,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    67,     2,    68,     2,     2,     2,     2,
+       2,     2,     2,    65,     2,    66,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2687,6 +2720,10 @@ switch (yykind)
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.copy< ListNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.copy< PathElem > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2824,6 +2861,10 @@ switch (yykind)
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.move< PathElem > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_path: // path

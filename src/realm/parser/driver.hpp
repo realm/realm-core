@@ -212,17 +212,17 @@ private:
 
 class PathNode : public ParserNode {
 public:
-    std::vector<std::string> path_elems;
+    std::vector<PathElem> path_elems;
 
-    PathNode(std::string first)
+    PathNode(PathElem first)
     {
         add_element(first);
     }
     LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
-    void add_element(const std::string& str)
+    void add_element(const PathElem& elem)
     {
         if (backlink) {
-            path_elems.back() = path_elems.back() + "." + str;
+            path_elems.back().id = path_elems.back().id + "." + elem.id;
             if (backlink == 2) {
                 backlink = 0;
             }
@@ -231,9 +231,9 @@ public:
             }
         }
         else {
-            if (str == "@links")
+            if (elem.id == "@links")
                 backlink = 1;
-            path_elems.push_back(str);
+            path_elems.push_back(elem);
         }
     }
 
@@ -246,13 +246,7 @@ public:
     PathNode* path;
     util::Optional<ExpressionComparisonType> comp_type = util::none;
     PostOpNode* post_op = nullptr;
-    ConstantNode* index = nullptr;
 
-    PropertyNode(PathNode* path, ConstantNode* idx)
-        : path(path)
-        , index(idx)
-    {
-    }
     PropertyNode(PathNode* path, util::Optional<ExpressionComparisonType> ct = util::none)
         : path(path)
         , comp_type(ct)
@@ -260,7 +254,7 @@ public:
     }
     const std::string& identifier() const
     {
-        return path->path_elems.back();
+        return path->path_elems.back().id;
     }
     const LinkChain& link_chain() const
     {
@@ -468,7 +462,10 @@ public:
     }
     void add(PathNode* path)
     {
-        columns.push_back(path->path_elems);
+        auto& vec = columns.emplace_back();
+        for (PathElem& e : path->path_elems) {
+            vec.push_back(e.id);
+        }
     }
     void add(PathNode* path, bool direction)
     {
@@ -537,6 +534,8 @@ public:
         error_string = err;
         parse_error = true;
     }
+
+    Mixed get_arg(std::string);
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

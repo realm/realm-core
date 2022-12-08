@@ -8,7 +8,8 @@
 %define parse.assert
 
 %code requires {
-  # include <string>
+  #include <string>
+  #include <realm/mixed.hpp>
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -27,6 +28,14 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
+    struct PathElem {
+        std::string id;
+        Mixed index;
+        PathElem() {}
+        PathElem(std::string s) : id(s) {}
+        PathElem(std::string s, Mixed i) : id(s), index(i) {}
+    };
+
   }
   using namespace realm::query_parser;
 }
@@ -129,10 +138,12 @@ using namespace realm::query_parser;
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
 %type  <std::string> id
+%type  <PathElem> path_elem
 %type  <PropertyNode*> simple_prop
 
 %destructor { } <int>
 
+%printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
 
@@ -190,7 +201,6 @@ value
 
 prop
     : path post_op              { $$ = drv.m_parse_nodes.create<PropertyNode>($1); $$->add_postop($2); }
-    | path '[' constant ']' post_op { $$ = drv.m_parse_nodes.create<PropertyNode>($1, $3); $$->add_postop($5); }
     | comp_type path post_op    { $$ = drv.m_parse_nodes.create<PropertyNode>($2, ExpressionComparisonType($1)); $$->add_postop($3); }
 
 aggregate
@@ -307,8 +317,14 @@ stringop
     | LIKE                      { $$ = CompareNode::LIKE; }
 
 path
-    : id                        { $$ = drv.m_parse_nodes.create<PathNode>($1); }
-    | path '.' id               { $1->add_element($3); $$ = $1; }
+    : path_elem                 { $$ = drv.m_parse_nodes.create<PathNode>($1); }
+    | path '.' path_elem        { $1->add_element($3); $$ = $1; }
+
+path_elem
+    : id                        { $$ = PathElem{$1}; }
+    | id '[' NATURAL0 ']'       { $$ = PathElem{$1, int64_t(strtoll($3.c_str(), nullptr, 0))}; }
+    | id '[' STRING ']'         { $$ = PathElem{$1, $3.substr(1, $3.size() - 2)}; }
+    | id '[' ARG ']'            { $$ = PathElem{$1, drv.get_arg($3)}; }
 
 id  
     : ID                        { $$ = $1; }
