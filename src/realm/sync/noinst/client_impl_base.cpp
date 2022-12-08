@@ -2275,6 +2275,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
@@ -2286,6 +2289,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect

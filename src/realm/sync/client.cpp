@@ -754,10 +754,12 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
-    if (call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version, batch_state,
-                        received_changesets.size()) == SyncClientHookAction::EarlyReturn) {
+    auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version,
+                                       batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
         return true;
     }
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (batch_state == DownloadBatchState::MoreToCome) {
         return true;
@@ -825,8 +827,9 @@ void SessionImpl::process_pending_flx_bootstrap()
         changesets_processed += pending_batch.changesets.size();
         auto duration = std::chrono::steady_clock::now() - start_time;
 
-        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
+        auto action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                      batch_state, pending_batch.changesets.size());
+        REALM_ASSERT(action == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3 in %4 ms. %5 changesets remaining in bootstrap",
