@@ -248,6 +248,7 @@ private:
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
     std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
+    bool m_in_debug_hook = false;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -877,19 +878,25 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
 
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
 {
+    // Make sure we don't call the debug hook recursively.
+    if (m_wrapper.m_in_debug_hook) {
+        return SyncClientHookAction::NoAction;
+    }
+    m_wrapper.m_in_debug_hook = true;
+    auto in_hook_guard = util::make_scope_exit([&]() noexcept {
+        m_wrapper.m_in_debug_hook = false;
+    });
+
     auto action = m_wrapper.m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            if (data.event == SyncClientHookEvent::ErrorMessageReceived) {
-                return action;
-            }
             SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
                                       true);
             err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
             auto err_processing_err = receive_error_message(err_info);
             REALM_ASSERT(!err_processing_err);
-            return SyncClientHookAction::NoAction;
+            return SyncClientHookAction::EarlyReturn;
         }
         default:
             return action;
