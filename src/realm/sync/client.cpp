@@ -845,7 +845,8 @@ void SessionImpl::process_pending_flx_bootstrap()
 
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
                                   DownloadBatchState::LastInBatch, changesets_processed);
-    REALM_ASSERT(action == SyncClientHookAction::NoAction);
+    // NoAction/EarlyReturn are both valid no-op actions to take here.
+    REALM_ASSERT(action == SyncClientHookAction::NoAction || action == SyncClientHookAction::EarlyReturn);
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
