@@ -2621,15 +2621,13 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     CHECK(write_info.primary_key.is_type(type_ObjectId));
     CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
     CHECK(write_info.object_name == "TopLevel");
-    CHECK_THAT(write_info.reason,
-               Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
+    CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 
     write_info = compensating_writes[1];
     REQUIRE(write_info.primary_key.is_type(type_ObjectId));
     REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
     REQUIRE(write_info.object_name == "TopLevel");
-    REQUIRE(write_info.reason ==
-            util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+    REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
 }
