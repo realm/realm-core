@@ -8,10 +8,11 @@
 #include <exception>
 #include <system_error>
 
+#include <realm/sync/network/network.hpp>
+
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/misc_errors.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/logger.hpp>
 

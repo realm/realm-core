@@ -1,6 +1,6 @@
 #include <thread>
 
-#include <realm/util/network_ssl.hpp>
+#include <realm/sync/network/network_ssl.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"

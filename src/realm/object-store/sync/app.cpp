@@ -19,8 +19,8 @@
 #include "external/json/json.hpp"
 #include <realm/object-store/sync/app.hpp>
 
+#include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>

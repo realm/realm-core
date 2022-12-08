@@ -6,7 +6,7 @@
 #include <thread>
 
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"

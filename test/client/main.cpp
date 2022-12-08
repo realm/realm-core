@@ -33,7 +33,6 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/load_file.hpp>
@@ -45,6 +44,7 @@
 #include <realm/util/json_parser.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/version.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 

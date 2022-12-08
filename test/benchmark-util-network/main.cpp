@@ -3,7 +3,7 @@
 #include <thread>
 #include <iostream>
 
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
