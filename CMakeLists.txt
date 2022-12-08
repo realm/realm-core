@@ -19,6 +19,7 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+include(AcquireRealmDependency)
 
 include(CodeCoverage)
 
@@ -130,8 +131,6 @@ if(ANDROID)
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 
-set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
-
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 
@@ -228,52 +227,15 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
 endif()
 
 if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+    if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+        # Use our own prebuilt OpenSSL
+        realm_acquire_dependency(openssl ${DEP_OPENSSL_VERSION} OPENSSL_CMAKE_INCLUDE_FILE)
+
+        include(${OPENSSL_CMAKE_INCLUDE_FILE})
+    endif()
+
     set(OPENSSL_USE_STATIC_LIBS ON)
-    if(VCPKG_TOOLCHAIN)
-        # If we're building with vcpkg, prefer to find OpenSSL there first
-        find_package(OpenSSL)
-    endif()
-    # We aren't building with vcpkg, or it didn't have OpenSSL
-    if(NOT OpenSSL_FOUND)
-        if(ANDROID OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
-            # We have prebuilt OpenSSL tarballs for Android and Linux x86_64
-            set(_realm_have_prebuilt_openssl ON)
-        endif()
-        if(NOT REALM_USE_SYSTEM_OPENSSL AND _realm_have_prebuilt_openssl)
-            # Use our own prebuilt OpenSSL
-            if(NOT OpenSSL_DIR)
-                if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-                    if(ANDROID)
-                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
-                    else()
-                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tar.gz")
-                    endif()
-
-                    message(STATUS "Getting ${OPENSSL_URL}...")
-                    file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
-
-                    list(GET download_status 0 status_code)
-                    if (NOT "${status_code}" STREQUAL "0")
-                        message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-                    endif()
-
-                    message(STATUS "Uncompressing OpenSSL...")
-                    execute_process(
-                        COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
-                        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
-                    )
-                endif()
-
-                set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
-            endif()
-            find_package(OpenSSL REQUIRED CONFIG)
-            target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
-        else()
-            # Use whatever OpenSSL CMake finds on the system
-            find_package(OpenSSL REQUIRED)
-        endif()
-    endif()
-
+    find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
 elseif(APPLE)
@@ -285,7 +247,10 @@ endif()
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
 if(NOT APPLE AND NOT TARGET ZLIB::ZLIB)
-    if(ANDROID)
+    if(WIN32)
+        realm_acquire_dependency(zlib ${DEP_WIN32_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
+        include(${ZLIB_CMAKE_INCLUDE_FILE})
+    elseif(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
         # (see https://github.com/android/ndk/issues/1179)
         # We want to link against the stub library instead of statically linking anyway,
@@ -364,7 +329,8 @@ if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
 endif()
 export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
+configure_file(tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
+configure_file(tools/cmake/AcquireRealmDependency.cmake ${CMAKE_CURRENT_BINARY_DIR}/AcquireRealmDependency.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
@@ -375,6 +341,11 @@ install(EXPORT realm
 )
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
+        DESTINATION lib/cmake/Realm
+        COMPONENT devel
+)
+
+install(FILES tools/cmake/AcquireRealmDependency.cmake
         DESTINATION lib/cmake/Realm
         COMPONENT devel
 )

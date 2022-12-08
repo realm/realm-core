@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#????](https://github.com/realm/realm-core/pull/????))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -18,6 +18,7 @@
   * `SubscriptionSet::find()` overloads now return `const Subscription*` with `nullptr` to signal not-found, rather than an at-end iterator
   * `MutableSubscriptionSet::erase()` now has overloads taking a `StringData name` or a `Query`. Both return a bool to indicate if anything was found and removed.
   * `MutableSubscriptionSet::commit()` is no longer `&&`-qualified. This means you no longer need to `std::move()` the set when calling it.
+* Core no longer provides any VCPKG infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
