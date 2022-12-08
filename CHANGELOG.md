@@ -45,7 +45,7 @@
 -----------
 
 ### Internals
-* None.
+* Updates for upcoming Platform Networking feature, including new SyncSocketInterface class.
 
 ----------------------------------------------
 

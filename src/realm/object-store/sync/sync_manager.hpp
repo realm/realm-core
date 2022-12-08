@@ -25,6 +25,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/client_syncsocket.hpp>
 
 #include <memory>
 #include <mutex>
@@ -79,6 +80,10 @@ struct SyncClientConfig {
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
     bool multiplex_sessions = false;
+
+    // The SyncSocket instance used by the Sync Client for event synchronization
+    // and creating WebSockets. If not provided the default implementation will be used.
+    std::shared_ptr<sync::SyncSocketInterface> sync_socket;
 
     // Optional information about the binding/application that is sent as part of the User-Agent
     // when establishing a connection to the server.

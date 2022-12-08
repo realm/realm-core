@@ -116,7 +116,7 @@ public:
     ///                  handshake was completed.
     /// @param status_code The WebSocket status code indicating why the connection
     ///                    was closed.
-    /// @param message The string message describing why the connection was closed.
+    /// @param reason The string message describing why the connection was closed.
     ///
     /// @return bool designates whether the WebSocket object has been destroyed
     ///         during the execution of this function. The normal return value is
