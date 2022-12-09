@@ -718,9 +718,9 @@ void SyncReplication::unsupported_instruction() const
 bool SyncReplication::select_table(const Table& table, util::Optional<PrimaryKey> key)
 {
     if (is_short_circuited()) {
-        if (m_bootstrap_write_validator && key.has_value()) {
+        if (m_bootstrap_write_validator && key) {
             // Register bootstrap object.
-            m_bootstrap_write_validator->add_bootstrap_object(table, key.value());
+            m_bootstrap_write_validator->add_bootstrap_object(table, *key);
         }
         return false;
     }
@@ -733,9 +733,9 @@ bool SyncReplication::select_table(const Table& table, util::Optional<PrimaryKey
         return false;
     }
 
-    if (m_bootstrap_write_validator && key.has_value()) {
+    if (m_bootstrap_write_validator && key) {
         // Validate modification to local object.
-        m_bootstrap_write_validator->validate_local_write(table, key.value());
+        m_bootstrap_write_validator->validate_local_write(table, *key);
     }
 
     m_last_class_name = emit_class_name(table);
