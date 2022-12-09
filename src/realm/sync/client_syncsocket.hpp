@@ -181,8 +181,7 @@ struct WebSocketInterface {
 
 /// WebSocket observer interface in the SyncClient that receives the websocket
 /// events during operation.
-class WebSocketObserver {
-public:
+struct WebSocketObserver {
     virtual ~WebSocketObserver() = default;
 
     /// Called when the websocket is connected, i.e. after the handshake is done.

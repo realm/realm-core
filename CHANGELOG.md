@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Updates for upcoming Platform Networking feature, including new SyncSocketInterface class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
 
 ----------------------------------------------
 
@@ -45,7 +45,7 @@
 -----------
 
 ### Internals
-* Updates for upcoming Platform Networking feature, including new SyncSocketInterface class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
+* None.
 
 ----------------------------------------------
 
