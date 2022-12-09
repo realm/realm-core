@@ -276,7 +276,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
                     if (table.get_table_type() != Table::Type::TopLevel) {
                         return;
                     }
-                    auto object_class_name = Group::table_name_to_class_name(table.get_name());
+                    auto object_class_name = table.get_class_name();
                     if (tables.find(object_class_name) == tables.end()) {
                         throw NoSubscriptionForWrite(util::format(
                             "Cannot write to class %1 when no flexible sync subscription has been created.",
