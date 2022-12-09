@@ -85,10 +85,14 @@ struct SyncClientConfig {
     // and creating WebSockets. If not provided the default implementation will be used.
     std::shared_ptr<sync::SyncSocketInterface> sync_socket;
 
+    // {@
     // Optional information about the binding/application that is sent as part of the User-Agent
-    // when establishing a connection to the server.
+    // when establishing a connection to the server. These values are only used by the default
+    // SyncSocket implementation. Custom SyncSocket implementations must update the User-Agent
+    // directly, if supported by the platform APIs.
     std::string user_agent_binding_info;
     std::string user_agent_application_info;
+    // @}
 
     SyncClientTimeouts timeouts;
 };
