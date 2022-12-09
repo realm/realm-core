@@ -176,6 +176,11 @@ public:
     NoSubscriptionForWrite(const std::string& msg);
 };
 
+class WriteNotAllowed : public std::runtime_error {
+public:
+    WriteNotAllowed(const std::string& msg);
+};
+
 namespace query_parser {
 
 /// Exception thrown when parsing fails due to invalid syntax.
@@ -397,6 +402,11 @@ inline InvalidPathError::InvalidPathError(const std::string& msg)
 }
 
 inline NoSubscriptionForWrite::NoSubscriptionForWrite(const std::string& msg)
+    : std::runtime_error(msg)
+{
+}
+
+inline WriteNotAllowed::WriteNotAllowed(const std::string& msg)
     : std::runtime_error(msg)
 {
 }

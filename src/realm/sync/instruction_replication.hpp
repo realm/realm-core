@@ -23,6 +23,8 @@
 #include <realm/sync/instructions.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 
+#include <unordered_set>
+
 namespace realm {
 namespace sync {
 
@@ -90,6 +92,9 @@ public:
     void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx) final;
     //@}
 
+    void on_bootstrap_started();
+    void on_bootstrap_ended();
+
 protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
@@ -110,9 +115,11 @@ private:
     template <class T>
     void emit(T instruction);
 
-    // Returns true and populates m_last_table_name if instructions for the
+    using PrimaryKey = mpark::variant<Mixed, ObjKey>;
+
+    // Returns true and populates m_last_class_name if instructions for the
     // table should be emitted.
-    bool select_table(const Table&);
+    bool select_table(const Table&, util::Optional<PrimaryKey> key = util::none);
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 
@@ -145,6 +152,18 @@ private:
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
     InternString m_last_field_name;
     util::UniqueFunction<WriteValidator> m_write_validator;
+
+    class BootstrapWriteValidator {
+    public:
+        void add_bootstrap_object(const Table&, PrimaryKey);
+        void validate_local_write(const Table&, PrimaryKey);
+
+    private:
+        Mixed get_primary_key(const Table&, PrimaryKey);
+
+        std::unordered_map<StringData, std::unordered_set<Mixed>> m_bootstrap_objects;
+    };
+    std::unique_ptr<BootstrapWriteValidator> m_bootstrap_write_validator;
 };
 
 inline void SyncReplication::set_short_circuit(bool b) noexcept

@@ -416,6 +416,11 @@ void ClientHistory::integrate_server_changesets(
         ensure_updated(local_version); // Throws
         prepare_for_write();           // Throws
 
+        if (batch_state != DownloadBatchState::SteadyState && !m_bootstrap_in_progress) {
+            m_replication.on_bootstrap_started();
+            m_bootstrap_in_progress = true;
+        }
+
         std::uint64_t downloaded_bytes_in_transaction = 0;
         auto changesets_transformed_count = transform_and_apply_server_changesets(
             changesets_to_integrate, transact, logger, downloaded_bytes_in_transaction);
@@ -438,6 +443,8 @@ void ClientHistory::integrate_server_changesets(
         // synthetic server version that represents synthetic changesets generated from state on the server.
         if (batch_state == DownloadBatchState::LastInBatch && changesets_to_integrate.empty()) {
             update_sync_progress(progress, downloadable_bytes, transact); // Throws
+            m_replication.on_bootstrap_ended();
+            m_bootstrap_in_progress = false;
         }
         // Always update progress for download messages from steady state.
         else if (batch_state == DownloadBatchState::SteadyState) {

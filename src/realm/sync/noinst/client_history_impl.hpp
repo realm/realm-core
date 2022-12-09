@@ -401,6 +401,8 @@ private:
 
     util::UniqueFunction<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
 
+    bool m_bootstrap_in_progress = false;
+
     void initialize(DB& db) noexcept
     {
         REALM_ASSERT(!m_db);

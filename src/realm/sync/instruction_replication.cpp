@@ -277,7 +277,7 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
     }
 
     Replication::create_object_with_primary_key(table, oid, value);
-    if (select_table(*table)) {
+    if (select_table(*table, value)) {
         if (m_write_validator) {
             m_write_validator(*table);
         }
@@ -483,7 +483,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
 {
     Replication::add_int(table, col, ndx, value);
 
-    if (select_table(*table)) {
+    if (select_table(*table, ndx)) {
         REALM_ASSERT(col != table->get_primary_key_column());
 
         Instruction::AddInteger instr;
@@ -510,7 +510,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         return;
     }
 
-    if (select_table(*table)) {
+    if (select_table(*table, key)) {
         // Omit of Update(NULL, default=true) for embedded object / dictionary
         // columns if the value is already NULL. This is a workaround for the
         // fact that erase always wins for nested structures, but we don't want
@@ -544,7 +544,7 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
         return;
     REALM_ASSERT(!row_ndx.is_unresolved());
 
-    if (select_table(*table)) {
+    if (select_table(*table, row_ndx)) {
         Instruction::EraseObject instr;
         instr.table = m_last_class_name;
         instr.object = primary_key_for_object(*table, row_ndx);
@@ -678,7 +678,7 @@ void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey nd
 {
     Replication::nullify_link(table, col_ndx, ndx);
 
-    if (select_table(*table)) {
+    if (select_table(*table, ndx)) {
         Instruction::Update instr;
         populate_path_instr(instr, *table, ndx, col_ndx);
         REALM_ASSERT(!instr.is_array_update());
@@ -700,14 +700,28 @@ void SyncReplication::link_list_nullify(const Lst<ObjKey>& view, size_t ndx)
     }
 }
 
+void SyncReplication::on_bootstrap_started()
+{
+    m_bootstrap_write_validator = std::make_unique<BootstrapWriteValidator>();
+}
+
+void SyncReplication::on_bootstrap_ended()
+{
+    m_bootstrap_write_validator.reset();
+}
+
 void SyncReplication::unsupported_instruction() const
 {
     throw realm::sync::TransformError{"Unsupported instruction"};
 }
 
-bool SyncReplication::select_table(const Table& table)
+bool SyncReplication::select_table(const Table& table, util::Optional<PrimaryKey> key)
 {
     if (is_short_circuited()) {
+        if (m_bootstrap_write_validator && key.has_value()) {
+            // Register bootstrap object.
+            m_bootstrap_write_validator->add_bootstrap_object(table, key.value());
+        }
         return false;
     }
 
@@ -717,6 +731,11 @@ bool SyncReplication::select_table(const Table& table)
 
     if (!m_transaction->table_is_public(table.get_key())) {
         return false;
+    }
+
+    if (m_bootstrap_write_validator && key.has_value()) {
+        // Validate modification to local object.
+        m_bootstrap_write_validator->validate_local_write(table, key.value());
     }
 
     m_last_class_name = emit_class_name(table);
@@ -733,12 +752,12 @@ bool SyncReplication::select_collection(const CollectionBase& view)
         return false;
     }
 
-    return select_table(*view.get_table());
+    return select_table(*view.get_table(), view.get_owner_key());
 }
 
 Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& table, ObjKey key)
 {
-    bool should_emit = select_table(table);
+    bool should_emit = select_table(table, key);
     REALM_ASSERT(should_emit);
 
     if (table.get_primary_key_column()) {
@@ -833,6 +852,38 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
 {
     populate_path_instr(instr, list);
     instr.path.m_path.push_back(ndx);
+}
+
+void SyncReplication::BootstrapWriteValidator::add_bootstrap_object(const Table& table, PrimaryKey key)
+{
+    auto pk_value = get_primary_key(table, key);
+    m_bootstrap_objects[table.get_class_name()].insert(pk_value); // table.get_primary_key(
+}
+
+void SyncReplication::BootstrapWriteValidator::validate_local_write(const Table& table, PrimaryKey key)
+{
+    auto pk_value = get_primary_key(table, key);
+    const auto& table_name = table.get_class_name();
+    if (auto table_it = m_bootstrap_objects.find(table_name); table_it != m_bootstrap_objects.end()) {
+        auto& keys = table_it->second;
+        if (auto object_it = keys.find(pk_value); object_it != keys.end()) {
+            throw WriteNotAllowed(
+                util::format("Write to bootstrap object \"%1\" in table \"%2\" not allowed during bootstrap.",
+                             pk_value, table.get_class_name()));
+        }
+    }
+}
+
+Mixed SyncReplication::BootstrapWriteValidator::get_primary_key(const Table& table, SyncReplication::PrimaryKey key)
+{
+    if (const auto obj_key_ptr = mpark::get_if<ObjKey>(&key)) {
+        return table.get_primary_key(*obj_key_ptr);
+    }
+    else if (const auto mixed_ptr = mpark::get_if<Mixed>(&key)) {
+        return *mixed_ptr;
+    }
+
+    REALM_UNREACHABLE();
 }
 
 } // namespace sync
