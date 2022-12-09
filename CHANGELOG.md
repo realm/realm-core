@@ -1,18 +1,14 @@
-# NEXT RELEASE
-
+# 13.1.2 Release notes
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
-
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed `realm_add_realm_refresh_callback` and notify immediately that there is not transaction snapshot to advance to. ([#6075](https://github.com/realm/realm-core/issues/6075), since v12.6.0)
 * Fix no notification for write transaction that contains only change to backlink property. ([#4994](https://github.com/realm/realm-core/issues/4994), since v11.4.1)
  
 ### Breaking changes
 * FLX Subscription API reworked to better match SDK consumption patterns ([#6065](https://github.com/realm/realm-core/pull/6065)). Not all changes are breaking, but listing them all here together.
   * `Subscription` is now a plain struct with public fields rather than getter functions
-    * `has_name()` and `name()` were merged into a single `optional<string> name` field
+  * `has_name()` and `name()` were merged into a single `optional<string> name` field
   * `SubscriptionSet` now uses the same types for `iterator` and `const_iterator` since neither was intended to support direct mutability
   * `SubscriptionSet::get_state_change_notification()` now offers a callback-taking overload
   * `SubscriptionSet::find()` overloads now return `const Subscription*` with `nullptr` to signal not-found, rather than an at-end iterator
