@@ -5011,6 +5011,77 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][a
     realm_release(http_transport);
 }
 
+TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]") {
+    using namespace realm::app;
+    FLXSyncTestHarness harness("c_api_flx_compensating_writes");
+    create_user_and_log_in(harness.app());
+    SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
+
+    struct TestState {
+        std::mutex mutex;
+        std::condition_variable cond_var;
+        std::vector<sync::CompensatingWriteErrorInfo> compensating_writes;
+    };
+    auto state = std::make_unique<TestState>();
+    realm_sync_config_set_error_handler(
+        sync_config,
+        [](realm_userdata_t user_data, realm_sync_session_t*, const realm_sync_error_t error) {
+            auto state = reinterpret_cast<TestState*>(user_data);
+            REQUIRE(error.error_code.category == RLM_SYNC_ERROR_CATEGORY_SESSION);
+            REQUIRE(error.error_code.value == RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
+
+            REQUIRE(error.compensating_writes_length > 0);
+            sync::CompensatingWriteErrorInfo err_info;
+            err_info.object_name = error.compensating_writes[0].object_name;
+            err_info.reason = error.compensating_writes[0].reason;
+            Mixed pk(c_api::from_capi(error.compensating_writes[0].primary_key));
+            err_info.primary_key = pk;
+
+            std::lock_guard<std::mutex> lk(state->mutex);
+            state->compensating_writes.push_back(std::move(err_info));
+            state->cond_var.notify_one();
+        },
+        state.get(), [](realm_userdata_t) {});
+
+    auto realm = Realm::get_shared_realm(test_config);
+
+    auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    auto table = realm->read_group().get_table("class_TopLevel");
+    mut_subs.insert_or_assign(Query(table).equal(table->get_column_key("name"), "bizz"));
+
+    CppContext c(realm);
+    realm->begin_transaction();
+    auto obj_1_id = ObjectId::gen();
+    auto obj_2_id = ObjectId::gen();
+    Object::create(c, realm, "TopLevel",
+                   std::any(AnyDict{
+                       {"_id", obj_1_id},
+                       {"queryable_str_field", std::string{"foo"}},
+                   }));
+    Object::create(c, realm, "TopLevel",
+                   std::any(AnyDict{
+                       {"_id", obj_2_id},
+                       {"queryable_str_field", std::string{"bar"}},
+                   }));
+    realm->commit_transaction();
+
+    std::unique_lock<std::mutex> lk(state->mutex);
+    state->cond_var.wait_for(lk, std::chrono::seconds(30), [&] {
+        return state->compensating_writes.size() == 2;
+    });
+
+    auto errors = std::move(state->compensating_writes);
+    lk.unlock();
+
+    REQUIRE(errors.size() == 2);
+    REQUIRE(errors[0].primary_key == obj_1_id);
+    REQUIRE(errors[0].object_name == "TopLevel");
+    REQUIRE(errors[1].primary_key == obj_2_id);
+    REQUIRE(errors[1].object_name == "TopLevel");
+    REQUIRE(errors[0].reason == "no way jose!");
+}
+
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     using namespace realm::app;
 
