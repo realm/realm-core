@@ -3527,6 +3527,12 @@ typedef struct realm_sync_error_user_info {
     const char* value;
 } realm_sync_error_user_info_t;
 
+typedef struct realm_sync_error_compensating_write_info {
+    const char* reason;
+    const char* object_name;
+    realm_value_t primary_key;
+} realm_sync_error_compensating_write_info_t;
+
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
 // Pointers to this struct and its pointer members are only valid inside the scope
@@ -3543,6 +3549,9 @@ typedef struct realm_sync_error {
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
+
+    realm_sync_error_compensating_write_info_t* compensating_writes;
+    size_t compensating_writes_length;
 } realm_sync_error_t;
 
 /**
