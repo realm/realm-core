@@ -86,12 +86,12 @@ public:
     /// before the handshake is done.
     ///
     /// @param protocol The negotiated subprotocol value returned by the server
-    virtual void websocket_handshake_completion_handler(const std::string& protocol) = 0;
+    virtual void websocket_connected_handler(const std::string& protocol) = 0;
 
     /// Called when an error occurs while establishing the WebSocket connection
     /// to the server or during normal operations. No additional binary messages
     /// will be processed after this function is called.
-    virtual void websocket_connect_error_handler() = 0;
+    virtual void websocket_error_handler() = 0;
 
     /// Called whenever a full message has arrived. The WebSocket implementation
     /// is responsible for defragmenting fragmented messages internally and
@@ -106,22 +106,20 @@ public:
     ///         execution of the function.
     virtual bool websocket_binary_message_received(util::Span<const char> data) = 0;
 
-
     /// Called whenever the WebSocket connection has been closed, either as a result
     /// of a WebSocket error or a normal close.
     ///
     /// @param was_clean Was the TCP connection closed after the WebSocket closing
     ///                  handshake was completed.
-    /// @param status_code The WebSocket status code indicating why the connection
-    ///                    was closed.
-    /// @param reason The string message describing why the connection was closed.
+    /// @param status A Status object containing the WebSocket status code and the
+    ///               reason string why the connection was closed.
     ///
     /// @return bool designates whether the WebSocket object has been destroyed
     ///         during the execution of this function. The normal return value is
-    ///         False to indicate the WebSocket object is no longer valid. If True
+    ///         True to indicate the WebSocket object is no longer valid. If False
     ///         is returned, the WebSocket object will be destroyed at some point
     ///         in the future.
-    virtual bool websocket_close_message_received(bool was_clean, int status_code, const std::string& reason) = 0;
+    virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
 };
 
 
