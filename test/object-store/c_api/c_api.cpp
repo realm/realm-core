@@ -5007,7 +5007,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][a
 
 TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]") {
     using namespace realm::app;
-    FLXSyncTestHarness harness("c_api_flx_compensating_writes");
+    FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
     SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
     realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
@@ -5026,14 +5026,17 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
             REQUIRE(error.error_code.value == RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
 
             REQUIRE(error.compensating_writes_length > 0);
-            sync::CompensatingWriteErrorInfo err_info;
-            err_info.object_name = error.compensating_writes[0].object_name;
-            err_info.reason = error.compensating_writes[0].reason;
-            Mixed pk(c_api::from_capi(error.compensating_writes[0].primary_key));
-            err_info.primary_key = pk;
 
             std::lock_guard<std::mutex> lk(state->mutex);
-            state->compensating_writes.push_back(std::move(err_info));
+            for (size_t i = 0; i < error.compensating_writes_length; ++i) {
+                sync::CompensatingWriteErrorInfo err_info;
+                err_info.object_name = error.compensating_writes[i].object_name;
+                err_info.reason = error.compensating_writes[i].reason;
+                Mixed pk(c_api::from_capi(error.compensating_writes[i].primary_key));
+                err_info.primary_key = pk;
+                state->compensating_writes.push_back(std::move(err_info));
+            }
+
             state->cond_var.notify_one();
         },
         state.get(), [](realm_userdata_t) {});
@@ -5042,7 +5045,8 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
 
     auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
     auto table = realm->read_group().get_table("class_TopLevel");
-    mut_subs.insert_or_assign(Query(table).equal(table->get_column_key("name"), "bizz"));
+    mut_subs.insert_or_assign(Query(table).equal(table->get_column_key("queryable_str_field"), "bizz"));
+    mut_subs.commit();
 
     CppContext c(realm);
     realm->begin_transaction();
@@ -5071,9 +5075,10 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     REQUIRE(errors.size() == 2);
     REQUIRE(errors[0].primary_key == obj_1_id);
     REQUIRE(errors[0].object_name == "TopLevel");
+    REQUIRE_THAT(errors[0].reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
     REQUIRE(errors[1].primary_key == obj_2_id);
     REQUIRE(errors[1].object_name == "TopLevel");
-    REQUIRE(errors[0].reason == "no way jose!");
+    REQUIRE_THAT(errors[1].reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 }
 
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
