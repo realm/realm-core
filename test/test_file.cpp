@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_FILE
 
+#include <map>
 #include <ostream>
 #include <sstream>
 
@@ -267,6 +268,13 @@ TEST(File_MultipleWriters)
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
         File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
 
+        // Place zeroes in selected places
+        for (size_t i = 0; i < count; i += increments) {
+            realm::util::encryption_read_barrier(map1, i);
+            map1.get_addr()[i] = 0;
+            realm::util::encryption_write_barrier(map1, i);
+        }
+
         for (size_t i = 0; i < count; i += increments) {
             realm::util::encryption_read_barrier(map1, i);
             ++map1.get_addr()[i];
@@ -501,6 +509,27 @@ TEST(File_PreallocResizingAPFSBug)
     CHECK_EQUAL(strncmp(input, insert_str, input_size), 0);
 }
 
+TEST(File_parent_dir)
+{
+    std::map<std::string, std::string> mappings = {{"Unicorn🦄/file.cpp", "Unicorn🦄"},
+                                                   {"", ""},
+                                                   {"asdf", ""},
+                                                   {"file.cpp", ""},
+                                                   {"Unicorn🦄", ""},
+                                                   {"parent/file.cpp", "parent"},
+                                                   {"parent//file.cpp", "parent"},
+                                                   {"parent///file.cpp", "parent"},
+                                                   {"parent////file.cpp", "parent"},
+                                                   {"1/2/3/4.cpp", "1/2/3"},
+                                                   {"/1/2/3/4", "/1/2/3"}};
+    for (auto [input, expected] : mappings) {
+        std::string actual = File::parent_dir(input);
+        CHECK_EQUAL(actual, expected);
+        if (actual != expected) {
+            realm::util::format(std::cout, "unexpected result '%1' for input '%2'", actual, input);
+        }
+    }
+}
 
 #ifndef _WIN32
 TEST(File_GetUniqueID)

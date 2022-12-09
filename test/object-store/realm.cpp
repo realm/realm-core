@@ -340,7 +340,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto& db = TestHelper::get_db(realm);
         auto rt = db->start_read();
         VersionID old_version = rt->get_version_of_current_transaction();
-        rt = nullptr;
         realm->close();
 
         config.schema = Schema{
@@ -353,7 +352,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
+        // must retain 'rt' until after opening for reading at that version
         TestHelper::begin_read(old_realm, old_version);
+        rt = nullptr;
         REQUIRE(old_realm->schema().size() == 1);
     }
 

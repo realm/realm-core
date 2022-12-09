@@ -1006,7 +1006,7 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     }
 
     if (!m_logger)
-        m_logger = audit_user->sync_manager()->make_logger();
+        m_logger = audit_user->sync_manager()->get_logger();
     if (!m_serializer)
         m_serializer = std::make_shared<AuditObjectSerializer>();
 

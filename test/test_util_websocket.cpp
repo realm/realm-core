@@ -298,7 +298,7 @@ public:
 TEST(WebSocket_Pipe)
 {
     {
-        PipeTest pipe_test{test_context.logger};
+        PipeTest pipe_test{*(test_context.logger)};
         std::string input_1 = "Hello World";
         pipe_test.write(input_1);
         pipe_test.read_plain(input_1.size());
@@ -345,7 +345,7 @@ TEST(WebSocket_Pipe)
 
 TEST(WebSocket_Messages)
 {
-    Fixture fixt{test_context.logger};
+    Fixture fixt{*(test_context.logger)};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -407,7 +407,7 @@ TEST(WebSocket_Messages)
 
 TEST(WebSocket_Fragmented_Messages)
 {
-    Fixture fixt{test_context.logger};
+    Fixture fixt{*(test_context.logger)};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -442,7 +442,7 @@ TEST(WebSocket_Fragmented_Messages)
 
 TEST(WebSocket_Interleaved_Fragmented_Messages)
 {
-    Fixture fixt{test_context.logger};
+    Fixture fixt{*(test_context.logger)};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 

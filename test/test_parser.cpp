@@ -407,6 +407,26 @@ TEST(Parser_invalid_queries)
 }
 
 static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                          std::vector<mpark::variant<Mixed, std::vector<Mixed>>> args, size_t num_results,
+                          query_parser::KeyPathMapping mapping = {})
+{
+    Query q = t->query(query_string, args, mapping);
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, mapping);
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+    return q2;
+}
+
+static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
                           size_t num_results, query_parser::KeyPathMapping mapping = {})
 {
     realm::query_parser::NoArguments args;
@@ -553,6 +573,7 @@ TEST(Parser_basic_serialisation)
 
     Query q = t->where();
 
+    // constant values
     verify_query(test_context, t, "time == NULL", 1);
     verify_query(test_context, t, "time == NIL", 1);
     verify_query(test_context, t, "time != NULL", 4);
@@ -579,6 +600,23 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees BETWEEN {2.20, 2.25}", 3);
     verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
+
+    // params
+    verify_query(test_context, t, "time == $0", {null()}, 1);
+    verify_query(test_context, t, "time != $0", {null()}, 4);
+    verify_query(test_context, t, "age > $0", {2}, 2);
+    verify_query(test_context, t, "!(age >= $0)", {2}, 2);
+    verify_query(test_context, t, "!(age => $0)", {2}, 2);
+    verify_query(test_context, t, "$0 <= age", {3}, 2);
+    verify_query(test_context, t, "$0 =< age", {3}, 2);
+    verify_query(test_context, t, "age > $0 and age < $1", {2, 4}, 1);
+    verify_query(test_context, t, "age = $0 || age == $1", {1, 3}, 2);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {1.2, 2.23}, 1);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {2, 3}, 1);
+    verify_query(test_context, t, "fees BETWEEN {$0, $1}", {2, 3}, 4);
+    verify_query(test_context, t, "fees BETWEEN {$0, $1}", {2.2, 2.25}, 3);
+    verify_query(test_context, t, "fees = $0 || fees = $1 || fees = $2", {2, 3, 4}, 1);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {0, 1}, 0);
 
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
     verify_query(test_context, t, "fees > 2.0E0", 4);
@@ -3826,6 +3864,7 @@ TEST(Parser_OperatorIN)
     }
 
     // RHS is a constant list
+    verify_query(test_context, t, "customer_id IN {}", 0);
     verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
     verify_query(test_context, t, "NOT customer_id IN {0}", 2);
     verify_query(test_context, t, "customer_id != {0}", 2);
@@ -3852,6 +3891,36 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "fav_item.name endswith {'lk', 'EAL', 'GeS'}", 1);
     verify_query(test_context, t, "fav_item.name endswith[c] {'lk', 'EAL', 'GeS'}", 2);
     verify_query(test_context, t, "fav_item.name like {'*lk', '*zz*'}", 2);
+
+    // RHS is a param
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, t, "customer_id IN $0", {Vec{}}, 0);
+    verify_query(test_context, t, "customer_id IN $0", {Vec{0, 1, 2}}, 3);
+    verify_query(test_context, t, "NOT customer_id IN $0", {Vec{0}}, 2);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0}}, 2);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0, 1}}, 3);
+    verify_query(test_context, t, "NOT customer_id IN $0", {Vec{0, 1}}, 1);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0, 1, 2}}, 3);
+    verify_query(test_context, t, "customer_id > $0", {Vec{0, 1}}, 2);
+    verify_query(test_context, t, "customer_id > $0", {Vec{4, 5, 6}}, 0);
+    verify_query(test_context, t, "customer_id < $0", {Vec{0, 1}}, 1);
+    verify_query(test_context, t, "customer_id < $0", {Vec{0}}, 0);
+    verify_query(test_context, t, "customer_id >= $0", {Vec{0, 1}}, 3);
+    verify_query(test_context, t, "customer_id >= $0", {Vec{2, 3, 4}}, 1);
+    verify_query(test_context, t, "customer_id <= $0", {Vec{0, 1}}, 2);
+    verify_query(test_context, t, "customer_id <= $0", {Vec{-1}}, 0);
+
+    verify_query(test_context, t, "fav_item.name IN $0", {Vec{"milk", "oranges", "cereal"}}, 2);
+    verify_query(test_context, t, "fav_item.price IN $0", {Vec{6.5, 9.5}}, 1);
+    verify_query(test_context, t, "fav_item.name IN $0",
+                 {Vec{0, null{}, -1, "not found", 3.14, ObjectId("000000000000000000000000")}}, 0);
+    verify_query(test_context, t, "fav_item.name != $0", {Vec{"milk", "oranges"}}, 3);
+    verify_query(test_context, t, "NOT fav_item.name IN $0", {Vec{"milk", "oranges"}}, 1);
+    verify_query(test_context, t, "fav_item.name contains[c] $0", {Vec{"ILK", "Range"}}, 2);
+    verify_query(test_context, t, "fav_item.name beginswith[c] $0", {Vec{"MIL", "CERe"}}, 1);
+    verify_query(test_context, t, "fav_item.name endswith $0", {Vec{"lk", "EAL", "GeS"}}, 1);
+    verify_query(test_context, t, "fav_item.name endswith[c] $0", {Vec{"lk", "EAL", "GeS"}}, 2);
+    verify_query(test_context, t, "fav_item.name like $0", {Vec{"*lk", "*zz*"}}, 2);
 
     std::vector<Mixed> int_list = {0, 1, 2};
     std::vector<Mixed> strings_list = {"milk", "oranges", "cereal"};

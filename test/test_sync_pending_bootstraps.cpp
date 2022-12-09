@@ -16,7 +16,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
     progress.upload = {5, 5};
     {
         auto db = DB::create(make_client_replication(), db_path);
-        sync::PendingBootstrapStore store(db, &test_context.logger);
+        sync::PendingBootstrapStore store(db, *test_context.logger);
 
         CHECK(!store.has_pending());
         std::vector<Transformer::RemoteChangeset> changesets;
@@ -53,7 +53,7 @@ TEST(Sync_PendingBootstrapStoreBatching)
 
     {
         auto db = DB::create(make_client_replication(), db_path);
-        sync::PendingBootstrapStore store(db, &test_context.logger);
+        sync::PendingBootstrapStore store(db, *test_context.logger);
         CHECK(store.has_pending());
 
         auto stats = store.pending_stats();
@@ -114,7 +114,7 @@ TEST(Sync_PendingBootstrapStoreClear)
     progress.latest_server_version = {5, 123456789};
     progress.upload = {5, 5};
     auto db = DB::create(make_client_replication(), db_path);
-    sync::PendingBootstrapStore store(db, &test_context.logger);
+    sync::PendingBootstrapStore store(db, *test_context.logger);
 
     CHECK(!store.has_pending());
     std::vector<Transformer::RemoteChangeset> changesets;

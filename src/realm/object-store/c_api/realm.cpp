@@ -1,6 +1,7 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
 
+
 realm_callback_token_realm::~realm_callback_token_realm()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
@@ -14,6 +15,11 @@ realm_callback_token_schema::~realm_callback_token_schema()
 realm_refresh_callback_token::~realm_refresh_callback_token()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
+}
+
+realm_thread_observer_token::~realm_thread_observer_token()
+{
+    realm::g_binding_callback_thread_observer = nullptr;
 }
 
 namespace realm::c_api {
@@ -167,20 +173,24 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
-RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
-                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                             bool notify_only)
+RLM_API bool realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                     bool notify_only, unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
     return wrap_err([&]() {
-        return (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        auto id = (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 
-RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, bool allow_grouping)
+RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
+                                realm_free_userdata_func_t userdata_free, bool allow_grouping,
+                                unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
         if (err) {
@@ -196,7 +206,10 @@ RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_
         }
     };
     return wrap_err([&]() {
-        return (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        auto id = (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 
@@ -239,14 +252,23 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     if (!latest_snapshot_version)
         return nullptr;
 
+    const auto current_version = (*realm)->current_transaction_version();
+    if (!current_version || *latest_snapshot_version <= (*current_version).version)
+        return nullptr;
+
     auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
     return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
 }
 
-RLM_API bool realm_refresh(realm_t* realm)
+RLM_API bool realm_refresh(realm_t* realm, bool* did_refresh)
 {
     return wrap_err([&]() {
-        (*realm)->refresh();
+        bool result = (*realm)->refresh();
+        if (did_refresh) {
+            *did_refresh = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
@@ -263,8 +285,12 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {
         auto& p = **realm;
-        if (did_compact)
-            *did_compact = p.compact();
+        bool result = p.compact();
+        if (did_compact) {
+            *did_compact = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
@@ -327,6 +353,34 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
         m_realm_pending_refresh_callbacks.invoke(version_id.version);
     }
     m_realm_changed_callbacks.invoke();
+}
+
+RLM_API
+realm_thread_observer_token_t*
+realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
+                                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t userdata,
+                                           realm_free_userdata_func_t free_userdata)
+{
+    realm::c_api::CBindingThreadObserver::ThreadCallback thread_create =
+        [on_thread_create, userdata = UserdataPtr{userdata, free_userdata}]() {
+            on_thread_create(userdata.get());
+        };
+
+    realm::c_api::CBindingThreadObserver::ThreadCallback thread_destroyed =
+        [on_thread_destroy, userdata = UserdataPtr{userdata, free_userdata}]() {
+            on_thread_destroy(userdata.get());
+        };
+
+    realm::c_api::CBindingThreadObserver::ErrorCallback error =
+        [on_error, userdata = UserdataPtr{userdata, free_userdata}](const char* error) {
+            on_error(userdata.get(), error);
+        };
+
+    auto& instance = realm::c_api::CBindingThreadObserver::create();
+    instance.set(std::move(thread_create), std::move(thread_destroyed), std::move(error));
+    g_binding_callback_thread_observer = &instance;
+    return new realm_thread_observer_token_t();
 }
 
 } // namespace realm::c_api

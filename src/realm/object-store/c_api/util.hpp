@@ -64,15 +64,19 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
         throw NotNullableException{schema.name, table.get_column_name(col_key)};
     }
 
-    if (val.get_type() == type_TypedLink &&
-        (col_key.get_type() == col_type_Link || col_key.get_type() == col_type_LinkList)) {
+    auto col_type = col_key.get_type();
+    if (col_type == col_type_Mixed) {
+        // Anything goes
+        return;
+    }
+    if (val.get_type() == type_TypedLink && (col_type == col_type_Link || col_type == col_type_LinkList)) {
         auto obj_link = val.get<ObjLink>();
         if (table.get_link_target(col_key)->get_key() != obj_link.get_table_key()) {
             report_type_mismatch(realm, table, col_key);
         }
     }
     else {
-        if (ColumnType(val.get_type()) != col_key.get_type()) {
+        if (ColumnType(val.get_type()) != col_type) {
             report_type_mismatch(realm, table, col_key);
         }
     }

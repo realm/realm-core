@@ -54,6 +54,7 @@ public:
 private:
     void clean_up_state() noexcept;
 
+    // The lifetime of this class is within a Session, so no need for a shared_ptr
     util::Logger& m_logger;
     DBRef m_db;
     DBRef m_db_fresh;

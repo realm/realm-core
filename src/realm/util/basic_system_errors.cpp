@@ -65,7 +65,7 @@ std::string system_category::message(int value) const
         }
     }
 
-#elif !REALM_ANDROID && _GNU_SOURCE // GNU specific version
+#elif (!REALM_ANDROID && _GNU_SOURCE) || (defined(__USE_GNU) && __ANDROID_API__ >= 23)
 
     {
         char* msg = nullptr;

@@ -34,14 +34,13 @@ static_assert(realm_log_level_e(Logger::Level::error) == RLM_LOG_LEVEL_ERROR);
 static_assert(realm_log_level_e(Logger::Level::fatal) == RLM_LOG_LEVEL_FATAL);
 static_assert(realm_log_level_e(Logger::Level::off) == RLM_LOG_LEVEL_OFF);
 
-class CLogger : public realm::util::RootLogger {
+class CLogger : public realm::util::Logger {
 public:
     CLogger(SharedUserdata userdata, realm_log_func_t log_callback, Logger::Level level)
-        : RootLogger()
+        : Logger(level)
         , m_userdata(std::move(userdata))
         , m_log_callback(log_callback)
     {
-        this->set_level_threshold(level);
     }
 
 protected:
@@ -60,7 +59,7 @@ realm::SyncClientConfig::LoggerFactory make_logger_factory(realm_log_func_t logg
                                                            realm_free_userdata_func_t free_userdata)
 {
     return [logger, userdata = SharedUserdata{userdata, free_userdata}](Logger::Level level) {
-        return std::make_unique<CLogger>(userdata, logger, level);
+        return std::make_shared<CLogger>(userdata, logger, level);
     };
 }
 } // namespace realm::c_api

@@ -66,6 +66,10 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
         if (m_sync_client)
             return;
 
+        // create a new logger - if the logger_factory is updated later, a new
+        // logger will be created at that time.
+        do_make_logger();
+
         {
             util::CheckedLockGuard lock(m_file_system_mutex);
 
@@ -247,6 +251,7 @@ void SyncManager::reset_for_testing()
 
         // Reset even more state.
         m_config = {};
+        m_logger_ptr.reset();
         m_sync_route = "";
     }
 
@@ -262,29 +267,39 @@ void SyncManager::set_log_level(util::Logger::Level level) noexcept
 {
     util::CheckedLockGuard lock(m_mutex);
     m_config.log_level = level;
+    // Update the level threshold in the already created logger
+    if (m_logger_ptr) {
+        m_logger_ptr->set_level_threshold(level);
+    }
 }
 
-void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) noexcept
+void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
 {
     util::CheckedLockGuard lock(m_mutex);
     m_config.logger_factory = std::move(factory);
+
+    if (m_sync_client)
+        throw std::logic_error("Cannot set the logger_factory after creating the sync client");
+
+    // Create a new logger using the new factory
+    do_make_logger();
 }
 
-std::unique_ptr<util::Logger> SyncManager::make_logger() const
-{
-    util::CheckedLockGuard lock(m_mutex);
-    return do_make_logger();
-}
-
-std::unique_ptr<util::Logger> SyncManager::do_make_logger() const
+void SyncManager::do_make_logger()
 {
     if (m_config.logger_factory) {
-        return m_config.logger_factory(m_config.log_level); // Throws
+        m_logger_ptr = m_config.logger_factory(m_config.log_level);
     }
+    else {
+        // recreate the logger as a StderrLogger, even if it was created before...
+        m_logger_ptr = std::make_shared<util::StderrLogger>(m_config.log_level);
+    }
+}
 
-    auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-    stderr_logger->set_level_threshold(m_config.log_level);
-    return std::unique_ptr<util::Logger>(stderr_logger.release());
+const std::shared_ptr<util::Logger>& SyncManager::get_logger() const
+{
+    util::CheckedLockGuard lock(m_mutex);
+    return m_logger_ptr;
 }
 
 void SyncManager::set_user_agent(std::string user_agent)
@@ -744,7 +759,7 @@ SyncClient& SyncManager::get_sync_client() const
 
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
-    return std::make_unique<SyncClient>(do_make_logger(), m_config, weak_from_this());
+    return std::make_unique<SyncClient>(m_logger_ptr, m_config, weak_from_this());
 }
 
 util::Optional<SyncAppMetadata> SyncManager::app_metadata() const

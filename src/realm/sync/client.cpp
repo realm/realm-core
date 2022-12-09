@@ -1032,11 +1032,11 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     REALM_ASSERT(m_flx_latest_version != 0);
-    REALM_ASSERT(m_flx_latest_version <= version);
+    REALM_ASSERT(m_flx_latest_version >= version);
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 void SessionWrapper::on_flx_sync_version_complete(int64_t version)
@@ -1085,7 +1085,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
     mut_subs.update_state(new_state);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
@@ -1338,16 +1338,15 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);      // Throws
-        std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
-        SessionImpl& sess = *sess_2;
+        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
+        std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
         if (sync_mode == SyncServerMode::FLX) {
-            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, &sess.logger);
+            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
 
-        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
-        m_sess = &sess;
-        conn.activate_session(std::move(sess_2)); // Throws
+        sess->logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        m_sess = sess.get();
+        conn.activate_session(std::move(sess)); // Throws
 
         m_actualized = true;
     }
@@ -1383,6 +1382,8 @@ void SessionWrapper::finalize()
     ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
 
+    // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+    m_flx_pending_bootstrap_store.reset();
     m_sess = nullptr;
 
     // The Realm file can be closed now, as no access to the Realm file is
@@ -1483,7 +1484,7 @@ void SessionWrapper::on_download_completion()
                              m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
         mutable_subs.update_state(SubscriptionSet::State::Complete);
-        std::move(mutable_subs).commit();
+        mutable_subs.commit();
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
@@ -1582,7 +1583,8 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
                                    SyncServerMode sync_mode)
-    : logger{make_logger_prefix(ident), client.logger} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.logger_ptr)} // Throws
+    , logger{*logger_ptr}
     , m_client{client}
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}

@@ -34,7 +34,7 @@ using VersionList = BackupHandler::VersionList;
 using VersionTimeList = BackupHandler::VersionTimeList;
 
 // Note: accepted versions should have new versions added at front
-const VersionList BackupHandler::accepted_versions_ = {22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
+const VersionList BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.

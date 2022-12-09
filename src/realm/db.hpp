@@ -143,7 +143,7 @@ public:
     ///  * for read or write transactions - but not frozen transactions, explicitly call
     ///    close() at earliest time possible
     ///  * explicitly nullify any DBRefs you may have.
-    void close(bool allow_open_read_transactions = false);
+    void close(bool allow_open_read_transactions = false) REQUIRES(!m_mutex);
 
     bool is_attached() const noexcept;
 
@@ -162,8 +162,8 @@ public:
         m_replication = repl;
     }
 
-    void create_new_history(Replication& repl);
-    void create_new_history(std::unique_ptr<Replication> repl);
+    void create_new_history(Replication& repl) REQUIRES(!m_mutex);
+    void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
 
     const std::string& get_path() const noexcept
     {
@@ -235,13 +235,12 @@ public:
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
-
     /// Transactions are obtained from one of the following 3 methods:
-    TransactionRef start_read(VersionID = VersionID());
-    TransactionRef start_frozen(VersionID = VersionID());
+    TransactionRef start_read(VersionID = VersionID()) REQUIRES(!m_mutex);
+    TransactionRef start_frozen(VersionID = VersionID()) REQUIRES(!m_mutex);
     // If nonblocking is true and a write transaction is already active,
     // an invalid TransactionRef is returned.
-    TransactionRef start_write(bool nonblocking = false);
+    TransactionRef start_write(bool nonblocking = false) REQUIRES(!m_mutex);
 
     // ask for write mutex. Callback takes place when mutex has been acquired.
     // callback may occur on ANOTHER THREAD. Must not be called if write mutex
@@ -257,7 +256,7 @@ public:
     // that is free in current version, but being used in still live versions.
     // Notice that we will always have two live versions - the current and the
     // previous.
-    void get_stats(size_t& free_space, size_t& used_space, size_t* locked_space = nullptr) const;
+    void get_stats(size_t& free_space, size_t& used_space, size_t* locked_space = nullptr) const REQUIRES(!m_mutex);
     //@}
 
     enum TransactStage {
@@ -266,6 +265,13 @@ public:
         transact_Writing,
         transact_Frozen,
     };
+
+    enum class EvacStage { idle, evacuating, waiting, blocked };
+
+    EvacStage get_evacuation_stage() const
+    {
+        return m_evac_stage;
+    }
 
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
@@ -298,9 +304,10 @@ public:
     /// the file to the new 64 byte key.
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
+    bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none)
+        REQUIRES(!m_mutex);
 
-    void write_copy(StringData path, const char* output_encryption_key);
+    void write_copy(StringData path, const char* output_encryption_key) REQUIRES(!m_mutex);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
@@ -417,14 +424,16 @@ protected:
 
 private:
     class AsyncCommitHelper;
+    class VersionManager;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
+        enum Type { Frozen, Live, Full };
         uint_fast64_t m_version = std::numeric_limits<version_type>::max();
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
-
+        Type m_type = Live;
         // a little helper
         static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
         {
@@ -442,29 +451,27 @@ private:
     class ReadLockGuard;
 
     // Member variables
-    std::recursive_mutex m_mutex;
-    int m_transaction_count = 0;
+    mutable util::CheckedMutex m_mutex;
+    int m_transaction_count GUARDED_BY(m_mutex) = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
+    std::unique_ptr<VersionManager> m_version_manager;
     Replication* m_replication = nullptr;
-    size_t m_free_space = 0;
-    size_t m_locked_space = 0;
-    size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0;          // highest version observed by this DB
-    std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
+    size_t m_free_space GUARDED_BY(m_mutex) = 0;
+    size_t m_locked_space GUARDED_BY(m_mutex) = 0;
+    size_t m_used_space GUARDED_BY(m_mutex) = 0;
+    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
+    std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map;   // Never remapped, provides access to everything but the ringbuffer
-    util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    bool m_wait_for_change_enabled = true;    // Initially wait_for_change is enabled
-    bool m_write_transaction_open = false;
-    std::string m_lockfile_path;
-    std::string m_lockfile_prefix;
+    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
+    bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
-    std::string m_coordination_dir;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
     util::InterprocessMutex m_controlmutex;
+    util::InterprocessMutex m_versionlist_mutex;
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
@@ -504,9 +511,10 @@ private:
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
-    void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions());
-    void open(BinaryData, bool take_ownership = true);
-    void open(Replication&, const std::string& file, const DBOptions& options = DBOptions());
+    void open(const std::string& file, bool no_create = false, const DBOptions& options = DBOptions())
+        REQUIRES(!m_mutex);
+    void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
+    void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
 
     void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
@@ -535,51 +543,48 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    void grab_read_lock(ReadLockInfo&, VersionID);
+    ReadLockInfo grab_read_lock(ReadLockInfo::Type, VersionID) REQUIRES(!m_mutex);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
-    void release_read_lock(ReadLockInfo&) noexcept;
-
+    void release_read_lock(ReadLockInfo&) noexcept REQUIRES(!m_mutex);
+    void do_release_read_lock(ReadLockInfo&) noexcept REQUIRES(m_mutex);
     // Stop tracking a read lock without actually releasing it.
-    void leak_read_lock(ReadLockInfo&) noexcept;
+    void leak_read_lock(ReadLockInfo&) noexcept REQUIRES(!m_mutex);
 
     // Release all read locks held by this DB object. After release, further calls to
     // release_read_lock for locks already released must be avoided.
-    void release_all_read_locks() noexcept;
+    void release_all_read_locks() noexcept REQUIRES(!m_mutex);
 
     /// return true if write transaction can commence, false otherwise.
-    bool do_try_begin_write();
-    void do_begin_write();
-    void do_begin_possibly_async_write();
-    version_type do_commit(Transaction&, bool commit_to_disk = true);
-    void do_end_write() noexcept;
-    void end_write_on_correct_thread() noexcept;
-
-    // make sure the given index is within the currently mapped area.
-    // if not, expand the mapped area. Returns true if the area is expanded.
-    bool grow_reader_mapping(uint_fast32_t index);
-
+    bool do_try_begin_write() REQUIRES(!m_mutex);
+    void do_begin_write() REQUIRES(!m_mutex);
+    void do_begin_possibly_async_write() REQUIRES(!m_mutex);
+    version_type do_commit(Transaction&, bool commit_to_disk = true) REQUIRES(!m_mutex);
+    void do_end_write() noexcept REQUIRES(!m_mutex);
+    void end_write_on_correct_thread() noexcept REQUIRES(!m_mutex);
     // Must be called only by someone that has a lock on the write mutex.
-    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk = true);
+    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk = true)
+        REQUIRES(!m_mutex);
 
     void do_async_commits();
 
     /// Upgrade file format and/or history schema
     void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
-                             int current_hist_schema_version, int target_hist_schema_version);
+                             int current_hist_schema_version, int target_hist_schema_version) REQUIRES(!m_mutex);
 
     int get_file_format_version() const noexcept;
 
     /// finish up the process of starting a write transaction. Internal use only.
-    void finish_begin_write();
+    void finish_begin_write() REQUIRES(!m_mutex);
 
     void reset_free_space_tracking()
     {
         m_alloc.reset_free_space_tracking();
     }
 
-    void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
+    void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions)
+        REQUIRES(!m_mutex);
 
     void async_begin_write(util::UniqueFunction<void()> fn);
     void async_end_write();
@@ -590,13 +595,13 @@ private:
 
 inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked_space) const
 {
+    util::CheckedLockGuard lock(m_mutex);
     free_space = m_free_space;
     used_space = m_used_space;
     if (locked_space) {
         *locked_space = m_locked_space;
     }
 }
-
 
 
 class DisableReplication {
@@ -642,7 +647,6 @@ private:
     DB& m_db;
     ReadLockInfo* m_read_lock;
 };
-
 
 inline int DB::get_file_format_version() const noexcept
 {
