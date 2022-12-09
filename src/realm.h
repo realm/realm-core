@@ -3553,8 +3553,8 @@ typedef struct realm_sync_error {
 } realm_sync_error_t;
 
 
-static const char* realm_sync_error_original_file_path_key;
-static const char* realm_sync_error_recovery_file_path_key;
+RLM_API const char* realm_sync_error_original_file_path_key;
+RLM_API const char* realm_sync_error_recovery_file_path_key;
 
 /**
  * Callback function invoked by the sync session once it has uploaded or download

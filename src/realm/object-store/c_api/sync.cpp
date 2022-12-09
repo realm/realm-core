@@ -420,8 +420,8 @@ RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t* conf
     config->stop_policy = SyncSessionStopPolicy(policy);
 }
 
-const char* realm_sync_error_original_file_path_key = SyncError::c_original_file_path_key;
-const char* realm_sync_error_recovery_file_path_key = SyncError::c_recovery_file_path_key;
+RLM_API const char* realm_sync_error_original_file_path_key = SyncError::c_original_file_path_key;
+RLM_API const char* realm_sync_error_recovery_file_path_key = SyncError::c_recovery_file_path_key;
 
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, realm_sync_error_handler_func_t handler,
                                                  realm_userdata_t userdata,
