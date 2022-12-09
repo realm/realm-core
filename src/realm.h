@@ -3540,6 +3540,8 @@ typedef struct realm_sync_error_compensating_write_info {
 typedef struct realm_sync_error {
     realm_sync_error_code_t error_code;
     const char* detailed_message;
+    const char* c_original_file_path_key;
+    const char* c_recovery_file_path_key;
     bool is_fatal;
     bool is_unrecognized_by_client;
     bool is_client_reset_requested;
@@ -3551,10 +3553,6 @@ typedef struct realm_sync_error {
     realm_sync_error_compensating_write_info_t* compensating_writes;
     size_t compensating_writes_length;
 } realm_sync_error_t;
-
-
-RLM_API const char* realm_sync_error_original_file_path_key;
-RLM_API const char* realm_sync_error_recovery_file_path_key;
 
 /**
  * Callback function invoked by the sync session once it has uploaded or download

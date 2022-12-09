@@ -420,8 +420,8 @@ RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t* conf
     config->stop_policy = SyncSessionStopPolicy(policy);
 }
 
-RLM_API const char* realm_sync_error_original_file_path_key = SyncError::c_original_file_path_key;
-RLM_API const char* realm_sync_error_recovery_file_path_key = SyncError::c_recovery_file_path_key;
+RLM_API const char* const realm_sync_error_original_file_path_key = SyncError::c_original_file_path_key;
+RLM_API const char* const realm_sync_error_recovery_file_path_key = SyncError::c_recovery_file_path_key;
 
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, realm_sync_error_handler_func_t handler,
                                                  realm_userdata_t userdata,
@@ -438,6 +438,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
         c_error.server_requests_action = static_cast<realm_sync_error_action_e>(error.server_requests_action);
+        c_error.c_original_file_path_key = error.c_original_file_path_key;
+        c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         c_user_info.reserve(error.user_info.size());
