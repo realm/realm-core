@@ -35,6 +35,7 @@ public:
         RuntimeError = 2,
         LogicError = 3,
         BrokenPromise = 4,
+        OperationAborted = 5,
 
         /// WebSocket Errors
         // WebSocket_OK = 1000 is not used, just use OK instead

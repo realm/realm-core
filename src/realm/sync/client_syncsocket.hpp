@@ -157,8 +157,7 @@ public:
     ///
     /// This object provides a cancel() mechanism to cancel the timer. The
     /// handler function for this timer must be called with a Status of
-    /// realm::util::error::operation_aborted error code if the timer is
-    /// canceled.
+    /// ErrorCodes::OperationAborted error code if the timer is canceled.
     ///
     /// Custom event loop implementations will need to create a subclass of
     /// Timer that provides access to the underlying implementation to cancel

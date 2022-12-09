@@ -31,6 +31,8 @@ StringData ErrorCodes::error_string(Error code)
             return "LogicError";
         case ErrorCodes::BrokenPromise:
             return "BrokenPromise";
+        case ErrorCodes::OperationAborted:
+            return "OperationAborted";
 
         /// WebSocket error codes
         case ErrorCodes::WebSocket_GoingAway:
