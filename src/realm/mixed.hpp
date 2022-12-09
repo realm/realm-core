@@ -337,6 +337,25 @@ public:
         return *this;
     }
 
+    explicit OwnedMixed(const Mixed& m)
+        : Mixed(m)
+    {
+        if (m.is_type(type_String)) {
+            m_owned_string = std::string(m.get_string());
+            string_val = m_owned_string;
+        }
+    }
+
+    OwnedMixed& operator=(const Mixed& m)
+    {
+        *static_cast<Mixed*>(this) = m;
+        if (m.is_type(type_String)) {
+            m_owned_string = std::string(m.get_string());
+            string_val = m_owned_string;
+        }
+        return *this;
+    }
+
     using Mixed::Mixed;
 
 private:
