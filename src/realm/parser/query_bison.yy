@@ -31,9 +31,12 @@
     struct PathElem {
         std::string id;
         Mixed index;
+        std::string buffer;
         PathElem() {}
+        PathElem(const PathElem& other);
+        PathElem& operator=(const PathElem& other);
         PathElem(std::string s) : id(s) {}
-        PathElem(std::string s, Mixed i) : id(s), index(i) {}
+        PathElem(std::string s, Mixed i) : id(s), index(i) { index.use_buffer(buffer); }
     };
 
   }

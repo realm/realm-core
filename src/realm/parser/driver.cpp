@@ -1353,6 +1353,22 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+PathElem::PathElem(const PathElem& other)
+    : id(other.id)
+    , index(other.index)
+{
+    index.use_buffer(buffer);
+}
+
+PathElem& PathElem::operator=(const PathElem& other)
+{
+    id = other.id;
+    index = other.index;
+    index.use_buffer(buffer);
+
+    return *this;
+}
+
 LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
