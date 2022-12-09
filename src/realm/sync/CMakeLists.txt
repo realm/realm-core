@@ -22,7 +22,7 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
-    network/default_syncsocket.cpp
+    network/default_socket.cpp
     network/http.cpp
     network/network.cpp
     network/network_ssl.cpp
@@ -55,7 +55,7 @@ set(SYNC_INSTALL_HEADERS
 )
 
 set(NOINST_HEADERS
-    network/default_syncsocket.hpp
+    network/default_socket.hpp
     network/network.hpp
     network/network_ssl.hpp
     network/websocket.hpp

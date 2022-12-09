@@ -1,4 +1,4 @@
-#include <realm/sync/network/default_syncsocket.hpp>
+#include <realm/sync/network/default_socket.hpp>
 
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>

@@ -102,7 +102,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/instruction_applier.cpp",
     "realm/sync/instruction_replication.cpp",
     "realm/sync/instructions.cpp",
-    "realm/sync/network/default_syncsocket.cpp",
+    "realm/sync/network/default_socket.cpp",
     "realm/sync/network/http.cpp",
     "realm/sync/network/network.cpp",
     "realm/sync/network/network_ssl.cpp",
