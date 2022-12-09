@@ -83,7 +83,7 @@ struct SyncClientConfig {
 
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
-    std::shared_ptr<sync::SyncSocketInterface> sync_socket;
+    std::shared_ptr<sync::SyncSocketProvider> sync_socket;
 
     // {@
     // Optional information about the binding/application that is sent as part of the User-Agent

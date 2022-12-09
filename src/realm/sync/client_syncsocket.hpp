@@ -16,8 +16,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_CLIENT_SYNC_SOCKET_HPP
-#define REALM_SYNC_CLIENT_SYNC_SOCKET_HPP
+#pragma once
 
 #include <map>
 #include <memory>
@@ -33,14 +32,120 @@
 
 namespace realm::sync {
 
-/// Function handler typedef
-using FunctionHandler = util::UniqueFunction<void(Status)>;
+struct WebSocketEndpoint;
+struct WebSocketInterface;
+struct WebSocketObserver;
+
+/// Sync Socket interface that provides the event loop and WebSocket factory
+/// used by the SyncClient.
+///
+/// All callback and event operations in the SyncClient must be completed in
+/// the order in which they were issued (via post() or timer) to the event
+/// loop and cannot be run in parallel. It is up to the custom event loop
+/// implementation to determine if these are run on the same thread or a
+/// thread pool as long as it is guaranteed that the callback handler
+/// functions are processed in order and not run concurrently.
+///
+/// The implementation of a SyncSocketInterface must support the following
+/// operations that post handler functions (via by the Sync client) onto the
+/// event loop:
+/// * Post a handler function directly onto the event loop
+/// * Post a handler function when the specified timer duration expires
+///
+/// The event loop is not required to be a single thread as long as the
+/// following requirements are satisfied:
+/// * handler functions are called in the order they were posted to the
+/// event loop queue, and
+/// * a handler function runs to completion before the next handler function
+/// is called.
+///
+/// The SyncSocketInterface also provides a WebSocket interface for
+/// connecting to the server via a WebSocket connection.
+class SyncSocketProvider {
+public:
+    /// Function handler typedef
+    using FunctionHandler = util::UniqueFunction<void(Status)>;
+
+    /// The Timer object used to track a timer that was started on the event
+    /// loop.
+    ///
+    /// This object provides a cancel() mechanism to cancel the timer. The
+    /// handler function for this timer must be called with a Status of
+    /// ErrorCodes::OperationAborted error code if the timer is canceled.
+    ///
+    /// Custom event loop implementations will need to create a subclass of
+    /// Timer that provides access to the underlying implementation to cancel
+    /// the timer.
+    struct Timer {
+        /// Cancels the timer and destroys the timer instance.
+        virtual ~Timer() = default;
+        /// Cancel the timer immediately. Does nothing if the timer has
+        /// already expired or been cancelled.
+        virtual void cancel() = 0;
+    };
+
+    /// The event loop implementation must ensure the event loop is stopped and
+    /// flushed when the object is destroyed. If the event loop is processed by
+    /// a thread, the thread must be joined as part of this operation.
+    virtual ~SyncSocketProvider() = default;
+
+    /// Create a new websocket pointed to the server indicated by endpoint and
+    /// connect to the server. Any events that occur during the execution of the
+    /// websocket will call directly to the handlers provided by the observer.
+    /// The WebSocketObserver guarantees that the WebSocket object will be
+    /// closed/destroyed before the observer is terminated/destroyed.
+    virtual std::unique_ptr<WebSocketInterface> connect(WebSocketObserver* observer,
+                                                        WebSocketEndpoint&& endpoint) = 0;
+
+    /// Submit a handler function to be executed by the event loop (thread).
+    ///
+    /// Register the specified handler function to be queued on the event loop
+    /// for immediate asynchronous execution. The specified handler will be
+    /// executed by an expression on the form `handler()`. If the the handler
+    /// object is movable, it will never be copied. Otherwise, it will be
+    /// copied as necessary.
+    ///
+    /// This function is thread-safe and can be called by any thread. It can
+    /// also be called from other post() handler function.
+    ///
+    /// The handler will never be called as part of the execution of post(). If
+    /// post() is called on a thread separate from the event loop, the handler
+    /// may be called before post() returns.
+    ///
+    /// Handler functions added through post() must be executed in the order
+    /// they are added. More precisely, if post() is called twice to add two
+    /// handlers, A and B, and the execution of post(A) ends before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
+    ///
+    /// @param handler The handler function to be queued on the event loop.
+    virtual void post(FunctionHandler&& handler) = 0;
+
+    /// Create and register a new timer whose handler function will be posted
+    /// to the event loop when the provided delay expires.
+    ///
+    /// This is a one shot timer and the Timer class returned becomes invalid
+    /// once the timer has expired. A new timer will need to be created to wait
+    /// again.
+    ///
+    /// @param delay The duration to wait in ms before the timer expires.
+    /// @param handler The handler function to be called on the event loop
+    ///                when the timer expires.
+    ///
+    /// @return A pointer to the Timer object that can be used to cancel the
+    /// timer. The timer will also be canceled if the Timer object returned is
+    /// destroyed.
+    virtual std::unique_ptr<Timer> create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
+};
+
+// Defines to help make the code a bit cleaner
+using SyncTimer = std::unique_ptr<SyncSocketProvider::Timer>;
 
 
 /// Struct that defines the endpoint to create a new websocket connection.
 /// Many of these values come from the SyncClientConfig passed to SyncManager when
 /// it was created.
-struct Endpoint {
+struct WebSocketEndpoint {
     using port_type = sync::port_type;
 
     std::string address;                // Host address
@@ -70,7 +175,7 @@ struct WebSocketInterface {
     ///                successfully. If the WebSocket readyState is anything other
     ///                than OPEN, the handler function should be called with a
     ///                Status of ErrorCodes::RuntimeError.
-    virtual void async_write_binary(util::Span<const char> data, FunctionHandler&& handler) = 0;
+    virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) = 0;
 };
 
 
@@ -122,108 +227,4 @@ public:
     virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
 };
 
-
-/// Sync Socket interface that provides the event loop and WebSocket factory
-/// used by the SyncClient.
-///
-/// All callback and event operations in the SyncClient must be completed in
-/// the order in which they were issued (via post() or timer) to the event
-/// loop and cannot be run in parallel. It is up to the custom event loop
-/// implementation to determine if these are run on the same thread or a
-/// thread pool as long as it is guaranteed that the callback handler
-/// functions are processed in order and not run concurrently.
-///
-/// The implementation of a SyncSocketInterface must support the following
-/// operations that post handler functions (via by the Sync client) onto the
-/// event loop:
-/// * Post a handler function directly onto the event loop
-/// * Post a handler function when the specified timer duration expires
-///
-/// The event loop is not required to be a single thread as long as the
-/// following requirements are satisfied:
-/// * handler functions are called in the order they were posted to the
-/// event loop queue, and
-/// * a handler function runs to completion before the next handler function
-/// is called.
-///
-/// The SyncSocketInterface also provides a WebSocket interface for
-/// connecting to the server via a WebSocket connection.
-class SyncSocketInterface {
-public:
-    /// The Timer object used to track a timer that was started on the event
-    /// loop.
-    ///
-    /// This object provides a cancel() mechanism to cancel the timer. The
-    /// handler function for this timer must be called with a Status of
-    /// ErrorCodes::OperationAborted error code if the timer is canceled.
-    ///
-    /// Custom event loop implementations will need to create a subclass of
-    /// Timer that provides access to the underlying implementation to cancel
-    /// the timer.
-    struct Timer {
-        /// Cancels the timer and destroys the timer instance.
-        virtual ~Timer() = default;
-        /// Cancel the timer immediately. Does nothing if the timer has
-        /// already expired or been cancelled.
-        virtual void cancel() = 0;
-    };
-
-    /// The event loop implementation must ensure the event loop is stopped and
-    /// flushed when the object is destroyed. If the event loop is processed by
-    /// a thread, the thread must be joined as part of this operation.
-    virtual ~SyncSocketInterface() = default;
-
-    /// Create a new websocket pointed to the server indicated by endpoint and
-    /// connect to the server. Any events that occur during the execution of the
-    /// websocket will call directly to the handlers provided by the observer.
-    /// The WebSocketObserver guarantees that the WebSocket object will be
-    /// closed/destroyed before the observer is terminated/destroyed.
-    virtual std::unique_ptr<WebSocketInterface> connect(WebSocketObserver* observer, Endpoint&& endpoint) = 0;
-
-    /// Submit a handler function to be executed by the event loop (thread).
-    ///
-    /// Register the specified handler function to be queued on the event loop
-    /// for immediate asynchronous execution. The specified handler will be
-    /// executed by an expression on the form `handler()`. If the the handler
-    /// object is movable, it will never be copied. Otherwise, it will be
-    /// copied as necessary.
-    ///
-    /// This function is thread-safe and can be called by any thread. It can
-    /// also be called from other post() handler function.
-    ///
-    /// The handler will never be called as part of the execution of post(). If
-    /// post() is called on a thread separate from the event loop, the handler
-    /// may be called before post() returns.
-    ///
-    /// Handler functions added through post() must be executed in the order
-    /// they are added. More precisely, if post() is called twice to add two
-    /// handlers, A and B, and the execution of post(A) ends before the
-    /// beginning of the execution of post(B), then A is guaranteed to execute
-    /// before B.
-    ///
-    /// @param handler The handler function to be queued on the event loop.
-    virtual void post(FunctionHandler&& handler) = 0;
-
-    /// Create and register a new timer whose handler function will be posted
-    /// to the event loop when the provided delay expires.
-    ///
-    /// This is a one shot timer and the Timer class returned becomes invalid
-    /// once the timer has expired. A new timer will need to be created to wait
-    /// again.
-    ///
-    /// @param delay The duration to wait in ms before the timer expires.
-    /// @param handler The handler function to be called on the event loop
-    ///                when the timer expires.
-    ///
-    /// @return A pointer to the Timer object that can be used to cancel the
-    /// timer. The timer will also be canceled if the Timer object returned is
-    /// destroyed.
-    virtual std::unique_ptr<Timer> create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
-};
-
-// Defines to help make the code a bit cleaner
-using SyncTimer = std::unique_ptr<SyncSocketInterface::Timer>;
-
 } // namespace realm::sync
-
-#endif // REALM_SYNC_CLIENT_SYNC_SOCKET_HPP
