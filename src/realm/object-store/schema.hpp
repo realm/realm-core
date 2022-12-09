@@ -168,7 +168,7 @@ public:
 
 private:
     template <typename T, typename U, typename Func>
-    static void zip_matching(T&&, U&&, Func&&);
+    static void zip_matching(T&& a, U&& b, Func&& func) noexcept;
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
     // append missing properties and update matching properties for schema
