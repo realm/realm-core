@@ -167,9 +167,8 @@ public:
     using base::size;
 
 private:
-    template <typename Func>
-    static std::vector<ObjectSchema> zip_matching(Schema const& a, Schema const& b, Func&& func,
-                                                  bool is_schema_additive = false);
+    template <typename T, typename U, typename Func>
+    static void zip_matching(T&&, U&&, Func&&);
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
     // append missing properties and update matching properties for schema

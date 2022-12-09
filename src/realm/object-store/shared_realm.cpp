@@ -338,8 +338,9 @@ Schema Realm::get_full_schema()
 
     // If the user hasn't specified a schema previously then m_schema is always
     // the full schema
-    if (m_dynamic_schema)
+    if (m_dynamic_schema) {
         return m_schema;
+    }
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
