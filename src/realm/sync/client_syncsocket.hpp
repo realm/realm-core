@@ -179,7 +179,7 @@ public:
 
     /// Submit a handler function to be executed by the event loop (thread).
     ///
-    /// Register the sepcified handler function to be queued on the event loop
+    /// Register the specified handler function to be queued on the event loop
     /// for immediate asynchronous execution. The specified handler will be
     /// executed by an expression on the form `handler()`. If the the handler
     /// object is movable, it will never be copied. Otherwise, it will be
