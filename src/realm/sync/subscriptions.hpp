@@ -148,7 +148,7 @@ public:
     // Returns a future that will resolve either with an error status if this subscription set encounters an
     // error, or resolves when the subscription set reaches at least that state. It's possible for a subscription
     // set to skip a state (i.e. go from Pending to Complete or Pending to Superseded), and the future value
-    // will the the state it actually reached.
+    // will be the state it actually reached.
     util::Future<State> get_state_change_notification(State notify_when) const;
     void get_state_change_notification(
         State notify_when, util::UniqueFunction<void(util::Optional<State>, util::Optional<Status>)> callback) const;

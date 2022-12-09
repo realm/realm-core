@@ -356,8 +356,7 @@ protected:
 
     //@{
 
-    /// do_initiate_transact() is called by initiate_transact(), and likewise
-    /// for do_prepare_commit()
+    /// do_initiate_transact() is called by initiate_transact()
     ///
     /// With respect to exception safety, the Replication implementation has two
     /// options: It can prepare to accept the accumulated changeset in
