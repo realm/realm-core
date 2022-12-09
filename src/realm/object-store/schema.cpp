@@ -284,8 +284,8 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
     }
 }
 
- template <typename T, typename U, typename Func>
- void Schema::zip_matching(T&& a, U&& b, Func&& func)
+template <typename T, typename U, typename Func>
+void Schema::zip_matching(T&& a, U&& b, Func&& func)
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
@@ -360,16 +360,14 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
 void Schema::copy_keys_from(Schema const& other, bool is_schema_additive)
 {
     std::vector<ObjectSchema> other_classes;
-    zip_matching(
-        *this, other,
-        [&](ObjectSchema const* existing, ObjectSchema const* other) {
-            if(is_schema_additive && !existing && other) {
-                other_classes.push_back(*other);
-            }
-            if (!existing || !other)
-                return;
-            update_or_append_properties(const_cast<ObjectSchema*>(existing), other, is_schema_additive);
-        });
+    zip_matching(*this, other, [&](ObjectSchema const* existing, ObjectSchema const* other) {
+        if (is_schema_additive && !existing && other) {
+            other_classes.push_back(*other);
+        }
+        if (!existing || !other)
+            return;
+        update_or_append_properties(const_cast<ObjectSchema*>(existing), other, is_schema_additive);
+    });
 
     if (!other_classes.empty()) {
         insert(end(), other_classes.begin(), other_classes.end());
