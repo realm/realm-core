@@ -143,6 +143,8 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
             table.add_search_index(key);
+        if (property.requires_fulltext_index())
+            table.add_fulltext_index(key);
         return key;
     }
 }
@@ -212,9 +214,9 @@ void make_property_required(Group& group, Table& table, Property property)
     property.column_key = add_column(group, table, property);
 }
 
-void add_search_index(Table& table, Property property)
+void add_search_index(Table& table, Property property, IndexType type)
 {
-    table.add_search_index(table.get_column_key(property.name));
+    table.add_search_index(table.get_column_key(property.name), type);
 }
 
 void remove_search_index(Table& table, Property property)
@@ -556,7 +558,7 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
-            table(op.object).add_search_index(op.property->column_key);
+            table(op.object).add_search_index(op.property->column_key, op.type);
         }
         void operator()(RemoveIndex op)
         {
@@ -629,7 +631,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         }
         void operator()(AddIndex op)
         {
-            add_search_index(table(op.object), *op.property);
+            add_search_index(table(op.object), *op.property, op.type);
         }
         void operator()(RemoveIndex op)
         {
@@ -748,7 +750,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
-            add_search_index(table(op.object), *op.property);
+            add_search_index(table(op.object), *op.property, op.type);
         }
         void operator()(RemoveIndex op)
         {

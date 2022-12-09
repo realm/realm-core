@@ -156,6 +156,12 @@ Schema set_indexed(Schema schema, StringData object_name, StringData property_na
     return schema;
 }
 
+Schema set_fulltext_indexed(Schema schema, StringData object_name, StringData property_name, bool value)
+{
+    schema.find(object_name)->property_for_name(property_name)->is_fulltext_indexed = value;
+    return schema;
+}
+
 Schema set_optional(Schema schema, StringData object_name, StringData property_name, bool value)
 {
     auto& prop = *schema.find(object_name)->property_for_name(property_name);
@@ -1060,6 +1066,7 @@ TEST_CASE("migration: Automatic") {
                  {"pk", PropertyType::Int, Property::IsPrimary{true}},
                  {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  {"optional", PropertyType::Int | PropertyType::Nullable},
+                 {"text", PropertyType::String},
              }},
             {"link origin",
              {
@@ -1149,6 +1156,9 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("add index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "optional", true));
+        }
+        SECTION("add fulltext index") {
+            VERIFY_SCHEMA_IN_MIGRATION(set_fulltext_indexed(schema, "object", "text", true));
         }
         SECTION("remove index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "value", false));

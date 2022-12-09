@@ -219,6 +219,7 @@ struct MakePropertyRequired {
 struct AddIndex {
     const ObjectSchema* object;
     const Property* property;
+    IndexType type;
 };
 
 struct RemoveIndex {

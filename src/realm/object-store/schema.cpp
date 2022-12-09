@@ -261,9 +261,16 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
         }
         if (target_prop->requires_index()) {
             if (!current_prop.is_indexed)
-                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop});
+                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop, IndexType::General});
         }
         else if (current_prop.requires_index()) {
+            changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
+        }
+        if (target_prop->requires_fulltext_index()) {
+            if (!current_prop.is_fulltext_indexed)
+                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop, IndexType::Fulltext});
+        }
+        else if (current_prop.requires_fulltext_index()) {
             changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
         }
     }
@@ -383,7 +390,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         return cmp(value.type) == cmp(rgt);                                                                          \
     }
 
-        REALM_SC_COMPARE(AddIndex, v.object, v.property)
+        REALM_SC_COMPARE(AddIndex, v.object, v.property, v.type)
         REALM_SC_COMPARE(AddProperty, v.object, v.property)
         REALM_SC_COMPARE(AddInitialProperties, v.object)
         REALM_SC_COMPARE(AddTable, v.object)

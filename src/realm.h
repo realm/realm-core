@@ -362,6 +362,7 @@ typedef enum realm_property_flags {
     RLM_PROPERTY_NULLABLE = 1,
     RLM_PROPERTY_PRIMARY_KEY = 2,
     RLM_PROPERTY_INDEXED = 4,
+    RLM_PROPERTY_FULLTEXT_INDEXED = 8,
 } realm_property_flags_e;
 
 
