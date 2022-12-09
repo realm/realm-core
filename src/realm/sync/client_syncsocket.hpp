@@ -33,17 +33,21 @@
 
 namespace realm::sync {
 
+/// Function handler typedef
+using FunctionHandler = util::UniqueFunction<void(Status)>;
+
+
 /// Struct that defines the endpoint to create a new websocket connection.
 /// Many of these values come from the SyncClientConfig passed to SyncManager when
 /// it was created.
 struct Endpoint {
     using port_type = sync::port_type;
 
-    std::string address;   // Host address
-    port_type port;        // Host port number
-    std::string path;      // Includes access token in query.
-    std::string protocols; // One or more websocket protocols, separated with ", "
-    bool is_ssl;           // true if SSL should be used
+    std::string address;                // Host address
+    port_type port;                     // Host port number
+    std::string path;                   // Includes access token in query.
+    std::vector<std::string> protocols; // Array of one or more websocket protocols
+    bool is_ssl;                        // true if SSL should be used
 };
 
 
@@ -63,8 +67,10 @@ struct WebSocketInterface {
     /// during the write operation.
     /// @param data A util::Span containing the data to be sent to the server.
     /// @param handler The handler function to be called when the data has been sent
-    ///                successfully.
-    virtual void async_write_binary(util::Span<const char> data, util::UniqueFunction<void()>&& handler) = 0;
+    ///                successfully. If the WebSocket readyState is anything other
+    ///                than OPEN, the handler function should be called with a
+    ///                Status of ErrorCodes::RuntimeError.
+    virtual void async_write_binary(util::Span<const char> data, FunctionHandler&& handler) = 0;
 };
 
 
@@ -199,7 +205,7 @@ public:
     /// before B.
     ///
     /// @param handler The handler function to be queued on the event loop.
-    virtual void post(util::UniqueFunction<void(Status)>&& handler) = 0;
+    virtual void post(FunctionHandler&& handler) = 0;
 
     /// Create and register a new timer whose handler function will be posted
     /// to the event loop when the provided delay expires.
@@ -215,8 +221,7 @@ public:
     /// @return A pointer to the Timer object that can be used to cancel the
     /// timer. The timer will also be canceled if the Timer object returned is
     /// destroyed.
-    virtual std::unique_ptr<Timer> create_timer(std::chrono::milliseconds delay,
-                                                util::UniqueFunction<void(Status)>&& handler) = 0;
+    virtual std::unique_ptr<Timer> create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
 };
 
 // Defines to help make the code a bit cleaner

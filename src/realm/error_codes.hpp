@@ -35,6 +35,21 @@ public:
         RuntimeError = 2,
         LogicError = 3,
         BrokenPromise = 4,
+
+        /// WebSocket Errors
+        // WebSocket_OK = 1000 is not used, just use OK instead
+        WebSocket_GoingAway = 1001,
+        WebSocket_ProtocolError = 1002,
+        WebSocket_UnsupportedData = 1003,
+        WebSocket_Reserved = 1004,
+        WebSocket_NoStatusReceived = 1005,
+        WebSocket_AbnormalClosure = 1006,
+        WebSocket_InvalidPayloadData = 1007,
+        WebSocket_PolicyViolation = 1008,
+        WebSocket_MessageTooBig = 1009,
+        WebSocket_InavalidExtension = 1010,
+        WebSocket_InternalServerError = 1011,
+        WebSocket_TLSHandshakeFailed = 1015, // Used by default WebSocket
     };
 
     static StringData error_string(Error code);
