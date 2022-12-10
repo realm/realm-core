@@ -10,7 +10,7 @@
 #include "../util/benchmark_results.hpp"
 
 using namespace realm;
-using namespace realm::util;
+using namespace realm::sync;
 using namespace realm::test_util;
 
 

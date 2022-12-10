@@ -1,5 +1,4 @@
-#ifndef REALM_UTIL_NETWORK_SSL_HPP
-#define REALM_UTIL_NETWORK_SSL_HPP
+#pragma once
 
 #include <cstddef>
 #include <limits>
@@ -45,7 +44,7 @@
 
 
 namespace realm {
-namespace util {
+namespace sync {
 namespace network {
 namespace ssl {
 
@@ -76,13 +75,13 @@ inline std::error_condition make_error_condition(Errors err)
 
 } // namespace ssl
 } // namespace network
-} // namespace util
+} // namespace sync
 } // namespace realm
 
 namespace std {
 
 template <>
-class is_error_condition_enum<realm::util::network::ssl::Errors> {
+class is_error_condition_enum<realm::sync::network::ssl::Errors> {
 public:
     static const bool value = true;
 };
@@ -90,7 +89,7 @@ public:
 } // namespace std
 
 namespace realm {
-namespace util {
+namespace sync {
 namespace network {
 
 class OpensslErrorCategory : public std::error_category {
@@ -198,7 +197,7 @@ private:
 /// until its completion handler starts executing.
 class Stream {
 public:
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = network::Endpoint::port_type;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
 
@@ -658,7 +657,7 @@ public:
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
@@ -727,7 +726,7 @@ public:
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
@@ -969,7 +968,7 @@ inline std::size_t Stream::do_read_some_sync(char* buffer, std::size_t size, std
     Want want = Want::nothing;
     std::size_t n = do_read_some_async(buffer, size, ec, want);
     if (n == 0 && want != Want::nothing)
-        ec = error::resource_unavailable_try_again;
+        ec = util::error::resource_unavailable_try_again;
     return n;
 }
 
@@ -978,7 +977,7 @@ inline std::size_t Stream::do_write_some_sync(const char* data, std::size_t size
     Want want = Want::nothing;
     std::size_t n = do_write_some_async(data, size, ec, want);
     if (n == 0 && want != Want::nothing)
-        ec = error::resource_unavailable_try_again;
+        ec = util::error::resource_unavailable_try_again;
     return n;
 }
 
@@ -1018,7 +1017,7 @@ inline void Stream::ssl_handshake(std::error_code& ec, Want& want) noexcept
     REALM_ASSERT(n == 0 || n == 1);
     if (want == Want::nothing && n == 0 && !ec) {
         // End of input on TCP socket
-        ec = MiscExtErrors::premature_end_of_input;
+        ec = util::MiscExtErrors::premature_end_of_input;
     }
 }
 
@@ -1031,10 +1030,10 @@ inline std::size_t Stream::ssl_read(char* buffer, std::size_t size, std::error_c
     if (want == Want::nothing && n == 0 && !ec) {
         // End of input on TCP socket
         if (SSL_get_shutdown(m_ssl) & SSL_RECEIVED_SHUTDOWN) {
-            ec = MiscExtErrors::end_of_input;
+            ec = util::MiscExtErrors::end_of_input;
         }
         else {
-            ec = MiscExtErrors::premature_end_of_input;
+            ec = util::MiscExtErrors::premature_end_of_input;
         }
     }
     return n;
@@ -1047,7 +1046,7 @@ inline std::size_t Stream::ssl_write(const char* data, std::size_t size, std::er
     // not, so to achieve common behaviour, we make sure that any such attempt
     // will result in an `error::broken_pipe` error.
     if ((SSL_get_shutdown(m_ssl) & SSL_RECEIVED_SHUTDOWN) != 0) {
-        ec = error::broken_pipe;
+        ec = util::error::broken_pipe;
         want = Want::nothing;
         return 0;
     }
@@ -1057,7 +1056,7 @@ inline std::size_t Stream::ssl_write(const char* data, std::size_t size, std::er
     std::size_t n = ssl_perform(std::move(perform), ec, want);
     if (want == Want::nothing && n == 0 && !ec) {
         // End of input on TCP socket
-        ec = MiscExtErrors::premature_end_of_input;
+        ec = util::MiscExtErrors::premature_end_of_input;
     }
     return n;
 }
@@ -1096,7 +1095,7 @@ inline bool Stream::ssl_shutdown(std::error_code& ec, Want& want) noexcept
         // end of input", and 1 means "full success" (peers shutdown alert has
         // now been received).
         if ((SSL_get_shutdown(m_ssl) & SSL_SENT_SHUTDOWN) == 0)
-            ec = MiscExtErrors::premature_end_of_input;
+            ec = util::MiscExtErrors::premature_end_of_input;
     }
     return (n > 0);
 }
@@ -1222,7 +1221,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
                 // MiscExtErrors::premature_end_of_input.
                 // If we see this error case occurring in other situations in
                 // the future, we will have to update this case.
-                ec = MiscExtErrors::premature_end_of_input;
+                ec = util::MiscExtErrors::premature_end_of_input;
             }
             want = Want::nothing;
             return 0;
@@ -1320,13 +1319,13 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     }
 
     if (result == errSSLClosedGraceful) {
-        ec = MiscExtErrors::end_of_input;
+        ec = util::MiscExtErrors::end_of_input;
         want = Want::nothing;
         return n;
     }
 
     if (result == errSSLClosedAbort || result == errSSLClosedNoNotify) {
-        ec = MiscExtErrors::premature_end_of_input;
+        ec = util::MiscExtErrors::premature_end_of_input;
         want = Want::nothing;
         return n;
     }
@@ -1348,7 +1347,5 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
 
 } // namespace ssl
 } // namespace network
-} // namespace util
+} // namespace sync
 } // namespace realm
-
-#endif // REALM_UTIL_NETWORK_SSL_HPP

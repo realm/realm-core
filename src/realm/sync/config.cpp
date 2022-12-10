@@ -27,7 +27,7 @@
 namespace realm {
 
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
-static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type>);
+static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
 

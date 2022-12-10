@@ -1,6 +1,4 @@
-
-#ifndef REALM_UTIL_WEBSOCKET_HPP
-#define REALM_UTIL_WEBSOCKET_HPP
+#pragma once
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/functional.hpp>
@@ -10,7 +8,7 @@
 #include <system_error>
 #include <map>
 
-namespace realm::util::websocket {
+namespace realm::sync::websocket {
 
 using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
@@ -220,15 +218,13 @@ const std::error_category& error_category() noexcept;
 
 std::error_code make_error_code(Error) noexcept;
 
-} // namespace realm::util::websocket
+} // namespace realm::sync::websocket
 
 namespace std {
 
 template <>
-struct is_error_code_enum<realm::util::websocket::Error> {
+struct is_error_code_enum<realm::sync::websocket::Error> {
     static const bool value = true;
 };
 
 } // namespace std
-
-#endif // REALM_UTIL_WEBSOCKET_HPP

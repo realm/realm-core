@@ -31,7 +31,7 @@ struct HTTPParserErrorCategory : std::error_category {
 
     std::string message(int condition) const override
     {
-        using util::HTTPParserError;
+        using sync::HTTPParserError;
         switch (HTTPParserError(condition)) {
             case HTTPParserError::None:
                 return "None";
@@ -55,7 +55,7 @@ const HTTPParserErrorCategory g_http_parser_error_category;
 
 
 namespace realm {
-namespace util {
+namespace sync {
 
 bool valid_http_status_code(unsigned int code)
 {
@@ -184,7 +184,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
 }
 
 
-Optional<HTTPMethod> HTTPParserBase::parse_method_string(StringData method)
+util::Optional<HTTPMethod> HTTPParserBase::parse_method_string(StringData method)
 {
     if (method == "OPTIONS")
         return HTTPMethod::Options;
@@ -482,5 +482,5 @@ std::error_code make_error_code(HTTPParserError error)
     return std::error_code(static_cast<int>(error), g_http_parser_error_category);
 }
 
-} // namespace util
+} // namespace sync
 } // namespace realm

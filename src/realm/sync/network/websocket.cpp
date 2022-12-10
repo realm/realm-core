@@ -7,7 +7,7 @@
 #include <realm/util/sha_crypto.hpp>
 
 using namespace realm;
-using namespace util;
+using namespace sync;
 using Error = websocket::Error;
 
 
@@ -44,7 +44,7 @@ std::string make_random_sec_websocket_key(std::mt19937_64& random)
     }
 
     char out_buffer[24];
-    size_t encoded_size = base64_encode(random_bytes, 16, out_buffer, 24);
+    size_t encoded_size = util::base64_encode(random_bytes, 16, out_buffer, 24);
     REALM_ASSERT(encoded_size == 24);
 
     return std::string{out_buffer, 24};
@@ -65,7 +65,7 @@ std::string make_sec_websocket_accept(StringData sec_websocket_key)
     util::sha1(sha1_input.data(), sha1_input.length(), sha1_output);
 
     char base64_output[28];
-    size_t base64_output_size = base64_encode(reinterpret_cast<char*>(sha1_output), 20, base64_output, 28);
+    size_t base64_output_size = util::base64_encode(reinterpret_cast<char*>(sha1_output), 20, base64_output, 28);
     REALM_ASSERT(base64_output_size == 28);
 
     return std::string(base64_output, 28);
@@ -1081,7 +1081,7 @@ class ErrorCategoryImpl : public std::error_category {
 public:
     const char* name() const noexcept override final
     {
-        return "realm::util::websocket::Error";
+        return "realm::sync::websocket::Error";
     }
     std::string message(int error_code) const override final
     {
@@ -1098,7 +1098,7 @@ ErrorCategoryImpl g_error_category;
 class CloseStatusErrorCategory : public std::error_category {
     const char* name() const noexcept final
     {
-        return "realm::util::websocket::CloseStatus";
+        return "realm::sync::websocket::CloseStatus";
     }
     std::string message(int error_code) const final
     {

@@ -1607,7 +1607,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
             // Connection object may be destroyed now.
         }
     };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    m_on_idle = network::Trigger{client.get_service(), std::move(handler)}; // Throws
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept

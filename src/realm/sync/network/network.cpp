@@ -69,7 +69,7 @@
 #endif
 
 using namespace realm::util;
-using namespace realm::util::network;
+using namespace realm::sync::network;
 
 
 namespace {
@@ -2508,7 +2508,7 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
 
 
 namespace realm {
-namespace util {
+namespace sync {
 namespace network {
 
 std::string host_name()
@@ -2610,5 +2610,5 @@ std::string ResolveErrorCategory::message(int value) const
 }
 
 } // namespace network
-} // namespace util
+} // namespace sync
 } // namespace realm
