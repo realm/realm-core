@@ -5076,6 +5076,10 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     auto errors = std::move(state->compensating_writes);
     lk.unlock();
 
+    std::sort(errors.begin(), errors.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.primary_key < rhs.primary_key;
+    });
+
     REQUIRE(errors.size() == 2);
     REQUIRE(errors[0].primary_key == obj_1_id);
     REQUIRE(errors[0].object_name == "TopLevel");
