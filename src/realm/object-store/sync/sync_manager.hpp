@@ -25,7 +25,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
-#include <realm/sync/client_syncsocket.hpp>
+#include <realm/sync/socket_provider.hpp>
 
 #include <memory>
 #include <mutex>

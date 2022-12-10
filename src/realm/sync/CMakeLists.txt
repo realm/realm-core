@@ -41,7 +41,7 @@ set(SYNC_INSTALL_HEADERS
     changeset.hpp
     client.hpp
     client_base.hpp
-    client_syncsocket.hpp
+    socket_provider.hpp
     history.hpp
     instruction_applier.hpp
     instruction_replication.hpp
