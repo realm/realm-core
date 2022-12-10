@@ -718,6 +718,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
+    m_debug_writes[local_page_ndx]++;
     clear(m_page_state[local_page_ndx], Writable);
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -879,7 +880,8 @@ void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_page_state.size();
 #ifdef REALM_DEBUG
-    uint64_t pages_written = 0;
+    std::string debug_msg;
+    std::vector<uint64_t> pages_written;
 #endif
     for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
         if (is_not(m_page_state[local_page_ndx], Dirty)) {
@@ -891,23 +893,22 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
         clear(m_page_state[local_page_ndx], Dirty);
+        debug_msg += util::format("page %1 (pos %2) has %3 writes\n", page_ndx_in_file,
+                                  off_t(page_ndx_in_file << m_page_shift), m_debug_writes[local_page_ndx]);
+        m_debug_writes[local_page_ndx] = 0;
 #ifdef REALM_DEBUG
-        if (page_ndx_in_file < 64) {
-            pages_written |= (1 << page_ndx_in_file);
-        }
+        pages_written.push_back(page_ndx_in_file);
 #endif
     }
 #ifdef REALM_DEBUG
-    if (pages_written > 0 && m_file.validator.is_attached()) {
+    if (pages_written.size() > 0 && m_file.validator.is_attached()) {
         m_file.validator.seek(m_file.validator.get_size());
-        auto msg = util::format("wrote pages: bitwise[%1] at indices: ", pages_written);
-        for (size_t i = 0; i < 64; ++i) {
-            if ((pages_written & (uint64_t(1) << i)) > 0) {
-                msg += util::format("%1%2", i == 0 ? "" : ", ", i);
-            }
+        debug_msg += "wrote pages: ";
+        for (auto page : pages_written) {
+            debug_msg += util::format("%1, ", page);
         }
-        msg += std::string("\n");
-        m_file.validator.write(msg.data(), msg.size());
+        debug_msg += std::string("\n");
+        m_file.validator.write(debug_msg.data(), debug_msg.size());
     }
 #endif // REALM_DEBUG
 
@@ -1030,6 +1031,7 @@ void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     size_t num_pages = new_size >> m_page_shift;
     m_page_state.resize(num_pages, PageState::Clean);
+    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
     m_file.cryptor.set_file_size((off_t)(offset + new_size));
 }
@@ -1053,9 +1055,11 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_num_decrypted = 0;
     m_page_state.clear();
+    m_debug_writes.clear();
     m_chunk_dont_scan.clear();
 
     m_page_state.resize(num_pages, PageState(0));
+    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
 }
 
