@@ -28,6 +28,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/object.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
@@ -1957,6 +1958,56 @@ TEST_CASE("object") {
         REQUIRE(obj.get_linklist("array 2").size() == 2);
     }
 #endif
+}
+
+TEST_CASE("Multithreaded object notifications") {
+    InMemoryTestFile config;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({{"object", {{"value", PropertyType::Int}}}});
+
+    r->begin_transaction();
+    auto obj = r->read_group().get_table("class_object")->create_object();
+    r->commit_transaction();
+
+    Object object(r, obj);
+    int64_t value = 0;
+    auto token = object.add_notification_callback([&](auto) {
+        value = obj.get<int64_t>("value");
+    });
+    constexpr const int end_value = 1000;
+
+    // Try to verify that the notification machinery pins all versions that it
+    // needs to pin by performing a large number of very small writes on a
+    // background thread while the main thread is continously advancing via
+    // each of the three ways to advance reads.
+    JoiningThread thread([&] {
+        // Not actually frozen, but we need to disable thread-checks for libuv platforms
+        config.scheduler = util::Scheduler::make_frozen(VersionID());
+        auto r = Realm::get_shared_realm(config);
+        auto obj = *r->read_group().get_table("class_object")->begin();
+        for (int i = 0; i <= end_value; ++i) {
+            r->begin_transaction();
+            obj.set<int64_t>("value", i);
+            r->commit_transaction();
+        }
+    });
+
+    SECTION("notify()") {
+        REQUIRE_NOTHROW(util::EventLoop::main().run_until([&] {
+            return value == end_value;
+        }));
+    }
+    SECTION("refresh()") {
+        while (value < end_value) {
+            REQUIRE_NOTHROW(r->refresh());
+        }
+    }
+    SECTION("begin_transaction()") {
+        while (value < end_value) {
+            REQUIRE_NOTHROW(r->begin_transaction());
+            r->cancel_transaction();
+        }
+    }
 }
 
 TEST_CASE("Embedded Object") {

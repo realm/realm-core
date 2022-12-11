@@ -24,8 +24,7 @@
 
 #include <realm/db.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 class ResultsNotifierBase : public CollectionNotifier {
 public:
     using ListIndices = util::Optional<std::vector<size_t>>;
@@ -84,7 +83,7 @@ private:
     bool prepare_to_deliver() override;
 
     void release_data() noexcept override;
-    void do_attach_to(Transaction& sg) override;
+    void reattach() override;
 };
 
 class ListResultsNotifier : public ResultsNotifierBase {
@@ -119,10 +118,9 @@ private:
     bool prepare_to_deliver() override;
 
     void release_data() noexcept override;
-    void do_attach_to(Transaction& sg) override;
+    void reattach() override;
 };
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif /* REALM_RESULTS_NOTIFIER_HPP */
