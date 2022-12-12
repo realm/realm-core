@@ -1,55 +1,19 @@
 include("${CMAKE_CURRENT_LIST_DIR}/RealmTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/AcquireRealmDependency.cmake")
 
 # Find dependencies
 include(CMakeFindDependencyMacro)
 
-set(REALM_FORCE_OPENSSL @REALM_HAVE_OPENSSL@)
-if(REALM_FORCE_OPENSSL)
-    if(VCPKG_TOOLCHAIN)
-        # If we're building with vcpkg, prefer to find OpenSSL there first
-        if(Realm_FIND_QUIETLY)
-            set(_quiet_arg QUIET)
-        endif()
-        find_package(OpenSSL @OPENSSL_VERSION_MAJOR_MINOR@ ${_quiet_arg})
+if(@REALM_HAVE_OPENSSL@)
+    if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+        # Use our own prebuilt OpenSSL
+        realm_acquire_dependency(openssl @OPENSSL_VERSION@ OPENSSL_CMAKE_INCLUDE_FILE)
+
+        include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
-    # We aren't building with vcpkg, or it didn't have OpenSSL
-    if(NOT OpenSSL_FOUND)
-        if(ANDROID OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
-            # We have prebuilt OpenSSL tarballs for Android and Linux x86_64
-            set(_realm_have_prebuilt_openssl ON)
-        endif()
-        if(NOT REALM_USE_SYSTEM_OPENSSL AND _realm_have_prebuilt_openssl)
-            # Use our own prebuilt OpenSSL
-            if(NOT OpenSSL_DIR)
-                if(NOT EXISTS ${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-                    if(ANDROID)
-                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
-                    else()
-                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tar.gz")
-                    endif()
 
-                    message(STATUS "Getting ${OPENSSL_URL}...")
-                    file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
-
-                    list(GET download_status 0 status_code)
-                    if (NOT "${status_code}" STREQUAL "0")
-                        message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
-                    endif()
-                    message(STATUS "Uncompressing OpenSSL...")
-                    execute_process(
-                        COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
-                        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
-                    )
-                endif()
-
-                set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
-            endif()
-            find_package(OpenSSL REQUIRED CONFIG)
-            target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
-        else()
-            find_dependency(OpenSSL @OPENSSL_VERSION_MAJOR_MINOR@)
-        endif()
-    endif()
+    set(OPENSSL_USE_STATIC_LIBS ON)
+    find_dependency(OpenSSL @OPENSSL_VERSION@)
 endif()
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -60,5 +24,19 @@ find_dependency(Threads)
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
 if(TARGET Realm::Sync AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+    if(WIN32)
+        realm_acquire_dependency(zlib @DEP_WIN32_ZLIB_VERSION@ ZLIB_CMAKE_INCLUDE_FILE)
+        include(${ZLIB_CMAKE_INCLUDE_FILE})
+    elseif(ANDROID)
+        # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
+        # (see https://github.com/android/ndk/issues/1179)
+        # We want to link against the stub library instead of statically linking anyway,
+        # so we hack find_library to only consider shared object libraries when looking for libz
+        set(_CMAKE_FIND_LIBRARY_SUFFIXES_orig ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
+    endif()
     find_dependency(ZLIB)
+    if(ANDROID)
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES_orig})
+    endif()
 endif()
