@@ -670,7 +670,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir('build-macosx') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/', 'SDKROOT=']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
