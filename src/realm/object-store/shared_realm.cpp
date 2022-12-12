@@ -81,12 +81,11 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     , m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        m_transaction = coordinator->begin_read();
+        m_transaction = coordinator->begin_read(version.value_or(VersionID{}));
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
     }
-
     m_coordinator = std::move(coordinator);
 }
 
@@ -111,8 +110,9 @@ Group& Realm::read_group()
 Transaction& Realm::transaction()
 {
     verify_open();
-    if (!m_transaction)
+    if (!m_transaction) {
         begin_read(m_frozen_version.value_or(VersionID{}));
+    }
     return *m_transaction;
 }
 
@@ -216,7 +216,7 @@ sync::SubscriptionSet Realm::get_active_subscription_set()
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference);
+    schema.copy_keys_from(reference, m_config.is_schema_additive());
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -231,15 +231,16 @@ void Realm::read_schema_from_group_if_needed()
         }
         return;
     }
-
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
     if (m_schema_transaction_version == current_version)
         return;
 
+    auto previous_transaction_version = m_schema_transaction_version;
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
+
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
 
@@ -252,6 +253,10 @@ void Realm::read_schema_from_group_if_needed()
             // The structure of the schema has changed, so replace our copy of the schema.
             m_schema = std::move(schema);
         }
+    }
+    else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
+        // no verification of schema changes when opening a past version of the schema
+        m_schema = std::move(schema);
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
@@ -333,8 +338,9 @@ Schema Realm::get_full_schema()
 
     // If the user hasn't specified a schema previously then m_schema is always
     // the full schema
-    if (m_dynamic_schema)
+    if (m_dynamic_schema) {
         return m_schema;
+    }
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
@@ -437,10 +443,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     uint64_t old_schema_version = m_schema_version;
-    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
-                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
-                    m_config.schema_mode == SchemaMode::ReadOnly;
-    if (migration_function && !additive) {
+    bool is_schema_additive = m_config.is_schema_additive();
+    if (migration_function && !is_schema_additive) {
         auto wrapper = [&] {
             auto config = m_config;
             config.schema_mode = SchemaMode::ReadOnly;
@@ -470,7 +474,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations);
-        REALM_ASSERT_DEBUG(additive ||
+        REALM_ASSERT_DEBUG(is_schema_additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
@@ -515,9 +519,9 @@ void Realm::add_schema_change_handler()
         if (m_dynamic_schema) {
             m_schema = *m_new_schema;
         }
-        else
-            m_schema.copy_keys_from(*m_new_schema);
-
+        else {
+            m_schema.copy_keys_from(*m_new_schema, m_config.is_schema_additive());
+        }
         notify_schema_changed();
     });
 }

@@ -504,7 +504,6 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
         void operator()(AddProperty) {}
         void operator()(AddIndex) {}
         void operator()(RemoveIndex) {}
-
         // Deleting tables is not okay
         void operator()(RemoveTable op)
         {
