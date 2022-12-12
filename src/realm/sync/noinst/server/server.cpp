@@ -3772,7 +3772,7 @@ ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> p
     , m_compress_memory_arena{} // Throws
 {
     if (m_config.ssl) {
-        m_ssl_context = std::make_unique<network::ssl::Context>();          // Throws
+        m_ssl_context = std::make_unique<network::ssl::Context>();                // Throws
         m_ssl_context->use_certificate_chain_file(m_config.ssl_certificate_path); // Throws
         m_ssl_context->use_private_key_file(m_config.ssl_certificate_key_path);   // Throws
     }
@@ -3937,8 +3937,7 @@ void ServerImpl::listen()
 {
     network::Resolver resolver{get_service()};
     network::Resolver::Query query(m_config.listen_address, m_config.listen_port,
-                                         network::Resolver::Query::passive |
-                                             network::Resolver::Query::address_configured);
+                                   network::Resolver::Query::passive | network::Resolver::Query::address_configured);
     network::Endpoint::List endpoints = resolver.resolve(query); // Throws
 
     auto i = endpoints.begin();
@@ -4020,7 +4019,7 @@ void ServerImpl::handle_accept(std::error_code ec)
     else {
         HTTPConnection& conn = *m_next_http_conn;
         if (m_config.tcp_no_delay)
-            conn.get_socket().set_option(network::SocketBase::no_delay(true)); // Throws
+            conn.get_socket().set_option(network::SocketBase::no_delay(true));       // Throws
         m_http_connections.emplace(conn.get_id(), std::move(m_next_http_conn));      // Throws
         Formatter& formatter = m_misc_buffers.formatter;
         formatter.reset();

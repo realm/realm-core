@@ -1196,7 +1196,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
             return 0;
         case SSL_ERROR_SYSCALL:
             if (REALM_UNLIKELY(sys_error != 0)) {
-                ec = make_basic_system_error_code(sys_error);
+                ec = util::make_basic_system_error_code(sys_error);
             }
             else if (REALM_UNLIKELY(m_bio_error_code)) {
                 ec = m_bio_error_code;
