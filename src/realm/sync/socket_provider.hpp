@@ -36,8 +36,8 @@ struct WebSocketEndpoint;
 struct WebSocketInterface;
 struct WebSocketObserver;
 
-/// Sync Socket interface that provides the event loop and WebSocket factory
-/// used by the SyncClient.
+/// Sync Socket Provider interface that provides the event loop and WebSocket
+/// factory used by the SyncClient.
 ///
 /// All callback and event operations in the SyncClient must be completed in
 /// the order in which they were issued (via post() or timer) to the event
@@ -46,7 +46,7 @@ struct WebSocketObserver;
 /// thread pool as long as it is guaranteed that the callback handler
 /// functions are processed in order and not run concurrently.
 ///
-/// The implementation of a SyncSocketInterface must support the following
+/// The implementation of a SyncSocketProvider must support the following
 /// operations that post handler functions (via by the Sync client) onto the
 /// event loop:
 /// * Post a handler function directly onto the event loop
@@ -59,7 +59,7 @@ struct WebSocketObserver;
 /// * a handler function runs to completion before the next handler function
 /// is called.
 ///
-/// The SyncSocketInterface also provides a WebSocket interface for
+/// The SyncSocketProvider also provides a WebSocket interface for
 /// connecting to the server via a WebSocket connection.
 class SyncSocketProvider {
 public:
@@ -158,7 +158,7 @@ struct WebSocketEndpoint {
 
 /// The WebSocket base class that is used by the SyncClient to send data over the
 /// WebSocket connection with the server. This is the class that is returned by
-/// SyncSocketInterface::connect() when the connection to an endpoint is requested.
+/// SyncSocketProvider::connect() when a connection to an endpoint is requested.
 /// If an error occurs while establishing the connection, the error is presented
 /// to the WebSocketObserver provided when the WebSocket was created.
 struct WebSocketInterface {
