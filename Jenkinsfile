@@ -676,7 +676,7 @@ def doBuildMacOs(Map options = [:]) {
                     // in parallel.
                     retry(3) {
                         timeout(time: 2, unit: 'MINUTES') {
-                            sh "cmake ${cmakeDefinitions} -G Xcode .."
+                            sh "cmake ${cmakeDefinitions} -G Xcode --trace-expand .."
                         }
                     }
 
