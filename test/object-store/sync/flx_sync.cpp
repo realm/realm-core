@@ -2533,8 +2533,8 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync]") {
         auto latest_subs = target_realm->get_active_subscription_set();
         auto table = target_realm->read_group().get_table("class_TopLevel");
         REQUIRE(latest_subs.size() == 1);
-        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
-        REQUIRE(latest_subs.at(0).query_string() ==
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
+        REQUIRE(latest_subs.at(0).query_string ==
                 Query(table).greater(table->get_column_key("queryable_int_field"), 5).get_description());
 
         REQUIRE(table->size() == 2);
