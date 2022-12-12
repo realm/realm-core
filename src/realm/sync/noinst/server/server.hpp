@@ -8,10 +8,10 @@
 #include <set>
 #include <exception>
 
-#include <realm/util/network.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/time.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/client.hpp>

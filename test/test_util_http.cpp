@@ -1,7 +1,7 @@
 #include "test.hpp"
 
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
 
 #include <thread>
 

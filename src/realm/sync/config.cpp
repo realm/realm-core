@@ -19,8 +19,8 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
-#include <realm/util/network.hpp>
 
 #include <ostream>
 

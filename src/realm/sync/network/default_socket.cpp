@@ -1,8 +1,8 @@
-#include <realm/util/ez_websocket.hpp>
+#include <realm/sync/network/default_socket.hpp>
 
-#include <realm/util/websocket.hpp>
-#include <realm/util/network.hpp>
-#include <realm/util/network_ssl.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 namespace realm::util::websocket {
 

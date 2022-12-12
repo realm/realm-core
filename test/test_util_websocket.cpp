@@ -1,7 +1,7 @@
 #include "test.hpp"
 
-#include <realm/util/network.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 using namespace realm;
 using namespace realm::util;

@@ -3,7 +3,7 @@
 #include <sstream>
 #include <ostream>
 
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
 
 using namespace realm;
 

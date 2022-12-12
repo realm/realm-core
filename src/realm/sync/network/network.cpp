@@ -22,7 +22,7 @@
 #include <realm/util/misc_errors.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #if defined _GNU_SOURCE && !REALM_ANDROID
 #define HAVE_LINUX_PIPE2 1

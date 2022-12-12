@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
 
 ----------------------------------------------
 
