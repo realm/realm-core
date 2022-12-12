@@ -1038,8 +1038,11 @@ inline void RealmFixture::empty_transact()
 inline void RealmFixture::nonempty_transact()
 {
     auto func = [](Transaction& tr) {
-        TableRef table = tr.get_or_add_table("class_Table");
-        table->create_object();
+        TableRef table = tr.get_or_add_table_with_primary_key("class_Table", type_Int, "id");
+        int id = 1;
+        bool did_create = false;
+        while (!did_create)
+            table->create_object_with_primary_key(id++, &did_create);
         return true;
     };
     transact(func);

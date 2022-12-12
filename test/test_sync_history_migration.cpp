@@ -445,7 +445,7 @@ TEST(Sync_HistoryCompression)
 
     {
         WriteTransaction wt(db);
-        auto table = wt.add_table("class_table");
+        auto table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Binary, "data");
         wt.commit();
     }
@@ -454,7 +454,7 @@ TEST(Sync_HistoryCompression)
         WriteTransaction wt(db);
         auto table = wt.get_table("class_table");
         auto data = std::make_unique<char[]>(100'000);
-        table->create_object().set("data", BinaryData{data.get(), 100'000});
+        table->create_object_with_primary_key(1).set("data", BinaryData{data.get(), 100'000});
         wt.commit();
     }
 

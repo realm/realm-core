@@ -65,7 +65,7 @@ TEST(InstructionReplication_AddTable)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         wt.commit();
     }
     fixture.replay_transactions();
@@ -86,7 +86,7 @@ TEST(InstructionReplication_AddColumnTwice)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_types");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_types", type_Int, "id");
         for (auto type : basic_types) {
             foo->add_column(type, util::format("simple_%1", type));
             foo->add_column_list(type, util::format("list_of_%1", type));
@@ -129,9 +129,9 @@ TEST(InstructionReplication_ClearTable)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        auto t = wt.get_or_add_table("class_foo");
-        for (size_t i = 0; i < 10; i++)
-            t->create_object();
+        auto t = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+        for (int i = 0; i < 10; i++)
+            t->create_object_with_primary_key(i);
         wt.commit();
     }
     fixture.replay_transactions();
@@ -164,9 +164,9 @@ TEST(InstructionReplication_CreateObject)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        foo->create_object().set(col_ndx, 123);
+        foo->create_object_with_primary_key(1).set(col_ndx, 123);
         wt.commit();
     }
     fixture.replay_transactions();
@@ -314,16 +314,16 @@ TEST(InstructionReplication_EraseObject)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.get_or_add_table("class_foo");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "_id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt.get_or_add_table("class_bar");
+        TableRef bar = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "_id");
         ColKey col_link = bar->add_column(*foo, "link");
 
-        Obj obj = foo->create_object().set(col_ndx, 123);
+        Obj obj = foo->create_object_with_primary_key(1).set(col_ndx, 123);
         // Create link to object soon to be deleted
-        bar->create_object().set(col_link, obj.get_key());
+        bar->create_object_with_primary_key(1).set(col_link, obj.get_key());
 
-        foo->create_object().set(col_ndx, 456);
+        foo->create_object_with_primary_key(2).set(col_ndx, 456);
         obj.remove();
         wt.commit();
     }
@@ -348,13 +348,16 @@ TEST(InstructionReplication_InvalidateObject)
         auto wt = fixture.sg_1->start_write();
         TableRef foo = wt->add_table_with_primary_key("class_foo", type_Int, "_id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt->get_or_add_table("class_bar");
+        TableRef bar = wt->add_table_with_primary_key("class_bar", type_Int, "_id");
         ColKey col_link = bar->add_column(*foo, "link");
         ColKey col_linklist = bar->add_column_list(*foo, "linklist");
 
         Obj obj = foo->create_object_with_primary_key(1).set(col_ndx, 123);
         // Create link to object soon to be deleted
-        bar->create_object().set(col_link, obj.get_key()).get_linklist(col_linklist).add(obj.get_key());
+        bar->create_object_with_primary_key(1)
+            .set(col_link, obj.get_key())
+            .get_linklist(col_linklist)
+            .add(obj.get_key());
 
         foo->create_object_with_primary_key(2).set(col_ndx, 456);
         obj.invalidate();
@@ -383,16 +386,16 @@ TEST(InstructionReplication_SetLink)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
-        TableRef bar = wt.add_table("class_bar");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+        TableRef bar = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_l = bar->add_column(*foo, "l");
 
-        auto foo_1 = foo->create_object().set(foo_i, 123).get_key();
-        auto foo_2 = foo->create_object().set(foo_i, 456).get_key();
+        auto foo_1 = foo->create_object_with_primary_key(1).set(foo_i, 123).get_key();
+        auto foo_2 = foo->create_object_with_primary_key(2).set(foo_i, 456).get_key();
 
-        bar->create_object().set(bar_l, foo_1);
-        bar->create_object().set(bar_l, foo_2);
+        bar->create_object_with_primary_key(1).set(bar_l, foo_1);
+        bar->create_object_with_primary_key(2).set(bar_l, foo_2);
 
 
         wt.commit();
@@ -422,10 +425,10 @@ TEST(InstructionReplication_AddInteger)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
         ColKey col_mixed = foo->add_column(type_Mixed, "m");
-        auto obj = foo->create_object();
+        auto obj = foo->create_object_with_primary_key(1);
         obj.set(col_mixed, Mixed(100));
         obj.add_int(col_ndx, 123);
         obj.add_int(col_mixed, 42);
@@ -450,9 +453,9 @@ TEST(InstructionReplication_ListSwap)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         ColKey col_list = foo->add_column_list(type_Int, "i");
-        auto list = foo->create_object().get_list<Int>(col_list);
+        auto list = foo->create_object_with_primary_key(1).get_list<Int>(col_list);
         list.add(1);
         list.add(5);
         list.add(7);
@@ -484,16 +487,16 @@ TEST(InstructionReplication_LinkLists)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
-        TableRef bar = wt.add_table("class_bar");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+        TableRef bar = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_ll = bar->add_column_list(*foo, "ll");
 
-        ObjKey foo_1 = foo->create_object().set(foo_i, 123).get_key();
-        ObjKey foo_2 = foo->create_object().set(foo_i, 456).get_key();
+        ObjKey foo_1 = foo->create_object_with_primary_key(1).set(foo_i, 123).get_key();
+        ObjKey foo_2 = foo->create_object_with_primary_key(2).set(foo_i, 456).get_key();
 
-        Obj bar_1 = bar->create_object();
-        Obj bar_2 = bar->create_object();
+        Obj bar_1 = bar->create_object_with_primary_key(1);
+        Obj bar_2 = bar->create_object_with_primary_key(2);
 
         bar_1.get_linklist(bar_ll).insert(0, foo_1);
         bar_1.get_linklist(bar_ll).insert(1, foo_1);
@@ -535,17 +538,17 @@ TEST(InstructionReplication_LinkSets)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
-        TableRef bar = wt.add_table("class_bar");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+        TableRef bar = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
         ColKey foo_i = foo->add_column(type_Int, "int");
         ColKey bar_ls = bar->add_column_set(*foo, "link set");
 
-        ObjKey foo_1 = foo->create_object().set(foo_i, 123).get_key();
-        ObjKey foo_2 = foo->create_object().set(foo_i, 456).get_key();
-        ObjKey foo_3 = foo->create_object().set(foo_i, 789).get_key();
+        ObjKey foo_1 = foo->create_object_with_primary_key(1).set(foo_i, 123).get_key();
+        ObjKey foo_2 = foo->create_object_with_primary_key(2).set(foo_i, 456).get_key();
+        ObjKey foo_3 = foo->create_object_with_primary_key(3).set(foo_i, 789).get_key();
 
-        Obj bar_1 = bar->create_object();
-        Obj bar_2 = bar->create_object();
+        Obj bar_1 = bar->create_object_with_primary_key(1);
+        Obj bar_2 = bar->create_object_with_primary_key(2);
 
         auto ls1 = bar_1.get_linkset(bar_ls);
         ls1.insert(foo_1);
@@ -646,9 +649,9 @@ TEST(InstructionReplication_Dictionary)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.add_table("class_foo");
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         ColKey col_ndx = foo->add_column_dictionary(type_Mixed, "dict");
-        Obj obj = foo->create_object();
+        Obj obj = foo->create_object_with_primary_key(1);
         auto dict = obj.get_dictionary(col_ndx);
         dict.insert("a", 123);
         dict.insert("b", 45.0);

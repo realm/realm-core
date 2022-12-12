@@ -25,6 +25,10 @@ static inline realm_string_t to_capi(StringData data)
     return realm_string_t{data.data(), data.size()};
 }
 
+// Because this is often used as `return to_capi(...);` it is dangerous to pass a temporary string here. If you really
+// need to and know it is correct (eg passing to a C callback), you can explicitly create the StringData wrapper.
+realm_string_t to_capi(const std::string&& str) = delete; // temporary std::string would dangle.
+
 static inline realm_string_t to_capi(const std::string& str)
 {
     return to_capi(StringData{str});
