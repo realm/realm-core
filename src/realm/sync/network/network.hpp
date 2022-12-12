@@ -53,9 +53,7 @@
 
 // FIXME: Unfinished business around `Address::m_ip_v6_scope_id`.
 
-
-namespace realm {
-namespace sync {
+namespace realm::sync::network {
 
 /// \brief TCP/IP networking API.
 ///
@@ -127,7 +125,6 @@ namespace sync {
 /// the event loop, there is still no guarantee that an asynchronous operation
 /// remains cancelable up until the point in time where the completion handler
 /// starts to execute.
-namespace network {
 
 std::string host_name();
 
@@ -1482,9 +1479,7 @@ inline std::error_code make_error_code(ResolveErrors err)
     return std::error_code(int(err), resolve_error_category);
 }
 
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network
 
 namespace std {
 
@@ -1496,10 +1491,7 @@ public:
 
 } // namespace std
 
-namespace realm {
-namespace sync {
-namespace network {
-
+namespace realm::sync::network {
 
 // Implementation
 
@@ -3712,6 +3704,4 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     return true;
 }
 
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network

@@ -7,7 +7,7 @@
 #include <realm/util/sha_crypto.hpp>
 
 using namespace realm;
-using namespace sync;
+using namespace realm::sync;
 using Error = websocket::Error;
 
 

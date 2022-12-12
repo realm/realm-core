@@ -30,8 +30,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/string_data.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 enum class HTTPParserError {
     None = 0,
     ContentTooLong,
@@ -41,8 +40,7 @@ enum class HTTPParserError {
     BadRequest,
 };
 std::error_code make_error_code(HTTPParserError);
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 namespace std {
 template <>
@@ -50,8 +48,7 @@ struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {
 };
 } // namespace std
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 /// See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
 ///
@@ -533,5 +530,4 @@ private:
     }
 };
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

@@ -54,8 +54,7 @@ const HTTPParserErrorCategory g_http_parser_error_category;
 } // unnamed namespace
 
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 bool valid_http_status_code(unsigned int code)
 {
@@ -482,5 +481,4 @@ std::error_code make_error_code(HTTPParserError error)
     return std::error_code(static_cast<int>(error), g_http_parser_error_category);
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

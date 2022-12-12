@@ -9,7 +9,7 @@
 
 namespace realm::sync::network {
 class Service;
-}
+} // namespace realm::sync::network
 
 namespace realm::sync::websocket {
 using port_type = sync::port_type;

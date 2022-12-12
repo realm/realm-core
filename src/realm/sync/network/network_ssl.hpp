@@ -43,10 +43,7 @@
 // case in teh future.
 
 
-namespace realm {
-namespace sync {
-namespace network {
-namespace ssl {
+namespace realm::sync::network::ssl {
 
 enum class Errors {
     certificate_rejected = 1,
@@ -73,10 +70,7 @@ inline std::error_condition make_error_condition(Errors err)
     return std::error_condition(int(err), error_category);
 }
 
-} // namespace ssl
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network::ssl
 
 namespace std {
 
@@ -88,9 +82,7 @@ public:
 
 } // namespace std
 
-namespace realm {
-namespace sync {
-namespace network {
+namespace realm::sync::network {
 
 class OpensslErrorCategory : public std::error_category {
 public:
@@ -111,7 +103,6 @@ public:
 /// The error category associated with error codes produced by Apple's
 /// SecureTransport library. The name of this category is `securetransport`.
 extern SecureTransportErrorCategory secure_transport_error_category;
-
 
 namespace ssl {
 
@@ -1346,6 +1337,4 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
 #endif // REALM_HAVE_OPENSSL / REALM_HAVE_SECURE_TRANSPORT
 
 } // namespace ssl
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network

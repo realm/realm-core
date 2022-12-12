@@ -2507,9 +2507,7 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
 }
 
 
-namespace realm {
-namespace sync {
-namespace network {
+namespace realm::sync::network {
 
 std::string host_name()
 {
@@ -2609,6 +2607,4 @@ std::string ResolveErrorCategory::message(int value) const
     return {};
 }
 
-} // namespace network
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync::network
