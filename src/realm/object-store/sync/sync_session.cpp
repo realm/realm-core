@@ -30,10 +30,10 @@
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/util/websocket.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

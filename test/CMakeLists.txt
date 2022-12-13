@@ -181,7 +181,6 @@ if(REALM_ENABLE_SYNC)
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
-        test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp

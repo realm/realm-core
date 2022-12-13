@@ -6,6 +6,9 @@
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
@@ -19,11 +22,9 @@
 #include <realm/util/circular_buffer.hpp>
 #include <realm/util/compression.hpp>
 #include <realm/util/file.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/json_parser.hpp>
 #include <realm/util/load_file.hpp>
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/network_ssl.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/random.hpp>
@@ -33,7 +34,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/thread_exec_guard.hpp>
 #include <realm/util/value_reset_guard.hpp>
-#include <realm/util/websocket.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>

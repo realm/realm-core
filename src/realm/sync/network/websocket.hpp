@@ -2,8 +2,8 @@
 #ifndef REALM_UTIL_WEBSOCKET_HPP
 #define REALM_UTIL_WEBSOCKET_HPP
 
+#include <realm/sync/network/http.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
 
 #include <random>

@@ -6,7 +6,7 @@
 #include <map>
 
 #include <realm/sync/config.hpp>
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
 
 namespace realm::util::network {
 class Service;

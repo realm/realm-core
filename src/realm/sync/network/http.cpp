@@ -3,7 +3,7 @@
 #include <sstream>
 #include <ostream>
 
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
 
 using namespace realm;
 
@@ -158,7 +158,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
         return false;
     }
 
-    if (key == "Content-Length") {
+    if (key == "Content-Length" || key == "content-length") {
         if (value.size() == 0) {
             // We consider the empty Content-Length to mean 0.
             // A warning is logged.

@@ -1,6 +1,6 @@
 #include <realm/sync/client.hpp>
-#include <realm/util/http.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include "test.hpp"
 #include "util/thread_wrapper.hpp"

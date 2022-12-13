@@ -1120,10 +1120,9 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
  *
  * This calls `advance_read()` at the Core layer.
  *
- * @return True if the realm was successfully refreshed and no exceptions were
- *         thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
-RLM_API bool realm_refresh(realm_t*);
+RLM_API bool realm_refresh(realm_t*, bool* did_refresh);
 
 /**
  * Produce a frozen view of this realm.
@@ -1135,7 +1134,7 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 /**
  * Vacuum the free space from the realm file, reducing its file size.
  *
- * @return True if compaction was successful and no exceptions were thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
@@ -3146,7 +3145,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
-    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+    realm_app_void_completion_func_t callback, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Creates a user API key that can be used to authenticate as the current user.
@@ -3528,6 +3527,12 @@ typedef struct realm_sync_error_user_info {
     const char* value;
 } realm_sync_error_user_info_t;
 
+typedef struct realm_sync_error_compensating_write_info {
+    const char* reason;
+    const char* object_name;
+    realm_value_t primary_key;
+} realm_sync_error_compensating_write_info_t;
+
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
 // Pointers to this struct and its pointer members are only valid inside the scope
@@ -3544,6 +3549,9 @@ typedef struct realm_sync_error {
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
+
+    realm_sync_error_compensating_write_info_t* compensating_writes;
+    size_t compensating_writes_length;
 } realm_sync_error_t;
 
 /**
