@@ -18,7 +18,8 @@
 -----------
 
 ### Internals
-* Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096), [PR #6109](https://github.com/realm/realm-core/pull/6109))
+* Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
+* Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
 
 ----------------------------------------------
 
