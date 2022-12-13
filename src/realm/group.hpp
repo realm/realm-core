@@ -788,6 +788,8 @@ private:
     ///
     ///  23 Layout of Set and Dictionary changed.
     ///
+    ///  24 Variable sized arrays for Decimal128.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -795,7 +797,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 23;
+    static constexpr int g_current_file_format_version = 24;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
