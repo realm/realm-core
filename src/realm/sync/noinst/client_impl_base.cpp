@@ -1410,7 +1410,7 @@ void Session::cancel_resumption_delay()
 void Session::gather_pending_compensating_writes(util::Span<Changeset> changesets,
                                                  std::vector<ProtocolErrorInfo>* out)
 {
-    if (m_pending_compensating_write_errors.empty()) {
+    if (m_pending_compensating_write_errors.empty() || changesets.empty()) {
         return;
     }
 
@@ -1422,31 +1422,16 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
                        }));
 #endif
 
-    auto changeset_it = changesets.begin();
-    auto error_it = m_pending_compensating_write_errors.begin();
-    bool found_match = false;
-    while (changeset_it != changesets.end() && error_it != m_pending_compensating_write_errors.end()) {
-        if (error_it->compensating_write_server_version < changeset_it->version) {
-            ++error_it;
+    while (!m_pending_compensating_write_errors.empty() &&
+           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+               changesets.back().version) {
+        auto& cur_error = m_pending_compensating_write_errors.front();
+        if (cur_error.compensating_write_server_version >= changesets.front().version) {
+            out->push_back(std::move(cur_error));
         }
-        else {
-            if (changeset_it->version >= error_it->compensating_write_server_version) {
-                found_match = true;
-                out->push_back(*error_it);
-            }
-            ++changeset_it;
-        }
-    }
 
-    if (!found_match) {
-        return;
+        m_pending_compensating_write_errors.pop_front();
     }
-    auto remove_it =
-        std::lower_bound(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
-                         changesets.back().version, [](const ProtocolErrorInfo& info, version_type version) {
-                             return info.compensating_write_server_version < version;
-                         });
-    m_pending_compensating_write_errors.erase(m_pending_compensating_write_errors.begin(), remove_it);
 }
 
 

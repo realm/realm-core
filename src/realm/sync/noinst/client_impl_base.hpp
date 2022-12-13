@@ -937,7 +937,7 @@ private:
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
 
-    std::vector<ProtocolErrorInfo> m_pending_compensating_write_errors;
+    std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
     bool m_connection_to_close;
