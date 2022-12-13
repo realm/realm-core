@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.1.0"
+let versionStr = "13.1.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -102,6 +102,11 @@ let notSyncServerSources: [String] = [
     "realm/sync/instruction_applier.cpp",
     "realm/sync/instruction_replication.cpp",
     "realm/sync/instructions.cpp",
+    "realm/sync/network/default_socket.cpp",
+    "realm/sync/network/http.cpp",
+    "realm/sync/network/network.cpp",
+    "realm/sync/network/network_ssl.cpp",
+    "realm/sync/network/websocket.cpp",
     "realm/sync/noinst/changeset_index.cpp",
     "realm/sync/noinst/client_history_impl.cpp",
     "realm/sync/noinst/client_impl_base.cpp",

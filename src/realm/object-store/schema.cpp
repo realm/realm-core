@@ -51,6 +51,11 @@ Schema::Schema(std::initializer_list<ObjectSchema> types)
 Schema::Schema(base types) noexcept
     : base(std::move(types))
 {
+    sort_schema();
+}
+
+void Schema::sort_schema()
+{
     std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
         return lft.name < rgt.name;
     });
@@ -280,7 +285,7 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
 }
 
 template <typename T, typename U, typename Func>
-void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
+void Schema::zip_matching(T&& a, U&& b, Func&& func)
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
@@ -301,10 +306,12 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
             ++j;
         }
     }
-    for (; i < a.size(); ++i)
+    for (; i < a.size(); ++i) {
         func(&a[i], nullptr);
-    for (; j < b.size(); ++j)
+    }
+    for (; j < b.size(); ++j) {
         func(nullptr, &b[j]);
+    }
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
@@ -329,8 +336,10 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
 
     // Modify columns
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (target && existing)
+        if (target && existing) {
             ::compare(*existing, *target, changes);
+        }
+
         else if (target && !orphans.count(target->name)) {
             // Target is a new table -- add all properties
             changes.emplace_back(schema_change::AddInitialProperties{target});
@@ -348,20 +357,36 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other) noexcept
+void Schema::copy_keys_from(Schema const& other, bool is_schema_additive)
 {
-    zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
+    std::vector<ObjectSchema> other_classes;
+    zip_matching(*this, other, [&](ObjectSchema const* existing, ObjectSchema const* other) {
+        if (is_schema_additive && !existing && other) {
+            other_classes.push_back(*other);
+        }
         if (!existing || !other)
             return;
-
-        existing->table_key = other->table_key;
-        for (auto& current_prop : other->persisted_properties) {
-            auto target_prop = existing->property_for_name(current_prop.name);
-            if (target_prop) {
-                target_prop->column_key = current_prop.column_key;
-            }
-        }
+        update_or_append_properties(const_cast<ObjectSchema*>(existing), other, is_schema_additive);
     });
+
+    if (!other_classes.empty()) {
+        insert(end(), other_classes.begin(), other_classes.end());
+        sort_schema();
+    }
+}
+
+void Schema::update_or_append_properties(ObjectSchema* existing, const ObjectSchema* other, bool is_schema_additive)
+{
+    existing->table_key = other->table_key;
+    for (auto& current_prop : other->persisted_properties) {
+        auto target_prop = existing->property_for_name(current_prop.name);
+        if (target_prop) {
+            target_prop->column_key = current_prop.column_key;
+        }
+        else if (is_schema_additive) {
+            existing->persisted_properties.push_back(current_prop);
+        }
+    }
 }
 
 namespace realm {

@@ -10,10 +10,10 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/sync/network/http.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -21,7 +21,7 @@
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove
+#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
@@ -112,7 +112,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
-    , m_socket_factory(util::websocket::EZConfig{
+    , m_socket_factory(websocket::EZConfig{
           logger_ptr,
           m_random,
           m_service,
@@ -184,7 +184,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     auto handler = [this] {
         actualize_and_finalize_session_wrappers(); // Throws
     };
-    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
+    m_actualize_and_finalize = network::Trigger{get_service(), std::move(handler)}; // Throws
 
     start_keep_running_timer(); // Throws
 }
@@ -340,14 +340,14 @@ void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
 {
     bool is_fatal;
-    if (ec == util::websocket::Error::bad_response_3xx_redirection ||
-        ec == util::websocket::Error::bad_response_301_moved_permanently ||
-        ec == util::websocket::Error::bad_response_401_unauthorized ||
-        ec == util::websocket::Error::bad_response_5xx_server_error ||
-        ec == util::websocket::Error::bad_response_500_internal_server_error ||
-        ec == util::websocket::Error::bad_response_502_bad_gateway ||
-        ec == util::websocket::Error::bad_response_503_service_unavailable ||
-        ec == util::websocket::Error::bad_response_504_gateway_timeout) {
+    if (ec == websocket::Error::bad_response_3xx_redirection ||
+        ec == websocket::Error::bad_response_301_moved_permanently ||
+        ec == websocket::Error::bad_response_401_unauthorized ||
+        ec == websocket::Error::bad_response_5xx_server_error ||
+        ec == websocket::Error::bad_response_500_internal_server_error ||
+        ec == websocket::Error::bad_response_502_bad_gateway ||
+        ec == websocket::Error::bad_response_503_service_unavailable ||
+        ec == websocket::Error::bad_response_504_gateway_timeout) {
         is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
     }
@@ -659,7 +659,7 @@ void Connection::initiate_reconnect()
     }
 
     m_websocket =
-        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+        m_client.m_socket_factory.connect(this, websocket::EZEndpoint{
                                                     m_address,
                                                     m_port,
                                                     get_http_request_path(),
@@ -875,7 +875,7 @@ void Connection::send_next_message()
     while (!m_sessions_enlisted_to_send.empty()) {
         // The state of being connected is not supposed to be able to change
         // across this loop thanks to the "no callback reentrance" guarantee
-        // provided by util::Websocket::async_write_text(), and friends.
+        // provided by Websocket::async_write_text(), and friends.
         REALM_ASSERT(m_state == ConnectionState::connected);
 
         Session& sess = *m_sessions_enlisted_to_send.front();
