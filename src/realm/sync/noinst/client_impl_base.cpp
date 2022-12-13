@@ -2385,8 +2385,8 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    // For compensating write errors we want to raise them to the server after the server version the compensating
-    // write will appear in is observed in a download message.
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
     if (error_code == ProtocolError::compensating_write) {
         m_pending_compensating_write_errors.push_back(info);
         return {};
