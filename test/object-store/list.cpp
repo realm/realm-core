@@ -123,6 +123,41 @@ TEST_CASE("list") {
             return token;
         };
 
+        auto shallow_require_change = [&] {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            }, KeyPathArray());
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto shallow_require_no_change = [&] {
+            bool first = true;
+            auto token = lst.add_notification_callback([& first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            }, KeyPathArray());
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("modifying the list with shallow listerner sends a change notifications") {
+            auto token = shallow_require_change();
+            write([&] {
+                if (lv2->size() > 5)
+                    lst.remove(5);
+            });
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying one of the target rows with shallow listener does not send a change notification") {
+            auto token = shallow_require_no_change();
+            write([&] {
+                lst.get(5).set(col_target_value, 6);
+            });
+        }
+
         SECTION("modifying the list sends a change notifications") {
             auto token = require_change();
             write([&] {
