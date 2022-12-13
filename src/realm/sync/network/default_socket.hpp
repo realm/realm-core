@@ -1,5 +1,4 @@
-#ifndef REALM_UTIL_EZ_WEBSOCKET_HPP
-#define REALM_UTIL_EZ_WEBSOCKET_HPP
+#pragma once
 
 #include <random>
 #include <system_error>
@@ -8,18 +7,18 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/network/http.hpp>
 
-namespace realm::util::network {
+namespace realm::sync::network {
 class Service;
-}
+} // namespace realm::sync::network
 
-namespace realm::util::websocket {
+namespace realm::sync::websocket {
 using port_type = sync::port_type;
 
 // TODO figure out what belongs on config and what belongs on endpoint.
 struct EZConfig {
     std::shared_ptr<util::Logger> logger;
     std::mt19937_64& random;
-    util::network::Service& service;
+    network::Service& service;
     std::string user_agent;
 };
 
@@ -108,6 +107,4 @@ private:
     EZConfig m_config;
 };
 
-} // namespace realm::util::websocket
-
-#endif // REALM_UTIL_EZ_WEBSOCKET_HPP
+} // namespace realm::sync::websocket

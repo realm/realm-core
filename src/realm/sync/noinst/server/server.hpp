@@ -188,7 +188,7 @@ public:
         /// `/proc/sys/net/core/somaxconn`). You can change the value of that
         /// parameter using `sysctl -w net.core.somaxconn=...`. It is usually
         /// 128 by default.
-        int listen_backlog = util::network::Acceptor::max_connections;
+        int listen_backlog = network::Acceptor::max_connections;
 
         /// Set the `TCP_NODELAY` option on all TCP/IP sockets. This disables
         /// the Nagle algorithm. Disabling it, can in some cases be used to
@@ -271,7 +271,7 @@ public:
     void start(const std::string& listen_address, const std::string& listen_port, bool reuse_address = true);
 
     /// Return the resolved and bound endpoint of the listening socket.
-    util::network::Endpoint listen_endpoint() const;
+    network::Endpoint listen_endpoint() const;
 
     /// Run the internal network event-loop of the server. At most one thread
     /// may execute run() at any given time. It is an error if run() is called
