@@ -1426,10 +1426,8 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
            m_pending_compensating_write_errors.front().compensating_write_server_version <=
                changesets.back().version) {
         auto& cur_error = m_pending_compensating_write_errors.front();
-        if (cur_error.compensating_write_server_version >= changesets.front().version) {
-            out->push_back(std::move(cur_error));
-        }
-
+        REALM_ASSERT(cur_error.compensating_write_server_version >= changesets.front().version);
+        out->push_back(std::move(cur_error));
         m_pending_compensating_write_errors.pop_front();
     }
 }
