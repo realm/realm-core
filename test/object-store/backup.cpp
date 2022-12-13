@@ -69,7 +69,7 @@ TEST_CASE("Automated backup") {
     util::File::copy(copy_from_file_name, config.path);
     REQUIRE(util::File::exists(config.path));
     // backup name must reflect version of old realm file (which is v6)
-    std::string backup_path = test_util::get_test_path_prefix() + "test_backup.v6.backup.realm";
+    std::string backup_path = test_util::get_test_path_prefix() + "test_backup.v20.backup.realm";
     std::string backup_log = test_util::get_test_path_prefix() + "test_backup.realm.backup-log";
     util::File::try_remove(backup_path);
     util::File::try_remove(backup_log);
