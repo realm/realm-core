@@ -19,6 +19,9 @@
 #include "fuzz_engine.hpp"
 #include <iostream>
 #include <cstdlib>
+#if REALM_USE_UV
+#include <uv.h>
+#endif
 
 // This function is the entry point for libfuzzer, main is auto-generated
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size)
