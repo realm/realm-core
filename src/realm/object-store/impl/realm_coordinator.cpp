@@ -166,10 +166,13 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         }
 
         if (config.sync_config) {
-            if (*m_config.sync_config->user != *config.sync_config->user) {
+            auto old_user = m_config.sync_config->user;
+            auto new_user = config.sync_config->user;
+            if (old_user && new_user && *old_user != *new_user) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.",
                                                 config.path);
             }
+
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
                                                 config.path);
