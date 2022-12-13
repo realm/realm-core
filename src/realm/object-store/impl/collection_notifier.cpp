@@ -103,14 +103,14 @@ void CollectionNotifier::recalculate_key_path_array()
     m_any_callbacks_filtered = false;
     m_key_path_array.clear();
     for (const auto& callback : m_callbacks) {
-        if (callback.key_path_array.empty()) {
+        if (!callback.key_path_array) {
             m_all_callbacks_filtered = false;
         }
         else {
             m_any_callbacks_filtered = true;
-        }
-        for (const auto& key_path : callback.key_path_array) {
-            m_key_path_array.push_back(key_path);
+            for (const auto& key_path : callback.key_path_array.value()) {
+                m_key_path_array.push_back(key_path);
+            }
         }
     }
 }
@@ -146,11 +146,11 @@ void CollectionNotifier::release_data() noexcept
 static bool all_have_filters(std::vector<NotificationCallback> const& callbacks) noexcept
 {
     return std::all_of(callbacks.begin(), callbacks.end(), [](auto& cb) {
-        return !cb.key_path_array.empty();
+        return !cb.key_path_array;
     });
 }
 
-uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array)
+uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, std::optional<KeyPathArray> key_path_array)
 {
     m_realm->verify_thread();
 
@@ -158,7 +158,7 @@ uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, Key
     // If we're adding a callback with a keypath filter or if previously all
     // callbacks had filters but this one doesn't we will need to recalculate
     // the related tables on the background thread.
-    if (!key_path_array.empty() || all_have_filters(m_callbacks)) {
+    if (!key_path_array || all_have_filters(m_callbacks)) {
         m_did_modify_callbacks = true;
     }
 
@@ -197,7 +197,7 @@ void CollectionNotifier::remove_callback(uint64_t token)
         // If we're removing a callback with a keypath filter or the last callback
         // without a keypath filter we will need to recalcuate the related tables
         // on next run.
-        if (!old.key_path_array.empty() || all_have_filters(m_callbacks)) {
+        if (!old.key_path_array || all_have_filters(m_callbacks)) {
             m_did_modify_callbacks = true;
         }
 

@@ -53,7 +53,7 @@ struct NotificationCallback {
     // The filter that this `NotificationCallback` is restricted to.
     // If not empty, modifications of elements not part of the `key_path_array`
     // will not invoke a notification.
-    KeyPathArray key_path_array = {};
+    std::optional<KeyPathArray> key_path_array = std::nullopt;
     // A unique-per-notifier identifier used to unregister the callback.
     uint64_t token = 0;
     // We normally want to skip calling the callback if there's no changes,
@@ -94,7 +94,7 @@ public:
      *
      * @return A token which can be passed to `remove_callback()`.
      */
-    uint64_t add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) REQUIRES(!m_callback_mutex);
+    uint64_t add_callback(CollectionChangeCallback callback, std::optional<KeyPathArray> key_path_array) REQUIRES(!m_callback_mutex);
 
     /**
      * Remove a previously added token.
