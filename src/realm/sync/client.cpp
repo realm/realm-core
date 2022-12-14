@@ -453,7 +453,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // invoked. Then the session wrapper will have been added to
     // `m_abandoned_session_wrappers`, and an invocation of
     // actualize_and_finalize_session_wrappers() will have been scheduled. The
-    // guarantees mentioned in the documentation of network::Trigger then ensure
+    // guarantees mentioned in the documentation of post() then ensure
     // that at least one execution of actualize_and_finalize_session_wrappers()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
