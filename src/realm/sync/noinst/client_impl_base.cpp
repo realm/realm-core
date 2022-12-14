@@ -1407,6 +1407,32 @@ void Session::cancel_resumption_delay()
 }
 
 
+void Session::gather_pending_compensating_writes(util::Span<Changeset> changesets,
+                                                 std::vector<ProtocolErrorInfo>* out)
+{
+    if (m_pending_compensating_write_errors.empty() || changesets.empty()) {
+        return;
+    }
+
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(
+        std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
+                       [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
+                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                       }));
+#endif
+
+    while (!m_pending_compensating_write_errors.empty() &&
+           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+               changesets.back().version) {
+        auto& cur_error = m_pending_compensating_write_errors.front();
+        REALM_ASSERT(cur_error.compensating_write_server_version >= changesets.front().version);
+        out->push_back(std::move(cur_error));
+        m_pending_compensating_write_errors.pop_front();
+    }
+}
+
+
 void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
@@ -1421,8 +1447,14 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+
+    std::vector<ProtocolErrorInfo> pending_compensating_write_errors;
+    history.integrate_server_changesets(
+        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger,
+        [&](const TransactionRef&, util::Span<Changeset> changesets) {
+            gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
+        },
+        get_transact_reporter()); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1430,6 +1462,20 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
                      version_info.sync_version.version, received_changesets.size()); // Throws
+    }
+
+    for (const auto& pending_error : pending_compensating_write_errors) {
+        logger.info("Reporting compensating write for client version %1 in server version %2: %3",
+                    pending_error.compensating_write_rejected_client_version,
+                    pending_error.compensating_write_server_version, pending_error.message);
+        try {
+            ProtocolError error_code = ProtocolError(pending_error.raw_error_code);
+            on_connection_state_changed(m_conn.get_state(),
+                                        SessionErrorInfo{pending_error, make_error_code(error_code)});
+        }
+        catch (...) {
+            logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
+        }
     }
 }
 
@@ -2212,6 +2258,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
@@ -2223,6 +2272,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
@@ -2305,6 +2357,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+    if (debug_action == SyncClientHookAction::EarlyReturn) {
+        return {};
+    }
+
     // Ignore the error because the connection is going to be closed.
     if (m_connection_to_close)
         return std::error_code{}; // Success
@@ -2326,9 +2383,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    if (!session_level_error_requires_suspend(error_code)) {
-        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
-        return {}; // Success
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
+    if (error_code == ProtocolError::compensating_write) {
+        m_pending_compensating_write_errors.push_back(info);
+        return {};
     }
 
     REALM_ASSERT(!m_suspended);

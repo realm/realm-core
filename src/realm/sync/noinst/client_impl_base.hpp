@@ -887,6 +887,8 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
+    void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
+
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
@@ -934,6 +936,8 @@ private:
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
+
+    std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
     bool m_connection_to_close;
@@ -1099,6 +1103,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
