@@ -21,6 +21,7 @@
 #include <netdb.h>
 #endif
 
+#include <realm/status.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -320,8 +321,10 @@ public:
     ///
     /// Register the sepcified completion handler for immediate asynchronous
     /// execution. The specified handler will be executed by an expression on
-    /// the form `handler()`. If the the handler object is movable, it will
-    /// never be copied. Otherwise, it will be copied as necessary.
+    /// the form `handler(status)` where status is a Status object whose value
+    /// will always be OK, but may change in the future. If the handler object
+    /// is movable, it will never be copied. Otherwise, it will be copied as
+    /// necessary.
     ///
     /// This function is thread-safe, that is, it may be called by any
     /// thread. It may also be called from other completion handlers.
@@ -1284,7 +1287,7 @@ public:
     /// ready to execute when the expiration time is reached, or an error occurs
     /// (cancellation counts as an error here). The expiration time is the time
     /// of initiation plus the specified delay. The error code passed to the
-    /// complition handler will **never** indicate success, unless the
+    /// completion handler will **never** indicate success, unless the
     /// expiration time was reached.
     ///
     /// The completion handler is always executed by the event loop thread,
@@ -1300,17 +1303,17 @@ public:
     ///
     /// The operation can be canceled by calling cancel(), and will be
     /// automatically canceled if the timer is destroyed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// canceled, it will fail with `ErrorCodes::OperationAborted`. The operation
     /// remains cancelable up until the point in time where the completion
     /// handler starts to execute. This means that if cancel() is called before
     /// the completion handler starts to execute, then the completion handler is
-    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// guaranteed to have `ErrorCodes::OperationAborted` passed to it. This is true
     /// regardless of whether cancel() is called explicitly or implicitly, such
     /// as when the timer is destroyed.
     ///
     /// The specified handler will be executed by an expression on the form
-    /// `handler(ec)` where `ec` is the error code. If the the handler object is
-    /// movable, it will never be copied. Otherwise, it will be copied as
+    /// `handler(status)` where `status` is a Status object. If the handler object
+    /// is movable, it will never be copied. Otherwise, it will be copied as
     /// necessary.
     ///
     /// It is an error to start a new asynchronous wait operation while an
@@ -2012,7 +2015,7 @@ public:
             // Service::recycle_post_oper() destroys this operation object
             Service::recycle_post_oper(m_service, this);
             was_recycled = true;
-            handler(); // Throws
+            handler(Status::OK()); // Throws
         }
         catch (...) {
             if (!was_recycled) {
@@ -3504,11 +3507,11 @@ public:
     void recycle_and_execute() override final
     {
         bool orphaned = !m_timer;
-        std::error_code ec;
+        Status status = Status::OK();
         if (is_canceled())
-            ec = util::error::operation_aborted;
+            status = Status{ErrorCodes::OperationAborted, "Timer canceled"};
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, status); // Throws
     }
 
 private:

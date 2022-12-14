@@ -3377,15 +3377,14 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     m_server.m_par_time.fetch_add(parallel_time, std::memory_order_relaxed);
 
     // Pass control back to the network event loop thread
-    auto handler = [this] {
+    network::Service& service = m_server.get_service();
+    service.post([this](Status) {
         // FIXME: The safety of capturing `this` here, relies on the fact
         // that ServerFile objects currently are not destroyed until the
         // server object is destroyed.
         group_postprocess_stage_1(); // Throws
         // Suicide may have happened at this point
-    };
-    network::Service& service = m_server.get_service();
-    service.post(std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -4054,19 +4053,17 @@ void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 
 void ServerImpl::set_connection_reaper_timeout(milliseconds_type timeout)
 {
-    auto handler = [this, timeout] {
+    get_service().post([this, timeout](Status) {
         m_config.connection_reaper_timeout = timeout;
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::close_connections()
 {
-    auto handler = [this] {
+    get_service().post([this](Status) {
         do_close_connections(); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
@@ -4079,10 +4076,9 @@ bool ServerImpl::map_virtual_to_real_path(const std::string& virt_path, std::str
 void ServerImpl::recognize_external_change(const std::string& virt_path)
 {
     std::string virt_path_2 = virt_path; // Throws (copy)
-    auto handler = [this, virt_path = std::move(virt_path_2)] {
+    get_service().post([this, virt_path = std::move(virt_path_2)](Status) {
         do_recognize_external_change(virt_path); // Throws
-    };
-    get_service().post(std::move(handler)); // Throws
+    });                                          // Throws
 }
 
 
@@ -4093,25 +4089,22 @@ void ServerImpl::stop_sync_and_wait_for_backup_completion(
                 "timeout = %1",
                 timeout); // Throws
 
-    auto handler = [this, completion_handler = std::move(completion_handler), timeout]() mutable {
+    get_service().post([this, completion_handler = std::move(completion_handler), timeout](Status) mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
                                                     timeout); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::initiate_connection_reaper_timer(milliseconds_type timeout)
 {
-    auto handler = [this, timeout](std::error_code ec) {
-        if (ec != util::error::operation_aborted) {
+    m_connection_reaper_timer.emplace(get_service());
+    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), [this, timeout](Status status) {
+        if (status != ErrorCodes::OperationAborted) {
             reap_connections();                        // Throws
             initiate_connection_reaper_timer(timeout); // Throws
         }
-    };
-
-    m_connection_reaper_timer.emplace(get_service());
-    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), std::move(handler)); // Throws
+    }); // Throws
 }
 
 

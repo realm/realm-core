@@ -94,15 +94,7 @@ public:
         Timer(network::Service& service, std::chrono::milliseconds delay, FunctionHandler&& handler)
             : m_timer{service}
         {
-            // Temporary workaround until the event loop is updated to use Status
-            auto&& new_handler = [handler = std::move(handler)](std::error_code ec) {
-                Status status = !ec ? Status::OK()
-                                : ec == util::error::operation_aborted
-                                    ? Status{ErrorCodes::OperationAborted, "Timer canceled"}
-                                    : Status{ErrorCodes::RuntimeError, "Timer failed"};
-                handler(status);
-            };
-            m_timer.async_wait(delay, std::move(new_handler));
+            m_timer.async_wait(delay, std::move(handler));
         }
 
         /// Cancels the timer and destroys the timer instance.
@@ -151,13 +143,9 @@ public:
     {
         REALM_ASSERT(m_service);
         // Don't post empty handlers onto the event loop
-        if (handler) {
-            // Temporary workaround until the event loop is updated to use Status
-            auto&& new_handler = [handler = std::move(handler)]() {
-                handler(Status::OK());
-            };
-            m_service->post(std::move(new_handler));
-        }
+        if (!handler)
+            return;
+        m_service->post(std::move(handler));
     }
 
     SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) override
@@ -166,6 +154,7 @@ public:
     }
 
 private:
+    // TODO: Revisit Service::run() so the keep running timer is no longer needed
     void start_keep_running_timer()
     {
         auto handler = [this](Status status) {

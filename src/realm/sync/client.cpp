@@ -405,7 +405,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    auto handler = [this](Status status) mutable {
+    event_loop_post([this](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         for (auto& p : m_server_slots) {
@@ -430,8 +430,7 @@ void ClientImpl::cancel_reconnect_delay()
                 }
             }
         }
-    };
-    event_loop_post(std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -461,14 +460,13 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    auto handler = [this](Status status) mutable {
+    event_loop_post([this](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         util::LockGuard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
-    };
-    event_loop_post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1181,7 +1179,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), new_version](Status status) {
+    m_client.event_loop_post([self = std::move(self), new_version](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1190,8 +1188,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         SessionImpl& sess = *self->m_sess;
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
-    };
-    m_client.event_loop_post(std::move(handler)); // Throws
+    });                                           // Throws
 }
 
 
@@ -1201,7 +1198,7 @@ void SessionWrapper::cancel_reconnect_delay()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self)](Status status) {
+    m_client.event_loop_post([self = std::move(self)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1211,8 +1208,7 @@ void SessionWrapper::cancel_reconnect_delay()
         sess.cancel_resumption_delay(); // Throws
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
-    };
-    m_client.event_loop_post(std::move(handler)); // Throws
+    });                                // Throws
 }
 
 void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
@@ -1222,8 +1218,8 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion,
-                      download_completion](Status status) mutable {
+    m_client.event_loop_post([self = std::move(self), handler = std::move(handler), upload_completion,
+                              download_completion](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1251,8 +1247,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
             sess.request_upload_completion_notification(); // Throws
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
-    };
-    m_client.event_loop_post(std::move(handler_2)); // Throws
+    });                                                      // Throws
 }
 
 
@@ -1268,7 +1263,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark](Status status) {
+    m_client.event_loop_post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1283,8 +1278,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
             SessionImpl& sess = *self->m_sess;
             sess.request_upload_completion_notification(); // Throws
         }
-    };
-    m_client.event_loop_post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1309,7 +1303,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark](Status status) {
+    m_client.event_loop_post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1324,8 +1318,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
             SessionImpl& sess = *self->m_sess;
             sess.request_download_completion_notification(); // Throws
         }
-    };
-    m_client.event_loop_post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {

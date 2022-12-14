@@ -593,14 +593,13 @@ void Connection::initiate_reconnect_wait()
                       remaining_delay); // Throws
     }
 
-    auto handler = [this](Status status) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (status != ErrorCodes::OperationAborted)
-            handle_reconnect_wait(status); // Throws
-    };
-    m_reconnect_disconnect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(remaining_delay),
-                                                                    std::move(handler)); // Throws
+    m_reconnect_disconnect_timer =
+        m_client.event_loop_create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
+            // If the operation is aborted, the connection object may have been
+            // destroyed.
+            if (status != ErrorCodes::OperationAborted)
+                handle_reconnect_wait(status); // Throws
+        });                                    // Throws
     m_reconnect_delay_in_progress = true;
     m_nonzero_reconnect_delay = (remaining_delay > 0);
 }
@@ -608,9 +607,9 @@ void Connection::initiate_reconnect_wait()
 
 void Connection::handle_reconnect_wait(Status status)
 {
-    if (status) {
+    if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw std::system_error(util::error::unknown, format("Reconnect timer failed: %1", status.reason()));
+        throw ExceptionForStatus(status);
     }
 
     m_reconnect_delay_in_progress = false;
@@ -691,21 +690,20 @@ void Connection::initiate_connect_wait()
     // long, or even indefinite time.
     milliseconds_type time = m_client.m_connect_timeout;
 
-    auto handler = [this](Status status) {
+    m_connect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (status != ErrorCodes::OperationAborted)
             handle_connect_wait(status); // Throws
-    };
-    m_connect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), std::move(handler)); // Throws
+    });                                  // Throws
 }
 
 
 void Connection::handle_connect_wait(Status status)
 {
-    if (status) {
+    if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw std::system_error(util::error::unknown, format("Connect timer failed: %1", status.reason()));
+        throw ExceptionForStatus(status);
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
@@ -795,12 +793,10 @@ void Connection::initiate_ping_delay(milliseconds_type now)
 
     m_ping_delay_in_progress = true;
 
-    auto handler = [this](Status status) {
+    m_heartbeat_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(delay), [this](Status status) {
         if (status != ErrorCodes::OperationAborted)
             handle_ping_delay(); // Throws
-    };
-    m_heartbeat_timer =
-        m_client.event_loop_create_timer(std::chrono::milliseconds(delay), std::move(handler)); // Throws
+    });                          // Throws
     logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
 }
 
@@ -828,12 +824,10 @@ void Connection::initiate_pong_timeout()
     m_pong_wait_started_at = monotonic_clock_now();
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
-    auto handler = [this](Status status) {
+    m_heartbeat_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
         if (status != ErrorCodes::OperationAborted)
             handle_pong_timeout(); // Throws
-    };
-    m_heartbeat_timer =
-        m_client.event_loop_create_timer(std::chrono::milliseconds(time), std::move(handler)); // Throws
+    });                            // Throws
 }
 
 
@@ -964,23 +958,22 @@ void Connection::initiate_disconnect_wait()
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
-    auto handler = [this](Status status) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (status != ErrorCodes::OperationAborted)
-            handle_disconnect_wait(status); // Throws
-    };
-    m_reconnect_disconnect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time),
-                                                                    std::move(handler)); // Throws
+    m_reconnect_disconnect_timer =
+        m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
+            // If the operation is aborted, the connection object may have been
+            // destroyed.
+            if (status != ErrorCodes::OperationAborted)
+                handle_disconnect_wait(status); // Throws
+        });                                     // Throws
     m_disconnect_delay_in_progress = true;
 }
 
 
 void Connection::handle_disconnect_wait(Status status)
 {
-    if (status) {
+    if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw std::system_error(util::error::unknown, format("Disconnect timer failed: %1", status.reason()));
+        throw ExceptionForStatus(status);
     }
 
     m_disconnect_delay_in_progress = false;
