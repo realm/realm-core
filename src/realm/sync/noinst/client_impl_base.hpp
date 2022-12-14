@@ -137,6 +137,7 @@ public:
     void event_loop_post(SyncSocketProvider::FunctionHandler&& handler);
     SyncTimer event_loop_create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler);
 
+    // TODO: This function will be removed once the event loop is integrated
     network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
@@ -163,10 +164,13 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
+    // This will be updated to the SyncSocketProvider interface once the integration is complete
     std::shared_ptr<websocket::DefaultSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
     const bool m_one_connection_per_session;
+
+    // TODO: m_service will be removed once the event loop is integrated
     network::Service& m_service;
     std::mt19937_64 m_random;
     Trigger<network::Service> m_actualize_and_finalize;
@@ -303,6 +307,8 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
+
+// TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
 class ClientImpl::Connection final : public websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
@@ -491,6 +497,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
+    // TODO: This will be updated to WebSocketInterface once the WebSocket integration is complete
     std::unique_ptr<websocket::DefaultWebSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
@@ -1132,6 +1139,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
 }
 
 
+// TODO: This function will be removed once the event loop is integrated
 inline network::Service& ClientImpl::get_service() noexcept
 {
     return m_service;
