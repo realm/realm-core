@@ -144,6 +144,7 @@ public:
 
 private:
     using connection_ident_type = std::int_fast64_t;
+    using Handle = std::function<void()>;
 
     const ReconnectMode m_reconnect_mode; // For testing purposes only
     const milliseconds_type m_connect_timeout;
@@ -165,7 +166,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    network::Trigger m_actualize_and_finalize;
+    Handle m_actualize_and_finalize;
     network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -403,6 +404,7 @@ public:
 
 private:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+    using Handle = ClientImpl::Handle;
 
     template <class H>
     void for_each_active_session(H handler);
@@ -506,7 +508,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    network::Trigger m_on_idle;
+    Handle m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -1207,7 +1209,7 @@ inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_client.m_service.post(m_on_idle);
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {

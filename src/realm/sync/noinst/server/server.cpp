@@ -1090,12 +1090,10 @@ public:
         // expand the buffer
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
-        network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        m_send_handler = [this] {
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = network::Trigger{service, std::move(handler)}; // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1334,7 +1332,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    network::Trigger m_send_trigger;
+    std::function<void()> m_send_handler;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -4227,7 +4225,7 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger.trigger();
+    m_server.get_service().post(m_send_handler);
 }
 
 
@@ -4664,7 +4662,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger.trigger();
+    m_server.get_service().post(m_send_handler);
 }
 
 

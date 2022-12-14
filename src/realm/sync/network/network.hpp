@@ -1348,75 +1348,6 @@ private:
 };
 
 
-/// \brief Register a function whose invocation can be triggered repeatedly.
-///
-/// While the function is always executed by the event loop thread, the
-/// triggering of its execution can be done by any thread, and the triggering
-/// operation is guaranteed to never throw.
-///
-/// The function is guaranteed to not be called after the Trigger object is
-/// destroyed.
-///
-/// It is safe to destroy the Trigger object during execution of the function.
-///
-/// Note that even though the trigger() function is thread-safe, the Trigger
-/// object, as a whole, is not. In particular, construction and destruction must
-/// not be considered thread-safe.
-///
-/// ### Relation to post()
-///
-/// For a particular execution of trigger() and a particular invocation of
-/// Service::post(), if the execution of trigger() ends before the execution of
-/// Service::post() begins, then it is guaranteed that the function associated
-/// with the trigger gets to execute at least once after the execution of
-/// trigger() begins, and before the post handler gets to execute.
-class Trigger {
-public:
-    template <class F>
-    Trigger(Service&, F&& func);
-    ~Trigger() noexcept;
-
-    Trigger() noexcept = default;
-    Trigger(Trigger&&) noexcept = default;
-    Trigger& operator=(Trigger&&) noexcept = default;
-
-    /// \brief Trigger another invocation of the associated function.
-    ///
-    /// An invocation of trigger() puts the Trigger object into the triggered
-    /// state. It remains in the triggered state until shortly before the
-    /// function starts to execute. While the Trigger object is in the triggered
-    /// state, trigger() has no effect. This means that the number of executions
-    /// of the function will generally be less that the number of times
-    /// trigger() is invoked().
-    ///
-    /// A particular invocation of trigger() ensures that there will be at least
-    /// one invocation of the associated function whose execution begins after
-    /// the beginning of the execution of trigger(), so long as the event loop
-    /// thread does not exit prematurely from run().
-    ///
-    /// If trigger() is invoked from the event loop thread, the next execution
-    /// of the associated function will not begin until after trigger returns(),
-    /// effectively preventing reentrancy for the associated function.
-    ///
-    /// If trigger() is invoked from another thread, the associated function may
-    /// start to execute before trigger() returns.
-    ///
-    /// Note that the associated function can retrigger itself, i.e., if the
-    /// associated function calls trigger(), then that will lead to another
-    /// invocation of the associated function, but not until the first
-    /// invocation ends (no reentrance).
-    ///
-    /// This function is thread-safe.
-    void trigger() noexcept;
-
-private:
-    template <class H>
-    class ExecOper;
-
-    util::bind_ptr<Service::TriggerExecOperBase> m_exec_oper;
-};
-
-
 class ReadAheadBuffer {
 public:
     ReadAheadBuffer();
@@ -3610,49 +3541,6 @@ inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H&& han
     clock::time_point expiration_time = now + delay;
     initiate_oper(Service::alloc<WaitOper<H>>(m_wait_oper, *this, expiration_time,
                                               std::move(handler))); // Throws
-}
-
-// ---------------- Trigger ----------------
-
-template <class H>
-class Trigger::ExecOper : public Service::TriggerExecOperBase {
-public:
-    ExecOper(Service::Impl& service_impl, H&& handler)
-        : Service::TriggerExecOperBase{service_impl}
-        , m_handler{std::move(handler)}
-    {
-    }
-    void recycle_and_execute() override final
-    {
-        REALM_ASSERT(in_use());
-        // Note: Potential suicide when `self` goes out of scope
-        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
-        if (m_service) {
-            Service::reset_trigger_exec(*m_service, *this);
-            m_handler(); // Throws
-        }
-    }
-
-private:
-    H m_handler;
-};
-
-template <class H>
-inline Trigger::Trigger(Service& service, H&& handler)
-    : m_exec_oper{new ExecOper<H>{*service.m_impl, std::move(handler)}} // Throws
-{
-}
-
-inline Trigger::~Trigger() noexcept
-{
-    if (m_exec_oper)
-        m_exec_oper->orphan();
-}
-
-inline void Trigger::trigger() noexcept
-{
-    REALM_ASSERT(m_exec_oper);
-    m_exec_oper->trigger();
 }
 
 // ---------------- ReadAheadBuffer ----------------
