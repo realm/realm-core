@@ -754,6 +754,8 @@ ref_type GroupWriter::write_group()
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
+                                                    //    m_free_lengths.ensure_minimum_width(value_4);
+                                                    //    m_free_versions.ensure_minimum_width(m_current_version);
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -1343,7 +1345,8 @@ void GroupWriter::commit(ref_type new_top_ref)
                          new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);
-            msg += util::format("{%1, %2}[%3], ", pos, pos + m_free_lengths.get(i), m_free_versions.get(i));
+            ref_type size = m_free_lengths.get(i);
+            msg += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, m_free_versions.get(i));
         }
         msg += "\n";
         validator.write(msg.data(), msg.size());

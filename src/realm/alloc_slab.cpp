@@ -1258,7 +1258,12 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     // FIXME: don't refresh the same page more than once!
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
 #ifdef REALM_DEBUG
-    std::map<size_t, std::vector<std::pair<uint64_t, uint64_t>>> debug_freelists;
+    struct FreelistTriplet {
+        MemRef positions_ref;
+        MemRef lengths_ref;
+        MemRef versions_ref;
+    };
+    std::map<size_t, FreelistTriplet> debug_freelists;
     std::set<uint64_t> computed_pages_for_refresh;
     const size_t page_size = util::page_size();
     std::string debug_allocs;
@@ -1279,6 +1284,24 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         debug_allocs += util::format("[%1, %2], ", alloc.begin, alloc.end);
     };
+
+    auto debug_freelist_info = [&](Array& positions, Array& lengths, Array& versions) {
+        debug_allocs += "\npages refreshed so far: ";
+        for (auto page : computed_pages_for_refresh) {
+            debug_allocs += util::format("%1, ", page);
+        }
+        debug_allocs += util::format("\nfreelist pos from %1, to %2", positions.get_ref(),
+                                     positions.get_ref() + positions.get_byte_size());
+        debug_allocs += util::format("\nfreelist sizes from %1 to %2", lengths.get_ref(),
+                                     lengths.get_ref() + lengths.get_byte_size());
+        debug_allocs += "\nfreelist: ";
+        for (size_t i = 0; i < positions.size(); ++i) {
+            uint64_t pos = positions.get(i);
+            uint64_t size = lengths.get(i);
+            debug_allocs += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, versions.get(i));
+        }
+    };
+
 #endif
     auto do_refresh = [&](const RefRanges& ranges) {
         if (REALM_UNLIKELY(refresh_hook)) {
@@ -1343,20 +1366,15 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         const ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
         load_array(cur_freelist_positions, free_positions_ref, read_lock);
         load_array(cur_freelist_lengths, free_sizes_ref, read_lock);
+        load_array(cur_freelist_versions, top_array.get_as_ref(Group::s_free_version_ndx), read_lock);
         REALM_ASSERT_EX(cur_freelist_positions.size() == cur_freelist_lengths.size(), cur_freelist_positions.size(),
                         cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, read_lock.version,
                         read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
                         (--read_locks.end())->version);
 #if REALM_DEBUG
-        {
-            std::vector<std::pair<uint64_t, uint64_t>> freelist;
-            for (size_t i = 0; i < cur_freelist_positions.size(); ++i) {
-                uint64_t pos = cur_freelist_positions.get(i);
-                uint64_t size = cur_freelist_lengths.get(i);
-                freelist.push_back(std::make_pair(pos, pos + size));
-            }
-            debug_freelists.emplace(read_lock.version, std::move(freelist));
-        }
+        debug_freelists.emplace(read_lock.version,
+                                FreelistTriplet{cur_freelist_positions.get_mem(), cur_freelist_lengths.get_mem(),
+                                                cur_freelist_versions.get_mem()});
 #endif
 
         if (!processed_first_version) {
@@ -1421,26 +1439,18 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             }
             if (current_ndx + 1 < cur_freelist_size) {
                 size_t start = cur_freelist_positions.get(current_ndx + 1);
-                size_t end = start + cur_freelist_lengths.get(current_ndx + 1);
+                size_t size = cur_freelist_lengths.get(current_ndx + 1);
                 if (cur_end > start) {
                     debug_allocs += util::format("\nfreelist inconsistency detected at version %1, index %2, current "
-                                                 "{%3, %4}, next {%5, %6} computed versions: ",
-                                                 read_lock.version, current_ndx, cur_start, cur_end, start, end);
-                    for (auto page : computed_pages_for_refresh) {
-                        debug_allocs += util::format("%1, ", page);
-                    }
-                    debug_allocs += util::format("\nfreelist pos from %1, to %2", free_positions_ref,
-                                                 free_positions_ref + cur_freelist_positions.get_byte_size());
-                    debug_allocs +=
-                        util::format("\nfreelist sizes from %1 to %2", cur_freelist_lengths.get_ref(),
-                                     cur_freelist_lengths.get_ref() + cur_freelist_lengths.get_byte_size());
-                    debug_allocs += "\nfreelist: ";
-                    for (size_t i = 0; i < cur_freelist_positions.size(); ++i) {
-                        debug_allocs += util::format("{%1, %2}, ", cur_freelist_positions.get(i),
-                                                     cur_freelist_positions.get(i) + cur_freelist_lengths.get(i));
-                    }
+                                                 "{%3 + %4 = %5}[%6], next {%7 + %8 = %9}[%10], during refresh of "
+                                                 "versions %11->%12, computed versions: ",
+                                                 read_lock.version, current_ndx, cur_start, cur_end - cur_start,
+                                                 cur_end, cur_freelist_versions.get(current_ndx), start, size,
+                                                 start + size, cur_freelist_versions.get(current_ndx + 1),
+                                                 read_locks[0].version, read_locks[read_locks.size() - 1].version);
+                    debug_freelist_info(cur_freelist_positions, cur_freelist_lengths, cur_freelist_versions);
                     std::cout << debug_allocs;
-                    REALM_ASSERT_EX(cur_end <= start, cur_start, prev_end, start, end);
+                    REALM_ASSERT_EX(cur_end <= start, cur_start, prev_end, start, size);
                 }
             }
 #endif // REALM_DEBUG
@@ -1635,20 +1645,33 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             }
             size_t open_paren = buffer.find("{", suffix_ndx);
             size_t freelist_count = 0;
-            size_t found_freelist_size = debug_freelists[read_lock.version].size();
+            const FreelistTriplet& freelist = debug_freelists.at(read_lock.version);
+            Array positions(*this), lengths(*this), versions(*this);
+            positions.init_from_mem(freelist.positions_ref);
+            lengths.init_from_mem(freelist.lengths_ref);
+            versions.init_from_mem(freelist.versions_ref);
+
+            size_t found_freelist_size = positions.size();
             while (open_paren != buffer.npos && open_paren < freelist_end_pos) {
-                size_t sep = buffer.find(", ", open_paren);
+                size_t sep = buffer.find(" = ", open_paren);
                 REALM_ASSERT(sep != buffer.npos);
                 size_t end = buffer.find("}", sep);
                 REALM_ASSERT(end != buffer.npos);
                 uint64_t actual_begin = parse_int(buffer.substr(open_paren + 1, sep));
-                uint64_t actual_end = parse_int(buffer.substr(sep + 1, end));
+                uint64_t actual_end = parse_int(buffer.substr(sep + 3, end));
                 REALM_ASSERT_EX(freelist_count < found_freelist_size, freelist_count, found_freelist_size,
                                 read_lock.version);
-                uint64_t found_begin = debug_freelists[read_lock.version][freelist_count].first;
-                uint64_t found_end = debug_freelists[read_lock.version][freelist_count].second;
-                REALM_ASSERT_EX(actual_begin == found_begin && actual_end == found_end, actual_begin, actual_end,
-                                found_begin, found_end, read_lock.version);
+
+                uint64_t found_begin = positions.get(freelist_count);
+                uint64_t found_length = lengths.get(freelist_count);
+                uint64_t found_version = versions.get(freelist_count);
+                if (actual_begin != found_begin || actual_end != found_begin + found_length) {
+                    debug_freelist_info(positions, lengths, versions);
+                    std::cout << debug_allocs;
+                }
+                REALM_ASSERT_EX(actual_begin == found_begin && actual_end == found_begin + found_length, actual_begin,
+                                actual_end, found_begin, found_length, found_begin + found_length, found_version,
+                                read_lock.version, freelist_count);
                 ++freelist_count;
                 open_paren = buffer.find("{", end);
             }
@@ -1660,7 +1683,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         if (begin_file_size < end_file_size) {
             track_pages(pages_across_all_versions, {begin_file_size, end_file_size});
         }
-
         // the file header is always changed during commit, but we do not necessarily need to refresh that page
         // if there have been no other modifications because we get the top_refs from the lock file and address them
         // directly
