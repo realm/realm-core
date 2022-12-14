@@ -5,8 +5,7 @@
 * Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#6097](https://github.com/realm/realm-core/pull/6097))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
  
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
