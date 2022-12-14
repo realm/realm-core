@@ -3940,10 +3940,11 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
  * needed
  * @param realm_app ptr to realm app.
  * @param sync_path path where the sync files are.
- * @param did_run ptr to bool, which will be set to true if operation was successful 
- * @return true if operation was succesful
+ * @param did_run ptr to bool, which will be set to true if operation was successful
+ * @return true if operation was successful
  */
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path, bool* did_run) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session's connection state changes.
