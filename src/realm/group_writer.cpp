@@ -754,6 +754,8 @@ ref_type GroupWriter::write_group()
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
+                                                    //    m_free_lengths.ensure_minimum_width(value_4);
+                                                    //    m_free_versions.ensure_minimum_width(m_current_version);
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -847,6 +849,15 @@ ref_type GroupWriter::write_group()
     write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
     write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
     write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
+    // FIXME: encryption write barrier?
+    REALM_ASSERT_EX(
+        free_positions_ref >= reserve_ref && free_positions_ref + free_positions_size <= reserve_ref + used,
+        reserve_ref, reserve_ref + used, free_positions_ref, free_positions_ref + free_positions_size, top_ref);
+    REALM_ASSERT_EX(free_sizes_ref >= reserve_ref && free_sizes_ref + free_sizes_size <= reserve_ref + used,
+                    reserve_ref, reserve_ref + used, free_sizes_ref, free_sizes_ref + free_sizes_size, top_ref);
+    REALM_ASSERT_EX(free_versions_ref >= reserve_ref && free_versions_ref + free_versions_size <= reserve_ref + used,
+                    reserve_ref, reserve_ref + used, free_versions_ref, free_versions_ref + free_versions_size,
+                    top_ref);
 
     // Write top
     write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
@@ -1398,7 +1409,8 @@ void GroupWriter::commit(ref_type new_top_ref)
                          new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
             ref_type pos = m_free_positions.get(i);
-            msg += util::format("{%1, %2}, ", pos, pos + m_free_lengths.get(i));
+            ref_type size = m_free_lengths.get(i);
+            msg += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, m_free_versions.get(i));
         }
         msg += "\n";
         validator.write(msg.data(), msg.size());

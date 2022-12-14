@@ -52,7 +52,7 @@
 #include <process.h>
 #endif
 
-//#define REALM_ENABLE_LOGFILE
+// #define REALM_ENABLE_LOGFILE
 
 
 using namespace realm;
@@ -1637,7 +1637,7 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
-        start();
+        // start();
     }
     ~PageRefresher()
     {
