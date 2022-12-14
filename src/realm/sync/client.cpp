@@ -405,7 +405,9 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    auto handler = [this] {
+    auto handler = [this](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         for (auto& p : m_server_slots) {
             ServerSlot& slot = p.second;
             if (m_one_connection_per_session) {
@@ -429,7 +431,7 @@ void ClientImpl::cancel_reconnect_delay()
             }
         }
     };
-    get_service().post(std::move(handler)); // Throws
+    event_loop_post(std::move(handler)); // Throws
 }
 
 
@@ -459,12 +461,14 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    auto handler = [this] {
+    auto handler = [this](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         util::LockGuard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
     };
-    get_service().post(std::move(handler)); // Throws
+    event_loop_post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -492,16 +496,6 @@ void ClientImpl::run()
 {
     auto ta = util::make_temp_assign(m_running, true);
     m_service.run(); // Throws
-}
-
-
-void ClientImpl::start_keep_running_timer()
-{
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
-            start_keep_running_timer();
-    };
-    m_keep_running_timer.async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
 }
 
 
@@ -978,11 +972,14 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     auto pf = util::make_promise_future<std::string>();
 
-    get_client().get_service().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
-        auto id = ++m_last_pending_test_command_ident;
-        m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
-        ensure_enlisted_to_send();
-    });
+    get_client().event_loop_post(
+        [this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
+            if (status == ErrorCodes::OperationAborted)
+                return;
+            auto id = ++m_last_pending_test_command_ident;
+            m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
+            ensure_enlisted_to_send();
+        });
 
     return std::move(pf.future);
 }
@@ -1053,7 +1050,9 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.get_service().post([new_version, this] {
+    m_client.event_loop_post([new_version, this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(m_actualized);
         if (REALM_UNLIKELY(!m_sess)) {
             return; // Already finalized
@@ -1182,7 +1181,9 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), new_version] {
+    auto handler = [self = std::move(self), new_version](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1190,7 +1191,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.event_loop_post(std::move(handler)); // Throws
 }
 
 
@@ -1200,7 +1201,9 @@ void SessionWrapper::cancel_reconnect_delay()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self)] {
+    auto handler = [self = std::move(self)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1209,7 +1212,7 @@ void SessionWrapper::cancel_reconnect_delay()
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.event_loop_post(std::move(handler)); // Throws
 }
 
 void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
@@ -1220,7 +1223,9 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 
     util::bind_ptr<SessionWrapper> self{this};
     auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion,
-                      download_completion]() mutable {
+                      download_completion](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
@@ -1247,7 +1252,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
     };
-    m_client.get_service().post(std::move(handler_2)); // Throws
+    m_client.event_loop_post(std::move(handler_2)); // Throws
 }
 
 
@@ -1263,7 +1268,9 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark] {
+    auto handler = [self = std::move(self), target_mark](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1277,7 +1284,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
             sess.request_upload_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.event_loop_post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1302,7 +1309,9 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark] {
+    auto handler = [self = std::move(self), target_mark](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1316,7 +1325,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
             sess.request_download_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.event_loop_post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1334,7 +1343,9 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    m_client.get_service().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
+    m_client.event_loop_post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1636,16 +1647,15 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name}
     , m_custom_http_headers{custom_http_headers}
 {
-    m_on_idle =
-        Trigger<network::Service>{&client.get_service(), [this](Status status) {
-                                      if (!status.is_ok())
-                                          return;
-                                      REALM_ASSERT(m_activated);
-                                      if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-                                          on_idle(); // Throws
-                                          // Connection object may be destroyed now.
-                                      }
-                                  }};
+    m_on_idle = {&client.get_service(), [this](Status status) {
+                     if (!status.is_ok())
+                         return;
+                     REALM_ASSERT(m_activated);
+                     if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
+                         on_idle(); // Throws
+                         // Connection object may be destroyed now.
+                     }
+                 }};
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept

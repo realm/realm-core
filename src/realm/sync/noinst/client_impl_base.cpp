@@ -111,16 +111,12 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
-    , m_service{}                                         // Throws
-    , m_socket_factory(websocket::EZConfig{
-          logger_ptr,
-          m_random,
-          m_service,
-          get_user_agent_string(),
-      })
+    , m_socket_provider{std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string())}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
-    , m_keep_running_timer{get_service()} // Throws
+    // TODO: migrate service thread to DefaultSocketProvider
+    , m_service{m_socket_provider->get_service()}
+    , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
@@ -181,14 +177,12 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    m_actualize_and_finalize = Trigger<network::Service>{&get_service(), [this](Status status) {
-                                                             if (!status.is_ok())
-                                                                 return;
+    m_actualize_and_finalize = {&get_service(), [this](Status status) {
+                                    if (!status.is_ok())
+                                        return;
 
-                                                             actualize_and_finalize_session_wrappers(); // Throws
-                                                         }};
-
-    start_keep_running_timer(); // Throws
+                                    actualize_and_finalize_session_wrappers(); // Throws
+                                }};
 }
 
 
@@ -202,6 +196,21 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
     if (!config.user_agent_application_info.empty())
         out << " " << config.user_agent_application_info; // Throws
     return out.str();                                     // Throws
+}
+
+
+void ClientImpl::event_loop_post(SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    m_socket_provider->post(std::move(handler));
+}
+
+
+SyncTimer ClientImpl::event_loop_create_timer(std::chrono::milliseconds delay,
+                                              SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    return m_socket_provider->create_timer(delay, std::move(handler));
 }
 
 
@@ -262,7 +271,7 @@ void Connection::cancel_reconnect_delay()
         // operation might have to be initiated before the previous one
         // completes (its completion handler starts to execute), so the new wait
         // operation must be done on a new timer object.
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_reconnect_delay_in_progress = false;
         m_reconnect_info.reset();
         initiate_reconnect_wait(); // Throws
@@ -584,26 +593,24 @@ void Connection::initiate_reconnect_wait()
                       remaining_delay); // Throws
     }
 
-    if (!m_reconnect_disconnect_timer)
-        m_reconnect_disconnect_timer.emplace(m_client.get_service()); // Throws
-    auto handler = [this](std::error_code ec) {
+    auto handler = [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_reconnect_wait(ec); // Throws
+        if (status != ErrorCodes::OperationAborted)
+            handle_reconnect_wait(status); // Throws
     };
-    m_reconnect_disconnect_timer->async_wait(std::chrono::milliseconds(remaining_delay),
-                                             std::move(handler)); // Throws
+    m_reconnect_disconnect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(remaining_delay),
+                                                                    std::move(handler)); // Throws
     m_reconnect_delay_in_progress = true;
     m_nonzero_reconnect_delay = (remaining_delay > 0);
 }
 
 
-void Connection::handle_reconnect_wait(std::error_code ec)
+void Connection::handle_reconnect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (status) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw std::system_error(util::error::unknown, format("Reconnect timer failed: %1", status.reason()));
     }
 
     m_reconnect_delay_in_progress = false;
@@ -660,19 +667,19 @@ void Connection::initiate_reconnect()
         sec_websocket_protocol = std::move(out).str();
     }
 
-    m_websocket =
-        m_client.m_socket_factory.connect(this, websocket::EZEndpoint{
-                                                    m_address,
-                                                    m_port,
-                                                    get_http_request_path(),
-                                                    std::move(sec_websocket_protocol),
-                                                    is_ssl(m_protocol_envelope),
-                                                    {m_custom_http_headers.begin(), m_custom_http_headers.end()},
-                                                    m_verify_servers_ssl_certificate,
-                                                    m_ssl_trust_certificate_path,
-                                                    m_ssl_verify_callback,
-                                                    m_proxy_config,
-                                                });
+    m_websocket = m_client.m_socket_provider->connect_legacy(
+        this, websocket::EZEndpoint{
+                  m_address,
+                  m_port,
+                  get_http_request_path(),
+                  std::move(sec_websocket_protocol),
+                  is_ssl(m_protocol_envelope),
+                  {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                  m_verify_servers_ssl_certificate,
+                  m_ssl_trust_certificate_path,
+                  m_ssl_verify_callback,
+                  m_proxy_config,
+              });
 }
 
 
@@ -682,25 +689,23 @@ void Connection::initiate_connect_wait()
     // fully establish the connection (including SSL and WebSocket
     // handshakes). Without such a watchdog, connect operations could take very
     // long, or even indefinite time.
-    m_connect_timer.emplace(m_client.get_service()); // Throws
-
     milliseconds_type time = m_client.m_connect_timeout;
 
-    auto handler = [this](std::error_code ec) {
+    auto handler = [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_connect_wait(ec); // Throws
+        if (status != ErrorCodes::OperationAborted)
+            handle_connect_wait(status); // Throws
     };
-    m_connect_timer->async_wait(std::chrono::milliseconds(time), std::move(handler)); // Throws
+    m_connect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), std::move(handler)); // Throws
 }
 
 
-void Connection::handle_connect_wait(std::error_code ec)
+void Connection::handle_connect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (status) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw std::system_error(util::error::unknown, format("Connect timer failed: %1", status.reason()));
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
@@ -714,7 +719,7 @@ void Connection::handle_connect_wait(std::error_code ec)
 void Connection::handle_connection_established()
 {
     // Cancel connect timeout watchdog
-    m_connect_timer = util::none;
+    m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
 
@@ -742,7 +747,7 @@ void Connection::schedule_urgent_ping()
 {
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_ping_delay_in_progress) {
-        m_heartbeat_timer = util::none;
+        m_heartbeat_timer.reset();
         m_ping_delay_in_progress = false;
         m_minimize_next_ping_delay = true;
         milliseconds_type now = monotonic_clock_now();
@@ -790,12 +795,12 @@ void Connection::initiate_ping_delay(milliseconds_type now)
 
     m_ping_delay_in_progress = true;
 
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
+    auto handler = [this](Status status) {
+        if (status != ErrorCodes::OperationAborted)
             handle_ping_delay(); // Throws
     };
-    m_heartbeat_timer.emplace(m_client.get_service());                                   // Throws
-    m_heartbeat_timer->async_wait(std::chrono::milliseconds(delay), std::move(handler)); // Throws
+    m_heartbeat_timer =
+        m_client.event_loop_create_timer(std::chrono::milliseconds(delay), std::move(handler)); // Throws
     logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
 }
 
@@ -823,11 +828,12 @@ void Connection::initiate_pong_timeout()
     m_pong_wait_started_at = monotonic_clock_now();
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
+    auto handler = [this](Status status) {
+        if (status != ErrorCodes::OperationAborted)
             handle_pong_timeout(); // Throws
     };
-    m_heartbeat_timer->async_wait(std::chrono::milliseconds(time), std::move(handler)); // Throws
+    m_heartbeat_timer =
+        m_client.event_loop_create_timer(std::chrono::milliseconds(time), std::move(handler)); // Throws
 }
 
 
@@ -952,31 +958,29 @@ void Connection::initiate_disconnect_wait()
     REALM_ASSERT(!m_reconnect_delay_in_progress);
 
     if (m_disconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
     }
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
-    if (!m_reconnect_disconnect_timer)
-        m_reconnect_disconnect_timer.emplace(m_client.get_service()); // Throws
-    auto handler = [this](std::error_code ec) {
+    auto handler = [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_disconnect_wait(ec); // Throws
+        if (status != ErrorCodes::OperationAborted)
+            handle_disconnect_wait(status); // Throws
     };
-    m_reconnect_disconnect_timer->async_wait(std::chrono::milliseconds(time),
-                                             std::move(handler)); // Throws
+    m_reconnect_disconnect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time),
+                                                                    std::move(handler)); // Throws
     m_disconnect_delay_in_progress = true;
 }
 
 
-void Connection::handle_disconnect_wait(std::error_code ec)
+void Connection::handle_disconnect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (status) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw std::system_error(util::error::unknown, format("Disconnect timer failed: %1", status.reason()));
     }
 
     m_disconnect_delay_in_progress = false;
@@ -1092,7 +1096,7 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
 void Connection::disconnect(const SessionErrorInfo& info)
 {
     // Cancel connect timeout watchdog
-    m_connect_timer = util::none;
+    m_connect_timer.reset();
 
     if (m_state == ConnectionState::connected) {
         m_disconnect_time = monotonic_clock_now();
@@ -1122,7 +1126,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_minimize_next_ping_delay = false;
     m_ping_after_scheduled_reset_of_reconnect_info = false;
     m_ping_sent = false;
-    m_heartbeat_timer = util::none;
+    m_heartbeat_timer.reset();
     m_previous_ping_rtt = 0;
 
     m_websocket.reset();
@@ -1173,7 +1177,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
         m_reconnect_info.m_scheduled_reset = false;
     }
 
-    m_heartbeat_timer = util::none;
+    m_heartbeat_timer.reset();
     m_waiting_for_pong = false;
 
     initiate_ping_delay(now); // Throws
@@ -2452,7 +2456,6 @@ std::error_code Session::receive_test_command_response(request_ident_type ident,
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
-    m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
     if (error_info.resumption_delay_interval) {
         m_try_again_delay_info = *error_info.resumption_delay_interval;
     }
@@ -2468,17 +2471,18 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
     }
     m_try_again_error_code = ProtocolError(error_info.raw_error_code);
     logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
-    m_try_again_activation_timer->async_wait(*m_current_try_again_delay_interval, [this](std::error_code ec) {
-        if (ec == util::error::operation_aborted) {
-            return;
-        }
+    m_try_again_activation_timer =
+        get_client().event_loop_create_timer(*m_current_try_again_delay_interval, [this](Status status) {
+            if (status == ErrorCodes::OperationAborted) {
+                return;
+            }
 
-        m_try_again_activation_timer.reset();
-        if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {
-            *m_current_try_again_delay_interval *= m_try_again_delay_info.resumption_delay_backoff_multiplier;
-        }
-        cancel_resumption_delay();
-    });
+            m_try_again_activation_timer.reset();
+            if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {
+                *m_current_try_again_delay_interval *= m_try_again_delay_info.resumption_delay_backoff_multiplier;
+            }
+            cancel_resumption_delay();
+        });
 }
 
 void Session::clear_resumption_delay_state()

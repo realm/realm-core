@@ -54,6 +54,8 @@ public:
     inline Status& operator=(Status&& other) noexcept;
 
     inline bool is_ok() const noexcept;
+    // return true if error occurred
+    inline operator bool() const noexcept;
     inline const std::string& reason() const noexcept;
     inline ErrorCodes::Error code() const noexcept;
     inline StringData code_string() const noexcept;
@@ -199,7 +201,12 @@ inline Status& Status::operator=(Status&& other) noexcept
 
 inline bool Status::is_ok() const noexcept
 {
-    return !m_error;
+    return !m_error || m_error->m_code == ErrorCodes::OK;
+}
+
+inline Status::operator bool() const noexcept
+{
+    return !is_ok();
 }
 
 inline const std::string& Status::reason() const noexcept

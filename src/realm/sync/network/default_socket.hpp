@@ -5,7 +5,10 @@
 #include <map>
 
 #include <realm/sync/config.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/util/random.hpp>
 
 namespace realm::sync::network {
 class Service;
@@ -15,13 +18,6 @@ namespace realm::sync::websocket {
 using port_type = sync::port_type;
 
 // TODO figure out what belongs on config and what belongs on endpoint.
-struct EZConfig {
-    std::shared_ptr<util::Logger> logger;
-    std::mt19937_64& random;
-    network::Service& service;
-    std::string user_agent;
-};
-
 struct EZEndpoint {
     std::string address;
     port_type port;
@@ -84,27 +80,106 @@ protected:
     ~EZObserver() = default;
 };
 
-class EZSocket {
+class DefaultWebSocket {
 public:
-    virtual ~EZSocket();
+    virtual ~DefaultWebSocket() = default;
 
     virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 };
 
-class EZSocketFactory {
+class DefaultSocketProvider : public SyncSocketProvider {
 public:
-    EZSocketFactory(EZConfig config)
-        : m_config(config)
+    class Timer : public SyncSocketProvider::Timer {
+    public:
+        Timer(network::Service& service, std::chrono::milliseconds delay, FunctionHandler&& handler)
+            : m_timer{service}
+        {
+            // Temporary workaround until the event loop is updated to use Status
+            auto&& new_handler = [handler = std::move(handler)](std::error_code ec) {
+                Status status = !ec ? Status::OK()
+                                : ec == util::error::operation_aborted
+                                    ? Status{ErrorCodes::OperationAborted, "Timer canceled"}
+                                    : Status{ErrorCodes::RuntimeError, "Timer failed"};
+                handler(status);
+            };
+            m_timer.async_wait(delay, std::move(new_handler));
+        }
+
+        /// Cancels the timer and destroys the timer instance.
+        ~Timer() = default;
+
+        /// Cancel the timer immediately
+        void cancel() override
+        {
+            m_timer.cancel();
+        }
+
+    private:
+        network::DeadlineTimer m_timer;
+    };
+
+    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent)
+        : m_logger_ptr{logger}
+        , m_service{std::make_shared<network::Service>()}
+        , m_random{}
+        , m_user_agent{user_agent}
     {
-        REALM_ASSERT(m_config.logger); // Make sure the logger is valid
+        REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
+        REALM_ASSERT(m_service);                        // Make sure the service is valid
+        util::seed_prng_nondeterministically(m_random); // Throws
+        start_keep_running_timer();
     }
 
-    EZSocketFactory(EZSocketFactory&&) = delete;
+    // Don't allow move or copy constructor
+    DefaultSocketProvider(DefaultSocketProvider&&) = delete;
 
-    std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
+    // Temporary workaround until event loop is completely moved here
+    network::Service& get_service()
+    {
+        return *m_service;
+    }
+
+    // Temporary workaround until Client::Connection is updated to use WebSocketObserver
+    std::unique_ptr<DefaultWebSocket> connect_legacy(EZObserver* observer, EZEndpoint&& endpoint);
+
+    std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override
+    {
+        return nullptr;
+    }
+
+    void post(FunctionHandler&& handler) override
+    {
+        REALM_ASSERT(m_service);
+        // Don't post empty handlers onto the event loop
+        if (handler) {
+            // Temporary workaround until the event loop is updated to use Status
+            auto&& new_handler = [handler = std::move(handler)]() {
+                handler(Status::OK());
+            };
+            m_service->post(std::move(new_handler));
+        }
+    }
+
+    SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) override
+    {
+        return std::make_unique<DefaultSocketProvider::Timer>(*m_service, delay, std::move(handler));
+    }
 
 private:
-    EZConfig m_config;
+    void start_keep_running_timer()
+    {
+        auto handler = [this](Status status) {
+            if (status.code() != ErrorCodes::OperationAborted)
+                start_keep_running_timer();
+        };
+        m_keep_running_timer = create_timer(std::chrono::hours(1000), std::move(handler)); // Throws
+    }
+
+    std::shared_ptr<util::Logger> m_logger_ptr;
+    std::shared_ptr<network::Service> m_service;
+    std::mt19937_64 m_random;
+    const std::string m_user_agent;
+    SyncTimer m_keep_running_timer;
 };
 
 } // namespace realm::sync::websocket

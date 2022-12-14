@@ -133,6 +133,10 @@ public:
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
+
+    void event_loop_post(SyncSocketProvider::FunctionHandler&& handler);
+    SyncTimer event_loop_create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler);
+
     network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
@@ -159,15 +163,13 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    network::Service m_service;
-    std::mt19937_64 m_random;
-    websocket::EZSocketFactory m_socket_factory;
+    std::shared_ptr<websocket::DefaultSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
-
     const bool m_one_connection_per_session;
+    network::Service& m_service;
+    std::mt19937_64 m_random;
     Trigger<network::Service> m_actualize_and_finalize;
-    network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -219,7 +221,6 @@ private:
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
 
-    void start_keep_running_timer();
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
     void actualize_and_finalize_session_wrappers();
@@ -431,10 +432,10 @@ private:
     std::string get_http_request_path() const;
 
     void initiate_reconnect_wait();
-    void handle_reconnect_wait(std::error_code);
+    void handle_reconnect_wait(Status status);
     void initiate_reconnect();
     void initiate_connect_wait();
-    void handle_connect_wait(std::error_code);
+    void handle_connect_wait(Status status);
 
     void handle_connection_established();
     void schedule_urgent_ping();
@@ -450,7 +451,7 @@ private:
     void handle_write_ping();
     void handle_message_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
-    void handle_disconnect_wait(std::error_code);
+    void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_missing_protocol_feature();
@@ -490,7 +491,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<websocket::EZSocket> m_websocket;
+    std::unique_ptr<websocket::DefaultWebSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -546,16 +547,16 @@ private:
     // before the completion handler of the previous canceled wait operation
     // starts executing. Such an overlap is not allowed for wait operations on
     // the same timer instance.
-    util::Optional<network::DeadlineTimer> m_reconnect_disconnect_timer;
+    SyncTimer m_reconnect_disconnect_timer;
 
     // Timer for connect operation watchdog. For why this timer is optional, see
     // `m_reconnect_disconnect_timer`.
-    util::Optional<network::DeadlineTimer> m_connect_timer;
+    SyncTimer m_connect_timer;
 
     // This timer is used to schedule the sending of PING messages, and as a
     // watchdog for timely reception of PONG messages. For why this timer is
     // optional, see `m_reconnect_disconnect_timer`.
-    util::Optional<network::DeadlineTimer> m_heartbeat_timer;
+    SyncTimer m_heartbeat_timer;
 
     milliseconds_type m_pong_wait_started_at = 0;
     milliseconds_type m_last_ping_sent_at = 0;
@@ -907,7 +908,7 @@ private:
 
     bool m_suspended = false;
 
-    util::Optional<network::DeadlineTimer> m_try_again_activation_timer;
+    SyncTimer m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
@@ -1130,6 +1131,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
+
 inline network::Service& ClientImpl::get_service() noexcept
 {
     return m_service;
@@ -1218,7 +1220,7 @@ inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
     }
 }
