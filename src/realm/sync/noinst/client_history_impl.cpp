@@ -532,7 +532,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
         };
         auto changesets_transformed_count =
             transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets_to_integrate,
-                                                    std::move(changeset_applier), &logger); // Throws
+                                                    std::move(changeset_applier), logger); // Throws
         return changesets_transformed_count;
     }
     catch (const BadChangesetError& e) {

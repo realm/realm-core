@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "12.12.0"
+let versionStr = "13.1.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -117,9 +117,9 @@ let notSyncServerSources: [String] = [
     "realm/sync/subscriptions.cpp",
     "realm/sync/transform.cpp",
     "realm/table.cpp",
-    "realm/table_cluster_tree.cpp",
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
+    "realm/tokenizer.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
@@ -509,7 +509,6 @@ let package = Package(
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
-                "mongodb",
                 "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",

@@ -29,7 +29,7 @@
 
 namespace realm {
 
-class TableClusterTree;
+class ClusterTree;
 class Replication;
 class TableView;
 class CollectionBase;
@@ -376,7 +376,7 @@ private:
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 
-    const TableClusterTree* get_tree_top() const;
+    const ClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     ColKey get_primary_key_column() const;
     TableKey get_table_key() const;

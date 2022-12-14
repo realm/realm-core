@@ -1,6 +1,6 @@
 macro(build_fuzzer_variant variant)
     add_executable(${variant} command_file.hpp command_file.cpp ${variant}.cpp)
-    target_link_libraries(${variant} realm-object-store)
+    target_link_libraries(${variant} ObjectStore)
     set_target_properties(${variant} PROPERTIES
       EXCLUDE_FROM_ALL 1
       EXCLUDE_FROM_DEFAULT_BUILD 1)

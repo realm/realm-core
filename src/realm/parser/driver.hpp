@@ -110,6 +110,7 @@ public:
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
     static constexpr int IN = 10;
+    static constexpr int TEXT = 11;
 };
 
 class ConstantNode : public ParserNode {

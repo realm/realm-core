@@ -912,6 +912,38 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
+                    SECTION("changes to backlink are reported both to origin and destination object") {
+                        Object object_origin2;
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            object_origin2 = Object{r, obj_origin2};
+                        });
+
+                        // add a backlink
+                        auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
+                        write([&] {
+                            object_origin2.set_property_value(d, "link", util::Any(object_target));
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+
+                        // nullify a backlink
+                        write([&] {
+                            object_origin2.set_property_value(d, "link", std::any());
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+
+                        // remove a backlink
+                        write([&] {
+                            table_origin->remove_object(object_origin2.obj().get_key());
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
                 }
             }
 

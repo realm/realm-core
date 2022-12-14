@@ -143,7 +143,6 @@ int64_t random_int();
 bool chmod_supported(const std::string& path);
 int get_permissions(const std::string& path);
 void chmod(const std::string& path, int permissions);
-std::string get_parent_directory(const std::string& path);
 
 } // namespace realm
 

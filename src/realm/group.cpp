@@ -329,7 +329,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 22) {
+        if (current_file_format_version == 23) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
@@ -401,9 +401,6 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 11:
-        case 20:
-        case 21:
         case g_current_file_format_version:
             file_format_ok = true;
             break;
@@ -463,13 +460,6 @@ Group::~Group() noexcept
 }
 
 
-void Group::remap(size_t new_file_size)
-{
-    m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers(m_is_writable);
-}
-
-
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -495,7 +485,8 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
         case 7:
         case 9:
         case 10:
-        case 11: {
+        case 11:
+        case 12: {
             ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
             ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
@@ -910,7 +901,7 @@ Obj Group::get_object(ObjLink link)
 {
     auto target_table = get_table(link.get_table_key());
     ObjKey key = link.get_obj_key();
-    TableClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
     return ct->get(key);
 }
 
@@ -1583,18 +1574,11 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
 void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
 {
     REALM_ASSERT(m_file_format_version >= 7);
-    if (m_top.size() < s_group_max_size) {
-        REALM_ASSERT(m_top.size() <= s_hist_type_ndx);
-        while (m_top.size() < s_hist_type_ndx) {
-            m_top.add(0); // Throws
-        }
-        ref_type history_ref = 0;                                    // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
-        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
-        m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
+    while (m_top.size() < s_hist_type_ndx) {
+        m_top.add(0); // Throws
     }
-    else {
+
+    if (m_top.size() > s_hist_version_ndx) {
         int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
         int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         if (stored_history_type != Replication::hist_None) {
@@ -1603,6 +1587,21 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         }
         m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
         m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    else {
+        // No history yet
+        REALM_ASSERT(m_top.size() == s_hist_type_ndx);
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
+        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+
+    if (m_top.size() > s_sync_file_id_ndx) {
+        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(file_ident));
+    }
+    else {
+        m_top.add(RefOrTagged::make_tagged(file_ident)); // Throws
     }
 }
 
@@ -1785,8 +1784,7 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
-                            m_top.size() == 11,
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() >= 10,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
         Array pos(alloc), len(alloc), ver(alloc);

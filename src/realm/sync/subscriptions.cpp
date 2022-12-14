@@ -132,63 +132,26 @@ size_t state_to_order(SubscriptionSet::State needle)
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
-    : m_id(obj.get<ObjectId>(parent->m_sub_id))
-    , m_created_at(obj.get<Timestamp>(parent->m_sub_created_at))
-    , m_updated_at(obj.get<Timestamp>(parent->m_sub_updated_at))
-    , m_name(obj.is_null(parent->m_sub_name) ? OptionalString(util::none)
-                                             : OptionalString{obj.get<String>(parent->m_sub_name)})
-    , m_object_class_name(obj.get<String>(parent->m_sub_object_class_name))
-    , m_query_string(obj.get<String>(parent->m_sub_query_str))
+    : id(obj.get<ObjectId>(parent->m_sub_id))
+    , created_at(obj.get<Timestamp>(parent->m_sub_created_at))
+    , updated_at(obj.get<Timestamp>(parent->m_sub_updated_at))
+    , name(obj.is_null(parent->m_sub_name) ? OptionalString(util::none)
+                                           : OptionalString{obj.get<String>(parent->m_sub_name)})
+    , object_class_name(obj.get<String>(parent->m_sub_object_class_name))
+    , query_string(obj.get<String>(parent->m_sub_query_str))
 {
 }
 
 Subscription::Subscription(util::Optional<std::string> name, std::string object_class_name, std::string query_str)
-    : m_id(ObjectId::gen())
-    , m_created_at(std::chrono::system_clock::now())
-    , m_updated_at(m_created_at)
-    , m_name(std::move(name))
-    , m_object_class_name(std::move(object_class_name))
-    , m_query_string(std::move(query_str))
+    : id(ObjectId::gen())
+    , created_at(std::chrono::system_clock::now())
+    , updated_at(created_at)
+    , name(std::move(name))
+    , object_class_name(std::move(object_class_name))
+    , query_string(std::move(query_str))
 {
 }
 
-ObjectId Subscription::id() const
-{
-    return m_id;
-}
-
-Timestamp Subscription::created_at() const
-{
-    return m_created_at;
-}
-
-Timestamp Subscription::updated_at() const
-{
-    return m_updated_at;
-}
-
-bool Subscription::has_name() const
-{
-    return static_cast<bool>(m_name);
-}
-
-std::string_view Subscription::name() const
-{
-    if (!m_name) {
-        return std::string_view{};
-    }
-    return *m_name;
-}
-
-std::string_view Subscription::object_class_name() const
-{
-    return m_object_class_name;
-}
-
-std::string_view Subscription::query_string() const
-{
-    return m_query_string;
-}
 
 SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
                                  MakingMutableCopy making_mutable_copy)
@@ -259,7 +222,7 @@ size_t SubscriptionSet::size() const
     return m_subs.size();
 }
 
-Subscription SubscriptionSet::at(size_t index) const
+const Subscription& SubscriptionSet::at(size_t index) const
 {
     return m_subs.at(index);
 }
@@ -274,20 +237,24 @@ SubscriptionSet::const_iterator SubscriptionSet::end() const
     return m_subs.end();
 }
 
-SubscriptionSet::const_iterator SubscriptionSet::find(StringData name) const
+const Subscription* SubscriptionSet::find(StringData name) const
 {
-    return std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return sub.name() == name;
-    });
+    for (auto&& sub : *this) {
+        if (sub.name == name)
+            return &sub;
+    }
+    return nullptr;
 }
 
-SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
+const Subscription* SubscriptionSet::find(const Query& query) const
 {
     const auto query_desc = query.get_description();
     const auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
-    return std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return sub.object_class_name() == table_name && sub.query_string() == query_desc;
-    });
+    for (auto&& sub : *this) {
+        if (sub.object_class_name == table_name && sub.query_string == query_desc)
+            return &sub;
+    }
+    return nullptr;
 }
 
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
@@ -306,21 +273,31 @@ void MutableSubscriptionSet::check_is_mutable() const
     }
 }
 
-MutableSubscriptionSet::iterator MutableSubscriptionSet::begin()
-{
-    return m_subs.begin();
-}
-
-MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
-{
-    return m_subs.end();
-}
-
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
     REALM_ASSERT(it != end());
     return m_subs.erase(it);
+}
+
+bool MutableSubscriptionSet::erase(StringData name)
+{
+    check_is_mutable();
+    auto ptr = find(name);
+    if (!ptr)
+        return false;
+    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    return true;
+}
+
+bool MutableSubscriptionSet::erase(const Query& query)
+{
+    check_is_mutable();
+    auto ptr = find(query);
+    if (!ptr)
+        return false;
+    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    return true;
 }
 
 void MutableSubscriptionSet::clear()
@@ -341,9 +318,10 @@ MutableSubscriptionSet::insert_or_assign_impl(iterator it, util::Optional<std::s
 {
     check_is_mutable();
     if (it != end()) {
-        it->m_object_class_name = std::move(object_class_name);
-        it->m_query_string = std::move(query_str);
-        it->m_updated_at = Timestamp{std::chrono::system_clock::now()};
+        auto& sub = m_subs[it - begin()];
+        sub.object_class_name = std::move(object_class_name);
+        sub.query_string = std::move(query_str);
+        sub.updated_at = Timestamp{std::chrono::system_clock::now()};
 
         return {it, false};
     }
@@ -359,7 +337,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.has_name() && sub.name() == name);
+        return sub.name == name;
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
@@ -370,7 +348,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
+        return (!sub.name && sub.object_class_name == table_name && sub.query_string == query_str);
     });
 
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
@@ -492,6 +470,19 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     return std::move(future);
 }
 
+void SubscriptionSet::get_state_change_notification(
+    State notify_when, util::UniqueFunction<void(util::Optional<State>, util::Optional<Status>)> cb) const
+{
+    get_state_change_notification(notify_when).get_async([cb = std::move(cb)](StatusWith<State> result) {
+        if (result.is_ok()) {
+            cb(result.get_value(), {});
+        }
+        else {
+            cb({}, result.get_status());
+        }
+    });
+}
+
 void MutableSubscriptionSet::process_notifications()
 {
     auto mgr = get_flx_subscription_store(); // Throws
@@ -534,7 +525,7 @@ void MutableSubscriptionSet::process_notifications()
     }
 }
 
-SubscriptionSet MutableSubscriptionSet::commit() &&
+SubscriptionSet MutableSubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
         throw std::logic_error("SubscriptionSet is not in a commitable state");
@@ -552,14 +543,14 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         for (const auto& sub : m_subs) {
             auto new_sub =
                 obj_sub_list.create_and_insert_linked_object(obj_sub_list.is_empty() ? 0 : obj_sub_list.size());
-            new_sub.set(mgr->m_sub_id, sub.id());
-            new_sub.set(mgr->m_sub_created_at, sub.created_at());
-            new_sub.set(mgr->m_sub_updated_at, sub.updated_at());
-            if (sub.m_name) {
-                new_sub.set(mgr->m_sub_name, StringData(sub.name()));
+            new_sub.set(mgr->m_sub_id, sub.id);
+            new_sub.set(mgr->m_sub_created_at, sub.created_at);
+            new_sub.set(mgr->m_sub_updated_at, sub.updated_at);
+            if (sub.name) {
+                new_sub.set(mgr->m_sub_name, StringData(*sub.name));
             }
-            new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name()));
-            new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string()));
+            new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name));
+            new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string));
         }
     }
     m_obj.set(mgr->m_sub_set_state, state_to_storage(m_state));
@@ -587,13 +578,13 @@ std::string SubscriptionSet::to_ext_json() const
 
     util::FlatMap<std::string, std::vector<std::string>> table_to_query;
     for (const auto& sub : *this) {
-        std::string table_name(sub.object_class_name());
+        std::string table_name(sub.object_class_name);
         auto& queries_for_table = table_to_query.at(table_name);
-        auto query_it = std::find(queries_for_table.begin(), queries_for_table.end(), sub.query_string());
+        auto query_it = std::find(queries_for_table.begin(), queries_for_table.end(), sub.query_string);
         if (query_it != queries_for_table.end()) {
             continue;
         }
-        queries_for_table.emplace_back(sub.query_string());
+        queries_for_table.emplace_back(sub.query_string);
     }
 
     if (table_to_query.empty()) {

@@ -156,9 +156,7 @@ DB::version_type Transaction::commit()
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
     db->release_read_lock(lock_after_commit);
 
     db->end_write_on_correct_thread();
@@ -213,11 +211,9 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // completed commit.
 
     try {
-        DB::ReadLockInfo new_read_lock;
-        VersionID version_id = VersionID(); // Latest available snapshot
         // Grabbing the new lock before releasing the old one prevents m_transaction_count
         // from going shortly to zero
-        db->grab_read_lock(new_read_lock, version_id); // Throws
+        DB::ReadLockInfo new_read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID()); // Throws
 
         m_history = nullptr;
         set_transact_stage(DB::transact_Reading);
@@ -289,9 +285,7 @@ void Transaction::commit_and_continue_writing()
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    DB::ReadLockInfo lock_after_commit = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
     if (Replication* repl = db->get_replication()) {
@@ -461,7 +455,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 23, target_file_format_version);
 
     // DB::do_open() must ensure that only supported version are allowed.
     // It does that by asking backup if the current file format version is
@@ -590,37 +584,34 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // Ensure we have search index on all primary key columns. This is idempotent so no
-    // need to check on current_file_format_version
+    // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
-    for (auto k : table_keys) {
-        auto t = get_table(k);
-        if (auto col = t->get_primary_key_column()) {
-            t->do_add_search_index(col);
+    if (current_file_format_version < 22) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                t->do_add_search_index(col, IndexType::General);
+            }
         }
     }
 
+    if (current_file_format_version == 22) {
+        // Check that asymmetric table are empty
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (t->is_asymmetric() && t->size() > 0) {
+                t->clear();
+            }
+        }
+    }
+    if (current_file_format_version >= 21 && current_file_format_version < 23) {
+        // Upgrade Set and Dictionary columns
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->migrate_sets_and_dictionaries();
+        }
+    }
     // NOTE: Additional future upgrade steps go here.
-}
-
-void Transaction::check_consistency()
-{
-    // For the time being, we only check if asymmetric table are empty
-    std::vector<TableKey> needs_fix;
-    auto table_keys = get_table_keys();
-    for (auto tk : table_keys) {
-        auto table = get_table(tk);
-        if (table->is_asymmetric() && table->size() > 0) {
-            needs_fix.push_back(tk);
-        }
-    }
-    if (!needs_fix.empty()) {
-        promote_to_write();
-        for (auto tk : needs_fix) {
-            get_table(tk)->clear();
-        }
-        commit();
-    }
 }
 
 void Transaction::promote_to_async()
@@ -708,7 +699,7 @@ void Transaction::complete_async_commit()
     // sync to disk:
     DB::ReadLockInfo read_lock;
     try {
-        db->grab_read_lock(read_lock, VersionID());
+        read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
         GroupWriter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
@@ -860,6 +851,31 @@ void Transaction::do_end_read() noexcept
     db.reset();
 }
 
+// This is the same as do_end_read() above, but with the requirement that
+// 1) This is called with the db->mutex locked already
+// 2) No async commits outstanding
+void Transaction::close_read_with_lock()
+{
+    REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+    {
+        util::CheckedLockGuard lck(m_async_mutex);
+        REALM_ASSERT_EX(m_async_stage == AsyncState::Idle, size_t(m_async_stage));
+    }
+
+    detach();
+    REALM_ASSERT_EX(!m_oldest_version_not_persisted, m_oldest_version_not_persisted->m_type,
+                    m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_top_ref,
+                    m_oldest_version_not_persisted->m_file_size);
+    db->do_release_read_lock(m_read_lock);
+
+    m_alloc.note_reader_end(this);
+    set_transact_stage(DB::transact_Ready);
+    // reset the std::shared_ptr to allow the DB object to release resources
+    // as early as possible.
+    db.reset();
+}
+
+
 void Transaction::initialize_replication()
 {
     if (m_transact_stage == DB::transact_Writing) {
@@ -876,8 +892,11 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #if REALM_METRICS
     REALM_ASSERT(m_metrics == db->m_metrics);
     if (m_metrics) { // null if metrics are disabled
-        size_t total_size = db->m_used_space + db->m_free_space;
-        size_t free_space = db->m_free_space;
+        size_t free_space;
+        size_t used_space;
+        db->get_stats(free_space, used_space);
+        size_t total_size = used_space + free_space;
+
         size_t num_objects = m_total_rows;
         size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
         size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
@@ -906,6 +925,104 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #endif
 
     m_transact_stage = stage;
+}
+
+class NodeTree {
+public:
+    NodeTree(size_t evac_limit, size_t& work_limit)
+        : m_evac_limit(evac_limit)
+        , m_work_limit(work_limit)
+        , m_moved(0)
+    {
+    }
+    ~NodeTree()
+    {
+        // std::cout << "Moved: " << m_moved << std::endl;
+    }
+
+    /// Function used to traverse the node tree and "copy on write" nodes
+    /// that are found above the evac_limit. The function will return
+    /// when either the whole tree has been travesed or when the work_limit
+    /// has been reached.
+    /// \param current_node - node to process.
+    /// \param level - the level at which current_node is placed in the tree
+    /// \param progress - When the traversal is initiated, this vector identifies at which
+    ///                   node the process should be resumed. It is subesequently updated
+    ///                   to point to the node we have just processed
+    bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
+    {
+        if (current_node.is_read_only()) {
+            auto byte_size = current_node.get_byte_size();
+            if ((current_node.get_ref() + byte_size) > m_evac_limit) {
+                current_node.copy_on_write();
+                m_moved++;
+                if (m_work_limit > byte_size) {
+                    m_work_limit -= byte_size;
+                }
+                else {
+                    m_work_limit = 0;
+                    return false;
+                }
+            }
+        }
+
+        if (current_node.has_refs()) {
+            auto sz = current_node.size();
+            m_work_limit -= sz;
+            if (progress.size() == level) {
+                progress.push_back(0);
+            }
+            REALM_ASSERT_EX(level < progress.size(), level, progress.size());
+            size_t ndx = progress[level];
+            while (ndx < sz) {
+                auto val = current_node.get(ndx);
+                if (val && !(val & 1)) {
+                    Array arr(current_node.get_alloc());
+                    arr.set_parent(&current_node, ndx);
+                    arr.init_from_parent();
+                    if (!trv(arr, level + 1, progress)) {
+                        return false;
+                    }
+                }
+                ndx = ++progress[level];
+            }
+            while (progress.size() > level)
+                progress.pop_back();
+        }
+        return true;
+    }
+
+private:
+    size_t m_evac_limit;
+    size_t m_work_limit;
+    size_t m_moved;
+};
+
+
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
+{
+    NodeTree node_tree(evac_limit, work_limit);
+    if (progress.empty()) {
+        progress.push_back(s_table_name_ndx);
+    }
+    if (progress[0] == s_table_name_ndx) {
+        if (!node_tree.trv(m_table_names, 1, progress))
+            return;
+        progress.back() = s_table_refs_ndx; // Handle tables next
+    }
+    if (progress[0] == s_table_refs_ndx) {
+        if (!node_tree.trv(m_tables, 1, progress))
+            return;
+        progress.back() = s_hist_ref_ndx; // Handle history next
+    }
+    if (progress[0] == s_hist_ref_ndx && m_top.get(s_hist_ref_ndx)) {
+        Array hist_arr(m_top.get_alloc());
+        hist_arr.set_parent(&m_top, s_hist_ref_ndx);
+        hist_arr.init_from_parent();
+        if (!node_tree.trv(hist_arr, 1, progress))
+            return;
+    }
+    progress.clear();
 }
 
 } // namespace realm

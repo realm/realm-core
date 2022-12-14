@@ -1828,8 +1828,18 @@ TEST(StringIndex_MixedEqualBitPattern)
 
 TEST(Unicode_Casemap)
 {
-    std::string inp = "A very old house 🏠 is on 🔥, we have to save the 🦄";
-    auto out = case_map(inp, true);
+    std::string inp = "±ÀÁÂÃÄÅÆÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝß×÷";
+    auto out = case_map(inp, false);
+    if (CHECK(out)) {
+        CHECK_EQUAL(*out, "±àáâãäåæèéêëìíîïñòóôõöøùúûüýß×÷");
+    }
+    out = case_map(*out, true);
+    if (CHECK(out)) {
+        CHECK_EQUAL(*out, inp);
+    }
+
+    inp = "A very old house 🏠 is on 🔥, we have to save the 🦄";
+    out = case_map(inp, true);
     if (CHECK(out)) {
         CHECK_EQUAL(*out, "A VERY OLD HOUSE 🏠 IS ON 🔥, WE HAVE TO SAVE THE 🦄");
     }

@@ -136,18 +136,20 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
         if (column_key.is_dictionary()) {
             auto leaf = static_cast<const ArrayInteger*>(m_leaf_ptr);
             if (leaf->get(row)) {
-                auto key_type = m_tables[column]->get_dictionary_key_type(column_key);
-                DictionaryClusterTree dict_cluster(const_cast<ArrayInteger*>(leaf), key_type,
-                                                   get_base_table()->get_alloc(), row);
-                dict_cluster.init_from_parent();
+                Allocator& alloc = get_base_table()->get_alloc();
+                Array top(alloc);
+                top.set_parent(const_cast<ArrayInteger*>(leaf), row);
+                top.init_from_parent();
+                BPlusTree<Mixed> values(alloc);
+                values.set_parent(&top, 1);
+                values.init_from_parent();
 
-                // Iterate through cluster and insert all link values
-                ArrayMixed leaf(get_base_table()->get_alloc());
-                dict_cluster.traverse([&](const Cluster* cluster) {
-                    size_t e = cluster->node_size();
-                    cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-                    for (size_t i = 0; i < e; i++) {
-                        auto m = leaf.get(i);
+                // Iterate through values and insert all link values
+                values.traverse([&](BPlusTreeNode* node, size_t) {
+                    auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+                    auto sz = bplustree_leaf->size();
+                    for (size_t i = 0; i < sz; i++) {
+                        auto m = bplustree_leaf->get(i);
                         if (m.is_type(type_TypedLink)) {
                             auto link = m.get_link();
                             REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
@@ -275,13 +277,7 @@ void ColumnDictionaryKey::init_key(Mixed key_value)
     REALM_ASSERT(!key_value.is_null());
 
     m_key = key_value;
-    if (!key_value.is_null()) {
-        if (m_key.get_type() == type_String) {
-            m_buffer = std::string(m_key.get_string());
-            m_key = Mixed(m_buffer);
-        }
-        m_objkey = Dictionary::get_internal_obj_key(m_key);
-    }
+    m_key.use_buffer(m_buffer);
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
@@ -328,19 +324,21 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
 
         REALM_ASSERT(m_leaf_ptr != nullptr);
         if (m_leaf_ptr->get(index)) {
-            DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
-            dict_cluster.init_from_parent();
-            auto col = dict_cluster.get_keys_column_key();
+            Array top(alloc);
+            top.set_parent(const_cast<ArrayInteger*>(m_leaf_ptr), index);
+            top.init_from_parent();
+            BPlusTree<StringData> keys(alloc);
+            keys.set_parent(&top, 0);
+            keys.init_from_parent();
 
-            destination.init(true, dict_cluster.size());
-            ArrayString leaf(alloc);
+            destination.init(true, keys.size());
             size_t n = 0;
-            // Iterate through cluster and insert all keys
-            dict_cluster.traverse([&leaf, &destination, &n, col](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                cluster->init_leaf(col, &leaf);
-                for (size_t i = 0; i < e; i++) {
-                    destination.set(n, leaf.get(i));
+            // Iterate through BPlusTree and insert all keys
+            keys.traverse([&](BPlusTreeNode* node, size_t) {
+                auto bplustree_leaf = static_cast<BPlusTree<StringData>::LeafNode*>(node);
+                auto sz = bplustree_leaf->size();
+                for (size_t i = 0; i < sz; i++) {
+                    destination.set(n, bplustree_leaf->get(i));
                     n++;
                 }
                 return IteratorControl::AdvanceToNext;
@@ -382,16 +380,20 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
 
         REALM_ASSERT(m_leaf_ptr != nullptr);
         if (m_leaf_ptr->get(index)) {
-            DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
-            dict_cluster.init_from_parent();
+            Array top(alloc);
+            top.set_parent(const_cast<ArrayInteger*>(m_leaf_ptr), index);
+            top.init_from_parent();
+            BPlusTree<StringData> keys(alloc);
+            keys.set_parent(&top, 0);
+            keys.init_from_parent();
 
             Mixed val;
-            auto state = dict_cluster.try_get_with_key(m_objkey, m_key);
-            if (state.index != realm::npos) {
-                ArrayMixed values(alloc);
-                ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
-                values.init_from_ref(ref);
-                val = values.get(state.index);
+            size_t ndx = keys.find_first(m_key.get_string());
+            if (ndx != realm::npos) {
+                BPlusTree<Mixed> values(alloc);
+                values.set_parent(&top, 1);
+                values.init_from_parent();
+                val = values.get(ndx);
                 if (m_prop_list.size()) {
                     if (val.is_type(type_TypedLink)) {
                         auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
@@ -466,18 +468,21 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 
         REALM_ASSERT(m_leaf_ptr != nullptr);
         if (m_leaf_ptr->get(index)) {
-            DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
-            dict_cluster.init_from_parent();
+            Array top(alloc);
+            top.set_parent(const_cast<ArrayInteger*>(m_leaf_ptr), index);
+            top.init_from_parent();
+            BPlusTree<Mixed> values(alloc);
+            values.set_parent(&top, 1);
+            values.init_from_parent();
 
-            destination.init(true, dict_cluster.size());
-            ArrayMixed leaf(alloc);
+            destination.init(true, values.size());
             size_t n = 0;
-            // Iterate through cluster and insert all values
-            dict_cluster.traverse([&leaf, &destination, &n](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-                for (size_t i = 0; i < e; i++) {
-                    destination.set(n, leaf.get(i));
+            // Iterate through BPlusTreee and insert all values
+            values.traverse([&](BPlusTreeNode* node, size_t) {
+                auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+                auto sz = bplustree_leaf->size();
+                for (size_t i = 0; i < sz; i++) {
+                    destination.set(n, bplustree_leaf->get(i));
                     n++;
                 }
                 return IteratorControl::AdvanceToNext;
@@ -615,6 +620,12 @@ Query Subexpr2<StringData>::like(StringData sd, bool case_sensitive)
 Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sensitive)
 {
     return string_compare<Like, LikeIns>(*this, col, case_sensitive);
+}
+
+Query Columns<StringData>::fulltext(StringData text) const
+{
+    const LinkMap& link_map = get_link_map();
+    return link_map.get_base_table()->where().fulltext(column_key(), text, link_map);
 }
 
 
