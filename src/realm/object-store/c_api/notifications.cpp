@@ -43,10 +43,10 @@ struct CollectionNotificationsCallback {
     }
 };
 
-KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
+std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
-    KeyPathArray ret;
     if (key_path_array) {
+        KeyPathArray ret;
         for (size_t i = 0; i < key_path_array->nb_elements; i++) {
             realm_key_path_t* key_path = key_path_array->paths + i;
             ret.emplace_back();
@@ -56,8 +56,9 @@ KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
                 kp.emplace_back(TableKey(path_elem->object), ColKey(path_elem->property));
             }
         }
+        return ret;
     }
-    return ret;
+    return std::nullopt;
 }
 
 } // namespace

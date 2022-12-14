@@ -329,7 +329,7 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c) {
                     change = c;
@@ -339,7 +339,7 @@ TEST_CASE("object") {
             return token;
         };
 
-        auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_no_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             bool first = true;
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet) {

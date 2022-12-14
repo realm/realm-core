@@ -219,7 +219,7 @@ util::Optional<Mixed> Collection::average(ColKey col) const
 }
 
 NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
-                                                        KeyPathArray key_path_array) &
+                                                        std::optional<KeyPathArray> key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();

@@ -81,7 +81,7 @@ public:
      * callback via `remove_callback`.
      */
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     bool is_valid() const;
 
@@ -139,7 +139,7 @@ public:
      * callback via `remove_callback`.
      */
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     /// Return a new instance of SectionedResults that uses a snapshot of the underlying `Results`.
     /// The section key callback parameter will never be invoked.
@@ -188,7 +188,7 @@ private:
     bool m_has_performed_initial_evalutation = false;
     NotificationToken add_notification_callback_for_section(Mixed section_key,
                                                             SectionedResultsNotificatonCallback callback,
-                                                            KeyPathArray key_path_array = {});
+                                                            std::optional<KeyPathArray> key_path_array = std::nullopt);
 
     friend class realm::ResultsSection;
     Results m_results;
