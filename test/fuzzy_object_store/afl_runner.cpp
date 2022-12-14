@@ -19,6 +19,10 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <cstring>
+#if REALM_USE_UV
+#include <uv.h>
+#endif
 int main(int argc, const char* argv[])
 {
     FuzzEngine fuzz_engine;
@@ -26,7 +30,7 @@ int main(int argc, const char* argv[])
     std::string path = "real-afl.txt";
     size_t input_index = 0;
     for (size_t i = 0; i < (size_t)argc; ++i) {
-        if (strcmp(argv[i], "--log") == 0) {
+        if (::strcmp(argv[i], "--log") == 0) {
             enable_logging = true;
         }
         else {
