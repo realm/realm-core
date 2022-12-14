@@ -65,7 +65,7 @@ namespace realm::sync::network {
 ///
 /// A *service context* is a set of objects consisting of an instance of
 /// Service, and all the objects that are associated with that instance (\ref
-/// Resolver, \ref Socket`, \ref Acceptor`, \ref DeadlineTimer, and 
+/// Resolver, \ref Socket`, \ref Acceptor`, \ref DeadlineTimer, and
 /// \ref ssl::Stream).
 ///
 /// In general, it is unsafe for two threads to call functions on the same
