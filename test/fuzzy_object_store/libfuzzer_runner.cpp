@@ -19,6 +19,7 @@
 #include "fuzz_engine.hpp"
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
 #if REALM_USE_UV
 #include <uv.h>
 #endif
