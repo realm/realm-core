@@ -2011,10 +2011,12 @@ TEST_CASE("notifications: results") {
         // - all callbacks have filters
         int notification_calls_without_filter = 0;
         int notification_calls_table_value = 0;
+        int notification_calls_with_empty_filter = 0;
         int notification_calls_linked_to_value = 0;
         int notification_calls_other_linked_to_value = 0;
         CollectionChangeSet collection_change_set_without_filter;
         CollectionChangeSet collection_change_set_table_value;
+        CollectionChangeSet collection_change_set_with_empty_filter;
         CollectionChangeSet collection_change_set_linked_to_value;
         CollectionChangeSet collection_change_set_other_linked_to_value;
 
@@ -2032,6 +2034,12 @@ TEST_CASE("notifications: results") {
                     ++notification_calls_table_value;
                 },
                 key_path_array_table_value);
+            auto token_with_empty_filter = results_for_notification_filter.add_notification_callback(
+                [&](CollectionChangeSet collection_change_set) {
+                    collection_change_set_with_empty_filter = collection_change_set;
+                    ++notification_calls_with_empty_filter;
+                },
+                KeyPathArray());
             auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
                 [&](CollectionChangeSet collection_change_set) {
                     collection_change_set_linked_to_value = collection_change_set;
@@ -2052,6 +2060,8 @@ TEST_CASE("notifications: results") {
             REQUIRE(collection_change_set_without_filter.empty());
             REQUIRE(notification_calls_table_value == 1);
             REQUIRE(collection_change_set_table_value.empty());
+            REQUIRE(notification_calls_with_empty_filter == 1);
+            REQUIRE(collection_change_set_with_empty_filter.empty());
             REQUIRE(notification_calls_linked_to_value == 1);
             REQUIRE(collection_change_set_linked_to_value.empty());
 
@@ -2070,6 +2080,11 @@ TEST_CASE("notifications: results") {
                 REQUIRE_FALSE(collection_change_set_table_value.empty());
                 REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
                 REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_with_empty_filter == 2);
+                REQUIRE_FALSE(collection_change_set_with_empty_filter.empty());
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.modifications_new, 1);
 
                 REQUIRE(notification_calls_linked_to_value == 2);
                 REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
