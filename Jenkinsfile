@@ -664,18 +664,13 @@ def doBuildMacOs(Map options = [:]) {
     }
 
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
-    def xcodeVersion = "Xcode-13.1"
 
     return {
         rlmNode('osx') {
             getArchive()
 
             dir('build-macosx') {
-                // Forcing SDKROOT to be based off DEVELOPER_DIR, since it is being set to Xcode-14.1, which is incompatible with 13.1
-                withEnv([
-                    "DEVELOPER_DIR=/Applications/${xcodeVersion}.app/Contents/Developer/",
-                    "SDKROOT=/Applications/${xcodeVersion}.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-                ]) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -685,7 +680,7 @@ def doBuildMacOs(Map options = [:]) {
                         }
                     }
 
-                    sh 'echo DEVELOPER_DIR=$DEVELOPER_DIR && echo SDKROOT=$SDKROOT'
+                    sh 'echo "DEVELOPER_DIR=$DEVELOPER_DIR\nSDKROOT=$SDKROOT"'
 
                     runAndCollectWarnings(
                         parser: 'clang',
