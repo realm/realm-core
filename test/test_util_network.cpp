@@ -5,9 +5,10 @@
 #include <memory>
 #include <thread>
 
+#include <realm/status.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/sync/network/network.hpp>
-#include <realm/sync/noinst/client_impl_base.hpp>
+#include <realm/sync/trigger.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
@@ -1940,11 +1941,11 @@ TEST(Sync_Trigger_Basics)
 
     // Check that triggering works
     bool was_triggered = false;
-    auto func = [&] {
+    auto func = [&](realm::Status) {
         was_triggered = true;
     };
-    auto trigger = std::make_shared<Trigger>(&service, std::move(func));
-    trigger->trigger();
+    Trigger<network::Service> trigger(&service, std::move(func));
+    trigger.trigger();
     service.run();
     CHECK(was_triggered);
 
@@ -1955,14 +1956,14 @@ TEST(Sync_Trigger_Basics)
 
     // Check double-triggering
     was_triggered = false;
-    trigger->trigger();
-    trigger->trigger();
+    trigger.trigger();
+    trigger.trigger();
     service.run();
     CHECK(was_triggered);
 
     // Check that retriggering from triggered function works
     realm::util::UniqueFunction<void()> func_2;
-    auto trigger_2 = std::make_shared<Trigger>(&service, [&] {
+    Trigger<network::Service> trigger_2(&service, [&](realm::Status) {
         func_2();
     });
     was_triggered = false;
@@ -1973,10 +1974,10 @@ TEST(Sync_Trigger_Basics)
         }
         else {
             was_triggered = true;
-            trigger_2->trigger();
+            trigger_2.trigger();
         }
     };
-    trigger_2->trigger();
+    trigger_2.trigger();
     service.run();
     CHECK(was_triggered_twice);
 
@@ -1984,11 +1985,11 @@ TEST(Sync_Trigger_Basics)
     // object
     was_triggered = false;
     {
-        auto func_3 = [&] {
+        auto func_3 = [&](realm::Status) {
             was_triggered = true;
         };
-        auto trigger_3 = std::make_shared<Trigger>(&service, std::move(func_3));
-        trigger_3->trigger();
+        Trigger<network::Service> trigger_3(&service, std::move(func_3));
+        trigger_3.trigger();
     }
     service.run();
     CHECK_NOT(was_triggered);
@@ -1996,16 +1997,16 @@ TEST(Sync_Trigger_Basics)
     // Check that two functions can be triggered in an overlapping fashion
     bool was_triggered_4 = false;
     bool was_triggered_5 = false;
-    auto func_4 = [&] {
+    auto func_4 = [&](realm::Status) {
         was_triggered_4 = true;
     };
-    auto func_5 = [&] {
+    auto func_5 = [&](realm::Status) {
         was_triggered_5 = true;
     };
-    auto trigger_4 = std::make_shared<Trigger>(&service, std::move(func_4));
-    auto trigger_5 = std::make_shared<Trigger>(&service, std::move(func_5));
-    trigger_4->trigger();
-    trigger_5->trigger();
+    Trigger<network::Service> trigger_4(&service, std::move(func_4));
+    Trigger<network::Service> trigger_5(&service, std::move(func_5));
+    trigger_4.trigger();
+    trigger_5.trigger();
     service.run();
     CHECK(was_triggered_4);
     CHECK(was_triggered_5);
@@ -2019,21 +2020,21 @@ TEST(Sync_Trigger_ThreadSafety)
     keep_alive.async_wait(std::chrono::hours(10000), [](std::error_code) {});
     long n_1 = 0, n_2 = 0;
     std::atomic<bool> flag{false};
-    auto func = [&] {
+    auto func = [&](realm::Status) {
         ++n_1;
         if (flag)
             ++n_2;
     };
-    auto trigger = std::make_shared<Trigger>(&service, std::move(func));
+    Trigger<network::Service> trigger(&service, std::move(func));
     ThreadWrapper thread;
     thread.start([&] {
         service.run();
     });
     long m = 1000000;
     for (long i = 0; i < m; ++i)
-        trigger->trigger();
+        trigger.trigger();
     flag = true;
-    trigger->trigger();
+    trigger.trigger();
     service.post([&] {
         keep_alive.cancel();
     });

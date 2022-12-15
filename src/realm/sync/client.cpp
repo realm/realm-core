@@ -522,7 +522,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
     if (retrigger)
-        m_actualize_and_finalize->trigger();
+        m_actualize_and_finalize.trigger();
 }
 
 
@@ -549,7 +549,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
     if (retrigger)
-        m_actualize_and_finalize->trigger();
+        m_actualize_and_finalize.trigger();
 }
 
 
@@ -1600,14 +1600,16 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name}
     , m_custom_http_headers{custom_http_headers}
 {
-    auto handler = [this] {
-        REALM_ASSERT(m_activated);
-        if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    };
-    m_on_idle = std::make_shared<Trigger>(&client.get_service(), std::move(handler)); // Throws
+    m_on_idle =
+        Trigger<network::Service>{&client.get_service(), [this](Status status) {
+                                      if (!status.is_ok())
+                                          return;
+                                      REALM_ASSERT(m_activated);
+                                      if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
+                                          on_idle(); // Throws
+                                          // Connection object may be destroyed now.
+                                      }
+                                  }};
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept

@@ -50,6 +50,7 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+    trigger.hpp
 
     network/http.hpp
 )

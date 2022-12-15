@@ -25,6 +25,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/trigger.hpp>
 
 
 namespace realm {
@@ -54,57 +55,6 @@ public:
 
 private:
     SessionWrapper* m_back = nullptr;
-};
-
-/// Register a function whose invocation can be triggered repeatedly.
-///
-/// While the function is always executed by the event loop thread, the
-/// triggering of its execution can be done by any thread.
-///
-/// The function is guaranteed to not be called after the Trigger object is
-/// destroyed.
-///
-/// Note that even though the trigger() function is thread-safe, the Trigger
-/// object, as a whole, is not. In particular, construction and destruction must
-/// not be considered thread-safe.
-class Trigger : public std::enable_shared_from_this<Trigger> {
-public:
-    Trigger(network::Service* service, std::function<void()>&& handler);
-    ~Trigger() noexcept = default;
-
-    /// Trigger another invocation of the associated function.
-    ///
-    /// An invocation of trigger() puts the Trigger object into the triggered
-    /// state. It remains in the triggered state until shortly before the
-    /// function starts to execute. While the Trigger object is in the triggered
-    /// state, trigger() has no effect. This means that the number of executions
-    /// of the function will generally be less that the number of times
-    /// trigger() is invoked.
-    ///
-    /// A particular invocation of trigger() ensures that there will be at least
-    /// one invocation of the associated function whose execution begins after
-    /// the beginning of the execution of trigger(), so long as the event loop
-    /// thread does not exit prematurely from run().
-    ///
-    /// If trigger() is invoked from the event loop thread, the next execution
-    /// of the associated function will not begin until after trigger() returns,
-    /// effectively preventing reentrancy for the associated function.
-    ///
-    /// If trigger() is invoked from another thread, the associated function may
-    /// start to execute before trigger() returns.
-    ///
-    /// Note that the associated function can retrigger itself, i.e., if the
-    /// associated function calls trigger(), then that will lead to another
-    /// invocation of the associated function, but not until the first
-    /// invocation ends (no reentrance).
-    void trigger();
-
-protected:
-    // TODO: replace network::Service with SyncSocketProvider when DefaultSocketProvider is created
-    network::Service* m_service;
-    std::function<void()> m_handler;
-    bool m_triggered;
-    util::Mutex m_mutex;
 };
 
 class ClientImpl {
@@ -216,7 +166,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    std::shared_ptr<Trigger> m_actualize_and_finalize;
+    Trigger<network::Service> m_actualize_and_finalize;
     network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -557,7 +507,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    std::shared_ptr<Trigger> m_on_idle;
+    Trigger<network::Service> m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -1258,7 +1208,7 @@ inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle->trigger();
+        m_on_idle.trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {
@@ -1560,36 +1510,6 @@ inline bool ClientImpl::Session::check_received_sync_progress(const SyncProgress
 {
     int error_code = 0; // Dummy
     return check_received_sync_progress(progress, error_code);
-}
-
-inline Trigger::Trigger(network::Service* service, std::function<void()>&& handler)
-    : m_service(service)
-    , m_handler(std::move(handler))
-    , m_triggered(false)
-{
-}
-
-inline void Trigger::trigger()
-{
-    REALM_ASSERT(m_service);
-
-    util::LockGuard lock{m_mutex};
-    if (m_triggered) {
-        return;
-    }
-    m_triggered = !m_triggered;
-
-    auto handler = [self_weak = weak_from_this()] {
-        // Do not execute the handler if the Trigger does not exist anymore.
-        if (auto self = self_weak.lock()) {
-            {
-                util::LockGuard lock{self->m_mutex};
-                self->m_triggered = !self->m_triggered;
-            }
-            self->m_handler();
-        }
-    };
-    m_service->post(std::move(handler));
 }
 
 } // namespace sync

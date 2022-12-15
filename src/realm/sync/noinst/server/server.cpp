@@ -4,13 +4,13 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
+#include <realm/sync/trigger.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
@@ -1092,11 +1092,13 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        auto handler = [this](Status status) {
+            if (!status.is_ok())
+                return;
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = std::make_shared<Trigger>(&service, std::move(handler)); // Throws
+        m_send_trigger = Trigger<network::Service>{&service, std::move(handler)}; // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1335,7 +1337,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    std::shared_ptr<Trigger> m_send_trigger;
+    Trigger<network::Service> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -4228,7 +4230,7 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger->trigger();
+    m_send_trigger.trigger();
 }
 
 
@@ -4665,7 +4667,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger->trigger();
+    m_send_trigger.trigger();
 }
 
 
