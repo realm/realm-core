@@ -57,12 +57,20 @@ private:
 };
 
 /// Register a function whose invocation can be triggered repeatedly.
+///
+/// While the function is always executed by the event loop thread, the
+/// triggering of its execution can be done by any thread.
+///
+/// The function is guaranteed to not be called after the Trigger object is
+/// destroyed.
+///
+/// Note that even though the trigger() function is thread-safe, the Trigger
+/// object, as a whole, is not. In particular, construction and destruction must
+/// not be considered thread-safe.
 class Trigger : public std::enable_shared_from_this<Trigger> {
 public:
     Trigger(network::Service* service, std::function<void()>&& handler);
     ~Trigger() noexcept = default;
-
-    Trigger() noexcept = default;
 
     /// Trigger another invocation of the associated function.
     ///
@@ -96,6 +104,7 @@ protected:
     network::Service* m_service;
     std::function<void()> m_handler;
     bool m_triggered;
+    util::Mutex m_mutex;
 };
 
 class ClientImpl {
@@ -1563,6 +1572,8 @@ inline Trigger::Trigger(network::Service* service, std::function<void()>&& handl
 inline void Trigger::trigger()
 {
     REALM_ASSERT(m_service);
+
+    util::LockGuard lock{m_mutex};
     if (m_triggered) {
         return;
     }
@@ -1571,7 +1582,10 @@ inline void Trigger::trigger()
     auto handler = [self_weak = weak_from_this()] {
         // Do not execute the handler if the Trigger does not exist anymore.
         if (auto self = self_weak.lock()) {
-            self->m_triggered = !self->m_triggered;
+            {
+                util::LockGuard lock{self->m_mutex};
+                self->m_triggered = !self->m_triggered;
+            }
             self->m_handler();
         }
     };
