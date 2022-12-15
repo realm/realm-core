@@ -1943,8 +1943,8 @@ TEST(Sync_Trigger_Basics)
     auto func = [&] {
         was_triggered = true;
     };
-    Trigger trigger{&service, std::move(func)};
-    trigger.trigger();
+    auto trigger = std::make_shared<Trigger>(&service, std::move(func));
+    trigger->trigger();
     service.run();
     CHECK(was_triggered);
 
@@ -1955,16 +1955,16 @@ TEST(Sync_Trigger_Basics)
 
     // Check double-triggering
     was_triggered = false;
-    trigger.trigger();
-    trigger.trigger();
+    trigger->trigger();
+    trigger->trigger();
     service.run();
     CHECK(was_triggered);
 
     // Check that retriggering from triggered function works
     realm::util::UniqueFunction<void()> func_2;
-    Trigger trigger_2{&service, [&] {
-                          func_2();
-                      }};
+    auto trigger_2 = std::make_shared<Trigger>(&service, [&] {
+        func_2();
+    });
     was_triggered = false;
     bool was_triggered_twice = false;
     func_2 = [&] {
@@ -1973,12 +1973,25 @@ TEST(Sync_Trigger_Basics)
         }
         else {
             was_triggered = true;
-            trigger_2.trigger();
+            trigger_2->trigger();
         }
     };
-    trigger_2.trigger();
+    trigger_2->trigger();
     service.run();
     CHECK(was_triggered_twice);
+
+    // Check that the function is not called after destruction of the Trigger
+    // object
+    was_triggered = false;
+    {
+        auto func_3 = [&] {
+            was_triggered = true;
+        };
+        auto trigger_3 = std::make_shared<Trigger>(&service, std::move(func_3));
+        trigger_3->trigger();
+    }
+    service.run();
+    CHECK_NOT(was_triggered);
 
     // Check that two functions can be triggered in an overlapping fashion
     bool was_triggered_4 = false;
@@ -1989,10 +2002,10 @@ TEST(Sync_Trigger_Basics)
     auto func_5 = [&] {
         was_triggered_5 = true;
     };
-    Trigger trigger_4{&service, std::move(func_4)};
-    Trigger trigger_5{&service, std::move(func_5)};
-    trigger_4.trigger();
-    trigger_5.trigger();
+    auto trigger_4 = std::make_shared<Trigger>(&service, std::move(func_4));
+    auto trigger_5 = std::make_shared<Trigger>(&service, std::move(func_5));
+    trigger_4->trigger();
+    trigger_5->trigger();
     service.run();
     CHECK(was_triggered_4);
     CHECK(was_triggered_5);
@@ -2011,16 +2024,16 @@ TEST(Sync_Trigger_ThreadSafety)
         if (flag)
             ++n_2;
     };
-    Trigger trigger{&service, std::move(func)};
+    auto trigger = std::make_shared<Trigger>(&service, std::move(func));
     ThreadWrapper thread;
     thread.start([&] {
         service.run();
     });
     long m = 1000000;
     for (long i = 0; i < m; ++i)
-        trigger.trigger();
+        trigger->trigger();
     flag = true;
-    trigger.trigger();
+    trigger->trigger();
     service.post([&] {
         keep_alive.cancel();
     });

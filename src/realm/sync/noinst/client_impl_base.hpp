@@ -24,7 +24,6 @@
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 
 
@@ -58,14 +57,12 @@ private:
 };
 
 /// Register a function whose invocation can be triggered repeatedly.
-class Trigger {
+class Trigger : public std::enable_shared_from_this<Trigger> {
 public:
     Trigger(network::Service* service, std::function<void()>&& handler);
     ~Trigger() noexcept = default;
 
     Trigger() noexcept = default;
-    Trigger(Trigger&&) noexcept = default;
-    Trigger& operator=(Trigger&&) noexcept = default;
 
     /// Trigger another invocation of the associated function.
     ///
@@ -210,7 +207,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    Trigger m_actualize_and_finalize;
+    std::shared_ptr<Trigger> m_actualize_and_finalize;
     network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -551,7 +548,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    Trigger m_on_idle;
+    std::shared_ptr<Trigger> m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -1252,7 +1249,7 @@ inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {
@@ -1571,9 +1568,12 @@ inline void Trigger::trigger()
     }
     m_triggered = !m_triggered;
 
-    auto handler = [&] {
-        m_triggered = !m_triggered;
-        m_handler();
+    auto handler = [self_weak = weak_from_this()] {
+        // Do not execute the handler if the Trigger does not exist anymore.
+        if (auto self = self_weak.lock()) {
+            self->m_triggered = !self->m_triggered;
+            self->m_handler();
+        }
     };
     m_service->post(std::move(handler));
 }
