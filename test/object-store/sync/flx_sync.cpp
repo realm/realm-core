@@ -2479,7 +2479,6 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     }
 }
 
-<<<<<<< HEAD
 TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync]") {
     static auto foo_obj_id = ObjectId::gen();
     static auto bar_obj_id = ObjectId::gen();
