@@ -14,7 +14,7 @@ Please use this quick guide: https://aflplus.plus/building/ it requires llvm >= 
 For using libfuzzer, the only pre-requisite is having a recent version of clang.
 ## Running
 Note REALM_MAX_BPNODE_SIZE is the max number of nodes contained in the b+tree. It determines the depth of the tree and its fanout. \
-This number should be random generated. \
+This number should be random generated.
 
 If you don't want to build manually, you can skip this section and jump to the `Scripts` section. \
 Run the fuzzer via AFL++:
@@ -74,4 +74,4 @@ Optionally, the following arguments can be passed to the script:
 
 [AFL++ github](https://github.com/AFLplusplus/AFLplusplus) \
 [LibFuzzer](https://github.com/google/fuzzing/blob/master/tutorial/libFuzzerTutorial.md) \
-[Google Fuzz Test](https://github.com/google/fuzztest) \
+[Google Fuzz Test](https://github.com/google/fuzztest)
