@@ -34,7 +34,7 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type>;
+using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type>;
 
 class SessionWrapper;
 
@@ -62,7 +62,7 @@ public:
     class Connection;
     class Session;
 
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = network::Endpoint::port_type;
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
@@ -132,7 +132,7 @@ public:
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
-    util::network::Service& get_service() noexcept;
+    network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
     /// Returns false if the specified URL is invalid.
@@ -158,15 +158,15 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    util::network::Service m_service;
+    network::Service m_service;
     std::mt19937_64 m_random;
-    util::websocket::EZSocketFactory m_socket_factory;
+    websocket::EZSocketFactory m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    util::network::Trigger m_actualize_and_finalize;
-    util::network::DeadlineTimer m_keep_running_timer;
+    network::Trigger m_actualize_and_finalize;
+    network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -301,7 +301,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImpl::Connection final : public util::websocket::EZObserver {
+class ClientImpl::Connection final : public websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -374,7 +374,7 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in util::websocket::EZObserver
+    // Overriding methods in websocket::EZObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
     void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
@@ -489,7 +489,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<util::websocket::EZSocket> m_websocket;
+    std::unique_ptr<websocket::EZSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -506,7 +506,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    util::network::Trigger m_on_idle;
+    network::Trigger m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -545,16 +545,16 @@ private:
     // before the completion handler of the previous canceled wait operation
     // starts executing. Such an overlap is not allowed for wait operations on
     // the same timer instance.
-    util::Optional<util::network::DeadlineTimer> m_reconnect_disconnect_timer;
+    util::Optional<network::DeadlineTimer> m_reconnect_disconnect_timer;
 
     // Timer for connect operation watchdog. For why this timer is optional, see
     // `m_reconnect_disconnect_timer`.
-    util::Optional<util::network::DeadlineTimer> m_connect_timer;
+    util::Optional<network::DeadlineTimer> m_connect_timer;
 
     // This timer is used to schedule the sending of PING messages, and as a
     // watchdog for timely reception of PONG messages. For why this timer is
     // optional, see `m_reconnect_disconnect_timer`.
-    util::Optional<util::network::DeadlineTimer> m_heartbeat_timer;
+    util::Optional<network::DeadlineTimer> m_heartbeat_timer;
 
     milliseconds_type m_pong_wait_started_at = 0;
     milliseconds_type m_last_ping_sent_at = 0;
@@ -887,6 +887,8 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
+    void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
+
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
@@ -904,7 +906,7 @@ private:
 
     bool m_suspended = false;
 
-    util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
+    util::Optional<network::DeadlineTimer> m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
@@ -934,6 +936,8 @@ private:
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
+
+    std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
     bool m_connection_to_close;
@@ -1099,6 +1103,8 @@ private:
 
     SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const SyncProgress&, int64_t, DownloadBatchState,
                                          size_t);
+    SyncClientHookAction call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo&);
+    SyncClientHookAction call_debug_hook(const SyncClientHookData& data);
 
     bool is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version);
 
@@ -1123,7 +1129,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
-inline util::network::Service& ClientImpl::get_service() noexcept
+inline network::Service& ClientImpl::get_service() noexcept
 {
     return m_service;
 }

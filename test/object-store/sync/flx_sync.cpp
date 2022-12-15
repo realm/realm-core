@@ -2479,6 +2479,157 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     }
 }
 
+TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app]") {
+    AppCreateConfig::FLXSyncRole role;
+    role.name = "compensating_write_perms";
+    role.read = true;
+    role.write =
+        nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+    FLXSyncTestHarness::ServerSchema server_schema{
+        g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
+    FLXSyncTestHarness::Config harness_config("flx_bad_query", server_schema);
+    harness_config.reconnect_mode = ReconnectMode::testing;
+    FLXSyncTestHarness harness(std::move(harness_config));
+
+    auto test_obj_id_1 = ObjectId::gen();
+    auto test_obj_id_2 = ObjectId::gen();
+
+    create_user_and_log_in(harness.app());
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.cache = false;
+
+    {
+        auto error_received_pf = util::make_promise_future<void>();
+        config.sync_config->on_sync_client_event_hook =
+            [promise = util::CopyablePromiseHolder(std::move(error_received_pf.promise))](
+                std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+                if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                    return SyncClientHookAction::NoAction;
+                }
+                auto session = weak_session.lock();
+                REQUIRE(session);
+
+                auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+
+                if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                REQUIRE(error_code == sync::ProtocolError::compensating_write);
+                REQUIRE_FALSE(data.error_info->compensating_writes.empty());
+                promise.get_promise().emplace_value();
+
+                return SyncClientHookAction::SuspendWithRetryableError;
+            };
+
+        auto realm = Realm::get_shared_realm(config);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table).equal(queryable_str_field, "bizz"));
+        std::move(new_query).commit();
+
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {"_id", test_obj_id_1},
+                           {"queryable_str_field", std::string{"foo"}},
+                       }));
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{
+                           {"_id", test_obj_id_2},
+                           {"queryable_str_field", std::string{"baz"}},
+                       }));
+        realm->commit_transaction();
+
+        error_received_pf.future.get();
+        realm->sync_session()->shutdown_and_wait();
+        config.sync_config->on_sync_client_event_hook = {};
+    }
+
+    _impl::RealmCoordinator::clear_all_caches();
+
+    std::mutex errors_mutex;
+    std::condition_variable new_compensating_write;
+    std::vector<std::pair<ObjectId, sync::version_type>> error_to_download_version;
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes;
+    sync::version_type download_version;
+
+    config.sync_config->on_sync_client_event_hook = [&](std::weak_ptr<SyncSession> weak_session,
+                                                        const SyncClientHookData& data) mutable {
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+            if (data.event == SyncClientHookEvent::DownloadMessageReceived) {
+                download_version = data.progress.download.server_version;
+            }
+
+            return SyncClientHookAction::NoAction;
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        REQUIRE(error_code == sync::ProtocolError::compensating_write);
+        REQUIRE(!data.error_info->compensating_writes.empty());
+        std::lock_guard<std::mutex> lk(errors_mutex);
+        for (const auto& compensating_write : data.error_info->compensating_writes) {
+            error_to_download_version.emplace_back(compensating_write.primary_key.get_object_id(),
+                                                   data.error_info->compensating_write_server_version);
+        }
+
+        return SyncClientHookAction::NoAction;
+    };
+
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+        std::unique_lock<std::mutex> lk(errors_mutex);
+        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
+                                              [&](const auto& pair) {
+                                                  return pair.first == compensating_write.primary_key.get_object_id();
+                                              });
+            REQUIRE(tracked_error != error_to_download_version.end());
+            CHECK(tracked_error->second <= download_version);
+            compensating_writes.push_back(compensating_write);
+        }
+        new_compensating_write.notify_one();
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    std::unique_lock<std::mutex> lk(errors_mutex);
+    new_compensating_write.wait_for(lk, std::chrono::seconds(30), [&] {
+        return compensating_writes.size() == 2;
+    });
+
+    REQUIRE(compensating_writes.size() == 2);
+    auto& write_info = compensating_writes[0];
+    CHECK(write_info.primary_key.is_type(type_ObjectId));
+    CHECK(write_info.primary_key.get_object_id() == test_obj_id_1);
+    CHECK(write_info.object_name == "TopLevel");
+    CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
+
+    write_info = compensating_writes[1];
+    REQUIRE(write_info.primary_key.is_type(type_ObjectId));
+    REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
+    REQUIRE(write_info.object_name == "TopLevel");
+    REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+    auto top_level_table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(top_level_table->is_empty());
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS

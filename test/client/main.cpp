@@ -203,14 +203,14 @@ inline void MainEventLoop::end_of_test_proc() noexcept
 
 
 struct PeerControl {
-    PeerControl(util::network::Service&);
+    PeerControl(sync::network::Service&);
     int phase_ndx = 0;
     int transact_ndx = 0;
     int download_wait_ndx = 0;
-    util::network::DeadlineTimer transact_timer;
+    sync::network::DeadlineTimer transact_timer;
 };
 
-inline PeerControl::PeerControl(util::network::Service& service)
+inline PeerControl::PeerControl(sync::network::Service& service)
     : transact_timer{service}
 {
 }
@@ -1099,7 +1099,7 @@ int main(int argc, char* argv[])
 
     sync::ProtocolEnvelope protocol_envelope;
     std::string server_address;
-    util::network::Endpoint::port_type server_port = 0;
+    sync::network::Endpoint::port_type server_port = 0;
     if (have_server_url) {
         std::string path;
         bool good_url =
@@ -1137,7 +1137,7 @@ int main(int argc, char* argv[])
     util::Optional<std::string> ssl_trust_certificate_path =
         (ssl_trust_cert == "" ? util::none : util::Optional<std::string>(ssl_trust_cert));
 
-    util::network::Service test_proc_service;
+    sync::network::Service test_proc_service;
 
     auto on_sync_error = [&](bool is_fatal) {
         switch (abort_on_error) {
@@ -1167,7 +1167,7 @@ int main(int argc, char* argv[])
         std::string username;
         std::vector<std::string> queries;
     };
-    std::string host_name = util::network::host_name();
+    std::string host_name = sync::network::host_name();
     std::unique_ptr<PeerParams[]> peer_params = std::make_unique<PeerParams[]>(num_peers);
     {
         int peer_ndx = 0;
@@ -1550,7 +1550,7 @@ int main(int argc, char* argv[])
         }
     };
 
-    util::network::DeadlineTimer growth_timer{test_proc_service};
+    sync::network::DeadlineTimer growth_timer{test_proc_service};
     int current_num_peers = 0;
     int growth_ndx = 0;
     std::function<void()> grow = [&] {
@@ -1587,7 +1587,7 @@ int main(int argc, char* argv[])
         test_proc_service.post(func);
     }
 
-    util::network::DeadlineTimer keep_alive_timer{test_proc_service};
+    sync::network::DeadlineTimer keep_alive_timer{test_proc_service};
     std::function<void()> sched_keep_alive_wait;
     sched_keep_alive_wait = [&] {
         auto handler = [&](std::error_code ec) {

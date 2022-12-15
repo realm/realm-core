@@ -4,7 +4,7 @@
 #include <realm/sync/network/websocket.hpp>
 
 using namespace realm;
-using namespace realm::util;
+using namespace realm::sync;
 
 using WriteCompletionHandler = websocket::WriteCompletionHandler;
 using ReadCompletionHandler = websocket::ReadCompletionHandler;
@@ -103,7 +103,7 @@ private:
     {
         m_logger.trace("delim_not_found");
         m_reader_waiting = false;
-        m_handler(MiscExtErrors::delim_not_found, 0);
+        m_handler(util::MiscExtErrors::delim_not_found, 0);
     }
 };
 

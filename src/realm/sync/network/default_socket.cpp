@@ -4,10 +4,10 @@
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
 
-namespace realm::util::websocket {
+namespace realm::sync::websocket {
 
 namespace {
-class EZSocketImpl final : public EZSocket, public websocket::Config {
+class EZSocketImpl final : public EZSocket, public Config {
 public:
     EZSocketImpl(EZConfig& config, EZObserver& observer, EZEndpoint&& endpoint)
         : m_logger_ptr{config.logger}
@@ -44,7 +44,7 @@ private:
         return m_random;
     }
 
-    void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
+    void websocket_handshake_completion_handler(const HTTPHeaders& headers) override
     {
         const std::string empty;
         auto it = headers.find("Sec-WebSocket-Protocol");
@@ -60,7 +60,7 @@ private:
         m_logger.error("Writing failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
-    void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
+    void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
                                            const std::string_view* body) override
     {
         m_observer.websocket_handshake_error_handler(ec, body);
@@ -79,9 +79,9 @@ private:
     }
 
     void initiate_resolve();
-    void handle_resolve(std::error_code, util::network::Endpoint::List);
-    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t);
-    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t);
+    void handle_resolve(std::error_code, network::Endpoint::List);
+    void initiate_tcp_connect(network::Endpoint::List, std::size_t);
+    void handle_tcp_connect(std::error_code, network::Endpoint::List, std::size_t);
     void initiate_http_tunnel();
     void handle_http_tunnel(std::error_code);
     void initiate_websocket_or_ssl_handshake();
@@ -99,19 +99,19 @@ private:
     const std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
     std::mt19937_64& m_random;
-    util::network::Service& m_service;
+    network::Service& m_service;
     std::string m_user_agent;
 
     EZObserver& m_observer;
 
     const EZEndpoint m_endpoint;
-    util::Optional<util::network::Resolver> m_resolver;
-    util::Optional<util::network::Socket> m_socket;
-    util::Optional<util::network::ssl::Context> m_ssl_context;
-    util::Optional<util::network::ssl::Stream> m_ssl_stream;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
-    util::websocket::Socket m_websocket;
-    util::Optional<util::HTTPClient<EZSocketImpl>> m_proxy_client;
+    util::Optional<network::Resolver> m_resolver;
+    util::Optional<network::Socket> m_socket;
+    util::Optional<network::ssl::Context> m_ssl_context;
+    util::Optional<network::ssl::Stream> m_ssl_stream;
+    network::ReadAheadBuffer m_read_ahead_buffer;
+    websocket::Socket m_websocket;
+    util::Optional<HTTPClient<EZSocketImpl>> m_proxy_client;
 };
 
 
@@ -162,8 +162,8 @@ void EZSocketImpl::initiate_resolve()
 
     m_logger.detail("Resolving '%1:%2'", address, port); // Throws
 
-    util::network::Resolver::Query query(address, util::to_string(port)); // Throws
-    auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
+    network::Resolver::Query query(address, util::to_string(port)); // Throws
+    auto handler = [this](std::error_code ec, network::Endpoint::List endpoints) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (ec != util::error::operation_aborted)
@@ -174,7 +174,7 @@ void EZSocketImpl::initiate_resolve()
 }
 
 
-void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
+void EZSocketImpl::handle_resolve(std::error_code ec, network::Endpoint::List endpoints)
 {
     if (ec) {
         m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
@@ -186,11 +186,11 @@ void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::L
 }
 
 
-void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
+void EZSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
-    util::network::Endpoint ep = *(endpoints.begin() + i);
+    network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
     m_socket.emplace(m_service); // Throws
     m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
@@ -203,10 +203,10 @@ void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints,
 }
 
 
-void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
+void EZSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
-    const util::network::Endpoint& ep = *(endpoints.begin() + i);
+    const network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
         m_logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
                        ec.message()); // Throws
@@ -222,7 +222,7 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
     }
 
     REALM_ASSERT(m_socket);
-    util::network::Endpoint ep_2 = m_socket->local_endpoint();
+    network::Endpoint ep_2 = m_socket->local_endpoint();
     m_logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
                   ep_2.port()); // Throws
 
@@ -263,7 +263,7 @@ void EZSocketImpl::initiate_http_tunnel()
         if (response.status != HTTPStatus::Ok) {
             m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
-                util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
+                websocket::Error::bad_response_unexpected_status_code;       // FIXME: is this the right error?
             m_observer.websocket_connect_error_handler(ec2);                 // Throws
             return;
         }
@@ -276,7 +276,7 @@ void EZSocketImpl::initiate_http_tunnel()
 
 void EZSocketImpl::initiate_ssl_handshake()
 {
-    using namespace util::network::ssl;
+    using namespace network::ssl;
 
     if (!m_ssl_context) {
         m_ssl_context.emplace(); // Throws
@@ -336,7 +336,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 
 void EZSocketImpl::initiate_websocket_handshake()
 {
-    auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
+    auto headers = HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_user_agent;
 
     // Compute the value of the "Host" header.
@@ -356,4 +356,4 @@ std::unique_ptr<EZSocket> EZSocketFactory::connect(EZObserver* observer, EZEndpo
     return std::make_unique<EZSocketImpl>(m_config, *observer, std::move(endpoint));
 }
 
-} // namespace realm::util::websocket
+} // namespace realm::sync::websocket

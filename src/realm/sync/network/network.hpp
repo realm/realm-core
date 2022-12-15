@@ -1,5 +1,4 @@
-#ifndef REALM_UTIL_NETWORK_HPP
-#define REALM_UTIL_NETWORK_HPP
+#pragma once
 
 #include <cstddef>
 #include <memory>
@@ -54,9 +53,7 @@
 
 // FIXME: Unfinished business around `Address::m_ip_v6_scope_id`.
 
-
-namespace realm {
-namespace util {
+namespace realm::sync::network {
 
 /// \brief TCP/IP networking API.
 ///
@@ -128,7 +125,6 @@ namespace util {
 /// the event loop, there is still no guarantee that an asynchronous operation
 /// remains cancelable up until the point in time where the completion handler
 /// starts to execute.
-namespace network {
 
 std::string host_name();
 
@@ -265,7 +261,7 @@ public:
     List& operator=(List&&) noexcept = default;
 
 private:
-    Buffer<Endpoint> m_endpoints;
+    util::Buffer<Endpoint> m_endpoints;
 
     friend class Service;
 };
@@ -1483,24 +1479,19 @@ inline std::error_code make_error_code(ResolveErrors err)
     return std::error_code(int(err), resolve_error_category);
 }
 
-} // namespace network
-} // namespace util
-} // namespace realm
+} // namespace realm::sync::network
 
 namespace std {
 
 template <>
-class is_error_code_enum<realm::util::network::ResolveErrors> {
+class is_error_code_enum<realm::sync::network::ResolveErrors> {
 public:
     static const bool value = true;
 };
 
 } // namespace std
 
-namespace realm {
-namespace util {
-namespace network {
-
+namespace realm::sync::network {
 
 // Implementation
 
@@ -1579,7 +1570,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 #endif
     const char* ret = ::inet_ntop(af, src, buffer, sizeof buffer);
     if (ret == 0) {
-        std::error_code ec = make_basic_system_error_code(errno);
+        std::error_code ec = util::make_basic_system_error_code(errno);
         throw std::system_error(ec);
     }
     out << ret;
@@ -2021,7 +2012,7 @@ protected:
     friend class Service;
 };
 
-class Service::TriggerExecOperBase : public AsyncOper, public AtomicRefCountBase {
+class Service::TriggerExecOperBase : public AsyncOper, public util::AtomicRefCountBase {
 public:
     TriggerExecOperBase(Impl& service) noexcept
         : AsyncOper{0, false}
@@ -2034,7 +2025,7 @@ public:
         REALM_ASSERT(in_use());
         REALM_ASSERT(!m_service);
         // Note: Potential suicide when `self` goes out of scope
-        util::bind_ptr<TriggerExecOperBase> self{this, bind_ptr_base::adopt_tag{}};
+        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
     }
     void orphan() noexcept override final
     {
@@ -2646,7 +2637,7 @@ public:
         bool orphaned = !s.m_stream;
         std::error_code ec = s.m_error_code;
         if (s.is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         std::size_t num_bytes_transferred = std::size_t(s.m_curr - s.m_begin);
         // Note: do_recycle_and_execute() commits suicide.
         s.template do_recycle_and_execute<H>(orphaned, s.m_handler, ec,
@@ -2676,7 +2667,7 @@ public:
         bool orphaned = !s.m_stream;
         std::error_code ec = s.m_error_code;
         if (s.is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         std::size_t num_bytes_transferred = std::size_t(s.m_curr - s.m_begin);
         // Note: do_recycle_and_execute() commits suicide.
         s.template do_recycle_and_execute<H>(orphaned, s.m_handler, ec,
@@ -2709,7 +2700,7 @@ public:
         bool orphaned = !s.m_stream;
         std::error_code ec = s.m_error_code;
         if (s.is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         std::size_t num_bytes_transferred = std::size_t(s.m_curr - s.m_begin);
         // Note: do_recycle_and_execute() commits suicide.
         s.template do_recycle_and_execute<H>(orphaned, s.m_handler, ec,
@@ -2891,7 +2882,7 @@ public:
         bool orphaned = !m_resolver;
         std::error_code ec = m_error_code;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec, std::move(m_endpoints)); // Throws
     }
@@ -3171,7 +3162,7 @@ public:
         bool orphaned = !m_socket;
         std::error_code ec = m_error_code;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
@@ -3386,7 +3377,7 @@ inline std::size_t Socket::do_read_some_async(char* buffer, std::size_t size, st
 {
     std::error_code ec_2;
     std::size_t n = m_desc.read_some(buffer, size, ec_2);
-    bool success = (!ec_2 || ec_2 == error::resource_unavailable_try_again);
+    bool success = (!ec_2 || ec_2 == util::error::resource_unavailable_try_again);
     if (REALM_UNLIKELY(!success)) {
         ec = ec_2;
         want = Want::nothing; // Failure
@@ -3402,7 +3393,7 @@ inline std::size_t Socket::do_write_some_async(const char* data, std::size_t siz
 {
     std::error_code ec_2;
     std::size_t n = m_desc.write_some(data, size, ec_2);
-    bool success = (!ec_2 || ec_2 == error::resource_unavailable_try_again);
+    bool success = (!ec_2 || ec_2 == util::error::resource_unavailable_try_again);
     if (REALM_UNLIKELY(!success)) {
         ec = ec_2;
         want = Want::nothing; // Failure
@@ -3480,7 +3471,7 @@ public:
         bool orphaned = !m_acceptor;
         std::error_code ec = m_error_code;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
@@ -3555,7 +3546,7 @@ inline Acceptor::Want Acceptor::do_accept_async(Socket& socket, Endpoint* ep, st
 {
     std::error_code ec_2;
     m_desc.accept(socket.m_desc, m_protocol, ep, ec_2);
-    if (ec_2 == error::resource_unavailable_try_again)
+    if (ec_2 == util::error::resource_unavailable_try_again)
         return Want::read;
     ec = ec_2;
     return Want::nothing;
@@ -3586,7 +3577,7 @@ public:
         bool orphaned = !m_timer;
         std::error_code ec;
         if (is_canceled())
-            ec = error::operation_aborted;
+            ec = util::error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
         do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
@@ -3635,7 +3626,7 @@ public:
     {
         REALM_ASSERT(in_use());
         // Note: Potential suicide when `self` goes out of scope
-        util::bind_ptr<TriggerExecOperBase> self{this, bind_ptr_base::adopt_tag{}};
+        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
         if (m_service) {
             Service::reset_trigger_exec(*m_service, *this);
             m_handler(); // Throws
@@ -3713,8 +3704,4 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     return true;
 }
 
-} // namespace network
-} // namespace util
-} // namespace realm
-
-#endif // REALM_UTIL_NETWORK_HPP
+} // namespace realm::sync::network

@@ -4643,7 +4643,8 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         void reset_realm(const char* path)
         {
             realm_app_t realm_app{m_app};
-            realm_sync_immediately_run_file_actions(&realm_app, path);
+            bool did_run;
+            realm_sync_immediately_run_file_actions(&realm_app, path, &did_run);
         }
         static ResetRealmFiles& instance()
         {

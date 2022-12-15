@@ -248,6 +248,7 @@ private:
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
     std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
+    bool m_in_debug_hook = false;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -753,10 +754,12 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
-    if (call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version, batch_state,
-                        received_changesets.size()) == SyncClientHookAction::EarlyReturn) {
+    auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version,
+                                       batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
         return true;
     }
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (batch_state == DownloadBatchState::MoreToCome) {
         return true;
@@ -815,17 +818,18 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            [&](const TransactionRef& tr, size_t count) {
-                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
-                bootstrap_store->pop_front_pending(tr, count);
+            [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
+                REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, changesets_applied.size());
             },
             get_transact_reporter());
         progress = *pending_batch.progress;
         changesets_processed += pending_batch.changesets.size();
         auto duration = std::chrono::steady_clock::now() - start_time;
 
-        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
+        auto action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                      batch_state, pending_batch.changesets.size());
+        REALM_ASSERT(action == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
                     "%3 in %4 ms. %5 changesets remaining in bootstrap",
@@ -841,7 +845,8 @@ void SessionImpl::process_pending_flx_bootstrap()
 
     auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
                                   DownloadBatchState::LastInBatch, changesets_processed);
-    REALM_ASSERT(action == SyncClientHookAction::NoAction);
+    // NoAction/EarlyReturn are both valid no-op actions to take here.
+    REALM_ASSERT(action == SyncClientHookAction::NoAction || action == SyncClientHookAction::EarlyReturn);
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
@@ -875,6 +880,33 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
     m_wrapper.on_flx_sync_version_complete(version);
 }
 
+SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
+{
+    // Make sure we don't call the debug hook recursively.
+    if (m_wrapper.m_in_debug_hook) {
+        return SyncClientHookAction::NoAction;
+    }
+    m_wrapper.m_in_debug_hook = true;
+    auto in_hook_guard = util::make_scope_exit([&]() noexcept {
+        m_wrapper.m_in_debug_hook = false;
+    });
+
+    auto action = m_wrapper.m_debug_hook(data);
+    switch (action) {
+        case realm::SyncClientHookAction::SuspendWithRetryableError: {
+            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
+                                      true);
+            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+            auto err_processing_err = receive_error_message(err_info);
+            REALM_ASSERT(!err_processing_err);
+            return SyncClientHookAction::EarlyReturn;
+        }
+        default:
+            return action;
+    }
+}
+
 SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const SyncProgress& progress,
                                                   int64_t query_version, DownloadBatchState batch_state,
                                                   size_t num_changesets)
@@ -890,20 +922,24 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.num_changesets = num_changesets;
     data.query_version = query_version;
 
-    auto action = m_wrapper.m_debug_hook(data);
-    switch (action) {
-        case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
-                                      true);
-            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+    return call_debug_hook(data);
+}
 
-            auto err_processing_err = receive_error_message(err_info);
-            REALM_ASSERT(!err_processing_err);
-            return SyncClientHookAction::NoAction;
-        }
-        default:
-            return action;
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
+{
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
     }
+
+    SyncClientHookData data;
+    data.event = event;
+    data.batch_state = DownloadBatchState::SteadyState;
+    data.progress = m_progress;
+    data.num_changesets = 0;
+    data.query_version = 0;
+    data.error_info = &error_info;
+
+    return call_debug_hook(data);
 }
 
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
@@ -1607,7 +1643,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
             // Connection object may be destroyed now.
         }
     };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    m_on_idle = network::Trigger{client.get_service(), std::move(handler)}; // Throws
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
