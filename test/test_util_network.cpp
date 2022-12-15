@@ -7,6 +7,7 @@
 
 #include <realm/util/memory_stream.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/sync/noinst/client_impl_base.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
@@ -1930,6 +1931,104 @@ TEST(Network_StressTest)
         stats_2.num_reads, stats_2.num_canceled_reads);
     log("Writes: %1 (%2 canceled), %3 (%4 canceled)", stats_1.num_writes, stats_1.num_canceled_writes,
         stats_2.num_writes, stats_2.num_canceled_writes);
+}
+
+
+TEST(Sync_Trigger_Basics)
+{
+    network::Service service;
+
+    // Check that triggering works
+    bool was_triggered = false;
+    auto func = [&] {
+        was_triggered = true;
+    };
+    Trigger trigger{&service, std::move(func)};
+    trigger.trigger();
+    service.run();
+    CHECK(was_triggered);
+
+    // Check that the function is not called without triggering
+    was_triggered = false;
+    service.run();
+    CHECK_NOT(was_triggered);
+
+    // Check double-triggering
+    was_triggered = false;
+    trigger.trigger();
+    trigger.trigger();
+    service.run();
+    CHECK(was_triggered);
+
+    // Check that retriggering from triggered function works
+    realm::util::UniqueFunction<void()> func_2;
+    Trigger trigger_2{&service, [&] {
+                          func_2();
+                      }};
+    was_triggered = false;
+    bool was_triggered_twice = false;
+    func_2 = [&] {
+        if (was_triggered) {
+            was_triggered_twice = true;
+        }
+        else {
+            was_triggered = true;
+            trigger_2.trigger();
+        }
+    };
+    trigger_2.trigger();
+    service.run();
+    CHECK(was_triggered_twice);
+
+    // Check that two functions can be triggered in an overlapping fashion
+    bool was_triggered_4 = false;
+    bool was_triggered_5 = false;
+    auto func_4 = [&] {
+        was_triggered_4 = true;
+    };
+    auto func_5 = [&] {
+        was_triggered_5 = true;
+    };
+    Trigger trigger_4{&service, std::move(func_4)};
+    Trigger trigger_5{&service, std::move(func_5)};
+    trigger_4.trigger();
+    trigger_5.trigger();
+    service.run();
+    CHECK(was_triggered_4);
+    CHECK(was_triggered_5);
+}
+
+
+TEST(Sync_Trigger_ThreadSafety)
+{
+    network::Service service;
+    network::DeadlineTimer keep_alive{service};
+    keep_alive.async_wait(std::chrono::hours(10000), [](std::error_code) {});
+    long n_1 = 0, n_2 = 0;
+    std::atomic<bool> flag{false};
+    auto func = [&] {
+        ++n_1;
+        if (flag)
+            ++n_2;
+    };
+    Trigger trigger{&service, std::move(func)};
+    ThreadWrapper thread;
+    thread.start([&] {
+        service.run();
+    });
+    long m = 1000000;
+    for (long i = 0; i < m; ++i)
+        trigger.trigger();
+    flag = true;
+    trigger.trigger();
+    service.post([&] {
+        keep_alive.cancel();
+    });
+    CHECK_NOT(thread.join());
+    CHECK_GREATER_EQUAL(n_1, 1);
+    CHECK_LESS_EQUAL(n_1, m + 1);
+    CHECK_GREATER_EQUAL(n_2, 1);
+    CHECK_LESS_EQUAL(n_2, 2);
 }
 
 

@@ -181,9 +181,10 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    m_actualize_and_finalize = [this] {
+    auto handler = [this] {
         actualize_and_finalize_session_wrappers(); // Throws
     };
+    m_actualize_and_finalize = Trigger{&get_service(), std::move(handler)}; // Throws
 
     start_keep_running_timer(); // Throws
 }
@@ -206,7 +207,7 @@ void Connection::activate()
 {
     m_activated = true;
     if (m_num_active_sessions == 0)
-        m_client.m_service.post(m_on_idle);
+        m_on_idle.trigger();
     // We cannot in general connect immediately, because a prior failure to
     // connect may require a delay before reconnecting (see `m_reconnect_info`).
     initiate_reconnect_wait(); // Throws
@@ -235,7 +236,7 @@ void Connection::initiate_session_deactivation(Session* sess)
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
-            m_client.m_service.post(m_on_idle);
+            m_on_idle.trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
