@@ -103,8 +103,10 @@ inline Trigger<Service>::Trigger(Service* service, SyncSocketProvider::FunctionH
 template <class Service>
 inline Trigger<Service>::~Trigger() noexcept
 {
-    REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
-    m_handler_info->state = HandlerInfo::State::Destroyed;
+    if (m_handler_info) {
+        REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
+        m_handler_info->state = HandlerInfo::State::Destroyed;
+    }
 }
 
 template <class Service>
