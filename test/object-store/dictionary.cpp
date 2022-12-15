@@ -937,7 +937,106 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
         Obj target_obj = target->create_object().set(col_target_value, T(values[i]));
         dict.insert(keys[i], target_obj);
     }
+    r->commit_transaction();
 
+    SECTION("notifications") {
+        CollectionChangeSet change;
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        auto require_change = [&] {
+            auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto shallow_require_change = [&] {
+            auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            }, KeyPathArray());
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto shallow_require_no_change = [&] {
+            bool first = true;
+            auto token = dict.add_notification_callback([& first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            }, KeyPathArray());
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("insertion") {
+            auto token = require_change();
+            write([&] {
+                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
+                dict.insert("foo", target_obj);
+            });
+            REQUIRE(!change.insertions.empty());
+        }
+        SECTION("insertion shallow") {
+            auto token = shallow_require_change();
+            write([&] {
+                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
+                dict.insert("foo", target_obj);
+            });
+            REQUIRE(!change.insertions.empty());
+        }
+        SECTION("deletion") {
+            auto token = require_change();
+            write([&] {
+                dict.erase(keys[0]);
+            });
+            REQUIRE(!change.deletions.empty());
+        }
+        SECTION("deletion shallow") {
+            auto token = shallow_require_change();
+            write([&] {
+                dict.erase(keys[0]);
+            });
+            REQUIRE(!change.deletions.empty());
+        }
+        SECTION("replacement") {
+            auto token = require_change();
+            write([&] {
+                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
+                dict.insert(keys[0], target_obj);
+            });
+            REQUIRE(!change.modifications.empty());
+        }
+        SECTION("replacement shallow") {
+            auto token = shallow_require_change();
+            write([&] {
+                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
+                dict.insert(keys[0], target_obj);
+            });
+            REQUIRE(!change.modifications.empty());
+        }
+        SECTION("modification") {
+            auto token = require_change();
+            write([&] {
+                dict.get<Obj>(keys[0]).set(col_target_value, T(values[0]));
+            });
+            REQUIRE(!change.modifications.empty());
+        }
+        SECTION("modification shallow") {
+            auto token = shallow_require_no_change();
+            write([&] {
+                dict.get<Obj>(keys[0]).set(col_target_value, T(values[0]));
+            });
+            REQUIRE(change.modifications.empty());
+        }
+    }
+
+    r->begin_transaction();
     SECTION("min()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS_AS(dict.min(col_target_value), Results::UnsupportedColumnTypeException);
