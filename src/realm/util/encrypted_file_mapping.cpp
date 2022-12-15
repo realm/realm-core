@@ -278,7 +278,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
+size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT_EX(size % block_size == 0, size, block_size);
     // We need to throw DecryptionFailed if the key is incorrect or there has been a corruption in the data but
@@ -323,11 +323,12 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
         return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);
     };
 
-    while (size > 0) {
-        ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+    size_t bytes_read = 0;
+    while (bytes_read < size) {
+        ssize_t actual = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
-        if (bytes_read == 0)
-            return false;
+        if (actual == 0)
+            return bytes_read;
 
         iv_table& iv = get_iv_table(fd, pos, retry_count == 0 ? IVLookupMode::UseCache : IVLookupMode::Refetch);
         if (iv.iv1 == 0) {
@@ -338,10 +339,10 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // This block has never been written to, so we've just read pre-allocated
             // space. No memset() since the code using this doesn't rely on
             // pre-allocated space being zeroed.
-            return false;
+            return bytes_read;
         }
 
-        if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
+        if (!check_hmac(m_rw_buffer.get(), actual, iv.hmac1)) {
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
@@ -350,10 +351,10 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                     continue;
                 }
                 // Very first write was interrupted
-                return false;
+                return bytes_read;
             }
 
-            if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
+            if (check_hmac(m_rw_buffer.get(), actual, iv.hmac2)) {
                 // Un-bump the IV since the write with the bumped IV never actually
                 // happened
                 memcpy(&iv.iv1, &iv.iv2, 32);
@@ -364,16 +365,17 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
                 ssize_t i;
-                for (i = 0; i < bytes_read; ++i) {
+                for (i = 0; i < actual; ++i) {
                     if (m_rw_buffer[i] != 0) {
                         break;
                     }
                 }
-                if (i != bytes_read) {
+                if (i != actual) {
                     // at least one byte wasn't zero
                     retry(std::string_view{m_rw_buffer.get(), block_size}, iv, "i != bytes_read");
                     continue;
                 }
+                return bytes_read;
             }
         }
 
@@ -395,10 +397,10 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 
         pos += block_size;
         dst += block_size;
-        size -= block_size;
+        bytes_read += block_size;
         retry_count = 0;
     }
-    return true;
+    return bytes_read;
 }
 
 void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
@@ -627,7 +629,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missing)
+void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
     REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
@@ -637,10 +639,10 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missin
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         size_t size = static_cast<size_t>(1ULL << m_page_shift);
-        bool did_read = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
-        if (!did_read) {
-            if (allow_missing) {
-                memset(addr, 0, size);
+        size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
+        if (actual < size) {
+            if (actual >= required) {
+                memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
@@ -716,6 +718,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
+    m_debug_writes[local_page_ndx]++;
     clear(m_page_state[local_page_ndx], Writable);
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -877,7 +880,8 @@ void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_page_state.size();
 #ifdef REALM_DEBUG
-    uint64_t pages_written = 0;
+    std::string debug_msg;
+    std::vector<uint64_t> pages_written;
 #endif
     for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
         if (is_not(m_page_state[local_page_ndx], Dirty)) {
@@ -889,23 +893,22 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
         clear(m_page_state[local_page_ndx], Dirty);
+        debug_msg += util::format("page %1 (pos %2) has %3 writes\n", page_ndx_in_file,
+                                  off_t(page_ndx_in_file << m_page_shift), m_debug_writes[local_page_ndx]);
+        m_debug_writes[local_page_ndx] = 0;
 #ifdef REALM_DEBUG
-        if (page_ndx_in_file < 64) {
-            pages_written |= (1 << page_ndx_in_file);
-        }
+        pages_written.push_back(page_ndx_in_file);
 #endif
     }
 #ifdef REALM_DEBUG
-    if (pages_written > 0 && m_file.validator.is_attached()) {
+    if (pages_written.size() > 0 && m_file.validator.is_attached()) {
         m_file.validator.seek(m_file.validator.get_size());
-        auto msg = util::format("wrote pages: bitwise[%1] at indices: ", pages_written);
-        for (size_t i = 0; i < 64; ++i) {
-            if ((pages_written & (uint64_t(1) << i)) > 0) {
-                msg += util::format("%1%2", i == 0 ? "" : ", ", i);
-            }
+        debug_msg += "wrote pages: ";
+        for (auto page : pages_written) {
+            debug_msg += util::format("%1, ", page);
         }
-        msg += std::string("\n");
-        m_file.validator.write(msg.data(), msg.size());
+        debug_msg += std::string("\n");
+        m_file.validator.write(debug_msg.data(), debug_msg.size());
     }
 #endif // REALM_DEBUG
 
@@ -976,13 +979,16 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify)
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
+    size_t page_size = 1ULL << m_page_shift;
+    size_t required =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) & (page_size - 1)) + size;
     {
         // make sure the first page is available
         PageState& ps = m_page_state[first_accessed_local_page];
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(first_accessed_local_page, to_modify);
+            refresh_page(first_accessed_local_page, to_modify ? 0 : required);
         if (to_modify)
             set(ps, Writable);
     }
@@ -1004,6 +1010,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
+        required -= page_size;
         // force the page reclaimer to look into pages in this chunk
         chunk_ndx = idx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx])
@@ -1013,7 +1020,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(idx, to_modify);
+            refresh_page(idx, to_modify ? 0 : required);
         if (to_modify)
             set(ps, Writable);
     }
@@ -1024,6 +1031,7 @@ void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     size_t num_pages = new_size >> m_page_shift;
     m_page_state.resize(num_pages, PageState::Clean);
+    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
     m_file.cryptor.set_file_size((off_t)(offset + new_size));
 }
@@ -1047,9 +1055,11 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_num_decrypted = 0;
     m_page_state.clear();
+    m_debug_writes.clear();
     m_chunk_dont_scan.clear();
 
     m_page_state.resize(num_pages, PageState(0));
+    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
 }
 

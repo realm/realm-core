@@ -143,13 +143,14 @@ private:
 
 #ifdef REALM_DEBUG
     std::unique_ptr<char[]> m_validate_buffer;
+    std::vector<size_t> m_debug_writes;
 #endif
 
     char* page_addr(size_t local_page_ndx) const noexcept;
 
     void mark_outdated(size_t local_page_ndx) noexcept;
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
-    void refresh_page(size_t local_page_ndx, bool allow_missing);
+    void refresh_page(size_t local_page_ndx, size_t required);
     void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
