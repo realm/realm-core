@@ -939,7 +939,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 {
     auto index = m_table->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation("Column has no fulltext index");
     }
 
     auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
@@ -951,7 +951,7 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
 {
     auto index = link_map.get_target_table()->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation("Column has no fulltext index");
     }
 
     auto lm = std::make_unique<LinkMap>(link_map);

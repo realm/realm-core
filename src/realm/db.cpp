@@ -576,12 +576,12 @@ public:
         bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
-            throw BadVersion();
+            throw BadVersion(version_id.version);
         if (!picked_newest) {
             if (type == ReadLockInfo::Frozen && r.count_frozen == 0 && r.count_live == 0)
-                throw BadVersion();
+                throw BadVersion(version_id.version);
             if (type != ReadLockInfo::Frozen && r.count_live == 0)
-                throw BadVersion();
+                throw BadVersion(version_id.version);
         }
         switch (type) {
             case ReadLockInfo::Frozen: {

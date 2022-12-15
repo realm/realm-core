@@ -106,34 +106,10 @@ Dictionary& Dictionary::operator=(const Dictionary& other)
 
 size_t Dictionary::size() const
 {
-<<<<<<< HEAD
-    Mixed key;
-    switch (m_keys_col.get_type()) {
-        case col_type_String: {
-            ArrayString keys(m_alloc);
-            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(s.index));
-            break;
-        }
-        case col_type_Int: {
-            ArrayInteger keys(m_alloc);
-            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
-            keys.init_from_ref(ref);
-            key = Mixed(keys.get(s.index));
-            break;
-        }
-        default:
-            throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
-            break;
-    }
-    return key;
-=======
     if (!update())
         return 0;
 
     return m_values->size();
->>>>>>> 5d869c2f9da8d5ee1c7e9b57776f9a6ad41decdb
 }
 
 DataType Dictionary::get_key_data_type() const
