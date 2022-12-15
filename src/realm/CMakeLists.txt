@@ -95,7 +95,6 @@ set(UTIL_SOURCES
     util/to_string.cpp
     util/demangle.cpp
     util/enum.cpp
-    util/http.cpp
     util/json_parser.cpp
     util/load_file.cpp
     util/misc_ext_errors.cpp
@@ -227,7 +226,6 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
-    util/http.hpp
     util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
@@ -237,7 +235,6 @@ set(REALM_INSTALL_HEADERS
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
     util/miscellaneous.hpp
-    util/network.hpp
     util/optional.hpp
     util/overload.hpp
     util/priority_queue.hpp
@@ -270,12 +267,10 @@ set(REALM_NOINST_HEADERS
     util/cli_args.hpp
     util/demangle.hpp
     util/enum.hpp
-    util/ez_websocket.hpp
     util/from_chars.hpp
     util/get_file_size.hpp
     util/json_parser.hpp
     util/load_file.hpp
-    util/network_ssl.hpp
     util/platform_info.hpp
     util/quote.hpp
     util/random.hpp

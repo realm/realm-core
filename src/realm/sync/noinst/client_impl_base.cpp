@@ -10,10 +10,10 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/sync/network/http.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -21,7 +21,7 @@
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove
+#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
@@ -112,7 +112,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
-    , m_socket_factory(util::websocket::EZConfig{
+    , m_socket_factory(websocket::EZConfig{
           logger_ptr,
           m_random,
           m_service,
@@ -184,7 +184,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     auto handler = [this] {
         actualize_and_finalize_session_wrappers(); // Throws
     };
-    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
+    m_actualize_and_finalize = network::Trigger{get_service(), std::move(handler)}; // Throws
 
     start_keep_running_timer(); // Throws
 }
@@ -340,14 +340,14 @@ void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
 {
     bool is_fatal;
-    if (ec == util::websocket::Error::bad_response_3xx_redirection ||
-        ec == util::websocket::Error::bad_response_301_moved_permanently ||
-        ec == util::websocket::Error::bad_response_401_unauthorized ||
-        ec == util::websocket::Error::bad_response_5xx_server_error ||
-        ec == util::websocket::Error::bad_response_500_internal_server_error ||
-        ec == util::websocket::Error::bad_response_502_bad_gateway ||
-        ec == util::websocket::Error::bad_response_503_service_unavailable ||
-        ec == util::websocket::Error::bad_response_504_gateway_timeout) {
+    if (ec == websocket::Error::bad_response_3xx_redirection ||
+        ec == websocket::Error::bad_response_301_moved_permanently ||
+        ec == websocket::Error::bad_response_401_unauthorized ||
+        ec == websocket::Error::bad_response_5xx_server_error ||
+        ec == websocket::Error::bad_response_500_internal_server_error ||
+        ec == websocket::Error::bad_response_502_bad_gateway ||
+        ec == websocket::Error::bad_response_503_service_unavailable ||
+        ec == websocket::Error::bad_response_504_gateway_timeout) {
         is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
     }
@@ -659,7 +659,7 @@ void Connection::initiate_reconnect()
     }
 
     m_websocket =
-        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+        m_client.m_socket_factory.connect(this, websocket::EZEndpoint{
                                                     m_address,
                                                     m_port,
                                                     get_http_request_path(),
@@ -875,7 +875,7 @@ void Connection::send_next_message()
     while (!m_sessions_enlisted_to_send.empty()) {
         // The state of being connected is not supposed to be able to change
         // across this loop thanks to the "no callback reentrance" guarantee
-        // provided by util::Websocket::async_write_text(), and friends.
+        // provided by Websocket::async_write_text(), and friends.
         REALM_ASSERT(m_state == ConnectionState::connected);
 
         Session& sess = *m_sessions_enlisted_to_send.front();
@@ -1407,6 +1407,32 @@ void Session::cancel_resumption_delay()
 }
 
 
+void Session::gather_pending_compensating_writes(util::Span<Changeset> changesets,
+                                                 std::vector<ProtocolErrorInfo>* out)
+{
+    if (m_pending_compensating_write_errors.empty() || changesets.empty()) {
+        return;
+    }
+
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(
+        std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
+                       [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
+                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                       }));
+#endif
+
+    while (!m_pending_compensating_write_errors.empty() &&
+           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+               changesets.back().version) {
+        auto& cur_error = m_pending_compensating_write_errors.front();
+        REALM_ASSERT(cur_error.compensating_write_server_version >= changesets.front().version);
+        out->push_back(std::move(cur_error));
+        m_pending_compensating_write_errors.pop_front();
+    }
+}
+
+
 void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
@@ -1421,8 +1447,14 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+
+    std::vector<ProtocolErrorInfo> pending_compensating_write_errors;
+    history.integrate_server_changesets(
+        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger,
+        [&](const TransactionRef&, util::Span<Changeset> changesets) {
+            gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
+        },
+        get_transact_reporter()); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1430,6 +1462,20 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
                      version_info.sync_version.version, received_changesets.size()); // Throws
+    }
+
+    for (const auto& pending_error : pending_compensating_write_errors) {
+        logger.info("Reporting compensating write for client version %1 in server version %2: %3",
+                    pending_error.compensating_write_rejected_client_version,
+                    pending_error.compensating_write_server_version, pending_error.message);
+        try {
+            ProtocolError error_code = ProtocolError(pending_error.raw_error_code);
+            on_connection_state_changed(m_conn.get_state(),
+                                        SessionErrorInfo{pending_error, make_error_code(error_code)});
+        }
+        catch (...) {
+            logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
+        }
     }
 }
 
@@ -2212,6 +2258,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
@@ -2223,6 +2272,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
@@ -2305,6 +2357,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+    if (debug_action == SyncClientHookAction::EarlyReturn) {
+        return {};
+    }
+
     // Ignore the error because the connection is going to be closed.
     if (m_connection_to_close)
         return std::error_code{}; // Success
@@ -2326,9 +2383,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    if (!session_level_error_requires_suspend(error_code)) {
-        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
-        return {}; // Success
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
+    if (error_code == ProtocolError::compensating_write) {
+        m_pending_compensating_write_errors.push_back(info);
+        return {};
     }
 
     REALM_ASSERT(!m_suspended);

@@ -19,8 +19,8 @@
 #include "external/json/json.hpp"
 #include <realm/object-store/sync/app.hpp>
 
+#include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -917,7 +917,7 @@ void App::handle_possible_redirect_response(Request&& request, const Response& r
                                             UniqueFunction<void(const Response&)>&& completion)
 {
     // If the response contains a redirection, then process it
-    if (util::HTTPStatus(response.http_status_code) == util::HTTPStatus::MovedPermanently) {
+    if (sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::MovedPermanently) {
         handle_redirect_response(std::move(request), response, std::move(completion));
     }
     else {

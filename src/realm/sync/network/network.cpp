@@ -22,7 +22,7 @@
 #include <realm/util/misc_errors.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #if defined _GNU_SOURCE && !REALM_ANDROID
 #define HAVE_LINUX_PIPE2 1
@@ -69,7 +69,7 @@
 #endif
 
 using namespace realm::util;
-using namespace realm::util::network;
+using namespace realm::sync::network;
 
 
 namespace {
@@ -2507,9 +2507,7 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
 }
 
 
-namespace realm {
-namespace util {
-namespace network {
+namespace realm::sync::network {
 
 std::string host_name()
 {
@@ -2609,6 +2607,4 @@ std::string ResolveErrorCategory::message(int value) const
     return {};
 }
 
-} // namespace network
-} // namespace util
-} // namespace realm
+} // namespace realm::sync::network

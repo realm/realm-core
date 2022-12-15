@@ -4,14 +4,15 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#6097](https://github.com/realm/realm-core/pull/6097))
 * Converting flexible sync realms to bundled and local realms is now supported ([#6076](https://github.com/realm/realm-core/pull/6076))
+* Compensating write errors are now surfaced to the SDK/user after the compensating write has been applied in a download message ([#6095](https://github.com/realm/realm-core/pull/6095)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
  
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
 * Allow Realm instances to have a complete view of their schema, if mode is additive. ([PR #5784](https://github.com/realm/realm-core/pull/5784)).
+* `realm_sync_immediately_run_file_actions` (c-api) now takes a third argument `bool* did_run` that will be set to the result of `SyncManager::immediately_run_file_actions`. ((#6117)[https://github.com/realm/realm-core/pull/6117]) 
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -19,7 +20,8 @@
 -----------
 
 ### Internals
-* None.
+* Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
+* Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
 
 ----------------------------------------------
 

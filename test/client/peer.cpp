@@ -4,9 +4,9 @@
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/network.hpp>
-#include <realm/util/network_ssl.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/list.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
@@ -84,8 +84,8 @@ Peer::Error map_error(std::error_code ec) noexcept
         }
         return Peer::Error::system_other;
     }
-    if (category == util::network::resolve_error_category) {
-        using util::network::ResolveErrors;
+    if (category == sync::network::resolve_error_category) {
+        using sync::network::ResolveErrors;
         switch (ResolveErrors(ec.value())) {
             case ResolveErrors::host_not_found:
             case ResolveErrors::host_not_found_try_again:
@@ -99,41 +99,41 @@ Peer::Error map_error(std::error_code ec) noexcept
         return Peer::Error::network_other;
     }
     bool is_ssl_related =
-        (category == util::network::ssl::error_category || category == util::network::openssl_error_category ||
-         category == util::network::secure_transport_error_category);
+        (category == sync::network::ssl::error_category || category == sync::network::openssl_error_category ||
+         category == sync::network::secure_transport_error_category);
     if (is_ssl_related)
         return Peer::Error::ssl;
-    if (std::strcmp(category_name, "realm::util::websocket::Error") == 0) {
-        switch (util::websocket::Error(ec.value())) {
-            case util::websocket::Error::bad_request_malformed_http:
-            case util::websocket::Error::bad_request_header_upgrade:
-            case util::websocket::Error::bad_request_header_connection:
-            case util::websocket::Error::bad_request_header_websocket_version:
-            case util::websocket::Error::bad_request_header_websocket_key:
+    if (std::strcmp(category_name, "realm::sync::websocket::Error") == 0) {
+        switch (sync::websocket::Error(ec.value())) {
+            case sync::websocket::Error::bad_request_malformed_http:
+            case sync::websocket::Error::bad_request_header_upgrade:
+            case sync::websocket::Error::bad_request_header_connection:
+            case sync::websocket::Error::bad_request_header_websocket_version:
+            case sync::websocket::Error::bad_request_header_websocket_key:
                 break;
-            case util::websocket::Error::bad_response_invalid_http:
+            case sync::websocket::Error::bad_response_invalid_http:
                 return Peer::Error::websocket_malformed_response;
-            case util::websocket::Error::bad_response_2xx_successful:
-            case util::websocket::Error::bad_response_200_ok:
+            case sync::websocket::Error::bad_response_2xx_successful:
+            case sync::websocket::Error::bad_response_200_ok:
                 break;
-            case util::websocket::Error::bad_response_3xx_redirection:
-            case util::websocket::Error::bad_response_301_moved_permanently:
+            case sync::websocket::Error::bad_response_3xx_redirection:
+            case sync::websocket::Error::bad_response_301_moved_permanently:
                 return Peer::Error::websocket_3xx;
-            case util::websocket::Error::bad_response_4xx_client_errors:
-            case util::websocket::Error::bad_response_401_unauthorized:
-            case util::websocket::Error::bad_response_403_forbidden:
-            case util::websocket::Error::bad_response_404_not_found:
-            case util::websocket::Error::bad_response_410_gone:
+            case sync::websocket::Error::bad_response_4xx_client_errors:
+            case sync::websocket::Error::bad_response_401_unauthorized:
+            case sync::websocket::Error::bad_response_403_forbidden:
+            case sync::websocket::Error::bad_response_404_not_found:
+            case sync::websocket::Error::bad_response_410_gone:
                 return Peer::Error::websocket_4xx;
-            case util::websocket::Error::bad_response_5xx_server_error:
-            case util::websocket::Error::bad_response_500_internal_server_error:
-            case util::websocket::Error::bad_response_502_bad_gateway:
-            case util::websocket::Error::bad_response_503_service_unavailable:
-            case util::websocket::Error::bad_response_504_gateway_timeout:
+            case sync::websocket::Error::bad_response_5xx_server_error:
+            case sync::websocket::Error::bad_response_500_internal_server_error:
+            case sync::websocket::Error::bad_response_502_bad_gateway:
+            case sync::websocket::Error::bad_response_503_service_unavailable:
+            case sync::websocket::Error::bad_response_504_gateway_timeout:
                 return Peer::Error::websocket_5xx;
-            case util::websocket::Error::bad_response_unexpected_status_code:
-            case util::websocket::Error::bad_response_header_protocol_violation:
-            case util::websocket::Error::bad_message:
+            case sync::websocket::Error::bad_response_unexpected_status_code:
+            case sync::websocket::Error::bad_response_header_protocol_violation:
+            case sync::websocket::Error::bad_message:
                 break;
         }
         return Peer::Error::websocket_other;

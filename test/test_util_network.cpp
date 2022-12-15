@@ -6,7 +6,7 @@
 #include <thread>
 
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
@@ -44,6 +44,7 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+using namespace realm::sync;
 
 namespace {
 

@@ -1,13 +1,14 @@
 #include <thread>
 
-#include <realm/util/network_ssl.hpp>
+#include <realm/sync/network/network_ssl.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
 
-using namespace realm::util;
+using namespace realm;
+using namespace realm::sync;
 using namespace realm::test_util;
-
+using namespace realm::util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -148,7 +149,7 @@ public:
     }
 
     // Must be called by thread associated with `client_service`
-    void delay_client(realm::util::UniqueFunction<void()> handler, int n = 512)
+    void delay_client(UniqueFunction<void()> handler, int n = 512)
     {
         m_handler = std::move(handler);
         m_num = n;
@@ -159,7 +160,7 @@ private:
     network::Socket m_server_socket, m_client_socket;
     char m_server_char = 0, m_client_char = 0;
     int m_num;
-    realm::util::UniqueFunction<void()> m_handler;
+    UniqueFunction<void()> m_handler;
 
     void initiate_server_read()
     {
@@ -196,7 +197,7 @@ private:
     void initiate_client_write()
     {
         if (m_num <= 0) {
-            realm::util::UniqueFunction<void()> handler = std::move(m_handler);
+            UniqueFunction<void()> handler = std::move(m_handler);
             m_handler = nullptr;
             handler();
             return;
@@ -729,7 +730,7 @@ TEST(Util_Network_SSL_StressTest)
         network::DeadlineTimer read_timer{service};
         network::DeadlineTimer write_timer{service};
         bool read_done = false, write_done = false;
-        realm::util::UniqueFunction<void()> shedule_cancellation = [&] {
+        UniqueFunction<void()> shedule_cancellation = [&] {
             auto handler = [&](std::error_code ec) {
                 REALM_ASSERT(!ec || ec == error::operation_aborted);
                 if (ec == error::operation_aborted)
@@ -746,7 +747,7 @@ TEST(Util_Network_SSL_StressTest)
         char* read_begin = read_buffer.get();
         char* read_end = read_buffer.get() + original_size;
         int num_read_cycles = 0;
-        realm::util::UniqueFunction<void()> read = [&] {
+        UniqueFunction<void()> read = [&] {
             if (read_begin == read_end) {
                 log("<R%1>", id);
                 CHECK(std::equal(read_original, read_original + original_size, read_buffer.get()));
@@ -792,7 +793,7 @@ TEST(Util_Network_SSL_StressTest)
         const char* write_begin = write_original;
         const char* write_end = write_original + original_size;
         int num_write_cycles = 0;
-        realm::util::UniqueFunction<void()> write = [&] {
+        UniqueFunction<void()> write = [&] {
             if (write_begin == write_end) {
                 log("<W%1>", id);
                 ++num_write_cycles;
@@ -882,7 +883,7 @@ TEST(Util_Network_SSL_Certificate_CN_SAN)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     // We expect success because the certificate is signed for www.example.com
     // in both Common Name and SAN.
@@ -927,7 +928,7 @@ TEST(Util_Network_SSL_Certificate_SAN)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("support.example.com");
 
@@ -974,7 +975,7 @@ TEST(Util_Network_SSL_Certificate_CN)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("www.example.com");
 
@@ -1022,7 +1023,7 @@ TEST(Util_Network_SSL_Certificate_IP)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("127.0.0.1");
 
@@ -1073,7 +1074,7 @@ TEST(Util_Network_SSL_Certificate_Failure)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     // We expect failure because the certificate is signed for www.example.com
     ssl_stream_2.set_host_name("www.another-example.com");
