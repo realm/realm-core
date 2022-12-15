@@ -141,21 +141,71 @@ TEST_CASE("list") {
             return token;
         };
 
-        SECTION("modifying the list with shallow listerner sends a change notifications") {
-            auto token = shallow_require_change();
-            write([&] {
-                if (lv2->size() > 5)
-                    lst.remove(5);
-            });
-            REQUIRE_INDICES(change.deletions, 5);
-            REQUIRE(!change.collection_was_cleared);
-        }
-
         SECTION("modifying one of the target rows with shallow listener does not send a change notification") {
             auto token = shallow_require_no_change();
             write([&] {
                 lst.get(5).set(col_target_value, 6);
             });
+        }
+
+        SECTION("deleting a target row with shallow listener sends a change notification") {
+            auto token = shallow_require_change();
+            write([&] {
+                lst.remove(5);
+            });
+            REQUIRE_INDICES(change.deletions, 5);
+        }
+
+        SECTION("adding a row with shallow listener sends a change notifcation") {
+            auto token = shallow_require_change();
+            write([&] {
+                Obj obj = target->get_object(target_keys[5]);
+                lst.add(obj);
+            });
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
+        SECTION("moving a row with shallow listener sends a change notifcation") {
+            auto token = shallow_require_change();
+            write([&] {
+                lst.move(5, 8);
+            });
+            REQUIRE_INDICES(change.insertions, 8);
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE_MOVES(change, {5, 8});
+        }
+
+        SECTION("adding a row and then modifying the target row with shallow listener only gives insertion change") {
+            auto token = shallow_require_change();
+            write([&] {
+                Obj obj = target->get_object(target_keys[5]);
+                lst.add(obj);
+                obj.set(col_target_value, 10);
+            });
+            REQUIRE_INDICES(change.insertions, 10);
+            REQUIRE(change.modifications.empty());
+        }
+
+        SECTION("modifying a target row and then removing the target with shallow listener only gives deleteion change") {
+            auto token = shallow_require_change();
+            write([&] {
+                lst.get(5).set(col_target_value, 6);
+                lst.remove(5);
+            });
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE(change.modifications.empty());
+        }
+
+        SECTION("modifying and then moving a row with shallow listener reports move/insert but not modification") {
+            auto token = require_change();
+            write([&] {
+                target->get_object(target_keys[5]).set(col_target_value, 10);
+                lst.move(5, 8);
+            });
+            REQUIRE_INDICES(change.insertions, 8);
+            REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE_MOVES(change, {5, 8});
+            REQUIRE(change.modifications.empty());
         }
 
         SECTION("modifying the list sends a change notifications") {
