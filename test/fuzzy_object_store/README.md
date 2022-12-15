@@ -13,46 +13,47 @@ Please use this quick guide: https://aflplus.plus/building/ it requires llvm >= 
 
 For using libfuzzer, the only pre-requisite is having a recent version of clang.
 ## Running
-Note REALM_MAX_BPNODE_SIZE is the max number of nodes contained in the b+tree. It determines the depth of the tree and its fanout. 
-This number should be random generated.
+Note REALM_MAX_BPNODE_SIZE is the max number of nodes contained in the b+tree. It determines the depth of the tree and its fanout. \
+This number should be random generated. \
 
-If you don't want to build manually, you can skip this section and jump to the `Scripts` section.
+If you don't want to build manually, you can skip this section and jump to the `Scripts` section. \
 Run the fuzzer via AFL++:
-`
-cd <realm-core-src>
-mkdir build
+
+```
+cd <realm-core-src> 
+mkdir build 
 cd build
-cmake -D CMAKE_BUILD_TYPE=${build_mode} \
-      -D CMAKE_C_COMPILER=afl-cc \
-      -D CMAKE_CXX_COMPILER=afl-c++ \
-      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
-      -D REALM_ENABLE_ENCRYPTION=ON \
-      -G Ninja \
+cmake -D CMAKE_BUILD_TYPE=${build_mode} 
+      -D CMAKE_C_COMPILER=afl-cc 
+      -D CMAKE_CXX_COMPILER=afl-c++ 
+      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" 
+      -D REALM_ENABLE_ENCRYPTION=ON 
+      -G Ninja 
       ..
 cmake --build . --target realm-afl++
- afl-fuzz -t "$time_out" \
-        -m "$memory" \
-        -i "${ROOT_DIR}/test/fuzzy_object_store/testcases" \
-        -o "${FINDINGS_DIR}" \
+afl-fuzz -t "$time_out" 
+        -m "$memory" 
+        -i "${ROOT_DIR}/test/fuzzy_object_store/testcases" 
+        -o "${FINDINGS_DIR}" 
         realm-afl++ @@
-`
+```
 
 Run the fuzzer via libFuzzer (only with Clang)
-`
+```
 cd <realm-core-src>
 mkdir build
 cd build
-cmake -D REALM_LIBFUZZER=ON \
-      -D CMAKE_BUILD_TYPE=${build_mode} \
-      -D CMAKE_C_COMPILER=clang \
-      -D CMAKE_CXX_COMPILER=clang++ \
-      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
-      -D REALM_ENABLE_ENCRYPTION=ON \
-      -G Ninja \
+cmake -D REALM_LIBFUZZER=ON 
+      -D CMAKE_BUILD_TYPE=${build_mode} 
+      -D CMAKE_C_COMPILER=clang 
+      -D CMAKE_CXX_COMPILER=clang++ 
+      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" 
+      -D REALM_ENABLE_ENCRYPTION=ON 
+      -G Ninja 
       ..
 cmake --build . --target realm-libfuzz
 ./realm_libfuzz <corpus>
-`
+```
 
 ## Scripts
 
@@ -71,6 +72,6 @@ Optionally, the following arguments can be passed to the script:
 
 ## See Also
 
-[AFL++ github](https://github.com/AFLplusplus/AFLplusplus)
-[LibFuzzer](https://github.com/google/fuzzing/blob/master/tutorial/libFuzzerTutorial.md)
-[Google Fuzz Test](https://github.com/google/fuzztest)
+[AFL++ github](https://github.com/AFLplusplus/AFLplusplus) \
+[LibFuzzer](https://github.com/google/fuzzing/blob/master/tutorial/libFuzzerTutorial.md) \
+[Google Fuzz Test](https://github.com/google/fuzztest) \
