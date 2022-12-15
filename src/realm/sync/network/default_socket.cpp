@@ -4,11 +4,12 @@
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/random.hpp>
+#include <realm/util/span.hpp>
 
 namespace realm::sync::websocket {
 
 namespace {
-class DefaultWebSocketImpl final : public DefaultWebSocket, public Config {
+class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
                          std::mt19937_64& random, const std::string user_agent, EZObserver& observer,
@@ -25,9 +26,11 @@ public:
         initiate_resolve();
     }
 
-    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) override
+    void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {
-        m_websocket.async_write_binary(data, size, std::move(handler));
+        m_websocket.async_write_binary(data.data(), data.size(), [handler = std::move(handler)]() {
+            handler(Status::OK());
+        });
     }
 
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
@@ -352,7 +355,7 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 }
 } // namespace
 
-std::unique_ptr<DefaultWebSocket> DefaultSocketProvider::connect_legacy(EZObserver* observer, EZEndpoint&& endpoint)
+std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect_legacy(EZObserver* observer, EZEndpoint&& endpoint)
 {
     return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, *m_service, m_random, m_user_agent, *observer,
                                                   std::move(endpoint));

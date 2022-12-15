@@ -80,13 +80,6 @@ protected:
     ~EZObserver() = default;
 };
 
-class DefaultWebSocket {
-public:
-    virtual ~DefaultWebSocket() = default;
-
-    virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
-};
-
 class DefaultSocketProvider : public SyncSocketProvider {
 public:
     class Timer : public SyncSocketProvider::Timer {
@@ -132,7 +125,7 @@ public:
     }
 
     // Temporary workaround until Client::Connection is updated to use WebSocketObserver
-    std::unique_ptr<DefaultWebSocket> connect_legacy(EZObserver* observer, EZEndpoint&& endpoint);
+    std::unique_ptr<WebSocketInterface> connect_legacy(EZObserver* observer, EZEndpoint&& endpoint);
 
     std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override
     {

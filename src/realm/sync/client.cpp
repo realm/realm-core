@@ -405,7 +405,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    event_loop_post([this](Status status) mutable {
+    event_loop_post([this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         for (auto& p : m_server_slots) {

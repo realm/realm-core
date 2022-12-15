@@ -498,7 +498,7 @@ private:
 
     ClientImpl& m_client;
     // TODO: This will be updated to WebSocketInterface once the WebSocket integration is complete
-    std::unique_ptr<websocket::DefaultWebSocket> m_websocket;
+    std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;

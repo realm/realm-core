@@ -842,10 +842,11 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    auto handler = [this] {
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
+        if (!status.is_ok())
+            return;
         handle_write_message(); // Throws
-    };
-    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    });                         // Throws
     m_sending_session = sess;
     m_sending = true;
 }
@@ -922,10 +923,11 @@ void Connection::send_ping()
 
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
-    auto handler = [this] {
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
+        if (!status.is_ok())
+            return;
         handle_write_ping(); // Throws
-    };
-    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    });                      // Throws
     m_sending = true;
 }
 
