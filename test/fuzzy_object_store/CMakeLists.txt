@@ -23,15 +23,16 @@ file(GLOB AFL_SEEDS "testcases/*")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testcases)
 file(COPY ${AFL_SEEDS}
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/testcases)
-add_executable(realm-afl++ ${TEST_AFL_SOURCES})
-target_link_libraries(realm-afl++ TestUtil ObjectStore)
 
+if(NOT APPLE AND NOT WINDOWS_STORE)
+    find_package(LibUV REQUIRED)
+    set(libuv_target LibUV::LibUV)
+endif()
+
+add_executable(realm-afl++ ${TEST_AFL_SOURCES})
+target_link_libraries(realm-afl++ TestUtil ObjectStore ${libuv_target}) 
 
 if(REALM_LIBFUZZER)
-    if(NOT APPLE AND NOT WINDOWS_STORE)
-        find_package(LibUV REQUIRED)
-        set(libuv_target LibUV::LibUV)
-    endif()
     if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
         add_executable(realm-libfuzz ${TEST_LIBFUZZER_SOURCES})
         target_link_libraries(realm-libfuzz TestUtil ObjectStore ${libuv_target})
