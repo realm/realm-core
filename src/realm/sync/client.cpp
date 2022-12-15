@@ -1053,15 +1053,16 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.get_service().post([new_version, this] {
-        REALM_ASSERT(m_actualized);
-        if (REALM_UNLIKELY(!m_sess)) {
+    auto self = util::bind_ptr<SessionWrapper>(this);
+    m_client.get_service().post([new_version, self = std::move(self)] {
+        REALM_ASSERT(self->m_actualized);
+        if (REALM_UNLIKELY(!self->m_sess)) {
             return; // Already finalized
         }
-
-        m_sess->recognize_sync_version(m_db->get_version_of_latest_snapshot());
-        m_flx_latest_version = new_version;
-        m_sess->on_new_flx_subscription_set(new_version);
+        auto& sess = *self->m_sess;
+        sess.recognize_sync_version(self->m_db->get_version_of_latest_snapshot());
+        self->m_flx_latest_version = new_version;
+        sess.on_new_flx_subscription_set(new_version);
     });
 }
 
