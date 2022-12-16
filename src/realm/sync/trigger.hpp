@@ -43,7 +43,7 @@ public:
     Trigger(Service* service, SyncSocketProvider::FunctionHandler&& handler);
     ~Trigger() noexcept;
 
-    Trigger() noexcept = default;
+    Trigger() noexcept = delete;
     Trigger(Trigger&&) noexcept = default;
     Trigger& operator=(Trigger&&) noexcept = default;
 
@@ -126,7 +126,7 @@ inline void Trigger<Service>::trigger()
     }
     m_handler_info->state = HandlerInfo::State::Triggered;
 
-    auto handler = [handler_info = util::bind_ptr(m_handler_info)] {
+    auto handler = [handler_info = util::bind_ptr(m_handler_info)](Status status) {
         {
             util::LockGuard lock{handler_info->mutex};
             // Do not execute the handler if the Trigger does not exist anymore.
@@ -135,7 +135,7 @@ inline void Trigger<Service>::trigger()
             }
             handler_info->state = HandlerInfo::State::Idle;
         }
-        handler_info->handler(Status::OK());
+        handler_info->handler(status);
     };
     m_service->post(std::move(handler));
 }

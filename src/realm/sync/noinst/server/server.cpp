@@ -1098,7 +1098,7 @@ public:
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = Trigger<network::Service>{&service, std::move(handler)}; // Throws
+        m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1337,7 +1337,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    Trigger<network::Service> m_send_trigger;
+    std::unique_ptr<Trigger<network::Service>> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -4220,10 +4220,11 @@ void SyncConnection::terminate_if_dead(SteadyTimePoint now)
 
 void SyncConnection::enlist_to_send(Session* sess) noexcept
 {
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 
@@ -4646,6 +4647,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
     REALM_ASSERT(is_session_level_error(error_code) == (session_ident != 0));
     REALM_ASSERT(!is_session_level_error(error_code));
 
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     m_is_closing = true;
 
@@ -4660,7 +4662,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 

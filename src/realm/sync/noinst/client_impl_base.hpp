@@ -137,7 +137,10 @@ public:
     // Functions to post onto the event loop and create an event loop timer using the
     // SyncSocketProvider
     void post(SyncSocketProvider::FunctionHandler&& handler);
-    SyncTimer create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler);
+    SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
+                                               SyncSocketProvider::FunctionHandler&& handler);
+    using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
+    SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
     // TODO: This function will be removed once the event loop is integrated
     network::Service& get_service() noexcept;
@@ -175,7 +178,7 @@ private:
     // TODO: m_service will be removed once the event loop is integrated
     network::Service& m_service;
     std::mt19937_64 m_random;
-    Trigger<network::Service> m_actualize_and_finalize;
+    SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -517,7 +520,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    Trigger<network::Service> m_on_idle;
+    ClientImpl::SyncTrigger m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -556,16 +559,16 @@ private:
     // before the completion handler of the previous canceled wait operation
     // starts executing. Such an overlap is not allowed for wait operations on
     // the same timer instance.
-    SyncTimer m_reconnect_disconnect_timer;
+    SyncSocketProvider::SyncTimer m_reconnect_disconnect_timer;
 
     // Timer for connect operation watchdog. For why this timer is optional, see
     // `m_reconnect_disconnect_timer`.
-    SyncTimer m_connect_timer;
+    SyncSocketProvider::SyncTimer m_connect_timer;
 
     // This timer is used to schedule the sending of PING messages, and as a
     // watchdog for timely reception of PONG messages. For why this timer is
     // optional, see `m_reconnect_disconnect_timer`.
-    SyncTimer m_heartbeat_timer;
+    SyncSocketProvider::SyncTimer m_heartbeat_timer;
 
     milliseconds_type m_pong_wait_started_at = 0;
     milliseconds_type m_last_ping_sent_at = 0;
@@ -917,7 +920,7 @@ private:
 
     bool m_suspended = false;
 
-    SyncTimer m_try_again_activation_timer;
+    SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
@@ -1222,11 +1225,12 @@ inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInf
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
 {
+    REALM_ASSERT(m_on_idle);
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {

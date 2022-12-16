@@ -177,12 +177,12 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    m_actualize_and_finalize = {&get_service(), [this](Status status) {
-                                    if (!status.is_ok())
-                                        return;
+    m_actualize_and_finalize = create_trigger([this](Status status) {
+        if (!status.is_ok())
+            return;
 
-                                    actualize_and_finalize_session_wrappers(); // Throws
-                                }};
+        actualize_and_finalize_session_wrappers(); // Throws
+    });
 }
 
 
@@ -206,18 +206,26 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
 }
 
 
-SyncTimer ClientImpl::create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler)
+SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds delay,
+                                                       SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
     return m_socket_provider->create_timer(delay, std::move(handler));
 }
 
+ClientImpl::SyncTrigger ClientImpl::create_trigger(SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    return std::make_unique<Trigger<SyncSocketProvider>>(m_socket_provider.get(), std::move(handler));
+}
+
 
 void Connection::activate()
 {
+    REALM_ASSERT(m_on_idle);
     m_activated = true;
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
     // We cannot in general connect immediately, because a prior failure to
     // connect may require a delay before reconnecting (see `m_reconnect_info`).
     initiate_reconnect_wait(); // Throws
@@ -243,10 +251,11 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 
 void Connection::initiate_session_deactivation(Session* sess)
 {
+    REALM_ASSERT(m_on_idle);
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
-            m_on_idle.trigger();
+            m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {

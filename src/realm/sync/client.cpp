@@ -502,6 +502,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // Thread safety required.
 
     util::LockGuard lock{m_mutex};
+    REALM_ASSERT(m_actualize_and_finalize);
     m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
     bool retrigger = !m_actualize_and_finalize_needed;
     m_actualize_and_finalize_needed = true;
@@ -515,7 +516,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        m_actualize_and_finalize->trigger();
 }
 
 
@@ -524,6 +525,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // Thread safety required.
 
     util::LockGuard lock{m_mutex};
+    REALM_ASSERT(m_actualize_and_finalize);
 
     // If the session wrapper has not yet been actualized (on the event loop
     // thread), it can be immediately finalized. This ensures that we will
@@ -542,7 +544,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        m_actualize_and_finalize->trigger();
 }
 
 
@@ -1639,15 +1641,15 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name}
     , m_custom_http_headers{custom_http_headers}
 {
-    m_on_idle = {&client.get_service(), [this](Status status) {
-                     if (!status.is_ok())
-                         return;
-                     REALM_ASSERT(m_activated);
-                     if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-                         on_idle(); // Throws
-                         // Connection object may be destroyed now.
-                     }
-                 }};
+    m_on_idle = m_client.create_trigger([this](Status status) {
+        if (!status.is_ok())
+            return;
+        REALM_ASSERT(m_activated);
+        if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
+            on_idle(); // Throws
+            // Connection object may be destroyed now.
+        }
+    });
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
