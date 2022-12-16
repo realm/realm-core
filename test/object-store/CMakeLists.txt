@@ -142,6 +142,10 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     target_link_libraries(ObjectStoreTests uv_a)
     # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
+    
+    # the libuv include directory doesn't seem to flow properly
+    get_property(libuv_include_dir TARGET uv_a PROPERTY INCLUDE_DIRECTORIES)
+    target_include_directories(uv_a INTERFACE ${libuv_include_dir})
 endif()
 
 add_subdirectory(notifications-fuzzer)
