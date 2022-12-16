@@ -420,6 +420,13 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
+        SECTION("modifying the object with empty keyPathArray sends no notification") {
+            auto token = require_no_change(object, KeyPathArray());
+            write([&] {
+                obj.set(col_keys[0], 10);
+           });
+        }
+
         SECTION("modifying a different object") {
             auto token = require_no_change(object);
             write([&] {
@@ -945,6 +952,50 @@ TEST_CASE("object") {
                         REQUIRE_INDICES(change.modifications, 0);
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                }
+
+                SECTION("empty keypatharray for callbacks") {
+                    SECTION("modifying backlinked table 'table2', property 'value' "
+                            "with empty KeyPathArray "
+                            "-> DOES not send a notification") {
+                        auto token_with_shallow_subscribtion =
+                            require_no_change(object_target, KeyPathArray());
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                    }
+                    SECTION("modifying backlinked table 'table2', property 'link' "
+                            "with empty KeyPathArray "
+                            "-> does NOT send a notification") {
+                        auto token_with_empty_key_path_array =
+                            require_no_change(object_target, KeyPathArray());
+                        write([&] {
+                            Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                            Object object_target2(r, obj_target2);
+                            object_origin.set_property_value(d, "link", std::any(object_target2));
+                        });
+                    }
+                    SECTION("adding a new origin pointing to the target "
+                            "with empty KeyPathArray "
+                            "-> does NOT send a notification") {
+                        auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            Object object_origin2(r, obj_origin2);
+                            object_origin2.set_property_value(d, "link", std::any(object_target));
+                        });
+                    }
+                    SECTION("adding a new origin pointing to the target "
+                            "with empty KeyPathArray "
+                            "-> does NOT send a notification") {
+                        auto token_with_empty_key_path_array =
+                            require_no_change(object_target, KeyPathArray());
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            Object object_origin2(r, obj_origin2);
+                            object_origin2.set_property_value(d, "link", std::any(object_target));
+                        });
                     }
                 }
             }
