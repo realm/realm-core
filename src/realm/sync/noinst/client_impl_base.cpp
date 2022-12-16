@@ -199,15 +199,14 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 }
 
 
-void ClientImpl::event_loop_post(SyncSocketProvider::FunctionHandler&& handler)
+void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
     m_socket_provider->post(std::move(handler));
 }
 
 
-SyncTimer ClientImpl::event_loop_create_timer(std::chrono::milliseconds delay,
-                                              SyncSocketProvider::FunctionHandler&& handler)
+SyncTimer ClientImpl::create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
     return m_socket_provider->create_timer(delay, std::move(handler));
@@ -594,7 +593,7 @@ void Connection::initiate_reconnect_wait()
     }
 
     m_reconnect_disconnect_timer =
-        m_client.event_loop_create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
+        m_client.create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
             // If the operation is aborted, the connection object may have been
             // destroyed.
             if (status != ErrorCodes::OperationAborted)
@@ -690,7 +689,7 @@ void Connection::initiate_connect_wait()
     // long, or even indefinite time.
     milliseconds_type time = m_client.m_connect_timeout;
 
-    m_connect_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
+    m_connect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (status != ErrorCodes::OperationAborted)
@@ -793,7 +792,7 @@ void Connection::initiate_ping_delay(milliseconds_type now)
 
     m_ping_delay_in_progress = true;
 
-    m_heartbeat_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(delay), [this](Status status) {
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](Status status) {
         if (status != ErrorCodes::OperationAborted)
             handle_ping_delay(); // Throws
     });                          // Throws
@@ -824,7 +823,7 @@ void Connection::initiate_pong_timeout()
     m_pong_wait_started_at = monotonic_clock_now();
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
-    m_heartbeat_timer = m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         if (status != ErrorCodes::OperationAborted)
             handle_pong_timeout(); // Throws
     });                            // Throws
@@ -960,13 +959,12 @@ void Connection::initiate_disconnect_wait()
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
-    m_reconnect_disconnect_timer =
-        m_client.event_loop_create_timer(std::chrono::milliseconds(time), [this](Status status) {
-            // If the operation is aborted, the connection object may have been
-            // destroyed.
-            if (status != ErrorCodes::OperationAborted)
-                handle_disconnect_wait(status); // Throws
-        });                                     // Throws
+    m_reconnect_disconnect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
+        // If the operation is aborted, the connection object may have been
+        // destroyed.
+        if (status != ErrorCodes::OperationAborted)
+            handle_disconnect_wait(status); // Throws
+    });                                     // Throws
     m_disconnect_delay_in_progress = true;
 }
 
@@ -2467,7 +2465,7 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
     m_try_again_error_code = ProtocolError(error_info.raw_error_code);
     logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
     m_try_again_activation_timer =
-        get_client().event_loop_create_timer(*m_current_try_again_delay_interval, [this](Status status) {
+        get_client().create_timer(*m_current_try_again_delay_interval, [this](Status status) {
             if (status == ErrorCodes::OperationAborted) {
                 return;
             }

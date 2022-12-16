@@ -405,7 +405,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    event_loop_post([this](Status status) {
+    post([this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         for (auto& p : m_server_slots) {
@@ -460,7 +460,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    event_loop_post([this](Status status) mutable {
+    post([this](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         util::LockGuard lock{m_mutex};
@@ -970,14 +970,13 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     auto pf = util::make_promise_future<std::string>();
 
-    get_client().event_loop_post(
-        [this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
-            if (status == ErrorCodes::OperationAborted)
-                return;
-            auto id = ++m_last_pending_test_command_ident;
-            m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
-            ensure_enlisted_to_send();
-        });
+    get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        auto id = ++m_last_pending_test_command_ident;
+        m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
+        ensure_enlisted_to_send();
+    });
 
     return std::move(pf.future);
 }
@@ -1048,7 +1047,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.event_loop_post([new_version, this](Status status) {
+    m_client.post([new_version, this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(m_actualized);
@@ -1179,7 +1178,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.event_loop_post([self = std::move(self), new_version](Status status) {
+    m_client.post([self = std::move(self), new_version](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1198,7 +1197,7 @@ void SessionWrapper::cancel_reconnect_delay()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.event_loop_post([self = std::move(self)](Status status) {
+    m_client.post([self = std::move(self)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1218,8 +1217,8 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.event_loop_post([self = std::move(self), handler = std::move(handler), upload_completion,
-                              download_completion](Status status) mutable {
+    m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
+                   download_completion](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1263,7 +1262,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.event_loop_post([self = std::move(self), target_mark](Status status) {
+    m_client.post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1303,7 +1302,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    m_client.event_loop_post([self = std::move(self), target_mark](Status status) {
+    m_client.post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);
@@ -1336,7 +1335,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    m_client.event_loop_post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
+    m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         REALM_ASSERT(self->m_actualized);

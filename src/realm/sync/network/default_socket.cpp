@@ -3,8 +3,6 @@
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
-#include <realm/util/random.hpp>
-#include <realm/util/span.hpp>
 
 namespace realm::sync::websocket {
 
@@ -16,9 +14,9 @@ public:
                          EZEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
+        , m_random{random}
         , m_service{service}
         , m_user_agent{user_agent}
-        , m_random{random}
         , m_observer{observer}
         , m_endpoint{std::move(endpoint)}
         , m_websocket(*this)
@@ -104,9 +102,9 @@ private:
 
     const std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
+    std::mt19937_64& m_random;
     network::Service& m_service;
     const std::string m_user_agent;
-    std::mt19937_64& m_random;
 
     EZObserver& m_observer;
 

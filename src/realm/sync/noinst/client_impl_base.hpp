@@ -134,8 +134,10 @@ public:
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
 
-    void event_loop_post(SyncSocketProvider::FunctionHandler&& handler);
-    SyncTimer event_loop_create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler);
+    // Functions to post onto the event loop and create an event loop timer using the
+    // SyncSocketProvider
+    void post(SyncSocketProvider::FunctionHandler&& handler);
+    SyncTimer create_timer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler);
 
     // TODO: This function will be removed once the event loop is integrated
     network::Service& get_service() noexcept;
