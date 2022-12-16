@@ -27,7 +27,9 @@ namespace realm::sync {
 /// Register a function whose invocation can be triggered repeatedly.
 ///
 /// While the function is always executed by the event loop thread, the
-/// triggering of its execution can be done by any thread.
+/// triggering of its execution can be done by any thread. The event loop
+/// is provided through Service type and it must a
+/// `post(SyncSocketProvider::FunctionHandler&&)` method.
 ///
 /// The function is guaranteed to not be called after the Trigger object is
 /// destroyed.
@@ -104,6 +106,7 @@ template <class Service>
 inline Trigger<Service>::~Trigger() noexcept
 {
     if (m_handler_info) {
+        util::LockGuard lock{m_handler_info->mutex};
         REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
         m_handler_info->state = HandlerInfo::State::Destroyed;
     }
@@ -113,9 +116,11 @@ template <class Service>
 inline void Trigger<Service>::trigger()
 {
     REALM_ASSERT(m_service);
-    REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
+    REALM_ASSERT(m_handler_info);
 
     util::LockGuard lock{m_handler_info->mutex};
+    REALM_ASSERT(m_handler_info->state != HandlerInfo::State::Destroyed);
+
     if (m_handler_info->state == HandlerInfo::State::Triggered) {
         return;
     }

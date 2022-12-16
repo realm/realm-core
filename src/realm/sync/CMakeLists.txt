@@ -50,12 +50,12 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
-    trigger.hpp
 
     network/http.hpp
 )
 
 set(NOINST_HEADERS
+    trigger.hpp
     network/default_socket.hpp
     network/network.hpp
     network/network_ssl.hpp
