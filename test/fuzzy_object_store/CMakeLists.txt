@@ -36,14 +36,12 @@ endif()
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
 if(NOT APPLE AND NOT WINDOWS_STORE)
-    find_package(LibUV REQUIRED)
-    set(libuv_target LibUV::LibUV)
+    #find_package(LibUV REQUIRED)
+    #set(libuv_target LibUV::LibUV)
 
-    target_include_directories(realm-afl++  PRIVATE ${libuv_include_dir})
     target_link_libraries(realm-afl++ ${libuv_target})
     if(REALM_LIBFUZZER)
         if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        target_include_directories(realm-libfuzz  PRIVATE ${libuv_include_dir})
         target_link_libraries(realm-libfuzz ${libuv_target})
         endif()
     endif()
