@@ -20,7 +20,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
-
+#include <cstring>
 #if REALM_USE_UV
 #include <uv.h>
 #endif
