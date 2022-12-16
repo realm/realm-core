@@ -142,7 +142,7 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     target_link_libraries(ObjectStoreTests uv_a)
     # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
-    target_link_libraries(ObjectStore PUBLIC uv_a)
+    target_include_directories(ObjectStore PRIVATE $<TARGET_PROPERTY:uv_a,INCLUDE_DIRECTORIES>)
 endif()
 
 add_subdirectory(notifications-fuzzer)
