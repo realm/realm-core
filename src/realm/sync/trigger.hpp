@@ -28,7 +28,7 @@ namespace realm::sync {
 ///
 /// While the function is always executed by the event loop thread, the
 /// triggering of its execution can be done by any thread. The event loop
-/// is provided through Service type and it must a
+/// is provided through Service type and it must have
 /// `post(SyncSocketProvider::FunctionHandler&&)` method.
 ///
 /// The function is guaranteed to not be called after the Trigger object is
