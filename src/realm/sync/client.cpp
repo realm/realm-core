@@ -454,7 +454,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // invoked. Then the session wrapper will have been added to
     // `m_abandoned_session_wrappers`, and an invocation of
     // actualize_and_finalize_session_wrappers() will have been scheduled. The
-    // guarantees mentioned in the documentation of network::Trigger then ensure
+    // guarantees mentioned in the documentation of Trigger then ensure
     // that at least one execution of actualize_and_finalize_session_wrappers()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
@@ -1636,14 +1636,16 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name}
     , m_custom_http_headers{custom_http_headers}
 {
-    auto handler = [this] {
-        REALM_ASSERT(m_activated);
-        if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    };
-    m_on_idle = network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    m_on_idle =
+        Trigger<network::Service>{&client.get_service(), [this](Status status) {
+                                      if (!status.is_ok())
+                                          return;
+                                      REALM_ASSERT(m_activated);
+                                      if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
+                                          on_idle(); // Throws
+                                          // Connection object may be destroyed now.
+                                      }
+                                  }};
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept

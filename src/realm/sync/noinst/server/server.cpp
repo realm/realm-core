@@ -4,6 +4,7 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
+#include <realm/sync/trigger.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/network/http.hpp>
@@ -1091,11 +1092,13 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        auto handler = [this](Status status) {
+            if (!status.is_ok())
+                return;
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = network::Trigger{service, std::move(handler)}; // Throws
+        m_send_trigger = Trigger<network::Service>{&service, std::move(handler)}; // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1334,7 +1337,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    network::Trigger m_send_trigger;
+    Trigger<network::Service> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 

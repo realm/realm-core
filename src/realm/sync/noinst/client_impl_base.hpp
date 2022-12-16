@@ -25,6 +25,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/trigger.hpp>
 
 
 namespace realm {
@@ -165,7 +166,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
 
     const bool m_one_connection_per_session;
-    network::Trigger m_actualize_and_finalize;
+    Trigger<network::Service> m_actualize_and_finalize;
     network::DeadlineTimer m_keep_running_timer;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -506,7 +507,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    network::Trigger m_on_idle;
+    Trigger<network::Service> m_on_idle;
 
     // activate() has been called
     bool m_activated = false;

@@ -181,10 +181,12 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    auto handler = [this] {
-        actualize_and_finalize_session_wrappers(); // Throws
-    };
-    m_actualize_and_finalize = network::Trigger{get_service(), std::move(handler)}; // Throws
+    m_actualize_and_finalize = Trigger<network::Service>{&get_service(), [this](Status status) {
+                                                             if (!status.is_ok())
+                                                                 return;
+
+                                                             actualize_and_finalize_session_wrappers(); // Throws
+                                                         }};
 
     start_keep_running_timer(); // Throws
 }
