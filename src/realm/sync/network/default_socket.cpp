@@ -7,14 +7,16 @@
 namespace realm::sync::websocket {
 
 namespace {
-class EZSocketImpl final : public EZSocket, public Config {
+class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
 public:
-    EZSocketImpl(EZConfig& config, EZObserver& observer, EZEndpoint&& endpoint)
-        : m_logger_ptr{config.logger}
+    DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
+                         std::mt19937_64& random, const std::string user_agent, EZObserver& observer,
+                         EZEndpoint&& endpoint)
+        : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
-        , m_random{config.random}
-        , m_service{config.service}
-        , m_user_agent{config.user_agent}
+        , m_random{random}
+        , m_service{service}
+        , m_user_agent{user_agent}
         , m_observer{observer}
         , m_endpoint{std::move(endpoint)}
         , m_websocket(*this)
@@ -22,9 +24,11 @@ public:
         initiate_resolve();
     }
 
-    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) override
+    void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {
-        m_websocket.async_write_binary(data, size, std::move(handler));
+        m_websocket.async_write_binary(data.data(), data.size(), [handler = std::move(handler)]() {
+            handler(Status::OK());
+        });
     }
 
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
@@ -100,7 +104,7 @@ private:
     util::Logger& m_logger;
     std::mt19937_64& m_random;
     network::Service& m_service;
-    std::string m_user_agent;
+    const std::string m_user_agent;
 
     EZObserver& m_observer;
 
@@ -111,11 +115,11 @@ private:
     util::Optional<network::ssl::Stream> m_ssl_stream;
     network::ReadAheadBuffer m_read_ahead_buffer;
     websocket::Socket m_websocket;
-    util::Optional<HTTPClient<EZSocketImpl>> m_proxy_client;
+    util::Optional<HTTPClient<DefaultWebSocketImpl>> m_proxy_client;
 };
 
 
-void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
+void DefaultWebSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -127,7 +131,7 @@ void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHand
 }
 
 
-void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
+void DefaultWebSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -139,7 +143,7 @@ void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, 
 }
 
 
-void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
+void DefaultWebSocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -151,7 +155,7 @@ void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompleti
 }
 
 
-void EZSocketImpl::initiate_resolve()
+void DefaultWebSocketImpl::initiate_resolve()
 {
     const std::string& address = m_endpoint.proxy ? m_endpoint.proxy->address : m_endpoint.address;
     const port_type& port = m_endpoint.proxy ? m_endpoint.proxy->port : m_endpoint.port;
@@ -174,7 +178,7 @@ void EZSocketImpl::initiate_resolve()
 }
 
 
-void EZSocketImpl::handle_resolve(std::error_code ec, network::Endpoint::List endpoints)
+void DefaultWebSocketImpl::handle_resolve(std::error_code ec, network::Endpoint::List endpoints)
 {
     if (ec) {
         m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
@@ -186,7 +190,7 @@ void EZSocketImpl::handle_resolve(std::error_code ec, network::Endpoint::List en
 }
 
 
-void EZSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoints, std::size_t i)
+void DefaultWebSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
@@ -203,7 +207,7 @@ void EZSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoints, std::
 }
 
 
-void EZSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpoint::List endpoints, std::size_t i)
+void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const network::Endpoint& ep = *(endpoints.begin() + i);
@@ -235,7 +239,7 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpoint::Lis
     initiate_websocket_or_ssl_handshake(); // Throws
 }
 
-void EZSocketImpl::initiate_websocket_or_ssl_handshake()
+void DefaultWebSocketImpl::initiate_websocket_or_ssl_handshake()
 {
     if (m_endpoint.is_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -245,7 +249,7 @@ void EZSocketImpl::initiate_websocket_or_ssl_handshake()
     }
 }
 
-void EZSocketImpl::initiate_http_tunnel()
+void DefaultWebSocketImpl::initiate_http_tunnel()
 {
     HTTPRequest req;
     req.method = HTTPMethod::Connect;
@@ -274,7 +278,7 @@ void EZSocketImpl::initiate_http_tunnel()
     m_proxy_client->async_request(req, std::move(handler)); // Throws
 }
 
-void EZSocketImpl::initiate_ssl_handshake()
+void DefaultWebSocketImpl::initiate_ssl_handshake()
 {
     using namespace network::ssl;
 
@@ -322,7 +326,7 @@ void EZSocketImpl::initiate_ssl_handshake()
 }
 
 
-void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
+void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
@@ -334,7 +338,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 }
 
 
-void EZSocketImpl::initiate_websocket_handshake()
+void DefaultWebSocketImpl::initiate_websocket_handshake()
 {
     auto headers = HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_user_agent;
@@ -349,11 +353,10 @@ void EZSocketImpl::initiate_websocket_handshake()
 }
 } // namespace
 
-EZSocket::~EZSocket() = default;
-
-std::unique_ptr<EZSocket> EZSocketFactory::connect(EZObserver* observer, EZEndpoint&& endpoint)
+std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect_legacy(EZObserver* observer, EZEndpoint&& endpoint)
 {
-    return std::make_unique<EZSocketImpl>(m_config, *observer, std::move(endpoint));
+    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, *m_service, m_random, m_user_agent, *observer,
+                                                  std::move(endpoint));
 }
 
 } // namespace realm::sync::websocket

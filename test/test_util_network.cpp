@@ -13,6 +13,7 @@
 #include "test.hpp"
 #include "util/semaphore.hpp"
 
+using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -125,10 +126,11 @@ TEST(Network_PostOperation)
 {
     network::Service service;
     int var_1 = 381, var_2 = 743;
-    service.post([&] {
+    service.post([&](Status status) {
+        CHECK(status.is_ok());
         var_1 = 824;
     });
-    service.post([&] {
+    service.post([&](Status) {
         var_2 = 216;
     });
     CHECK_EQUAL(var_1, 381);
@@ -136,10 +138,10 @@ TEST(Network_PostOperation)
     service.run();
     CHECK_EQUAL(var_1, 824);
     CHECK_EQUAL(var_2, 216);
-    service.post([&] {
+    service.post([&](Status) {
         var_2 = 191;
     });
-    service.post([&] {
+    service.post([&](Status) {
         var_1 = 476;
     });
     CHECK_EQUAL(var_1, 824);
@@ -157,7 +159,7 @@ TEST(Network_EventLoopStopAndReset_1)
     // Prestop
     int var = 381;
     service.stop();
-    service.post([&] {
+    service.post([&](Status) {
         var = 824;
     });
     service.run(); // Must return immediately
@@ -167,13 +169,13 @@ TEST(Network_EventLoopStopAndReset_1)
 
     // Reset
     service.reset();
-    service.post([&] {
+    service.post([&](Status) {
         var = 824;
     });
     CHECK_EQUAL(var, 381);
     service.run();
     CHECK_EQUAL(var, 824);
-    service.post([&] {
+    service.post([&](Status) {
         var = 476;
     });
     CHECK_EQUAL(var, 824);
@@ -199,7 +201,7 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Check that the event loop is actually running
     BowlOfStonesSemaphore bowl_1; // Empty
-    service.post([&] {
+    service.post([&](Status) {
         bowl_1.add_stone();
     });
     bowl_1.get_stone(); // Block until the stone is added
@@ -210,7 +212,7 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Check that the event loop remains in the stopped state
     int var = 381;
-    service.post([&] {
+    service.post([&](Status) {
         var = 824;
     });
     CHECK_EQUAL(var, 381);
@@ -227,13 +229,13 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Check that the event loop is actually running
     BowlOfStonesSemaphore bowl_2; // Empty
-    service.post([&] {
+    service.post([&](Status) {
         bowl_2.add_stone();
     });
     bowl_2.get_stone(); // Block until the stone is added
 
     // Stop the event loop by canceling the blocking operation
-    service.post([&] {
+    service.post([&](Status) {
         acceptor.cancel();
     });
     CHECK_NOT(thread_2.join());
@@ -900,10 +902,10 @@ TEST(Network_DeadlineTimer)
     // Check that the completion handler is executed
     bool completed = false;
     bool canceled = false;
-    const auto wait_handler = [&](std::error_code ec) {
-        if (!ec)
+    const auto wait_handler = [&](Status status) {
+        if (status.is_ok())
             completed = true;
-        if (ec == error::operation_aborted)
+        if (status == ErrorCodes::OperationAborted)
             canceled = true;
     };
     timer.async_wait(std::chrono::seconds(0), wait_handler);
@@ -949,12 +951,12 @@ TEST(Network_DeadlineTimer_Special)
     network::DeadlineTimer timer_4{service};
     network::DeadlineTimer timer_5{service};
     network::DeadlineTimer timer_6{service};
-    timer_1.async_wait(std::chrono::seconds(3), [](error_code) { std::cerr << "*3*\n";   });
-    timer_2.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2*\n";   });
-    timer_3.async_wait(std::chrono::seconds(3), [](error_code) { std::cerr << "*3-2*\n"; });
-    timer_4.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2-2*\n"; });
-    timer_5.async_wait(std::chrono::seconds(1), [](error_code) { std::cerr << "*1*\n";   });
-    timer_6.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2-3*\n"; });
+    timer_1.async_wait(std::chrono::seconds(3), [](Status) { std::cerr << "*3*\n";   });
+    timer_2.async_wait(std::chrono::seconds(2), [](Status) { std::cerr << "*2*\n";   });
+    timer_3.async_wait(std::chrono::seconds(3), [](Status) { std::cerr << "*3-2*\n"; });
+    timer_4.async_wait(std::chrono::seconds(2), [](Status) { std::cerr << "*2-2*\n"; });
+    timer_5.async_wait(std::chrono::seconds(1), [](Status) { std::cerr << "*1*\n";   });
+    timer_6.async_wait(std::chrono::seconds(2), [](Status) { std::cerr << "*2-3*\n"; });
     service.run();
 }
 */
@@ -967,7 +969,7 @@ TEST(Network_ThrowFromHandlers)
     network::Service service;
     struct TestException1 {
     };
-    service.post([] {
+    service.post([](Status) {
         throw TestException1();
     });
     CHECK_THROW(service.run(), TestException1);
@@ -1030,7 +1032,7 @@ TEST(Network_ThrowFromHandlers)
         network::DeadlineTimer timer{service};
         struct TestException6 {
         };
-        timer.async_wait(std::chrono::seconds(0), [](std::error_code) {
+        timer.async_wait(std::chrono::seconds(0), [](Status) {
             throw TestException6();
         });
         CHECK_THROW(service.run(), TestException6);
@@ -1045,17 +1047,17 @@ TEST(Network_HandlerDealloc)
     {
         // m_post_handlers
         network::Service service;
-        service.post([] {});
+        service.post([](Status) {});
     }
     {
         // m_imm_handlers
         network::Service service;
         // By adding two post handlers that throw, one is going to be left
         // behind in `m_imm_handlers`
-        service.post([&] {
+        service.post([&](Status) {
             throw std::runtime_error("");
         });
-        service.post([&] {
+        service.post([&](Status) {
             throw std::runtime_error("");
         });
         CHECK_THROW(service.run(), std::runtime_error);
@@ -1113,7 +1115,7 @@ struct PostReallocHandler {
         : var(v)
     {
     }
-    void operator()()
+    void operator()(Status)
     {
         var = size;
     }
@@ -1635,7 +1637,7 @@ TEST(Network_HeavyAsyncPost)
 {
     network::Service service;
     network::DeadlineTimer dummy_timer{service};
-    dummy_timer.async_wait(std::chrono::hours(10000), [](std::error_code) {});
+    dummy_timer.async_wait(std::chrono::hours(10000), [](Status) {});
 
     ThreadWrapper looper_thread;
     looper_thread.start([&] {
@@ -1646,7 +1648,7 @@ TEST(Network_HeavyAsyncPost)
     const long num_iterations = 10000L;
     auto func = [&](int thread_index) {
         for (long i = 0; i < num_iterations; ++i)
-            service.post([&entries, thread_index, i] {
+            service.post([&entries, thread_index, i](Status) {
                 entries.emplace_back(thread_index, i);
             });
     };
@@ -1660,7 +1662,7 @@ TEST(Network_HeavyAsyncPost)
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 
-    service.post([&] {
+    service.post([&](Status) {
         dummy_timer.cancel();
     });
     CHECK_NOT(looper_thread.join());
@@ -1735,7 +1737,7 @@ TEST(Network_RepeatedCancelAndRestartRead)
                 std::min(random.draw_int<size_t>(1, write_buffer_size), num_bytes_to_write - num_bytes_written);
             socket_1.write(write_buffer, n);
             num_bytes_written += n;
-            service_2.post([&] {
+            service_2.post([&](Status) {
                 socket_2.cancel();
             });
         }
@@ -1792,16 +1794,6 @@ TEST(Network_StressTest)
         bool progress = false;
         bool read_done = false, write_done = false;
         realm::util::UniqueFunction<void()> shedule_cancellation = [&] {
-            auto handler = [&](std::error_code ec) {
-                REALM_ASSERT(!ec || ec == error::operation_aborted);
-                if (ec == error::operation_aborted)
-                    return;
-                if (read_done && write_done)
-                    return;
-                socket.cancel();
-                ++stats.num_cancellations;
-                shedule_cancellation();
-            };
             if (progress) {
                 microseconds_per_cancellation /= 2;
                 progress = false;
@@ -1812,7 +1804,16 @@ TEST(Network_StressTest)
             if (microseconds_per_cancellation < 10)
                 microseconds_per_cancellation = 10;
             cancellation_timer.async_wait(std::chrono::microseconds(microseconds_per_cancellation),
-                                          std::move(handler));
+                                          [&](Status status) {
+                                              REALM_ASSERT(status.is_ok() || status == ErrorCodes::OperationAborted);
+                                              if (status == ErrorCodes::OperationAborted)
+                                                  return;
+                                              if (read_done && write_done)
+                                                  return;
+                                              socket.cancel();
+                                              ++stats.num_cancellations;
+                                              shedule_cancellation();
+                                          });
         };
         shedule_cancellation();
         char* read_begin = read_buffer.get();
@@ -1844,11 +1845,10 @@ TEST(Network_StressTest)
                     progress = true;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    read_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         read();
-                    };
-                    read_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     read();
@@ -1892,11 +1892,10 @@ TEST(Network_StressTest)
                     progress = true;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    write_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         write();
-                    };
-                    write_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     write();
@@ -2017,7 +2016,7 @@ TEST(Sync_Trigger_ThreadSafety)
 {
     network::Service service;
     network::DeadlineTimer keep_alive{service};
-    keep_alive.async_wait(std::chrono::hours(10000), [](std::error_code) {});
+    keep_alive.async_wait(std::chrono::hours(10000), [](Status) {});
     long n_1 = 0, n_2 = 0;
     std::atomic<bool> flag{false};
     auto func = [&](realm::Status) {
@@ -2035,7 +2034,7 @@ TEST(Sync_Trigger_ThreadSafety)
         trigger.trigger();
     flag = true;
     trigger.trigger();
-    service.post([&] {
+    service.post([&](Status) {
         keep_alive.cancel();
     });
     CHECK_NOT(thread.join());
