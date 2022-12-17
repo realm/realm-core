@@ -408,6 +408,9 @@ void ClientImpl::cancel_reconnect_delay()
     post([this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         for (auto& p : m_server_slots) {
             ServerSlot& slot = p.second;
             if (m_one_connection_per_session) {
@@ -463,6 +466,9 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     post([this](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         util::LockGuard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
@@ -975,6 +981,9 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
     get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
         ensure_enlisted_to_send();
@@ -1052,6 +1061,9 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
     m_client.post([new_version, this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(m_actualized);
         if (REALM_UNLIKELY(!m_sess)) {
             return; // Already finalized
@@ -1183,6 +1195,9 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     m_client.post([self = std::move(self), new_version](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1202,6 +1217,9 @@ void SessionWrapper::cancel_reconnect_delay()
     m_client.post([self = std::move(self)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1223,6 +1241,9 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
                    download_completion](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
@@ -1267,6 +1288,9 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     m_client.post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1307,6 +1331,9 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     m_client.post([self = std::move(self), target_mark](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1340,6 +1367,9 @@ void SessionWrapper::refresh(std::string signed_access_token)
     m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1642,8 +1672,11 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_custom_http_headers{custom_http_headers}
 {
     m_on_idle = m_client.create_trigger([this](Status status) {
-        if (!status.is_ok())
+        if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         REALM_ASSERT(m_activated);
         if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
             on_idle(); // Throws

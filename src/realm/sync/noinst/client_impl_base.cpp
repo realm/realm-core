@@ -178,8 +178,10 @@ ClientImpl::ClientImpl(ClientConfig config)
     }
 
     m_actualize_and_finalize = create_trigger([this](Status status) {
-        if (!status.is_ok())
+        if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
 
         actualize_and_finalize_session_wrappers(); // Throws
     });
@@ -802,9 +804,13 @@ void Connection::initiate_ping_delay(milliseconds_type now)
     m_ping_delay_in_progress = true;
 
     m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](Status status) {
-        if (status != ErrorCodes::OperationAborted)
-            handle_ping_delay(); // Throws
-    });                          // Throws
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
+        handle_ping_delay();                                                             // Throws
+    });                                                                                  // Throws
     logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
 }
 
@@ -833,9 +839,13 @@ void Connection::initiate_pong_timeout()
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
     m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
-        if (status != ErrorCodes::OperationAborted)
-            handle_pong_timeout(); // Throws
-    });                            // Throws
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
+        handle_pong_timeout(); // Throws
+    });                        // Throws
 }
 
 
@@ -851,8 +861,11 @@ void Connection::handle_pong_timeout()
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
     m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
-        if (!status.is_ok())
+        if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         handle_write_message(); // Throws
     });                         // Throws
     m_sending_session = sess;
@@ -932,8 +945,11 @@ void Connection::send_ping()
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
     m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
-        if (!status.is_ok())
+        if (status == ErrorCodes::OperationAborted)
             return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         handle_write_ping(); // Throws
     });                      // Throws
     m_sending = true;
@@ -2475,9 +2491,10 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
     logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
     m_try_again_activation_timer =
         get_client().create_timer(*m_current_try_again_delay_interval, [this](Status status) {
-            if (status == ErrorCodes::OperationAborted) {
+            if (status == ErrorCodes::OperationAborted)
                 return;
-            }
+            else if (!status.is_ok())
+                throw ExceptionForStatus(status);
 
             m_try_again_activation_timer.reset();
             if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {

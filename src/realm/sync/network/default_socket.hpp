@@ -84,11 +84,7 @@ class DefaultSocketProvider : public SyncSocketProvider {
 public:
     class Timer : public SyncSocketProvider::Timer {
     public:
-        Timer(network::Service& service, std::chrono::milliseconds delay, FunctionHandler&& handler)
-            : m_timer{service}
-        {
-            m_timer.async_wait(delay, std::move(handler));
-        }
+        friend class DefaultSocketProvider;
 
         /// Cancels the timer and destroys the timer instance.
         ~Timer() = default;
@@ -97,6 +93,13 @@ public:
         void cancel() override
         {
             m_timer.cancel();
+        }
+
+    protected:
+        Timer(network::Service& service, std::chrono::milliseconds delay, FunctionHandler&& handler)
+            : m_timer{service}
+        {
+            m_timer.async_wait(delay, std::move(handler));
         }
 
     private:
@@ -143,7 +146,7 @@ public:
 
     SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) override
     {
-        return std::make_unique<DefaultSocketProvider::Timer>(*m_service, delay, std::move(handler));
+        return std::unique_ptr<Timer>(new DefaultSocketProvider::Timer(*m_service, delay, std::move(handler)));
     }
 
 private:
