@@ -515,10 +515,10 @@ tasks:
       test_filter: CoreTests
       report_test_progress: On
 
-- name: fuzz-tests
+- name:  fuzz-tests
+  #run it for 10min
+  exec_timeout_secs: 600
   commands:
-  - func: "run-fuzzer"
-    commands:
   - func: "fetch source"
   - func: "fetch binaries"
   - func: "compile"
@@ -526,9 +526,10 @@ tasks:
       target_to_build: "realm-libfuzz"
   - command: shell.exec
     params:
-      working_dir: realm-core/build/fuzz-test
+      working_dir: realm-core
       shell: /bin/bash
       script: |-
+        #!/bin/bash
         ./realm_libfuzz
 
 - name: core-tests
