@@ -515,6 +515,22 @@ tasks:
       test_filter: CoreTests
       report_test_progress: On
 
+- name: fuzz-tests
+  commands:
+  - func: "run-fuzzer"
+    commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: "realm-libfuzz"
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/fuzz-test
+      shell: /bin/bash
+      script: |-
+        ./realm_libfuzz
+
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
@@ -924,6 +940,21 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+
+  - name: macos_fuzzer
+  display_name: "MacOS 11.0 x86_64 Fuzzer"
+  run_on: macos-1100
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: Off
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DREALM_LIBFUZZER=ON  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++  -DREALM_ENABLE_ENCRYPTION=ON 
+  tasks:
+  - name: fuzz-tests
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
