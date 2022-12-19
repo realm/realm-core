@@ -2729,6 +2729,38 @@ TEST_CASE("notifications: results") {
                 }
             }
         }
+        SECTION("Shallow listener") {
+            CollectionChangeSet collection_change_set_with_empty_filter;
+            int notification_calls_with_empty_filter = 0;
+            auto token_with_empty_filter = results_for_notification_filter.add_notification_callback(
+                [&](CollectionChangeSet collection_change_set) {
+                    collection_change_set_with_empty_filter = collection_change_set;
+                    ++notification_calls_with_empty_filter;
+                },
+                KeyPathArray());
+            advance_and_notify(*r);
+            REQUIRE(notification_calls_with_empty_filter == 1);
+            REQUIRE(collection_change_set_with_empty_filter.empty());
+
+            SECTION("modifying root table 'object', property 'value' "
+                    "-> does NOT send a notification") {
+                write([&] {
+                    table->get_object(object_keys[0]).set(col_value, 3);
+                });
+
+                REQUIRE(notification_calls_with_empty_filter == 1);
+                REQUIRE(collection_change_set_with_empty_filter.empty());
+            }
+
+            SECTION("modifying root table 'object', property 'link' "
+                    "-> does NOT send a notification") {
+                write([&] {
+                    table->get_object(object_keys[0]).set(col_link, linked_to_table->create_object().get_key());
+                });
+                REQUIRE(notification_calls_with_empty_filter == 1);
+                REQUIRE(collection_change_set_with_empty_filter.empty());
+            }
+        }
 
         SECTION("keypath filter with a backlink") {
             auto col_second_link = table->get_column_key("second link");
