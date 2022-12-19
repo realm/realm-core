@@ -954,7 +954,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
-    cmake_build_type: Debug
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
