@@ -81,6 +81,10 @@ functions:
               set_cmake_var realm_vars REALM_ENABLE_ALLOC_SET_ZERO BOOL On
           fi
 
+          if [ -n "${enable_fuzzer|}" ]; then
+              set_cmake_var realm_vars REALM_LIBFUZZER BOOL On
+          fi
+
           if [ -z "${disable_sync|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
           fi
@@ -942,18 +946,21 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
 
-  - name: macos_fuzzer
+  - name: macos-fuzzer
   display_name: "MacOS 11.0 x86_64 (Fuzzer)"
   run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: Off
+    cmake_build_type: Debug
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
+    enable_fuzzer: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DREALM_LIBFUZZER=ON  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++  -DREALM_ENABLE_ENCRYPTION=ON 
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DREALM_LIBFUZZER=ON
   tasks:
  - name: compile_test
 
