@@ -15,7 +15,6 @@
 #include <cstring>
 #include <numeric>
 #include <thread>
-#include <iostream>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
