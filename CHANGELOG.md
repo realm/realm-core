@@ -8,6 +8,7 @@
 
 ### Fixed
 * Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
+* Core should not alter the order of the properties for additive schemas. ([#6134](https://github.com/realm/realm-core/issues/6134))
  
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.

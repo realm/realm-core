@@ -382,7 +382,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         TestHelper::begin_read(realm2, version1);
         auto& group = realm2->read_group();
         auto schema = realm2->schema();
-        REQUIRE(schema != config.schema);
+        REQUIRE(schema == config.schema);
         auto table_obj = group.get_table("class_object");
         auto table_obj1 = group.get_table("class_object1");
         REQUIRE(table_obj);        // empty schema always has class_object
