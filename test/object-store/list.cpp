@@ -810,19 +810,23 @@ TEST_CASE("list") {
 
         SECTION("callback with empty keypatharray") {
             auto shallow_require_change = [&] {
-                auto token = list.add_notification_callback([&](CollectionChangeSet c) {
-                    collection_change_set_with_empty_filter = c;
-                }, KeyPathArray());
+                auto token = list.add_notification_callback(
+                    [&](CollectionChangeSet c) {
+                        collection_change_set_with_empty_filter = c;
+                    },
+                    KeyPathArray());
                 advance_and_notify(*r);
                 return token;
             };
 
             auto shallow_require_no_change = [&] {
                 bool first = true;
-                auto token = list.add_notification_callback([& first](CollectionChangeSet) mutable {
-                    REQUIRE(first);
-                    first = false;
-                }, KeyPathArray());
+                auto token = list.add_notification_callback(
+                    [&first](CollectionChangeSet) mutable {
+                        REQUIRE(first);
+                        first = false;
+                    },
+                    KeyPathArray());
                 advance_and_notify(*r);
                 return token;
             };

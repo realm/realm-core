@@ -150,7 +150,8 @@ static bool all_have_filters(std::vector<NotificationCallback> const& callbacks)
     });
 }
 
-uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, std::optional<KeyPathArray> key_path_array)
+uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback,
+                                          std::optional<KeyPathArray> key_path_array)
 {
     m_realm->verify_thread();
 

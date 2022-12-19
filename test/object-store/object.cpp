@@ -725,43 +725,42 @@ TEST_CASE("object") {
             }
 
             SECTION("callback with empty keypatharray") {
-                    SECTION("modifying origin table 'table2', property 'value' "
-                            "while observing related table 'table', property 'value 1' "
-                            "-> does NOT send a notification") {
-                        auto token = require_no_change(object_origin, KeyPathArray());
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
 
-                        write([&] {
-                            object_origin.set_column_value("value", 105);
-                        });
-                    }
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
 
-                    SECTION("modifying related table 'table', property 'value 1' "
-                            "while observing related table 'table', property 'value 1' "
-                            "-> does NOT send a notification") {
-                        auto token = require_no_change(object_origin, KeyPathArray());
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
 
-                        write([&] {
-                            object_target.set_column_value("value 1", 205);
-                        });
-                    }
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
 
-                    SECTION("modifying related table 'table', property 'value 2' "
-                            "while observing related table 'table', property 'value 1' "
-                            "-> does NOT send a notification") {
-                        auto token = require_no_change(object_origin, KeyPathArray());
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
 
-                        write([&] {
-                            object_target.set_column_value("value 2", 205);
-                        });
-                    }
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
             }
 
             SECTION("callback with empty keypatharray, backlinks") {
                 SECTION("modifying backlinked table 'table2', property 'value' "
                         "with empty KeyPathArray "
                         "-> DOES not send a notification") {
-                    auto token_with_shallow_subscribtion =
-                        require_no_change(object_target, KeyPathArray());
+                    auto token_with_shallow_subscribtion = require_no_change(object_target, KeyPathArray());
                     write([&] {
                         object_origin.set_column_value("value", 105);
                     });
@@ -769,8 +768,7 @@ TEST_CASE("object") {
                 SECTION("modifying backlinked table 'table2', property 'link' "
                         "with empty KeyPathArray "
                         "-> does NOT send a notification") {
-                    auto token_with_empty_key_path_array =
-                        require_no_change(object_target, KeyPathArray());
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
                     write([&] {
                         Obj obj_target2 = table_target->create_object_with_primary_key(300);
                         Object object_target2(r, obj_target2);
@@ -790,8 +788,7 @@ TEST_CASE("object") {
                 SECTION("adding a new origin pointing to the target "
                         "with empty KeyPathArray "
                         "-> does NOT send a notification") {
-                    auto token_with_empty_key_path_array =
-                        require_no_change(object_target, KeyPathArray());
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
                     write([&] {
                         Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
                         Object object_origin2(r, obj_origin2);
@@ -991,7 +988,6 @@ TEST_CASE("object") {
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
                 }
-
             }
 
             SECTION("deleting the object sends a change notification") {

@@ -972,19 +972,23 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
 
             SECTION("callback with empty keypatharray") {
                 auto shallow_require_change = [&] {
-                    auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
-                        change = c;
-                    }, KeyPathArray());
+                    auto token = link_set.add_notification_callback(
+                        [&](CollectionChangeSet c) {
+                            change = c;
+                        },
+                        KeyPathArray());
                     advance_and_notify(*r);
                     return token;
                 };
 
                 auto shallow_require_no_change = [&] {
                     bool first = true;
-                    auto token = link_set.add_notification_callback([& first](CollectionChangeSet) mutable {
-                        REQUIRE(first);
-                        first = false;
-                    }, KeyPathArray());
+                    auto token = link_set.add_notification_callback(
+                        [&first](CollectionChangeSet) mutable {
+                            REQUIRE(first);
+                            first = false;
+                        },
+                        KeyPathArray());
                     advance_and_notify(*r);
                     return token;
                 };

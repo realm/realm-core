@@ -96,7 +96,8 @@ public:
      *
      * @return A token which can be passed to `remove_callback()`.
      */
-    uint64_t add_callback(CollectionChangeCallback callback, std::optional<KeyPathArray> key_path_array) REQUIRES(!m_callback_mutex);
+    uint64_t add_callback(CollectionChangeCallback callback, std::optional<KeyPathArray> key_path_array)
+        REQUIRES(!m_callback_mutex);
 
     /**
      * Remove a previously added token.

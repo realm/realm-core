@@ -186,9 +186,9 @@ private:
     void calculate_sections_if_required() REQUIRES(m_mutex);
     void calculate_sections() REQUIRES(m_mutex);
     bool m_has_performed_initial_evalutation = false;
-    NotificationToken add_notification_callback_for_section(Mixed section_key,
-                                                            SectionedResultsNotificatonCallback callback,
-                                                            std::optional<KeyPathArray> key_path_array = std::nullopt);
+    NotificationToken
+    add_notification_callback_for_section(Mixed section_key, SectionedResultsNotificatonCallback callback,
+                                          std::optional<KeyPathArray> key_path_array = std::nullopt);
 
     friend class realm::ResultsSection;
     Results m_results;
