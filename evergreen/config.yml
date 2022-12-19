@@ -956,6 +956,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    cmake_generator: Xcode
     run_with_encryption: On
     enable_fuzzer: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
