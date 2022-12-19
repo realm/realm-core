@@ -23,8 +23,8 @@
 * Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
 * Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
 * Replace util::network::Trigger with a Sync client custom trigger. ([PR #6121](https://github.com/realm/realm-core/pull/6121))
-* Create the fuzzer framework project in order to run fuzz testing on evergreen.
 * Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
+* Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
 
 ----------------------------------------------
 
