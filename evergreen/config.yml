@@ -958,11 +958,10 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
     enable_fuzzer: On
-    cmake_generator: Xcode
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-    - name: compile_test
+    - name: compile
     - name: fuzzer
 
 - name: macos-encrypted
