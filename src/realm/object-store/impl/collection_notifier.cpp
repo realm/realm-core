@@ -108,7 +108,7 @@ void CollectionNotifier::recalculate_key_path_array()
         }
         else {
             m_any_callbacks_filtered = true;
-            for (const auto& key_path : callback.key_path_array.value()) {
+            for (const auto& key_path : *callback.key_path_array) {
                 m_key_path_array.push_back(key_path);
             }
         }

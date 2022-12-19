@@ -970,7 +970,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 }
             }
 
-            SECTION("shallow callback listeners") {
+            SECTION("callback with empty keypatharray") {
                 auto shallow_require_change = [&] {
                     auto token = link_set.add_notification_callback([&](CollectionChangeSet c) {
                         change = c;

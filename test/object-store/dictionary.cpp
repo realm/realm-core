@@ -939,21 +939,13 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
     }
     r->commit_transaction();
 
-    SECTION("notifications") {
+    SECTION("callback with empty keypatharray") {
         CollectionChangeSet change;
         auto write = [&](auto&& f) {
             r->begin_transaction();
             f();
             r->commit_transaction();
             advance_and_notify(*r);
-        };
-
-        auto require_change = [&] {
-            auto token = dict.add_notification_callback([&](CollectionChangeSet c) {
-                change = c;
-            });
-            advance_and_notify(*r);
-            return token;
         };
 
         auto shallow_require_change = [&] {
@@ -974,65 +966,34 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
             return token;
         };
 
-        SECTION("insertion") {
-            auto token = require_change();
-            write([&] {
-                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
-                dict.insert("foo", target_obj);
-            });
-            REQUIRE(!change.insertions.empty());
-        }
-        SECTION("insertion shallow") {
+        SECTION("insertion DOES send notification") {
             auto token = shallow_require_change();
             write([&] {
                 Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
                 dict.insert("foo", target_obj);
             });
-            REQUIRE(!change.insertions.empty());
+            REQUIRE_FALSE(change.insertions.empty());
         }
-        SECTION("deletion") {
-            auto token = require_change();
-            write([&] {
-                dict.erase(keys[0]);
-            });
-            REQUIRE(!change.deletions.empty());
-        }
-        SECTION("deletion shallow") {
+        SECTION("deletion DOES send notification") {
             auto token = shallow_require_change();
             write([&] {
                 dict.erase(keys[0]);
             });
-            REQUIRE(!change.deletions.empty());
+            REQUIRE_FALSE(change.deletions.empty());
         }
-        SECTION("replacement") {
-            auto token = require_change();
-            write([&] {
-                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
-                dict.insert(keys[0], target_obj);
-            });
-            REQUIRE(!change.modifications.empty());
-        }
-        SECTION("replacement shallow") {
+        SECTION("replacement DOES send notification") {
             auto token = shallow_require_change();
             write([&] {
                 Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
                 dict.insert(keys[0], target_obj);
             });
-            REQUIRE(!change.modifications.empty());
+            REQUIRE_FALSE(change.modifications.empty());
         }
-        SECTION("modification") {
-            auto token = require_change();
-            write([&] {
-                dict.get<Obj>(keys[0]).set(col_target_value, T(values[0]));
-            });
-            REQUIRE(!change.modifications.empty());
-        }
-        SECTION("modification shallow") {
+        SECTION("modification does NOT send notification") {
             auto token = shallow_require_no_change();
             write([&] {
                 dict.get<Obj>(keys[0]).set(col_target_value, T(values[0]));
             });
-            REQUIRE(change.modifications.empty());
         }
     }
 

@@ -51,6 +51,8 @@ struct NotificationCallback {
     // target thread.
     CollectionChangeBuilder changes_to_deliver;
     // The filter that this `NotificationCallback` is restricted to.
+    // if std::nullopt, then no restriction is enforced.
+    // if empty, then modifications to objects within the collection won't fire notifications.
     // If not empty, modifications of elements not part of the `key_path_array`
     // will not invoke a notification.
     std::optional<KeyPathArray> key_path_array = std::nullopt;
