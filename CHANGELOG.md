@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#6097](https://github.com/realm/realm-core/pull/6097))
+* Converting flexible sync realms to bundled and local realms is now supported ([#6076](https://github.com/realm/realm-core/pull/6076))
 * Compensating write errors are now surfaced to the SDK/user after the compensating write has been applied in a download message ([#6095](https://github.com/realm/realm-core/pull/6095)).
 
 ### Fixed
@@ -21,7 +22,9 @@
 ### Internals
 * Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
 * Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
+* Replace util::network::Trigger with a Sync client custom trigger. ([PR #6121](https://github.com/realm/realm-core/pull/6121))
 * Create the fuzzer framework project in order to run fuzz testing on evergreen.
+* Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
 
 ----------------------------------------------
 

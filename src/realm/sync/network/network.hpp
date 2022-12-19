@@ -21,6 +21,7 @@
 #include <netdb.h>
 #endif
 
+#include <realm/status.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -65,8 +66,8 @@ namespace realm::sync::network {
 ///
 /// A *service context* is a set of objects consisting of an instance of
 /// Service, and all the objects that are associated with that instance (\ref
-/// Resolver, \ref Socket`, \ref Acceptor`, \ref DeadlineTimer, \ref Trigger,
-/// and \ref ssl::Stream).
+/// Resolver, \ref Socket`, \ref Acceptor`, \ref DeadlineTimer, and
+/// \ref ssl::Stream).
 ///
 /// In general, it is unsafe for two threads to call functions on the same
 /// object, or on different objects in the same service context. This also
@@ -138,7 +139,6 @@ class SocketBase;
 class Socket;
 class Acceptor;
 class DeadlineTimer;
-class Trigger;
 class ReadAheadBuffer;
 namespace ssl {
 class Stream;
@@ -321,8 +321,10 @@ public:
     ///
     /// Register the sepcified completion handler for immediate asynchronous
     /// execution. The specified handler will be executed by an expression on
-    /// the form `handler()`. If the the handler object is movable, it will
-    /// never be copied. Otherwise, it will be copied as necessary.
+    /// the form `handler(status)` where status is a Status object whose value
+    /// will always be OK, but may change in the future. If the handler object
+    /// is movable, it will never be copied. Otherwise, it will be copied as
+    /// necessary.
     ///
     /// This function is thread-safe, that is, it may be called by any
     /// thread. It may also be called from other completion handlers.
@@ -417,7 +419,6 @@ private:
     friend class Socket;
     friend class Acceptor;
     friend class DeadlineTimer;
-    friend class Trigger;
     friend class ReadAheadBuffer;
     friend class ssl::Stream;
 };
@@ -1286,7 +1287,7 @@ public:
     /// ready to execute when the expiration time is reached, or an error occurs
     /// (cancellation counts as an error here). The expiration time is the time
     /// of initiation plus the specified delay. The error code passed to the
-    /// complition handler will **never** indicate success, unless the
+    /// completion handler will **never** indicate success, unless the
     /// expiration time was reached.
     ///
     /// The completion handler is always executed by the event loop thread,
@@ -1302,17 +1303,17 @@ public:
     ///
     /// The operation can be canceled by calling cancel(), and will be
     /// automatically canceled if the timer is destroyed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// canceled, it will fail with `ErrorCodes::OperationAborted`. The operation
     /// remains cancelable up until the point in time where the completion
     /// handler starts to execute. This means that if cancel() is called before
     /// the completion handler starts to execute, then the completion handler is
-    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// guaranteed to have `ErrorCodes::OperationAborted` passed to it. This is true
     /// regardless of whether cancel() is called explicitly or implicitly, such
     /// as when the timer is destroyed.
     ///
     /// The specified handler will be executed by an expression on the form
-    /// `handler(ec)` where `ec` is the error code. If the the handler object is
-    /// movable, it will never be copied. Otherwise, it will be copied as
+    /// `handler(status)` where `status` is a Status object. If the handler object
+    /// is movable, it will never be copied. Otherwise, it will be copied as
     /// necessary.
     ///
     /// It is an error to start a new asynchronous wait operation while an
@@ -1345,75 +1346,6 @@ private:
     Service::OwnersOperPtr m_wait_oper;
 
     void initiate_oper(Service::LendersWaitOperPtr);
-};
-
-
-/// \brief Register a function whose invocation can be triggered repeatedly.
-///
-/// While the function is always executed by the event loop thread, the
-/// triggering of its execution can be done by any thread, and the triggering
-/// operation is guaranteed to never throw.
-///
-/// The function is guaranteed to not be called after the Trigger object is
-/// destroyed.
-///
-/// It is safe to destroy the Trigger object during execution of the function.
-///
-/// Note that even though the trigger() function is thread-safe, the Trigger
-/// object, as a whole, is not. In particular, construction and destruction must
-/// not be considered thread-safe.
-///
-/// ### Relation to post()
-///
-/// For a particular execution of trigger() and a particular invocation of
-/// Service::post(), if the execution of trigger() ends before the execution of
-/// Service::post() begins, then it is guaranteed that the function associated
-/// with the trigger gets to execute at least once after the execution of
-/// trigger() begins, and before the post handler gets to execute.
-class Trigger {
-public:
-    template <class F>
-    Trigger(Service&, F&& func);
-    ~Trigger() noexcept;
-
-    Trigger() noexcept = default;
-    Trigger(Trigger&&) noexcept = default;
-    Trigger& operator=(Trigger&&) noexcept = default;
-
-    /// \brief Trigger another invocation of the associated function.
-    ///
-    /// An invocation of trigger() puts the Trigger object into the triggered
-    /// state. It remains in the triggered state until shortly before the
-    /// function starts to execute. While the Trigger object is in the triggered
-    /// state, trigger() has no effect. This means that the number of executions
-    /// of the function will generally be less that the number of times
-    /// trigger() is invoked().
-    ///
-    /// A particular invocation of trigger() ensures that there will be at least
-    /// one invocation of the associated function whose execution begins after
-    /// the beginning of the execution of trigger(), so long as the event loop
-    /// thread does not exit prematurely from run().
-    ///
-    /// If trigger() is invoked from the event loop thread, the next execution
-    /// of the associated function will not begin until after trigger returns(),
-    /// effectively preventing reentrancy for the associated function.
-    ///
-    /// If trigger() is invoked from another thread, the associated function may
-    /// start to execute before trigger() returns.
-    ///
-    /// Note that the associated function can retrigger itself, i.e., if the
-    /// associated function calls trigger(), then that will lead to another
-    /// invocation of the associated function, but not until the first
-    /// invocation ends (no reentrance).
-    ///
-    /// This function is thread-safe.
-    void trigger() noexcept;
-
-private:
-    template <class H>
-    class ExecOper;
-
-    util::bind_ptr<Service::TriggerExecOperBase> m_exec_oper;
 };
 
 
@@ -2083,7 +2015,7 @@ public:
             // Service::recycle_post_oper() destroys this operation object
             Service::recycle_post_oper(m_service, this);
             was_recycled = true;
-            handler(); // Throws
+            handler(Status::OK()); // Throws
         }
         catch (...) {
             if (!was_recycled) {
@@ -3575,11 +3507,11 @@ public:
     void recycle_and_execute() override final
     {
         bool orphaned = !m_timer;
-        std::error_code ec;
+        Status status = Status::OK();
         if (is_canceled())
-            ec = util::error::operation_aborted;
+            status = Status{ErrorCodes::OperationAborted, "Timer canceled"};
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, status); // Throws
     }
 
 private:
@@ -3610,49 +3542,6 @@ inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H&& han
     clock::time_point expiration_time = now + delay;
     initiate_oper(Service::alloc<WaitOper<H>>(m_wait_oper, *this, expiration_time,
                                               std::move(handler))); // Throws
-}
-
-// ---------------- Trigger ----------------
-
-template <class H>
-class Trigger::ExecOper : public Service::TriggerExecOperBase {
-public:
-    ExecOper(Service::Impl& service_impl, H&& handler)
-        : Service::TriggerExecOperBase{service_impl}
-        , m_handler{std::move(handler)}
-    {
-    }
-    void recycle_and_execute() override final
-    {
-        REALM_ASSERT(in_use());
-        // Note: Potential suicide when `self` goes out of scope
-        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
-        if (m_service) {
-            Service::reset_trigger_exec(*m_service, *this);
-            m_handler(); // Throws
-        }
-    }
-
-private:
-    H m_handler;
-};
-
-template <class H>
-inline Trigger::Trigger(Service& service, H&& handler)
-    : m_exec_oper{new ExecOper<H>{*service.m_impl, std::move(handler)}} // Throws
-{
-}
-
-inline Trigger::~Trigger() noexcept
-{
-    if (m_exec_oper)
-        m_exec_oper->orphan();
-}
-
-inline void Trigger::trigger() noexcept
-{
-    REALM_ASSERT(m_exec_oper);
-    m_exec_oper->trigger();
 }
 
 // ---------------- ReadAheadBuffer ----------------

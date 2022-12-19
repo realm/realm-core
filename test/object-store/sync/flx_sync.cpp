@@ -2479,6 +2479,165 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
     }
 }
 
+TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync]") {
+    static auto foo_obj_id = ObjectId::gen();
+    static auto bar_obj_id = ObjectId::gen();
+    static auto bizz_obj_id = ObjectId::gen();
+    static std::optional<FLXSyncTestHarness> harness;
+    if (!harness) {
+        harness.emplace("bundled_flx_realms");
+        harness->load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "TopLevel",
+                           std::any(AnyDict{{"_id", foo_obj_id},
+                                            {"queryable_str_field", "foo"s},
+                                            {"queryable_int_field", static_cast<int64_t>(5)},
+                                            {"non_queryable_field", "non queryable 1"s}}));
+            Object::create(c, realm, "TopLevel",
+                           std::any(AnyDict{{"_id", bar_obj_id},
+                                            {"queryable_str_field", "bar"s},
+                                            {"queryable_int_field", static_cast<int64_t>(10)},
+                                            {"non_queryable_field", "non queryable 2"s}}));
+        });
+    }
+
+    SECTION("flx to flx (should succeed)") {
+        create_user_and_log_in(harness->app());
+        SyncTestFile target_config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.insert_or_assign(Query(table).greater(table->get_column_key("queryable_int_field"), 5));
+            auto subs = std::move(mut_subs).commit();
+
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            wait_for_advance(*realm);
+
+            realm->convert(target_config);
+        });
+
+        auto target_realm = Realm::get_shared_realm(target_config);
+
+        target_realm->begin_transaction();
+        CppContext c(target_realm);
+        Object::create(c, target_realm, "TopLevel",
+                       std::any(AnyDict{{"_id", bizz_obj_id},
+                                        {"queryable_str_field", "bizz"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", "non queryable 3"s}}));
+        target_realm->commit_transaction();
+
+        wait_for_upload(*target_realm);
+        wait_for_download(*target_realm);
+
+        auto latest_subs = target_realm->get_active_subscription_set();
+        auto table = target_realm->read_group().get_table("class_TopLevel");
+        REQUIRE(latest_subs.size() == 1);
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
+        REQUIRE(latest_subs.at(0).query_string ==
+                Query(table).greater(table->get_column_key("queryable_int_field"), 5).get_description());
+
+        REQUIRE(table->size() == 2);
+        REQUIRE(table->find_primary_key(bar_obj_id));
+        REQUIRE(table->find_primary_key(bizz_obj_id));
+        REQUIRE_FALSE(table->find_primary_key(foo_obj_id));
+    }
+
+    SECTION("flx to local (should succeed)") {
+        TestFile target_config;
+
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.insert_or_assign(Query(table).greater(table->get_column_key("queryable_int_field"), 5));
+            auto subs = std::move(mut_subs).commit();
+
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            wait_for_advance(*realm);
+
+            target_config.schema = realm->schema();
+            target_config.schema_version = realm->schema_version();
+            realm->convert(target_config);
+        });
+
+        auto target_realm = Realm::get_shared_realm(target_config);
+        REQUIRE_THROWS(target_realm->get_active_subscription_set());
+
+        auto table = target_realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table->size() == 2);
+        REQUIRE(table->find_primary_key(bar_obj_id));
+        REQUIRE(table->find_primary_key(bizz_obj_id));
+        REQUIRE_FALSE(table->find_primary_key(foo_obj_id));
+    }
+
+    SECTION("flx to pbs (should fail to convert)") {
+        create_user_and_log_in(harness->app());
+        SyncTestFile target_config(harness->app()->current_user(), "12345"s, harness->schema());
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.insert_or_assign(Query(table).greater(table->get_column_key("queryable_int_field"), 5));
+            auto subs = std::move(mut_subs).commit();
+
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            wait_for_advance(*realm);
+
+            REQUIRE_THROWS(realm->convert(target_config));
+        });
+    }
+
+    SECTION("pbs to flx (should fail to convert)") {
+        create_user_and_log_in(harness->app());
+        SyncTestFile target_config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
+
+        auto pbs_app_config = minimal_app_config(harness->app()->base_url(), "pbs_to_flx_convert", harness->schema());
+
+        TestAppSession pbs_app_session(create_app(pbs_app_config));
+        SyncTestFile source_config(pbs_app_session.app()->current_user(), "54321"s, pbs_app_config.schema);
+        auto realm = Realm::get_shared_realm(source_config);
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "non queryable 1"s}}));
+        realm->commit_transaction();
+
+        REQUIRE_THROWS(realm->convert(target_config));
+    }
+
+    SECTION("local to flx (should fail to convert)") {
+        TestFile source_config;
+        source_config.schema = harness->schema();
+        source_config.schema_version = 1;
+
+        auto realm = Realm::get_shared_realm(source_config);
+        auto foo_obj_id = ObjectId::gen();
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "non queryable 1"s}}));
+        realm->commit_transaction();
+
+        create_user_and_log_in(harness->app());
+        SyncTestFile target_config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
+
+        REQUIRE_THROWS(realm->convert(target_config));
+    }
+
+    // Add new sections before this
+    SECTION("teardown") {
+        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
+        harness.reset();
+    }
+}
+
 TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app]") {
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
