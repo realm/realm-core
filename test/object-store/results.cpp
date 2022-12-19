@@ -2760,6 +2760,28 @@ TEST_CASE("notifications: results") {
                 REQUIRE(notification_calls_with_empty_filter == 1);
                 REQUIRE(collection_change_set_with_empty_filter.empty());
             }
+
+            SECTION("inserting 'object' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->create_object(other_table_obj_key).set_all(1);
+                });
+
+                REQUIRE(notification_calls_with_empty_filter == 2);
+                REQUIRE_FALSE(collection_change_set_with_empty_filter.empty());
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.insertions, 0);
+            }
+
+            SECTION("deleting 'object' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->remove_object(object_keys[0]);
+                });
+
+                REQUIRE(notification_calls_with_empty_filter == 2);
+                REQUIRE_FALSE(collection_change_set_with_empty_filter.empty());
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.deletions, 0);
+            }
         }
 
         SECTION("keypath filter with a backlink") {
