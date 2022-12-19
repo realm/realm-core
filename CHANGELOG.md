@@ -14,6 +14,8 @@
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
 * Allow Realm instances to have a complete view of their schema, if mode is additive. ([PR #5784](https://github.com/realm/realm-core/pull/5784)).
 * `realm_sync_immediately_run_file_actions` (c-api) now takes a third argument `bool* did_run` that will be set to the result of `SyncManager::immediately_run_file_actions`. ((#6117)[https://github.com/realm/realm-core/pull/6117]) 
+* Device information in sync connection parameters was moved into a new `device_info` structure in App::Config ([PR #6066](https://github.com/realm/realm-core/pull/6066))
+* `sdk` is now a required field in the `device_device` structure in App::Config ([PR #6066](https://github.com/realm/realm-core/pull/6066))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
