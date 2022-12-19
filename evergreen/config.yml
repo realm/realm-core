@@ -943,7 +943,7 @@ buildvariants:
   - name: swift-build-and-test
 
   - name: macos_fuzzer
-  display_name: "MacOS 11.0 x86_64 Fuzzer"
+  display_name: "MacOS 11.0 x86_64 (Fuzzer)"
   run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
@@ -955,7 +955,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DREALM_LIBFUZZER=ON  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++  -DREALM_ENABLE_ENCRYPTION=ON 
   tasks:
-  - name: fuzz-tests
+ 
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
