@@ -378,6 +378,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm2 = Realm::get_shared_realm(config);
 
         // no verification if the version chosen is less than the current transaction schema version.
+        // the schemas should be just merged
         TestHelper::begin_read(realm2, version1);
         auto& group = realm2->read_group();
         auto schema = realm2->schema();
