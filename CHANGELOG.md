@@ -27,6 +27,7 @@
 * Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
 * Replace util::network::Trigger with a Sync client custom trigger. ([PR #6121](https://github.com/realm/realm-core/pull/6121))
 * Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
+* Improve detection of Windows target architecture when downloading prebuild dependencies. ([#6135](https://github.com/realm/realm-core/issues/6135)) 
 
 ----------------------------------------------
 
