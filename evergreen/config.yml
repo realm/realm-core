@@ -32,6 +32,16 @@ functions:
         script: |-
           set -o errexit
           git submodule update --init --recursive
+  
+
+"fuzzer":
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test-fuzz
+      shell: /bin/bash
+      script: |-
+         #!/bin/bash
+        ./realm_libfuzz
 
   "compile":
     - command: shell.exec
@@ -324,6 +334,11 @@ tasks:
   commands:
   - func: "compile"
 
+- name: fuzzer
+  exec_timeout_secs: 600
+  commands:
+  - func: "fuzzer"
+
 - name: package
   exec_timeout_secs: 1800
   commands:
@@ -406,17 +421,6 @@ tasks:
         export UNITTEST_PROGRESS=1
         export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
-
-- name: test-fuzzer
-  exec_timeout_secs: 600
-  commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test-fuzz
-      shell: /bin/bash
-      script: |-
-         #!/bin/bash
-        ./realm_libfuzz
 
 - name: bloaty
   exec_timeout_secs: 1800
@@ -756,7 +760,7 @@ task_groups:
     vars:
       target_to_build: "realm-libfuzz"
   tasks:
-  - "test-fuzzer"
+  - fuzzer
   
 buildvariants:
 - name: ubuntu2004
