@@ -916,6 +916,7 @@ buildvariants:
   display_name: "Ubuntu 2204 Fuzzer"
   run_on: ubuntu2204-large
   expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
@@ -925,7 +926,7 @@ buildvariants:
     run_with_encryption: On
     enable_fuzzer: On
   tasks:
-  - name: compile_test
+  - name: compile
   - name: fuzzer
 
 - name: ubuntu2004-arm64
