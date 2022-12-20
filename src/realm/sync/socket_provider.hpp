@@ -165,6 +165,18 @@ struct WebSocketInterface {
     /// is destroyed
     virtual ~WebSocketInterface() = default;
 
+
+    /// For implementations that support it, return the app services request ID header
+    /// value, i.e. the "X-Appservices-Request-Id" header value.
+    ///
+    /// TODO: This will go away with RCORE-1380 since it's not strictly available in the
+    /// websocket spec. If HTTP headers aren't available, the default implementation of
+    /// returning an empty string is okay.
+    virtual std::string_view get_appservices_request_id() const noexcept
+    {
+        return {};
+    }
+
     /// Write data asynchronously to the WebSocket connection. The handler function
     /// will be called when the data has been sent successfully. The WebSocketOberver
     /// provided when the WebSocket was created will be called if any errors occur

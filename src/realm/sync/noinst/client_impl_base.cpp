@@ -731,6 +731,11 @@ void Connection::handle_connection_established()
 
     m_state = ConnectionState::connected;
 
+    // TODO(RCORE-1380) get this information in-band rather than from the websocket.
+    if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
+        logger.info("Connected to app services with request id: \"%1\"", coid);
+    }
+
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
     initiate_ping_delay(now);     // Throws
