@@ -519,22 +519,6 @@ tasks:
       test_filter: CoreTests
       report_test_progress: On
 
-- name: fuzzer
-  #run it for 10min
-  exec_timeout_secs: 600
-  commands:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: "realm-libfuzz"
-  - command: shell.exec
-    params:
-      shell: /bin/bash
-      script: |-
-        #!/bin/bash
-        ./realm_libfuzz
-
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
@@ -749,6 +733,22 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - long-running-core-tests
+
+  - name: fuzzer
+  exec_timeout_secs: 600   #run it for 10min
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: "realm-libfuzz"
+  - command: shell.exec
+    params:
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        ./realm_libfuzz
 
 buildvariants:
 - name: ubuntu2004
