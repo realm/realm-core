@@ -34,14 +34,14 @@ functions:
           git submodule update --init --recursive
   
 
-"fuzzer":
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test-fuzz
-      shell: /bin/bash
-      script: |-
-         #!/bin/bash
-        ./realm_libfuzz
+  "fuzzer":
+    - command: shell.exec
+      params:
+        working_dir: realm-core/build/test-fuzz
+        shell: /bin/bash
+        script: |-
+           #!/bin/bash
+          ./realm_libfuzz
 
   "compile":
     - command: shell.exec
@@ -751,7 +751,7 @@ task_groups:
   tasks:
   - long-running-core-tests
 
-  - name: fuzzer
+- name: fuzzer
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
@@ -973,7 +973,7 @@ buildvariants:
     fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
   tasks:
-    - name: fuzzer
+  - name: fuzzer
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
