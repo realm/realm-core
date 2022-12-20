@@ -530,7 +530,6 @@ tasks:
       target_to_build: "realm-libfuzz"
   - command: shell.exec
     params:
-      working_dir: realm-core/build/fuzz-test
       shell: /bin/bash
       script: |-
         #!/bin/bash
