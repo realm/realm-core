@@ -407,6 +407,16 @@ tasks:
         export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
+- name: test-fuzzer
+  exec_timeout_secs: 600
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test-fuzz
+      shell: /bin/bash
+      script: |-
+         #!/bin/bash
+        ./realm_libfuzz
+
 - name: bloaty
   exec_timeout_secs: 1800
   commands:
@@ -663,6 +673,8 @@ tasks:
         echo $out
         exit 1
 
+
+
 task_groups:
 - name: compile_test_and_package
   max_hosts: 1
@@ -735,7 +747,6 @@ task_groups:
   - long-running-core-tests
 
   - name: fuzzer
-  exec_timeout_secs: 600   #run it for 10min
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
@@ -743,13 +754,9 @@ task_groups:
   - func: "compile"
     vars:
       target_to_build: "realm-libfuzz"
-  - command: shell.exec
-    params:
-      shell: /bin/bash
-      script: |-
-        #!/bin/bash
-        ./realm_libfuzz
-
+  tasks:
+  - "test-fuzzer"
+  
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
