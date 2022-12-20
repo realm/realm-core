@@ -912,22 +912,6 @@ buildvariants:
   tasks:
   - name: valgrind
 
-# - name: ubuntu-fuzzer
-#   display_name: "Ubuntu 2204 Fuzzer"
-#   run_on: ubuntu2204-large
-#   expansions:
-#     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-#     cmake_bindir: "./cmake_binaries/bin"
-#     fetch_missing_dependencies: On
-#     cmake_build_type: RelWithDebInfo
-#     c_compiler: "./clang_binaries/bin/clang"
-#     cxx_compiler: "./clang_binaries/bin/clang++"
-#     run_with_encryption: On
-#     enable_fuzzer: On
-#   tasks:
-#   - name: compile
-
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
   run_on: ubuntu2004-arm64-small
@@ -961,24 +945,23 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
 
-# - name: macos-fuzzer
-#   display_name: "MacOS 11.0 x86_64 (Fuzzer)"
-#   run_on: macos-1100
-#   expansions:
-#     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
-#     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-#     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-#     max_jobs: $(sysctl -n hw.logicalcpu)
-#     c_compiler: "./clang_binaries/bin/clang"
-#     cxx_compiler: "./clang_binaries/bin/clang++"
-#     cmake_generator: Xcode
-#     run_with_encryption: On
-#     enable_fuzzer: On
-#     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-#     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-#   tasks:
-#     - name: compile
-#     - name: fuzzer
+- name: macos-fuzzer
+  display_name: "MacOS 11.0 x86_64 (Fuzzer)"
+  run_on: macos-1100
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_generator: Xcode
+    run_with_encryption: On
+    enable_fuzzer: On
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
+    fetch_missing_dependencies: On
+    cmake_build_type: RelWithDebInfo
+  tasks:
+    - name: fuzzer
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
@@ -1009,14 +992,12 @@ buildvariants:
     cmake_build_type: Release
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
-    enable_fuzzer: On
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
   - name: test-on-exfat
-  - name: fuzzer
 
 - name: macos-1100-arm64
   display_name: "MacOS 11 arm64"
