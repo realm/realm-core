@@ -409,6 +409,7 @@ tasks:
 
 - name: test-fuzzer
   exec_timeout_secs: 600
+  commands:
   - command: shell.exec
     params:
       working_dir: realm-core/build/test-fuzz
