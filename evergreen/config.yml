@@ -925,6 +925,7 @@ buildvariants:
     run_with_encryption: On
     enable_fuzzer: On
   tasks:
+  - name: compile_test
   - name: fuzzer
 
 - name: ubuntu2004-arm64
