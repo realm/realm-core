@@ -919,13 +919,12 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    cmake_build_type: Debug
+    cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
     enable_fuzzer: On
   tasks:
-  - name: compile
   - name: fuzzer
 
 - name: ubuntu2004-arm64
