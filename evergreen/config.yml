@@ -663,8 +663,8 @@ tasks:
         echo $out
         exit 1
 
-- name: run-fuzzer
-  tags: [ "test_suite", "for_pull_requests" ]
+- name: fuzzer
+  tags: ["for_pull_requests" ]
   exec_timeout_secs: 600
   commands:
   - func: "fetch source"
@@ -674,7 +674,7 @@ tasks:
       target_to_build: realm-libfuzz
   - command: shell.exec
     params:
-      working_dir: realm-core/build/test-fuzz
+      working_dir: realm-core/build/test/fuzzy_object_store/
       shell: bash
       script: |-
         ./realm_libfuzz
@@ -952,16 +952,16 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    cmake_generator: Xcode
+    cmake_generator: ninja
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_with_encryption: On
     enable_fuzzer: On
     fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
   tasks:
-  - name: run-fuzzer
+  - name: fuzzer
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
