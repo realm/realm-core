@@ -744,14 +744,14 @@ task_groups:
   tasks:
   - long-running-core-tests
 
-- name: compile-fuzzer
+- name: run-fuzzer
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
   - func: "compile"
     vars:
-      target_to_build: "realm-libfuzz"
+      target_to_build: realm-libfuzz
   tasks:
   - fuzzer
   
@@ -966,7 +966,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile-fuzzer
+  - name: run-fuzzer
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
