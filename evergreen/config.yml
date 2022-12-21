@@ -953,7 +953,7 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
-    cmake_generator: Ninja
+    cmake_generator: Xcode
     run_with_encryption: On
     enable_fuzzer: On
     fetch_missing_dependencies: On
