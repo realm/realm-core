@@ -561,7 +561,7 @@ tasks:
 
 - name: object-store-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 2100
+  exec_timeout_secs: 2400
   commands:
   - func: "compile"
     vars:
