@@ -949,7 +949,7 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
-
+  
 - name: macos-fuzzer
   display_name: "MacOS 11.0 x86_64 (Fuzzer)"
   run_on: macos-1100
@@ -966,6 +966,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
+  - name: compile_test
   - name: run-fuzzer
 
 - name: macos-encrypted
