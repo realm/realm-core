@@ -21,8 +21,8 @@
 
 using namespace realm;
 using namespace realm::util;
-using namespace realm::util::network;
-using namespace realm::util::network::ssl;
+using namespace realm::sync::network;
+using namespace realm::sync::network::ssl;
 
 
 namespace {
@@ -153,7 +153,7 @@ OpensslInit::~OpensslInit()
 
 
 namespace realm {
-namespace util {
+namespace sync {
 namespace network {
 namespace ssl {
 
@@ -1525,5 +1525,5 @@ bool is_server_cert_rejected_error(std::error_code&)
 
 } // namespace ssl
 } // namespace network
-} // namespace util
+} // namespace sync
 } // namespace realm

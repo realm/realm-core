@@ -913,10 +913,12 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
     (*session)->revive_if_needed();
 }
 
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char* sync_path) noexcept
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        return (*app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        return true;
     });
 }
 

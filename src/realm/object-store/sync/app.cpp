@@ -225,24 +225,28 @@ void App::close_all_sync_sessions()
 
 App::App(const Config& config)
     : m_config(std::move(config))
-    , m_base_url(config.base_url.value_or(default_base_url))
+    , m_base_url(m_config.base_url.value_or(default_base_url))
     , m_base_route(m_base_url + base_path)
-    , m_app_route(m_base_route + app_path + "/" + config.app_id)
+    , m_app_route(m_base_route + app_path + "/" + m_config.app_id)
     , m_auth_route(m_app_route + auth_path)
-    , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
+    , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport);
 
-    if (m_config.platform.empty()) {
-        throw std::runtime_error("You must specify the Platform in App::Config");
+    if (m_config.device_info.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config::device");
     }
 
-    if (m_config.platform_version.empty()) {
-        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    if (m_config.device_info.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config::device");
     }
 
-    if (m_config.sdk_version.empty()) {
-        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    if (m_config.device_info.sdk.empty()) {
+        throw std::runtime_error("You must specify the SDK Name in App::Config::device");
+    }
+
+    if (m_config.device_info.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config::device");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -569,12 +573,19 @@ void App::attach_auth_options(BsonDocument& body)
         options["appVersion"] = *m_config.local_app_version;
     }
 
-    log_debug("App: version info: platform: %1  version: %1 - sdk version: %3 - core version: %4", m_config.platform,
-              m_config.platform_version, m_config.sdk_version, REALM_VERSION_STRING);
+    log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
+              m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
+              m_config.device_info.sdk_version, REALM_VERSION_STRING);
     options["appId"] = m_config.app_id;
-    options["platform"] = m_config.platform;
-    options["platformVersion"] = m_config.platform_version;
-    options["sdkVersion"] = m_config.sdk_version;
+    options["platform"] = m_config.device_info.platform;
+    options["platformVersion"] = m_config.device_info.platform_version;
+    options["sdk"] = m_config.device_info.sdk;
+    options["sdkVersion"] = m_config.device_info.sdk_version;
+    options["cpuArch"] = m_config.device_info.cpu_arch;
+    options["deviceName"] = m_config.device_info.device_name;
+    options["deviceVersion"] = m_config.device_info.device_version;
+    options["frameworkName"] = m_config.device_info.framework_name;
+    options["frameworkVersion"] = m_config.device_info.framework_version;
     options["coreVersion"] = REALM_VERSION_STRING;
 
     body["options"] = BsonDocument({{"device", options}});
@@ -917,7 +928,7 @@ void App::handle_possible_redirect_response(Request&& request, const Response& r
                                             UniqueFunction<void(const Response&)>&& completion)
 {
     // If the response contains a redirection, then process it
-    if (util::HTTPStatus(response.http_status_code) == util::HTTPStatus::MovedPermanently) {
+    if (sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::MovedPermanently) {
         handle_redirect_response(std::move(request), response, std::move(completion));
     }
     else {

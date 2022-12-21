@@ -69,7 +69,7 @@
 #endif
 
 using namespace realm::util;
-using namespace realm::util::network;
+using namespace realm::sync::network;
 
 
 namespace {
@@ -1352,24 +1352,23 @@ public:
     {
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         m_event_loop_metrics_timer.emplace(service);
-        auto handler_2 = [this, handler = std::move(handler)](std::error_code ec) {
-            REALM_ASSERT(!ec);
-            clock::time_point now = clock::now();
-            clock::duration elapsed_time = now - m_event_loop_metrics_start_time;
-            clock::duration sleep_time = io_reactor.get_and_reset_sleep_time();
-            clock::duration nonsleep_time = elapsed_time - sleep_time;
-            double saturation = double(nonsleep_time.count()) / double(elapsed_time.count());
-            clock::duration internal_exec_time = nonsleep_time - m_handler_exec_time;
-            internal_exec_time += now - m_handler_exec_start_time;
-            double inefficiency = double(internal_exec_time.count()) / double(elapsed_time.count());
-            m_event_loop_metrics_start_time = now;
-            m_handler_exec_start_time = now;
-            m_handler_exec_time = clock::duration::zero();
-            handler(saturation, inefficiency);             // Throws
-            report_event_loop_metrics(std::move(handler)); // Throws
-        };
-        m_event_loop_metrics_timer->async_wait(std::chrono::seconds{30},
-                                               std::move(handler_2)); // Throws
+        m_event_loop_metrics_timer->async_wait(
+            std::chrono::seconds{30}, [this, handler = std::move(handler)](Status status) {
+                REALM_ASSERT(status.is_ok());
+                clock::time_point now = clock::now();
+                clock::duration elapsed_time = now - m_event_loop_metrics_start_time;
+                clock::duration sleep_time = io_reactor.get_and_reset_sleep_time();
+                clock::duration nonsleep_time = elapsed_time - sleep_time;
+                double saturation = double(nonsleep_time.count()) / double(elapsed_time.count());
+                clock::duration internal_exec_time = nonsleep_time - m_handler_exec_time;
+                internal_exec_time += now - m_handler_exec_start_time;
+                double inefficiency = double(internal_exec_time.count()) / double(elapsed_time.count());
+                m_event_loop_metrics_start_time = now;
+                m_handler_exec_start_time = now;
+                m_handler_exec_time = clock::duration::zero();
+                handler(saturation, inefficiency);             // Throws
+                report_event_loop_metrics(std::move(handler)); // Throws
+            });                                                // Throws
 #else
         static_cast<void>(handler);
 #endif
@@ -2507,9 +2506,7 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
 }
 
 
-namespace realm {
-namespace util {
-namespace network {
+namespace realm::sync::network {
 
 std::string host_name()
 {
@@ -2609,6 +2606,4 @@ std::string ResolveErrorCategory::message(int value) const
     return {};
 }
 
-} // namespace network
-} // namespace util
-} // namespace realm
+} // namespace realm::sync::network

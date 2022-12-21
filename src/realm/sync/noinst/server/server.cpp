@@ -4,6 +4,7 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
+#include <realm/sync/trigger.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/network/http.hpp>
@@ -90,7 +91,7 @@ using UploadChangeset = ServerProtocol::UploadChangeset;
 
 using UploadChangesets = std::vector<UploadChangeset>;
 
-using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
+using EventLoopMetricsHandler = network::Service::EventLoopMetricsHandler;
 
 
 static_assert(std::numeric_limits<session_ident_type>::digits >= 63, "Bad session identifier type");
@@ -753,12 +754,12 @@ public:
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
-    util::network::Service& get_service() noexcept
+    network::Service& get_service() noexcept
     {
         return m_service;
     }
 
-    const util::network::Service& get_service() const noexcept
+    const network::Service& get_service() const noexcept
     {
         return m_service;
     }
@@ -783,7 +784,7 @@ public:
         return m_root_dir;
     }
 
-    util::network::ssl::Context& get_ssl_context() noexcept
+    network::ssl::Context& get_ssl_context() noexcept
     {
         return *m_ssl_context;
     }
@@ -848,7 +849,7 @@ public:
         start(); // Throws
     }
 
-    util::network::Endpoint listen_endpoint() const
+    network::Endpoint listen_endpoint() const
     {
         return m_acceptor.local_endpoint();
     }
@@ -974,7 +975,7 @@ public:
 
 private:
     Server::Config m_config;
-    util::network::Service m_service;
+    network::Service m_service;
     std::mt19937_64 m_random;
     const std::size_t m_max_upload_backlog;
     const std::string m_root_dir;
@@ -994,14 +995,14 @@ private:
     // file-system level intervention.
     std::set<std::string> m_realm_names;
 
-    std::unique_ptr<util::network::ssl::Context> m_ssl_context;
+    std::unique_ptr<network::ssl::Context> m_ssl_context;
     ServerFileAccessCache m_file_access_cache;
     Worker m_worker;
     std::map<std::string, util::bind_ptr<ServerFile>> m_files; // Key is virtual path
-    util::network::Acceptor m_acceptor;
+    network::Acceptor m_acceptor;
     std::int_fast64_t m_next_conn_id = 0;
     std::unique_ptr<HTTPConnection> m_next_http_conn;
-    util::network::Endpoint m_next_http_conn_endpoint;
+    network::Endpoint m_next_http_conn_endpoint;
     std::map<std::int_fast64_t, std::unique_ptr<HTTPConnection>> m_http_connections;
     std::map<std::int_fast64_t, std::unique_ptr<SyncConnection>> m_sync_connections;
     ServerProtocol m_server_protocol;
@@ -1010,7 +1011,7 @@ private:
     std::unique_ptr<Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
     int_fast64_t m_current_server_session_ident;
-    Optional<util::network::DeadlineTimer> m_connection_reaper_timer;
+    Optional<network::DeadlineTimer> m_connection_reaper_timer;
     bool m_allow_load_balancing = false;
 
     util::Mutex m_mutex;
@@ -1067,13 +1068,13 @@ private:
 
 // ============================ SyncConnection ============================
 
-class SyncConnection : public util::websocket::Config {
+class SyncConnection : public websocket::Config {
 public:
     util::PrefixLogger logger;
 
-    SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<util::network::Socket>&& socket,
-                   std::unique_ptr<util::network::ssl::Stream>&& ssl_stream,
-                   std::unique_ptr<util::network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
+    SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
+                   std::unique_ptr<network::ssl::Stream>&& ssl_stream,
+                   std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint)
         : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
@@ -1090,12 +1091,14 @@ public:
         // expand the buffer
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
-        util::network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        network::Service& service = m_server.get_service();
+        auto handler = [this](Status status) {
+            if (!status.is_ok())
+                return;
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = util::network::Trigger{service, std::move(handler)}; // Throws
+        m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1164,7 +1167,7 @@ public:
         return true;
     }
 
-    void async_write(const char* data, size_t size, util::websocket::WriteCompletionHandler handler) final override
+    void async_write(const char* data, size_t size, websocket::WriteCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
@@ -1174,7 +1177,7 @@ public:
         }
     }
 
-    void async_read(char* buffer, size_t size, util::websocket::ReadCompletionHandler handler) final override
+    void async_read(char* buffer, size_t size, websocket::ReadCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read(buffer, size, *m_read_ahead_buffer, std::move(handler)); // Throws
@@ -1185,7 +1188,7 @@ public:
     }
 
     void async_read_until(char* buffer, size_t size, char delim,
-                          util::websocket::ReadCompletionHandler handler) final override
+                          websocket::ReadCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read_until(buffer, size, delim, *m_read_ahead_buffer,
@@ -1231,7 +1234,7 @@ public:
         return m_id;
     }
 
-    util::network::Socket& get_socket() noexcept
+    network::Socket& get_socket() noexcept
     {
         return *m_socket;
     }
@@ -1295,11 +1298,11 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
-    std::unique_ptr<util::network::Socket> m_socket;
-    std::unique_ptr<util::network::ssl::Stream> m_ssl_stream;
-    std::unique_ptr<util::network::ReadAheadBuffer> m_read_ahead_buffer;
+    std::unique_ptr<network::Socket> m_socket;
+    std::unique_ptr<network::ssl::Stream> m_ssl_stream;
+    std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
 
-    util::websocket::Socket m_websocket;
+    websocket::Socket m_websocket;
     std::unique_ptr<char[]> m_input_body_buffer;
     OutputBuffer m_output_buffer;
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
@@ -1334,7 +1337,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    util::network::Trigger m_send_trigger;
+    std::unique_ptr<Trigger<network::Service>> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -1439,8 +1442,8 @@ public:
         : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
         , m_id{id}
-        , m_socket{new util::network::Socket{serv.get_service()}} // Throws
-        , m_read_ahead_buffer{new util::network::ReadAheadBuffer} // Throws
+        , m_socket{new network::Socket{serv.get_service()}} // Throws
+        , m_read_ahead_buffer{new network::ReadAheadBuffer} // Throws
         , m_http_server{*this, logger}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
@@ -1448,7 +1451,7 @@ public:
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         if (is_ssl) {
-            using namespace util::network::ssl;
+            using namespace network::ssl;
             Context& ssl_context = serv.get_ssl_context();
             m_ssl_stream = std::make_unique<Stream>(*m_socket, ssl_context,
                                                     Stream::server); // Throws
@@ -1465,7 +1468,7 @@ public:
         return m_id;
     }
 
-    util::network::Socket& get_socket() noexcept
+    network::Socket& get_socket() noexcept
     {
         return *m_socket;
     }
@@ -1571,9 +1574,9 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
-    std::unique_ptr<util::network::Socket> m_socket;
-    std::unique_ptr<util::network::ssl::Stream> m_ssl_stream;
-    std::unique_ptr<util::network::ReadAheadBuffer> m_read_ahead_buffer;
+    std::unique_ptr<network::Socket> m_socket;
+    std::unique_ptr<network::ssl::Stream> m_ssl_stream;
+    std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
     HTTPServer<HTTPConnection> m_http_server;
     OutputBuffer m_output_buffer;
     bool m_is_sending = false;
@@ -3374,15 +3377,14 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     m_server.m_par_time.fetch_add(parallel_time, std::memory_order_relaxed);
 
     // Pass control back to the network event loop thread
-    auto handler = [this] {
+    network::Service& service = m_server.get_service();
+    service.post([this](Status) {
         // FIXME: The safety of capturing `this` here, relies on the fact
         // that ServerFile objects currently are not destroyed until the
         // server object is destroyed.
         group_postprocess_stage_1(); // Throws
         // Suicide may have happened at this point
-    };
-    util::network::Service& service = m_server.get_service();
-    service.post(std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -3772,7 +3774,7 @@ ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> p
     , m_compress_memory_arena{} // Throws
 {
     if (m_config.ssl) {
-        m_ssl_context = std::make_unique<util::network::ssl::Context>();          // Throws
+        m_ssl_context = std::make_unique<network::ssl::Context>();                // Throws
         m_ssl_context->use_certificate_chain_file(m_config.ssl_certificate_path); // Throws
         m_ssl_context->use_private_key_file(m_config.ssl_certificate_key_path);   // Throws
     }
@@ -3935,11 +3937,10 @@ util::Buffer<char>& ServerImpl::get_transform_buffer() noexcept
 
 void ServerImpl::listen()
 {
-    util::network::Resolver resolver{get_service()};
-    util::network::Resolver::Query query(m_config.listen_address, m_config.listen_port,
-                                         util::network::Resolver::Query::passive |
-                                             util::network::Resolver::Query::address_configured);
-    util::network::Endpoint::List endpoints = resolver.resolve(query); // Throws
+    network::Resolver resolver{get_service()};
+    network::Resolver::Query query(m_config.listen_address, m_config.listen_port,
+                                   network::Resolver::Query::passive | network::Resolver::Query::address_configured);
+    network::Endpoint::List endpoints = resolver.resolve(query); // Throws
 
     auto i = endpoints.begin();
     auto end = endpoints.end();
@@ -3947,7 +3948,7 @@ void ServerImpl::listen()
         std::error_code ec;
         m_acceptor.open(i->protocol(), ec);
         if (!ec) {
-            using SocketBase = util::network::SocketBase;
+            using SocketBase = network::SocketBase;
             m_acceptor.set_option(SocketBase::reuse_address(m_config.reuse_address), ec);
             if (!ec) {
                 m_acceptor.bind(*i, ec);
@@ -3971,7 +3972,7 @@ void ServerImpl::listen()
 
     m_acceptor.listen(m_config.listen_backlog);
 
-    util::network::Endpoint local_endpoint = m_acceptor.local_endpoint();
+    network::Endpoint local_endpoint = m_acceptor.local_endpoint();
     const char* ssl_mode = (m_ssl_context ? "TLS" : "non-TLS");
     logger.info("Listening on %1:%2 (max backlog is %3, %4)", local_endpoint.address(), local_endpoint.port(),
                 m_config.listen_backlog, ssl_mode); // Throws
@@ -4020,7 +4021,7 @@ void ServerImpl::handle_accept(std::error_code ec)
     else {
         HTTPConnection& conn = *m_next_http_conn;
         if (m_config.tcp_no_delay)
-            conn.get_socket().set_option(util::network::SocketBase::no_delay(true)); // Throws
+            conn.get_socket().set_option(network::SocketBase::no_delay(true));       // Throws
         m_http_connections.emplace(conn.get_id(), std::move(m_next_http_conn));      // Throws
         Formatter& formatter = m_misc_buffers.formatter;
         formatter.reset();
@@ -4052,19 +4053,17 @@ void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 
 void ServerImpl::set_connection_reaper_timeout(milliseconds_type timeout)
 {
-    auto handler = [this, timeout] {
+    get_service().post([this, timeout](Status) {
         m_config.connection_reaper_timeout = timeout;
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::close_connections()
 {
-    auto handler = [this] {
+    get_service().post([this](Status) {
         do_close_connections(); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
@@ -4077,10 +4076,9 @@ bool ServerImpl::map_virtual_to_real_path(const std::string& virt_path, std::str
 void ServerImpl::recognize_external_change(const std::string& virt_path)
 {
     std::string virt_path_2 = virt_path; // Throws (copy)
-    auto handler = [this, virt_path = std::move(virt_path_2)] {
+    get_service().post([this, virt_path = std::move(virt_path_2)](Status) {
         do_recognize_external_change(virt_path); // Throws
-    };
-    get_service().post(std::move(handler)); // Throws
+    });                                          // Throws
 }
 
 
@@ -4091,25 +4089,22 @@ void ServerImpl::stop_sync_and_wait_for_backup_completion(
                 "timeout = %1",
                 timeout); // Throws
 
-    auto handler = [this, completion_handler = std::move(completion_handler), timeout]() mutable {
+    get_service().post([this, completion_handler = std::move(completion_handler), timeout](Status) mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
                                                     timeout); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::initiate_connection_reaper_timer(milliseconds_type timeout)
 {
-    auto handler = [this, timeout](std::error_code ec) {
-        if (ec != util::error::operation_aborted) {
+    m_connection_reaper_timer.emplace(get_service());
+    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), [this, timeout](Status status) {
+        if (status != ErrorCodes::OperationAborted) {
             reap_connections();                        // Throws
             initiate_connection_reaper_timer(timeout); // Throws
         }
-    };
-
-    m_connection_reaper_timer.emplace(get_service());
-    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -4225,10 +4220,11 @@ void SyncConnection::terminate_if_dead(SteadyTimePoint now)
 
 void SyncConnection::enlist_to_send(Session* sess) noexcept
 {
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 
@@ -4600,7 +4596,7 @@ void SyncConnection::handle_write_error()
     REALM_ASSERT(m_is_closing);
     if (!m_ssl_stream) {
         std::error_code ec;
-        m_socket->shutdown(util::network::Socket::shutdown_send, ec);
+        m_socket->shutdown(network::Socket::shutdown_send, ec);
         if (ec && ec != make_basic_system_error_code(ENOTCONN))
             throw std::system_error(ec);
     }
@@ -4651,6 +4647,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
     REALM_ASSERT(is_session_level_error(error_code) == (session_ident != 0));
     REALM_ASSERT(!is_session_level_error(error_code));
 
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     m_is_closing = true;
 
@@ -4665,7 +4662,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 
@@ -4752,7 +4749,7 @@ void Server::start(const std::string& listen_address, const std::string& listen_
 }
 
 
-util::network::Endpoint Server::listen_endpoint() const
+network::Endpoint Server::listen_endpoint() const
 {
     return m_impl->listen_endpoint(); // Throws
 }

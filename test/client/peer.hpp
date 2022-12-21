@@ -115,7 +115,7 @@ private:
     DBRef m_receive_shared_group;
     TransactionRef m_receive_group = nullptr;
     std::string m_refresh_token;
-    util::Optional<util::network::DeadlineTimer> m_access_token_refresh_timer;
+    util::Optional<sync::network::DeadlineTimer> m_access_token_refresh_timer;
     std::atomic<bool> m_receive_enabled{false}; // Release-Acquire ordering
     milliseconds_type m_start_time = 0;
     ConnectionState m_connection_state = ConnectionState::disconnected;
@@ -142,14 +142,14 @@ class Peer::Context {
 public:
     sync::Client& client;
     sync::auth::Client& auth;
-    util::network::Service& test_proc_service;
+    sync::network::Service& test_proc_service;
     std::mt19937_64& test_proc_random;
     Metrics& metrics;
     const bool disable_sync_to_disk;
     const bool report_roundtrip_times;
     const bool reset_on_reconnect;
 
-    Context(sync::Client&, sync::auth::Client&, util::network::Service&, std::mt19937_64&, Metrics&, bool dstd,
+    Context(sync::Client&, sync::auth::Client&, sync::network::Service&, std::mt19937_64&, Metrics&, bool dstd,
             bool rrt, bool ror) noexcept;
 
     void init_metrics_gauges(bool report_propagation_time);
@@ -175,7 +175,7 @@ private:
     std::vector<milliseconds_type> m_roundtrip_times;   // Protected by m_metrics_aggregation_mutex
     std::vector<milliseconds_type> m_propagation_times; // Protected by m_metrics_aggregation_mutex
 
-    util::network::DeadlineTimer m_metrics_aggregation_timer{test_proc_service};
+    sync::network::DeadlineTimer m_metrics_aggregation_timer{test_proc_service};
 
     std::map<Error, int> m_error_counters;
 
@@ -215,7 +215,7 @@ inline sync::Session& Peer::get_session() noexcept
     return m_session;
 }
 
-inline Peer::Context::Context(sync::Client& c, sync::auth::Client& a, util::network::Service& tps,
+inline Peer::Context::Context(sync::Client& c, sync::auth::Client& a, sync::network::Service& tps,
                               std::mt19937_64& tpr, Metrics& m, bool dstd, bool rrt, bool ror) noexcept
     : client{c}
     , auth{a}

@@ -84,6 +84,9 @@ public:
         virtual void cancel() = 0;
     };
 
+    /// Other class typedefs
+    using SyncTimer = std::unique_ptr<SyncSocketProvider::Timer>;
+
     /// The event loop implementation must ensure the event loop is stopped and
     /// flushed when the object is destroyed. If the event loop is processed by
     /// a thread, the thread must be joined as part of this operation.
@@ -135,12 +138,8 @@ public:
     /// @return A pointer to the Timer object that can be used to cancel the
     /// timer. The timer will also be canceled if the Timer object returned is
     /// destroyed.
-    virtual std::unique_ptr<Timer> create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
+    virtual SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
 };
-
-// Defines to help make the code a bit cleaner
-using SyncTimer = std::unique_ptr<SyncSocketProvider::Timer>;
-
 
 /// Struct that defines the endpoint to create a new websocket connection.
 /// Many of these values come from the SyncClientConfig passed to SyncManager when
@@ -165,6 +164,18 @@ struct WebSocketInterface {
     /// The destructor must close the websocket connection when the WebSocket object
     /// is destroyed
     virtual ~WebSocketInterface() = default;
+
+
+    /// For implementations that support it, return the app services request ID header
+    /// value, i.e. the "X-Appservices-Request-Id" header value.
+    ///
+    /// TODO: This will go away with RCORE-1380 since it's not strictly available in the
+    /// websocket spec. If HTTP headers aren't available, the default implementation of
+    /// returning an empty string is okay.
+    virtual std::string_view get_appservices_request_id() const noexcept
+    {
+        return {};
+    }
 
     /// Write data asynchronously to the WebSocket connection. The handler function
     /// will be called when the data has been sent successfully. The WebSocketOberver

@@ -262,6 +262,8 @@ CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_T
 
 ## Other tools
 
+### Realm-Import
+
 The `realm-import` tool lets you load files containing
 comma-separated values into Realm.
 
@@ -272,6 +274,22 @@ with GCC and other compilers, such as Clang, that are mostly command
 line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `realm-config --cflags --libs`
+
+### RealmTrawler
+
+`RealmTrawler` is a tool that can go through a Realm file and print metadata about the layout of the file.
+
+It is built the following way:
+
+```
+mkdir build
+cd build
+cmake ..
+cmake --build . --target RealmTrawler
+```
+
+On Mac this will create an executable located in `<path-to-repo>/build/src/realm/exec/realm-trawler-dbg`.
+
 
 ## cmake options
 

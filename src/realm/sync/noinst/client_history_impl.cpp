@@ -379,7 +379,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
-    util::Logger& logger, util::UniqueFunction<void(const TransactionRef&, size_t)> run_in_write_tr,
+    util::Logger& logger, util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
     SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
@@ -431,6 +431,7 @@ void ClientHistory::integrate_server_changesets(
         root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
 
         const RemoteChangeset& last_changeset = incoming_changesets[changesets_transformed_count - 1];
+        auto changesets_for_cb = changesets_to_integrate.first(changesets_transformed_count);
         changesets_to_integrate = changesets_to_integrate.sub_span(changesets_transformed_count);
         incoming_changesets = incoming_changesets.sub_span(changesets_transformed_count);
 
@@ -447,7 +448,7 @@ void ClientHistory::integrate_server_changesets(
             update_sync_progress(partial_progress, downloadable_bytes, transact); // Throws
         }
         if (run_in_write_tr) {
-            run_in_write_tr(transact, changesets_transformed_count);
+            run_in_write_tr(transact, changesets_for_cb);
         }
 
         // The reason we can use the `origin_timestamp`, and the `origin_file_ident`

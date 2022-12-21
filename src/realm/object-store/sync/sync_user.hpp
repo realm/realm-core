@@ -312,6 +312,11 @@ public:
         return lhs.identity() == rhs.identity();
     }
 
+    friend bool operator!=(const SyncUser& lhs, const SyncUser& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
 protected:
     friend class SyncManager;
     void detach_from_sync_manager() REQUIRES(!m_mutex);
