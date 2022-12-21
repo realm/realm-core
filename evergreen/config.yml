@@ -407,16 +407,6 @@ tasks:
         export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
 
-- name: fuzzer
-  exec_timeout_secs: 600
-  commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test-fuzz
-      shell: bash
-      script: |-
-        ./realm_libfuzz
-
 - name: bloaty
   exec_timeout_secs: 1800
   commands:
@@ -673,6 +663,21 @@ tasks:
         echo $out
         exit 1
 
+- name: run-fuzzer
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: realm-libfuzz
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test-fuzz
+      shell: bash
+      script: |-
+        ./realm_libfuzz
+
 task_groups:
 - name: compile_test_and_package
   max_hosts: 1
@@ -743,17 +748,6 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - long-running-core-tests
-
-- name: run-fuzzer
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: realm-libfuzz
-  tasks:
-  - fuzzer
   
 buildvariants:
 - name: ubuntu2004
@@ -949,7 +943,7 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
-  
+
 - name: macos-fuzzer
   display_name: "MacOS 11.0 x86_64 (Fuzzer)"
   run_on: macos-1100
@@ -966,7 +960,6 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile_test
   - name: run-fuzzer
 
 - name: macos-encrypted
