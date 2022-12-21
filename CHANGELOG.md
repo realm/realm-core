@@ -2,12 +2,15 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Improve performance of acquiring read locks when a read lock for that version is already held. This speeds up many operations related to change notifications, and particularly refreshing a Realm which has change notifiers registered.
 * Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#6097](https://github.com/realm/realm-core/pull/6097))
 * Converting flexible sync realms to bundled and local realms is now supported ([#6076](https://github.com/realm/realm-core/pull/6076))
 * Compensating write errors are now surfaced to the SDK/user after the compensating write has been applied in a download message ([#6095](https://github.com/realm/realm-core/pull/6095)).
 * Normalize sync connection parameters for device information ([#6029](https://github.com/realm/realm-core/issues/6029))
 
 ### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix `BadVersion` exceptions which could occur when performing multiple writes on one thread while observing change notifications on another thread ([#6069](https://github.com/realm/realm-core/issues/6069), since v13.0.0).
 * Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
 * Core should not alter the order of the properties for additive schemas. ([#6134](https://github.com/realm/realm-core/issues/6134))
 * Core should not use the version passed in `Realm` constructor to load the schema at some particular version, but only for setting `m_frozen_version`.

@@ -752,9 +752,9 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
         });
         if (have_notifiers) {
             REALM_ASSERT(!m_notifier_skip_version);
-            REALM_ASSERT(m_notifier_sg);
-            REALM_ASSERT_3(m_notifier_sg->get_transact_stage(), ==, DB::transact_Reading);
-            REALM_ASSERT_3(m_notifier_sg->get_version() + 1, ==, new_version.version);
+            REALM_ASSERT(m_notifier_transaction);
+            REALM_ASSERT_3(m_notifier_transaction->get_transact_stage(), ==, DB::transact_Reading);
+            REALM_ASSERT_3(m_notifier_transaction->get_version() + 1, ==, new_version.version);
             m_notifier_skip_version = tr.duplicate();
         }
     }
@@ -803,7 +803,6 @@ void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> not
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
-        notifier->attach_to(notifier->get_realm()->duplicate());
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -830,7 +829,8 @@ void RealmCoordinator::clean_up_dead_notifiers()
     };
 
     if (swap_remove(m_notifiers) && m_notifiers.empty()) {
-        m_notifier_sg = nullptr;
+        m_notifier_transaction = nullptr;
+        m_notifier_handover_transaction = nullptr;
         m_notifier_skip_version.reset();
     }
     swap_remove(m_new_notifiers);
@@ -866,8 +866,8 @@ bool compare_notifier_versions(const std::shared_ptr<_impl::CollectionNotifier>&
 
 class IncrementalChangeInfo {
 public:
-    IncrementalChangeInfo(Transaction& sg, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
-        : m_sg(sg)
+    IncrementalChangeInfo(Transaction& tr, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
+        : m_tr(tr)
     {
         if (notifiers.empty())
             return;
@@ -895,8 +895,8 @@ public:
 
     bool advance_incremental(VersionID version)
     {
-        if (version != m_sg.get_version_of_current_transaction()) {
-            transaction::advance(m_sg, *m_current, version);
+        if (version != m_tr.get_version_of_current_transaction()) {
+            transaction::advance(m_tr, *m_current, version);
             m_info.push_back({std::move(m_current->lists)});
             auto next = &m_info.back();
             for (auto& table : m_current->tables)
@@ -910,11 +910,11 @@ public:
     void advance_to_final(VersionID version)
     {
         if (!m_current) {
-            transaction::advance(m_sg, nullptr, version);
+            transaction::advance(m_tr, nullptr, version);
             return;
         }
 
-        transaction::advance(m_sg, *m_current, version);
+        transaction::advance(m_tr, *m_current, version);
 
         // We now need to combine the transaction change info objects so that all of
         // the notifiers see the complete set of changes from their first version to
@@ -953,7 +953,7 @@ public:
 private:
     std::vector<TransactionChangeInfo> m_info;
     TransactionChangeInfo* m_current = nullptr;
-    Transaction& m_sg;
+    Transaction& m_tr;
 };
 } // anonymous namespace
 
@@ -968,10 +968,10 @@ void RealmCoordinator::run_async_notifiers()
         return;
     }
 
-    if (!m_notifier_sg) {
+    if (!m_notifier_transaction) {
         REALM_ASSERT(m_notifiers.empty());
         REALM_ASSERT(!m_notifier_skip_version);
-        m_notifier_sg = m_db->start_read();
+        m_notifier_transaction = m_db->start_read();
     }
 
     // We need to pick the final version to advance to while the lock is held
@@ -986,7 +986,7 @@ void RealmCoordinator::run_async_notifiers()
     // Make a copy of the notifiers vector and then release the lock to avoid
     // blocking other threads trying to register or unregister notifiers while we run them
     decltype(m_notifiers) notifiers;
-    if (version != m_notifier_sg->get_version_of_current_transaction()) {
+    if (version != m_notifier_transaction->get_version_of_current_transaction()) {
         // We only want to rerun the existing notifiers if the version has changed.
         // This is both a minor optimization and required for notification
         // skipping to work. The skip logic assumes that the notifier can't be
@@ -1039,7 +1039,7 @@ void RealmCoordinator::run_async_notifiers()
         new_notifier_change_info->advance_to_final(version);
     }
     else {
-        if (version == m_notifier_sg->get_version_of_current_transaction()) {
+        if (version == m_notifier_transaction->get_version_of_current_transaction()) {
             // We were spuriously woken up and there isn't actually anything to do
             REALM_ASSERT(!skip_version);
             return;
@@ -1058,7 +1058,7 @@ void RealmCoordinator::run_async_notifiers()
     if (skip_version && skip_version->get_version_of_current_transaction() != version) {
         REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version->get_version_of_current_transaction());
-        IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
+        IncrementalChangeInfo change_info(*m_notifier_transaction, notifiers);
         for (auto& notifier : notifiers)
             notifier->add_required_change_info(change_info.current());
         change_info.advance_to_final(skip_version->get_version_of_current_transaction());
@@ -1072,7 +1072,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance the non-new notifiers to the same version as we advanced the new
     // ones to (or the latest if there were no new ones)
-    IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
+    IncrementalChangeInfo change_info(*m_notifier_transaction, notifiers);
     for (auto& notifier : notifiers) {
         notifier->add_required_change_info(change_info.current());
     }
@@ -1080,10 +1080,10 @@ void RealmCoordinator::run_async_notifiers()
 
     // Now that they're at the same version, switch the new notifiers over to
     // the main Transaction used for background work rather than the temporary one
-    REALM_ASSERT(new_notifiers.empty() || m_notifier_sg->get_version_of_current_transaction() ==
+    REALM_ASSERT(new_notifiers.empty() || m_notifier_transaction->get_version_of_current_transaction() ==
                                               new_notifier_transaction->get_version_of_current_transaction());
     for (auto& notifier : new_notifiers) {
-        notifier->attach_to(m_notifier_sg);
+        notifier->attach_to(m_notifier_transaction);
         notifier->run();
     }
 
@@ -1103,6 +1103,8 @@ void RealmCoordinator::run_async_notifiers()
         notifier->prepare_handover();
     }
     clean_up_dead_notifiers();
+    if (!m_notifiers.empty())
+        m_notifier_handover_transaction = m_db->start_read(version);
 }
 
 void RealmCoordinator::advance_to_ready(Realm& realm)
@@ -1113,9 +1115,12 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
     auto tr = Realm::Internal::get_transaction_ref(realm);
     auto current_version = tr->get_version_of_current_transaction();
 
-    VersionID notifier_version;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers;
 
+    // Transaction which will pin the version we're packaging for deliver to,
+    // to ensure it's not cleaned up between when we release the mutex and when
+    // we actually advance (which is not done while holding a lock).
+    std::shared_ptr<Transaction> handover_version_tr;
     {
         util::CheckedLockGuard lock(m_notifier_mutex);
 
@@ -1136,20 +1141,27 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             // unregistered but not yet cleaned up, so it effectively doesn't exist
             if (!notifier->package_for_delivery())
                 continue;
-            // If the most recent write was performed via the Realm instance being
-            // advanced, the notifiers can be at an older version than the Realm.
-            // This means that there's no advancing to do
-            if (notifier->version() < current_version)
-                return;
-            notifier_version = notifier->version();
             notifiers.push_back(notifier);
         }
+
+        handover_version_tr = m_notifier_handover_transaction;
     }
 
     if (notifiers.empty()) {
         // If we have no notifiers for this Realm, just advance to latest
         return transaction::advance(tr, realm.m_binding_context.get(), {});
     }
+
+    // If we have notifiers but no transaction, then they've never run before.
+    if (!handover_version_tr)
+        return;
+
+    auto notifier_version = handover_version_tr->get_version_of_current_transaction();
+    // If the most recent write was performed via the Realm instance being
+    // advanced, the notifiers can be at an older version than the Realm.
+    // This means that there's no advancing to do
+    if (notifier_version < current_version)
+        return;
 
     // We can have notifications for the current version if it's the initial
     // notification for a newly added callback or if the write was performed
@@ -1171,7 +1183,7 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
 
     // We have notifiers for a newer version, so advance to that
     transaction::advance(tr, realm.m_binding_context.get(),
-                         _impl::NotifierPackage(std::move(notifiers), notifier_version));
+                         _impl::NotifierPackage(std::move(notifiers), handover_version_tr));
 }
 
 std::vector<std::shared_ptr<_impl::CollectionNotifier>> RealmCoordinator::notifiers_for_realm(Realm& realm)
@@ -1197,10 +1209,10 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
         util::CheckedUniqueLock lock(m_notifier_mutex);
         notifiers = notifiers_for_realm(realm);
     }
-    auto version = package_notifiers(notifiers, m_db->get_version_of_latest_snapshot());
+    auto pin_tr = package_notifiers(notifiers, m_db->get_version_of_latest_snapshot());
 
     auto prev_version = tr->get_version_of_current_transaction();
-    transaction::advance(tr, realm.m_binding_context.get(), _impl::NotifierPackage(std::move(notifiers), version));
+    transaction::advance(tr, realm.m_binding_context.get(), _impl::NotifierPackage(std::move(notifiers), pin_tr));
     return !realm.is_closed() && prev_version != tr->get_version_of_current_transaction();
 }
 
@@ -1227,17 +1239,23 @@ void RealmCoordinator::process_available_async(Realm& realm)
     auto self = shared_from_this();
 
     auto current_version = realm.current_transaction_version();
-    VersionID notifier_version;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers;
 
     {
         util::CheckedLockGuard lock(m_notifier_mutex);
+        // No handover transaction means there can't be anything waiting to deliver
+        if (!m_notifier_handover_transaction)
+            return;
+        // If we have a read transaction, it needs to be an exact match in version
+        // to the notifications as we're only delivering initial notifications
+        // and not advancing.
+        if (current_version &&
+            current_version != m_notifier_handover_transaction->get_version_of_current_transaction())
+            return;
+
         for (auto& notifier : m_notifiers) {
             if (!notifier->is_for_realm(realm) || !notifier->has_run() || !notifier->package_for_delivery())
                 continue;
-            if (current_version && notifier->version() != current_version)
-                return;
-            notifier_version = notifier->version();
             notifiers.push_back(notifier);
         }
     }
@@ -1256,13 +1274,15 @@ void RealmCoordinator::process_available_async(Realm& realm)
         realm.m_binding_context->did_send_notifications();
 }
 
-std::optional<VersionID> RealmCoordinator::package_notifiers(NotifierVector& notifiers,
-                                                             VersionID::version_type target_version)
+TransactionRef RealmCoordinator::package_notifiers(NotifierVector& notifiers, VersionID::version_type target_version)
 {
     auto ready = [&] {
         util::CheckedUniqueLock notifier_lock(m_notifier_mutex);
+        bool up_to_date =
+            m_notifier_handover_transaction &&
+            m_notifier_handover_transaction->get_version_of_current_transaction().version >= target_version;
         return std::all_of(begin(notifiers), end(notifiers), [&](auto const& n) {
-            return !n->have_callbacks() || (n->has_run() && n->version().version >= target_version);
+            return !n->have_callbacks() || (n->has_run() && up_to_date);
         });
     };
 
@@ -1275,12 +1295,19 @@ std::optional<VersionID> RealmCoordinator::package_notifiers(NotifierVector& not
     }
 
     util::CheckedUniqueLock notifier_lock(m_notifier_mutex);
+    // If the notifiers are still out of date, that means none of them have callbacks
+    // so we don't want to block the calling thread to run them.
+    if (!m_notifier_handover_transaction ||
+        m_notifier_handover_transaction->get_version_of_current_transaction().version < target_version) {
+        notifiers.clear();
+        return nullptr;
+    }
+
     auto package = [&](auto& notifier) {
-        return !notifier->has_run() || !notifier->package_for_delivery() ||
-               notifier->version().version < target_version;
+        return !notifier->has_run() || !notifier->package_for_delivery();
     };
     notifiers.erase(std::remove_if(begin(notifiers), end(notifiers), package), end(notifiers));
-    return notifiers.empty() ? std::optional<VersionID>{} : notifiers.front()->version();
+    return notifiers.empty() ? nullptr : m_notifier_handover_transaction;
 }
 
 bool RealmCoordinator::compact()
