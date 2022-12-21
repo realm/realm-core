@@ -664,7 +664,8 @@ tasks:
         exit 1
 
 - name: run-fuzzer
-  exec_timeout_secs: 1800
+  tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 600
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
