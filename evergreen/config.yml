@@ -33,15 +33,6 @@ functions:
           set -o errexit
           git submodule update --init --recursive
   
-
-  "fuzzer":
-    - command: shell.exec
-      params:
-        working_dir: realm-core/build/test-fuzz
-        shell: bash
-        script: |-
-          ./realm_libfuzz
-
   "compile":
     - command: shell.exec
       params:
@@ -333,11 +324,6 @@ tasks:
   commands:
   - func: "compile"
 
-- name: fuzzer-task
-  exec_timeout_secs: 600
-  commands:
-  - func: "fuzzer"
-
 - name: package
   exec_timeout_secs: 1800
   commands:
@@ -420,6 +406,16 @@ tasks:
         export UNITTEST_PROGRESS=1
         export UNITTEST_THREADS=1
         valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$(pwd)/../../test/valgrind.suppress --error-exitcode=1 ./RelWithDebInfo/realm-tests
+
+- name: fuzzer
+  exec_timeout_secs: 600
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test-fuzz
+      shell: bash
+      script: |-
+        ./realm_libfuzz
 
 - name: bloaty
   exec_timeout_secs: 1800
@@ -748,7 +744,7 @@ task_groups:
   tasks:
   - long-running-core-tests
 
-- name: fuzzer
+- name: compile-fuzzer
   setup_group_can_fail_task: true
   setup_group:
   - func: "fetch source"
@@ -757,7 +753,7 @@ task_groups:
     vars:
       target_to_build: "realm-libfuzz"
   tasks:
-  - fuzzer-task
+  - fuzzer
   
 buildvariants:
 - name: ubuntu2004
@@ -961,16 +957,16 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
-    max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
     run_with_encryption: On
     enable_fuzzer: On
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: fuzzer
+  - name: compile-fuzzer
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
