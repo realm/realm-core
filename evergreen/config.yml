@@ -958,8 +958,8 @@ buildvariants:
     enable_fuzzer: On
     fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
-    xcode_developer_dir: /Applications/Xcode14.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    extra_flags: -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
   tasks:
   - name: fuzzer
 
