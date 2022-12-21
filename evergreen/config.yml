@@ -946,7 +946,7 @@ buildvariants:
   - name: swift-build-and-test
 
 - name: macos-fuzzer
-  display_name: "MacOS 11.0 x86_64 (Fuzzer)"
+  display_name: "MacOS 11.0 (Fuzzer)"
   run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
@@ -959,7 +959,7 @@ buildvariants:
     fetch_missing_dependencies: On
     cmake_build_type: RelWithDebInfo
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
+    extra_flags: -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
   tasks:
   - name: fuzzer
 
