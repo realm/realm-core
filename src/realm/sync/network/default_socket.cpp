@@ -31,6 +31,11 @@ public:
         });
     }
 
+    std::string_view get_appservices_request_id() const noexcept override
+    {
+        return m_app_services_coid;
+    }
+
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
     void async_read(char*, std::size_t, ReadCompletionHandler) override;
     void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
@@ -51,6 +56,9 @@ private:
     void websocket_handshake_completion_handler(const HTTPHeaders& headers) override
     {
         const std::string empty;
+        if (auto it = headers.find("X-Appservices-Request-Id"); it != headers.end()) {
+            m_app_services_coid = it->second;
+        }
         auto it = headers.find("Sec-WebSocket-Protocol");
         m_observer.websocket_handshake_completion_handler(it == headers.end() ? empty : it->second);
     }
@@ -105,6 +113,7 @@ private:
     std::mt19937_64& m_random;
     network::Service& m_service;
     const std::string m_user_agent;
+    std::string m_app_services_coid;
 
     EZObserver& m_observer;
 

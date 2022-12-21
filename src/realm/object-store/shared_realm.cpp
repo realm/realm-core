@@ -81,7 +81,7 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     , m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        m_transaction = coordinator->begin_read(version.value_or(VersionID{}));
+        m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
@@ -258,7 +258,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
         // no verification of schema changes when opening a past version of the schema
-        m_schema = std::move(schema);
+        m_schema.copy_keys_from(schema, m_config.is_schema_additive());
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
