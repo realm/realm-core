@@ -52,7 +52,7 @@
 #include <process.h>
 #endif
 
-//#define REALM_ENABLE_LOGFILE
+// #define REALM_ENABLE_LOGFILE
 
 
 using namespace realm;
@@ -689,6 +689,8 @@ private:
                 return r.count_live;
             case ReadLockInfo::Full:
                 return r.count_full;
+            default:
+                REALM_UNREACHABLE(); // silence a warning
         }
     }
 
