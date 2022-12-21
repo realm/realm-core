@@ -1,6 +1,7 @@
 # 13.1.0 Release notes
 
 ### Enhancements
+* Allows ignoring nested property changes when subscribing for notifications by passing an empty `key_path_array` to `add_notification_callback`. ([#6122](https://github.com/realm/realm-core/pull/6122)).
 * The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
 * Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
 
