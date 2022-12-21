@@ -38,9 +38,8 @@ functions:
     - command: shell.exec
       params:
         working_dir: realm-core/build/test-fuzz
-        shell: /bin/bash
+        shell: bash
         script: |-
-           #!/bin/bash
           ./realm_libfuzz
 
   "compile":
@@ -334,7 +333,7 @@ tasks:
   commands:
   - func: "compile"
 
-- name: fuzzer
+- name: fuzzer-task
   exec_timeout_secs: 600
   commands:
   - func: "fuzzer"
@@ -678,8 +677,6 @@ tasks:
         echo $out
         exit 1
 
-
-
 task_groups:
 - name: compile_test_and_package
   max_hosts: 1
@@ -760,7 +757,7 @@ task_groups:
     vars:
       target_to_build: "realm-libfuzz"
   tasks:
-  - fuzzer
+  - fuzzer-task
   
 buildvariants:
 - name: ubuntu2004
