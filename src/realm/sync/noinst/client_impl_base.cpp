@@ -216,7 +216,6 @@ ClientImpl::ClientImpl(ClientConfig config)
             return;
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
-
         actualize_and_finalize_session_wrappers(); // Throws
     });
 }
@@ -287,10 +286,9 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 
 void Connection::initiate_session_deactivation(Session* sess)
 {
-    REALM_ASSERT(m_on_idle);
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == ConnectionState::disconnected)
+        if (m_on_idle && m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws

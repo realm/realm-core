@@ -393,11 +393,12 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = m_running;
-    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
-
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
+
+    // Event Loop TODO: Until the event loop can be free-running, wait for the
+    // thread to exit before tearing down the client.
+    m_socket_provider->stop(true);
 
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
@@ -494,15 +495,15 @@ void ClientImpl::stop() noexcept
     if (m_stopped)
         return;
     m_stopped = true;
+    m_socket_provider->stop(false);
     m_wait_or_client_stopped_cond.notify_all();
-    m_socket_provider->stop();
 }
 
 
-void ClientImpl::run()
+void ClientImpl::run() noexcept
 {
-    auto ta = util::make_temp_assign(m_running, true);
-    m_socket_provider->run();
+    util::LockGuard lock{m_mutex};
+    m_socket_provider->start();
 }
 
 
@@ -1839,15 +1840,21 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
-void Client::run()
+void Client::run() noexcept
 {
-    m_impl->run(); // Throws
+    m_impl->run();
 }
 
 
 void Client::stop() noexcept
 {
     m_impl->stop();
+}
+
+
+void Client::post_for_testing(SyncSocketProvider::FunctionHandler&& handler)
+{
+    m_impl->post(std::move(handler));
 }
 
 

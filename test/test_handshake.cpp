@@ -299,11 +299,7 @@ void run_client_surprise_server(unit_test::TestContext& test_context, const std:
     client_config.one_connection_per_session = true;
     client_config.tcp_no_delay = true;
     Client client(client_config);
-
-    ThreadWrapper client_thread;
-    client_thread.start([&] {
-        client.run();
-    });
+    client.run();
 
     Session::Config session_config;
     session_config.server_address = "localhost";
@@ -326,7 +322,6 @@ void run_client_surprise_server(unit_test::TestContext& test_context, const std:
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
-    client_thread.join();
     server.stop();
     server_thread.join();
 }
@@ -489,11 +484,7 @@ TEST_IF(Handshake_ExternalServer, false)
     client_config.one_connection_per_session = true;
     client_config.tcp_no_delay = true;
     Client client(client_config);
-
-    ThreadWrapper client_thread;
-    client_thread.start([&] {
-        client.run();
-    });
+    client.run();
 
     Session::Config session_config;
     session_config.server_address = server_address;
@@ -517,7 +508,6 @@ TEST_IF(Handshake_ExternalServer, false)
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
-    client_thread.join();
 }
 
 } // unnamed namespace

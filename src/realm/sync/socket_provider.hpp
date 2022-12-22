@@ -142,8 +142,8 @@ public:
 
     /// Temporary functions added to support the default socket provider until
     /// it is fully integrated. Will be removed in future PRs.
-    virtual void run() {}
-    virtual void stop() {}
+    virtual void start() {}
+    virtual void stop(bool) {}
 };
 
 /// Struct that defines the endpoint to create a new websocket connection.
