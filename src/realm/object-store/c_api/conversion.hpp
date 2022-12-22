@@ -366,6 +366,7 @@ static inline Property from_capi(const realm_property_info_t& p) noexcept
     prop.link_origin_property_name = p.link_origin_property_name;
     prop.is_primary = Property::IsPrimary{bool(p.flags & RLM_PROPERTY_PRIMARY_KEY)};
     prop.is_indexed = Property::IsIndexed{bool(p.flags & RLM_PROPERTY_INDEXED)};
+    prop.is_fulltext_indexed = Property::IsFulltextIndexed{bool(p.flags & RLM_PROPERTY_FULLTEXT_INDEXED)};
 
     if (bool(p.flags & RLM_PROPERTY_NULLABLE)) {
         prop.type |= PropertyType::Nullable;
@@ -401,6 +402,8 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
     p.flags = RLM_PROPERTY_NORMAL;
     if (prop.is_indexed)
         p.flags |= RLM_PROPERTY_INDEXED;
+    if (prop.is_fulltext_indexed)
+        p.flags |= RLM_PROPERTY_FULLTEXT_INDEXED;
     if (prop.is_primary)
         p.flags |= RLM_PROPERTY_PRIMARY_KEY;
     if (bool(prop.type & PropertyType::Nullable))

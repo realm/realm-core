@@ -236,10 +236,10 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             if (!col_key_dst) {
                 DataType col_type = table_src->get_column_type(col_key);
                 bool nullable = col_key.is_nullable();
-                bool has_search_index = table_src->has_search_index(col_key);
+                auto search_index_type = table_src->search_index_type(col_key);
                 logger.trace("Create column, table = %1, column name = %2, "
-                             " type = %3, nullable = %4, has_search_index = %5",
-                             table_name, col_name, col_key.get_type(), nullable, has_search_index);
+                             " type = %3, nullable = %4, search_index = %5",
+                             table_name, col_name, col_key.get_type(), nullable, search_index_type);
                 ColKey col_key_dst;
                 if (Table::is_link_type(col_key.get_type())) {
                     ConstTableRef target_src = table_src->get_link_target(col_key);
@@ -274,8 +274,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                     col_key_dst = table_dst->add_column(col_type, col_name, nullable);
                 }
 
-                if (has_search_index)
-                    table_dst->add_search_index(col_key_dst);
+                if (search_index_type != IndexType::None)
+                    table_dst->add_search_index(col_key_dst, search_index_type);
             }
             else {
                 // column preexists in dest, make sure the types match
