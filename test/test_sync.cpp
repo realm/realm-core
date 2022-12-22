@@ -3696,29 +3696,31 @@ TEST(Sync_UploadDownloadProgress_6)
 
     auto progress_pf = util::make_promise_future<void>();
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
-        CHECK_EQUAL(downloaded_bytes, 0);
-        CHECK_EQUAL(downloadable_bytes, 0);
-        CHECK_EQUAL(uploaded_bytes, 0);
-        CHECK_EQUAL(uploadable_bytes, 0);
-        CHECK_EQUAL(progress_version, 0);
-        CHECK_EQUAL(snapshot_version, 1);
-        util::LockGuard lock{mutex};
-        session.reset();
-        progress_pf.promise.emplace_value();
-    };
+    auto progress_handler =
+        [this, &mutex, &session, progress_promise = util::CopyablePromiseHolder(std::move(progress_pf.promise))](
+            uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes, uint_fast64_t uploaded_bytes,
+            uint_fast64_t uploadable_bytes, uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
+            CHECK_EQUAL(downloaded_bytes, 0);
+            CHECK_EQUAL(downloadable_bytes, 0);
+            CHECK_EQUAL(uploaded_bytes, 0);
+            CHECK_EQUAL(uploadable_bytes, 0);
+            CHECK_EQUAL(progress_version, 0);
+            CHECK_EQUAL(snapshot_version, 1);
+            util::LockGuard lock{mutex};
+            session.reset();
+            progress_promise.get_promise().emplace_value();
+        };
 
     session->set_progress_handler(progress_handler);
 
-    {
-        util::LockGuard lock{mutex};
-        session->bind();
-    }
+    util::UniqueLock lock{mutex};
+    session->bind();
+    lock.unlock();
 
     // Wait for the progress to be called
     progress_pf.future.get();
+    lock.lock();
+
     client.stop();
     server.stop();
     server_thread.join();
