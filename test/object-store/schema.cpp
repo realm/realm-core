@@ -1189,6 +1189,14 @@ TEST_CASE("Schema") {
                     vec{(AddIndex{object_schema, &object_schema->persisted_properties[0], IndexType::Fulltext})});
         }
 
+        SECTION("remove fulltext index") {
+            Schema schema1 = {{"object", {{"text", Property::IsFulltextIndexed{true}}}}};
+            Schema schema2 = {{"object", {{"text", PropertyType::String}}}};
+            auto object_schema = &*schema1.find("object");
+            REQUIRE(schema1.compare(schema2) ==
+                    vec{(RemoveIndex{object_schema, &object_schema->persisted_properties[0]})});
+        }
+
         SECTION("remove index") {
             Schema schema1 = {
                 {"object", {{"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}}}};
