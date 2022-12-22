@@ -23,6 +23,9 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/instructions.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
@@ -32,12 +35,9 @@
 #include <realm/sync/transform.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/features.h>
-#include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/websocket.hpp>
 #include <realm/version.hpp>
 
 #include "sync_fixtures.hpp"
@@ -1676,14 +1676,14 @@ TEST(Sync_HTTP404NotFound)
     util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
-    util::network::Endpoint endpoint = server.listen_endpoint();
+    network::Endpoint endpoint = server.listen_endpoint();
 
     ThreadWrapper server_thread;
     server_thread.start([&] {
         server.run();
     });
 
-    util::HTTPRequest request;
+    HTTPRequest request;
     request.path = "/not-found";
 
     HTTPRequestClient client(*(test_context.logger), endpoint, request);
@@ -1693,9 +1693,9 @@ TEST(Sync_HTTP404NotFound)
 
     server_thread.join();
 
-    const util::HTTPResponse& response = client.get_response();
+    const HTTPResponse& response = client.get_response();
 
-    CHECK(response.status == util::HTTPStatus::NotFound);
+    CHECK(response.status == HTTPStatus::NotFound);
     CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_VERSION_STRING);
 }
 
@@ -1704,8 +1704,8 @@ namespace {
 
 class RequestWithContentLength {
 public:
-    RequestWithContentLength(test_util::unit_test::TestContext& test_context, util::network::Service& service,
-                             const util::network::Endpoint& endpoint, const std::string& content_length,
+    RequestWithContentLength(test_util::unit_test::TestContext& test_context, network::Service& service,
+                             const network::Endpoint& endpoint, const std::string& content_length,
                              const std::string& expected_response_line)
         : test_context{test_context}
         , m_socket{service}
@@ -1751,11 +1751,11 @@ public:
 
 private:
     test_util::unit_test::TestContext& test_context;
-    util::network::Socket m_socket;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
+    network::Socket m_socket;
+    network::ReadAheadBuffer m_read_ahead_buffer;
     static constexpr size_t m_buf_size = 1000;
     char m_buffer[m_buf_size];
-    const util::network::Endpoint& m_endpoint;
+    const network::Endpoint& m_endpoint;
     const std::string m_content_length;
     std::string m_request;
     const std::string m_expected_response_line;
@@ -1780,14 +1780,14 @@ TEST(Sync_HTTP_ContentLength)
     util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
-    util::network::Endpoint endpoint = server.listen_endpoint();
+    network::Endpoint endpoint = server.listen_endpoint();
 
     ThreadWrapper server_thread;
     server_thread.start([&] {
         server.run();
     });
 
-    util::network::Service service;
+    network::Service service;
 
     RequestWithContentLength req_0(test_context, service, endpoint, "0", "HTTP/1.1 404 Not Found\r\n");
 

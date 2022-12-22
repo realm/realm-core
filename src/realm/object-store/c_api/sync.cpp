@@ -447,6 +447,15 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.user_info_map = c_user_info.data();
         c_error.user_info_length = c_user_info.size();
 
+        std::vector<realm_sync_error_compensating_write_info_t> c_compensating_writes;
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            c_compensating_writes.push_back({compensating_write.reason.c_str(),
+                                             compensating_write.object_name.c_str(),
+                                             to_capi(compensating_write.primary_key)});
+        }
+        c_error.compensating_writes = c_compensating_writes.data();
+        c_error.compensating_writes_length = c_compensating_writes.size();
+
         realm_sync_session_t c_session(session);
         handler(userdata.get(), &c_session, std::move(c_error));
     };
@@ -904,10 +913,12 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
     (*session)->revive_if_needed();
 }
 
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char* sync_path) noexcept
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        return (*app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        return true;
     });
 }
 

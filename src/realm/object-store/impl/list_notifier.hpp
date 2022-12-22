@@ -35,19 +35,17 @@ private:
     PropertyType m_type;
     std::unique_ptr<CollectionBase> m_list;
 
-    TableKey m_table;
-    ColKey m_col;
-    ObjKey m_obj;
-
-    // The last-seen size of the LinkView so that we can report row deletions
-    // when the LinkView itself is deleted
+    // The last-seen size of the collection so that when the parent of the collection
+    // is deleted we can report each row as being deleted
     size_t m_prev_size;
 
-    TransactionChangeInfo* m_info;
+    TransactionChangeInfo* m_info = nullptr;
+
+    void attach(CollectionBase const& src);
 
     void run() override;
 
-    void do_attach_to(Transaction& sg) override;
+    void reattach() override;
 
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;

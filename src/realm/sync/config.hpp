@@ -135,6 +135,7 @@ enum class SyncClientHookEvent {
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
     BootstrapProcessed,
+    ErrorMessageReceived,
 };
 
 enum class SyncClientHookAction {
@@ -149,6 +150,7 @@ struct SyncClientHookData {
     int64_t query_version;
     sync::DownloadBatchState batch_state;
     size_t num_changesets;
+    const sync::ProtocolErrorInfo* error_info = nullptr;
 };
 
 struct SyncConfig {
@@ -168,16 +170,22 @@ struct SyncConfig {
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    util::Optional<std::string> ssl_trust_certificate_path;
-    std::function<SSLVerifyCallback> ssl_verify_callback;
-    util::Optional<ProxyConfig> proxy_config;
     bool flx_sync_requested = false;
 
     // When integrating a flexible sync bootstrap, process this many bytes of changeset data in a single integration
     // attempt. This many bytes of changesets will be uncompressed and held in memory while being applied.
     size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
+    // {@
+    // The following parameters are only used by the default SyncSocket implementation. Custom SyncSocket
+    // implementations must handle these directly, if these features are supported.
+    util::Optional<std::string> authorization_header_name; // not used
+    std::map<std::string, std::string> custom_http_headers;
     bool client_validate_ssl = true;
+    util::Optional<std::string> ssl_trust_certificate_path;
+    std::function<SSLVerifyCallback> ssl_verify_callback;
+    util::Optional<ProxyConfig> proxy_config;
+    // @}
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones
     bool cancel_waits_on_nonfatal_error = false;
@@ -186,9 +194,6 @@ struct SyncConfig {
     // applying them to the Realm file. This is required when writing objects
     // directly to replication, and will break horribly otherwise
     bool apply_server_changes = true;
-
-    util::Optional<std::string> authorization_header_name;
-    std::map<std::string, std::string> custom_http_headers;
 
     // The name of the directory which Realms should be backed up to following
     // a client reset in ClientResyncMode::Manual mode
