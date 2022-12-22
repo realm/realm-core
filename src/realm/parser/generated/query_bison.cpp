@@ -1850,7 +1850,7 @@ namespace yy {
     break;
 
   case 98: // path_elem: id '[' "argument" ']'
-                                { yylhs.value.as < PathElem > () = PathElem{yystack_[3].value.as < std::string > (), drv.get_arg(yystack_[1].value.as < std::string > ())}; }
+                                { yylhs.value.as < PathElem > () = PathElem{yystack_[3].value.as < std::string > (), drv.get_arg_for_index(yystack_[1].value.as < std::string > ())}; }
     break;
 
   case 99: // id: "identifier"

@@ -1487,8 +1487,9 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
-Mixed ParserDriver::get_arg(std::string i)
+Mixed ParserDriver::get_arg_for_index(std::string i)
 {
+    REALM_ASSERT(i[0] == '$');
     size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
     if (m_args.is_argument_null(arg_no) || m_args.is_argument_list(arg_no)) {
         throw InvalidQueryError("Invalid index parameter");

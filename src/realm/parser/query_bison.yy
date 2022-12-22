@@ -327,7 +327,7 @@ path_elem
     : id                        { $$ = PathElem{$1}; }
     | id '[' NATURAL0 ']'       { $$ = PathElem{$1, int64_t(strtoll($3.c_str(), nullptr, 0))}; }
     | id '[' STRING ']'         { $$ = PathElem{$1, $3.substr(1, $3.size() - 2)}; }
-    | id '[' ARG ']'            { $$ = PathElem{$1, drv.get_arg($3)}; }
+    | id '[' ARG ']'            { $$ = PathElem{$1, drv.get_arg_for_index($3)}; }
 
 id  
     : ID                        { $$ = $1; }
