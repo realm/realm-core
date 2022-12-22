@@ -938,69 +938,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
         dict.insert(keys[i], target_obj);
     }
     r->commit_transaction();
-
-    SECTION("callback with empty keypatharray") {
-        CollectionChangeSet change;
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
-        auto shallow_require_change = [&] {
-            auto token = dict.add_notification_callback(
-                [&](CollectionChangeSet c) {
-                    change = c;
-                },
-                KeyPathArray());
-            advance_and_notify(*r);
-            return token;
-        };
-
-        auto shallow_require_no_change = [&] {
-            bool first = true;
-            auto token = dict.add_notification_callback(
-                [&first](CollectionChangeSet) mutable {
-                    REQUIRE(first);
-                    first = false;
-                },
-                KeyPathArray());
-            advance_and_notify(*r);
-            return token;
-        };
-
-        SECTION("insertion DOES send notification") {
-            auto token = shallow_require_change();
-            write([&] {
-                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
-                dict.insert("foo", target_obj);
-            });
-            REQUIRE_FALSE(change.insertions.empty());
-        }
-        SECTION("deletion DOES send notification") {
-            auto token = shallow_require_change();
-            write([&] {
-                dict.erase(keys[0]);
-            });
-            REQUIRE_FALSE(change.deletions.empty());
-        }
-        SECTION("replacement DOES send notification") {
-            auto token = shallow_require_change();
-            write([&] {
-                Obj target_obj = target->create_object().set(col_target_value, T(values[0]));
-                dict.insert(keys[0], target_obj);
-            });
-            REQUIRE_FALSE(change.modifications.empty());
-        }
-        SECTION("modification does NOT send notification") {
-            auto token = shallow_require_no_change();
-            write([&] {
-                dict.get<Obj>(keys[0]).set(col_target_value, T(values[0]));
-            });
-        }
-    }
-
     r->begin_transaction();
     SECTION("min()") {
         if (!TestType::can_minmax()) {
@@ -1410,4 +1347,86 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     auto res = dict.get_values();
     auto sum = res.sum("intCol");
     REQUIRE(*sum == 16);
+}
+
+TEST_CASE("callback with empty keypatharray") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target", {{"value", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
+
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    ColKey col_links = table->get_column_key("links");
+    ColKey col_target_value = target->get_column_key("value");
+    object_store::Dictionary dict(r, obj, col_links);
+    auto key = "key";
+    Obj target_obj = target->create_object().set(col_target_value, 1);
+    dict.insert(key, target_obj);
+    r->commit_transaction();
+
+    CollectionChangeSet change;
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
+    auto shallow_require_change = [&] {
+        auto token = dict.add_notification_callback(
+            [&](CollectionChangeSet c) {
+                change = c;
+            },
+            KeyPathArray());
+        advance_and_notify(*r);
+        return token;
+    };
+
+    auto shallow_require_no_change = [&] {
+        bool first = true;
+        auto token = dict.add_notification_callback(
+            [&first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            },
+            KeyPathArray());
+        advance_and_notify(*r);
+        return token;
+    };
+
+    SECTION("insertion DOES send notification") {
+        auto token = shallow_require_change();
+        write([&] {
+            Obj target_obj = target->create_object().set(col_target_value, 1);
+            dict.insert("foo", target_obj);
+        });
+        REQUIRE_FALSE(change.insertions.empty());
+    }
+    SECTION("deletion DOES send notification") {
+        auto token = shallow_require_change();
+        write([&] {
+            dict.erase(key);
+        });
+        REQUIRE_FALSE(change.deletions.empty());
+    }
+    SECTION("replacement DOES send notification") {
+        auto token = shallow_require_change();
+        write([&] {
+            Obj target_obj = target->create_object().set(col_target_value, 1);
+            dict.insert(key, target_obj);
+        });
+        REQUIRE_FALSE(change.modifications.empty());
+    }
+    SECTION("modification does NOT send notification") {
+        auto token = shallow_require_no_change();
+        write([&] {
+            dict.get<Obj>(key).set(col_target_value, 2);
+        });
+    }
 }
