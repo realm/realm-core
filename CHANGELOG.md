@@ -1,7 +1,6 @@
 # 13.1.0 Release notes
 
 ### Enhancements
-* Allows ignoring nested property changes when subscribing for notifications by passing an empty `key_path_array` to `add_notification_callback`. ([#6122](https://github.com/realm/realm-core/pull/6122)).
 * The choice of a faster linker will now automatically be propagated to anything that statically links against realm-core. ([#6043](https://github.com/realm/realm-core/pull/6043))
 * Replace explicit callback registration with tokens in the C API. ([#6047](https://github.com/realm/realm-core/pull/6047))
 
@@ -10,6 +9,7 @@
 * Freelist may be corrupted if compaction was initiated ([#6054](https://github.com/realm/realm-core/pull/6054), since v13.0.0)
 
 ### Breaking changes
+* Passing an empty `key_path_array` to `add_notification_callback now` now ignores nested property changes. Pass `std::nullopt` to achieve the old meaning. ([#6122](https://github.com/realm/realm-core/pull/6122))
 * Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr` ([PR #5980](https://github.com/realm/realm-core/pull/5980))
 * `util::RootLogger` has been replaced with `util::Logger`
 
