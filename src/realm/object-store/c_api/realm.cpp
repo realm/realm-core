@@ -2,6 +2,13 @@
 #include "realm.hpp"
 
 
+#if !REALM_ENABLE_SYNC
+namespace realm {
+BindingCallbackThreadObserver* g_binding_callback_thread_observer = nullptr;
+} // namespace realm
+#endif
+
+
 realm_callback_token_realm::~realm_callback_token_realm()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
