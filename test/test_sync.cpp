@@ -2996,7 +2996,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
-    client_thread.join();
 }
 
 #endif // REALM_HAVE_OPENSSL
