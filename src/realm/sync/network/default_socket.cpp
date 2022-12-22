@@ -426,9 +426,9 @@ void DefaultSocketProvider::start()
     m_stop_future = std::move(stop_pf.future);
     m_thread = std::thread{
         [this, start_promise = std::move(start_pf.promise), stop_promise = std::move(stop_pf.promise)]() mutable {
-            // The thread has started
-            start_promise.emplace_value();
             m_logger_ptr->info("Event loop thread running");
+            // The thread has started - release the main start() future
+            start_promise.emplace_value();
             auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
                 if (g_binding_callback_thread_observer) {
                     g_binding_callback_thread_observer->will_destroy_thread();
