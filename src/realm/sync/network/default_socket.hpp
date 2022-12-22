@@ -45,7 +45,7 @@ public:
     };
 
     // The current state of the event loop
-    enum State {NotStarted, Started, Running, Stopping, Stopped};
+    enum State { NotStarted, Started, Running, Stopping, Stopped };
 
     DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent);
 
@@ -103,8 +103,8 @@ private:
     const std::string m_user_agent;
     SyncTimer m_keep_running_timer;
     std::mutex m_state_mutex;
-    State m_state; // protected by m_state_mutex
-    std::thread m_thread; // protected by m_state_mutex
+    State m_state;                                   // protected by m_state_mutex
+    std::thread m_thread;                            // protected by m_state_mutex
     std::optional<util::Future<void>> m_stop_future; // protected by m_state_mutex
 };
 

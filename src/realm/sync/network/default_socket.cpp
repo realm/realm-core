@@ -374,7 +374,8 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 }
 } // namespace
 
-DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent)
+DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger,
+                                             const std::string user_agent)
     : m_logger_ptr{logger}
     , m_service{}
     , m_random{}
@@ -386,7 +387,7 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 {
     REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
     util::seed_prng_nondeterministically(m_random); // Throws
-    start_keep_running_timer(); // TODO: Update service so this timer is not needed
+    start_keep_running_timer();                     // TODO: Update service so this timer is not needed
 }
 
 DefaultSocketProvider::~DefaultSocketProvider()
@@ -423,57 +424,58 @@ void DefaultSocketProvider::start()
     auto start_pf = util::make_promise_future<void>();
     auto stop_pf = util::make_promise_future<void>();
     m_stop_future = std::move(stop_pf.future);
-    m_thread = std::thread{[this, start_promise = std::move(start_pf.promise), stop_promise = std::move(stop_pf.promise)]() mutable {
-        // The thread has started
-        start_promise.emplace_value();
-        m_logger_ptr->info("Event loop thread running");
-        auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+    m_thread = std::thread{
+        [this, start_promise = std::move(start_pf.promise), stop_promise = std::move(stop_pf.promise)]() mutable {
+            // The thread has started
+            start_promise.emplace_value();
+            m_logger_ptr->info("Event loop thread running");
+            auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+                if (g_binding_callback_thread_observer) {
+                    g_binding_callback_thread_observer->will_destroy_thread();
+                }
+                thread_update_state(Stopped);
+                stop_promise.emplace_value();
+            });
             if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->will_destroy_thread();
-            }
-            thread_update_state(Stopped);
-            stop_promise.emplace_value();
-        });
-        if (g_binding_callback_thread_observer) {
-            g_binding_callback_thread_observer->did_create_thread();
-            try {
-                {
-                    std::lock_guard<std::mutex> lock{m_state_mutex};
-                    // Was the thread stopped before we got here?
-                    if (m_state != Started) {
-                        m_logger_ptr->info("Event loop thread early exit");
-                        return;
+                g_binding_callback_thread_observer->did_create_thread();
+                try {
+                    {
+                        std::lock_guard<std::mutex> lock{m_state_mutex};
+                        // Was the thread stopped before we got here?
+                        if (m_state != Started) {
+                            m_logger_ptr->info("Event loop thread early exit");
+                            return;
+                        }
+                        m_state = Running;
                     }
-                    m_state = Running;
+                    m_service.run(); // Throws
                 }
-                m_service.run(); // Throws
+                catch (const std::exception& e) {
+                    m_logger_ptr->error("Event loop exception: ", e.what());
+                    g_binding_callback_thread_observer->handle_error(e);
+                    throw;
+                }
             }
-            catch (const std::exception& e) {
-                m_logger_ptr->error("Event loop exception: ", e.what());
-                g_binding_callback_thread_observer->handle_error(e);
-                throw;
-            }
-        }
-        else {
-            try {
-                {
-                    std::lock_guard<std::mutex> lock{m_state_mutex};
-                    // Was the thread stopped before we got here?
-                    if (m_state != Started) {
-                        m_logger_ptr->info("Event loop thread early exit");
-                        return;
+            else {
+                try {
+                    {
+                        std::lock_guard<std::mutex> lock{m_state_mutex};
+                        // Was the thread stopped before we got here?
+                        if (m_state != Started) {
+                            m_logger_ptr->info("Event loop thread early exit");
+                            return;
+                        }
+                        m_state = Running;
                     }
-                    m_state = Running;
+                    m_service.run(); // Throws
                 }
-                m_service.run(); // Throws
+                catch (const std::exception& e) {
+                    m_logger_ptr->error("Event loop exception: ", e.what());
+                    throw;
+                }
             }
-            catch (const std::exception& e) {
-                m_logger_ptr->error("Event loop exception: ", e.what());
-                throw;
-            }
-        }
-        m_logger_ptr->info("Event loop thread exiting");
-    }};
+            m_logger_ptr->info("Event loop thread exiting");
+        }};
     // Wait for the thread to start before continuing
     start_pf.future.get();
 }

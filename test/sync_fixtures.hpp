@@ -842,7 +842,7 @@ private:
             // If we're using a simulated failure, post it onto the event loop
             client.post_for_testing([sim = m_simulated_client_error_rates[i]](Status) {
                 sf::prime_random(sf::sync_client__read_head, sim.first, sim.second,
-                                random_int<uint_fast64_t>()); // Seed from global generator
+                                 random_int<uint_fast64_t>()); // Seed from global generator
             });
         }
         client.run();
