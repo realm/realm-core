@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
 
 #include "table.hpp"
 #include "cuckoo.hpp"
@@ -511,7 +512,8 @@ void Object::set(Field<String> f, std::string value) {
     if (f.key != table->fields[idx].key)
         throw std::runtime_error("Stale or invalid field specifier");
     _String s = ::get<_String>(mem, cluster->entries[idx], index);
-    uint64_t limit = value.size();
+    // hack - just limit to 250 chars
+    uint64_t limit = std::min(250UL, value.size());
     s.set_size(mem, limit);
     for (uint64_t k = 0; k < limit; ++k) s.set(mem, k, value[k]);
     ::set<_String>(mem, cluster->entries[idx], index, s, size);

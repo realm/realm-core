@@ -31,11 +31,11 @@ run: test
 
 perf: test_perf
 	rm -f perf.core2
-	./test_perf
+	./test_perf /home/finn/Downloads/hits.tsv
 
 lib: libstorage.a
 
-libstorage.a: $(OBJS)
+libstorage.a: $(OBJS) Makefile
 	ar rcs libstorage.a $(OBJS)
 
 $(OBJS): Makefile
