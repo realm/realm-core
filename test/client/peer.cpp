@@ -84,7 +84,7 @@ Peer::Error map_error(std::error_code ec) noexcept
         }
         return Peer::Error::system_other;
     }
-    if (category == sync::network::resolve_error_category) {
+    if (category == sync::network::resolve_error_category()) {
         using sync::network::ResolveErrors;
         switch (ResolveErrors(ec.value())) {
             case ResolveErrors::host_not_found:
