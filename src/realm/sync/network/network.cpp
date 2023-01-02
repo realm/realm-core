@@ -2576,34 +2576,44 @@ Address make_address(const char* c_str, std::error_code& ec) noexcept
     */
 }
 
+class ResolveErrorCategory : public std::error_category {
+public:
+    const char* name() const noexcept final
+    {
+        return "realm.sync.network.resolve";
+    }
 
-ResolveErrorCategory resolve_error_category;
+    std::string message(int value) const final
+    {
+        switch (ResolveErrors(value)) {
+            case ResolveErrors::host_not_found:
+                return "Host not found (authoritative)";
+            case ResolveErrors::host_not_found_try_again:
+                return "Host not found (non-authoritative)";
+            case ResolveErrors::no_data:
+                return "The query is valid but does not have associated address data";
+            case ResolveErrors::no_recovery:
+                return "A non-recoverable error occurred";
+            case ResolveErrors::service_not_found:
+                return "The service is not supported for the given socket type";
+            case ResolveErrors::socket_type_not_supported:
+                return "The socket type is not supported";
+        }
+        REALM_ASSERT(false);
+        return {};
+    }
+};
 
+ResolveErrorCategory g_resolve_error_category;
 
-const char* ResolveErrorCategory::name() const noexcept
+const std::error_category& resolve_error_category() noexcept
 {
-    return "realm.util.network.resolve";
+    return g_resolve_error_category;
 }
 
-
-std::string ResolveErrorCategory::message(int value) const
+std::error_code make_error_code(ResolveErrors err)
 {
-    switch (ResolveErrors(value)) {
-        case ResolveErrors::host_not_found:
-            return "Host not found (authoritative)";
-        case ResolveErrors::host_not_found_try_again:
-            return "Host not found (non-authoritative)";
-        case ResolveErrors::no_data:
-            return "The query is valid but does not have associated address data";
-        case ResolveErrors::no_recovery:
-            return "A non-recoverable error occurred";
-        case ResolveErrors::service_not_found:
-            return "The service is not supported for the given socket type";
-        case ResolveErrors::socket_type_not_supported:
-            return "The socket type is not supported";
-    }
-    REALM_ASSERT(false);
-    return {};
+    return std::error_code(int(err), g_resolve_error_category);
 }
 
 } // namespace realm::sync::network

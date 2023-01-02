@@ -457,6 +457,8 @@ static inline realm_version_id_t to_capi(const VersionID& v)
     return version_id;
 }
 
+realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message);
+
 } // namespace realm::c_api
 
 

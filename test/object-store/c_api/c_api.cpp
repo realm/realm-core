@@ -3,6 +3,7 @@
 #include <realm.h>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/util/base64.hpp>
 
@@ -23,6 +24,9 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #endif
@@ -620,6 +624,40 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(!error);
         });
     }
+
+    SECTION("realm_sync_error_code to_capi()") {
+        using namespace realm::sync;
+        std::string message;
+
+        std::error_code error_code = make_error_code(sync::ClientError::connection_closed);
+        realm_sync_error_code_t error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
+        CHECK(error.value == int(error_code.value()));
+        CHECK(error_code.message() == error.message);
+        CHECK(message == error.message);
+
+        error_code = make_error_code(sync::ProtocolError::connection_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
+
+        error_code = make_error_code(sync::ProtocolError::session_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
+
+        error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
+
+        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+
+        error_code = make_error_code(util::error::misc_errors::unknown);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
+    }
+
+
 #endif // REALM_ENABLE_AUTH_TESTS
 }
 
