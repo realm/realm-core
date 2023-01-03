@@ -198,6 +198,13 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
             if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
                 return; // this response came in after the app shut down, ignore it
             }
+            else if (error->error_code == app::make_client_error_code(app::ClientErrorCode::too_many_redirects) ||
+                     (error->http_status_code &&
+                      (*error->http_status_code == 301 || *error->http_status_code == 308))) {
+                // The server has been moved and the redirected location cannot be reached
+                session->handle_bad_auth(session_user, error->error_code,
+                                         "Unabled to refresh access token due to invalid redirect.");
+            }
             else if (error->error_code.category() == app::client_error_category()) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server

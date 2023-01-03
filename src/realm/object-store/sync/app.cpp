@@ -928,7 +928,8 @@ void App::handle_possible_redirect_response(Request&& request, const Response& r
                                             UniqueFunction<void(const Response&)>&& completion)
 {
     // If the response contains a redirection, then process it
-    if (sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::MovedPermanently) {
+    if (sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::MovedPermanently ||
+        sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::PermanentRedirect) {
         handle_redirect_response(std::move(request), response, std::move(completion));
     }
     else {
