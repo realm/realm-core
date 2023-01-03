@@ -1353,13 +1353,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             cur_freelist_versions(*this);
         load_array(top_array, read_lock.top_ref, read_lock);
         static_assert(Group::s_free_pos_ndx < Group::s_free_size_ndx, "use the lowest index");
-        if (top_array.size() < Group::s_version_ndx || top_array.size() <= Group::s_free_pos_ndx) {
-            // a file on streaming format may not contain versioning info or a freelist
+        if (top_array.size() <= Group::s_free_pos_ndx) {
+            // a file on streaming format does not contain a freelist
             continue;
         }
         auto actual_version = top_array.get_as_ref_or_tagged(Group::s_version_ndx).get_as_int();
         REALM_ASSERT_EX(actual_version == read_lock.version, actual_version, read_lock.version, read_lock.top_ref);
-        REALM_ASSERT_EX(top_array.size() > Group::s_free_size_ndx, top_array.size(), Group::s_free_size_ndx,
+        REALM_ASSERT_EX(top_array.size() > Group::s_free_version_ndx, top_array.size(), Group::s_free_version_ndx,
                         read_lock.top_ref, read_lock.version);
 
         const ref_type free_positions_ref = top_array.get_as_ref(Group::s_free_pos_ndx);
