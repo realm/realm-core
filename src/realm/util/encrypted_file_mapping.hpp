@@ -110,11 +110,10 @@ private:
 
     enum PageState {
         Clean = 0,
-        Touched = 1,         // a ref->ptr translation has taken place
-        UpToDate = 2,        // the page is fully up to date
-        RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8,           // the page has been modified with respect to what's on file.
-        Writable = 16        // the page is open for writing
+        Touched = 1,  // a ref->ptr translation has taken place
+        UpToDate = 2, // the page is fully up to date
+        Writable = 4, // the page is open for writing
+        Dirty = 8     // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
