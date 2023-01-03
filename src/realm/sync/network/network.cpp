@@ -2604,16 +2604,15 @@ public:
     }
 };
 
-ResolveErrorCategory g_resolve_error_category;
-
 const std::error_category& resolve_error_category() noexcept
 {
-    return g_resolve_error_category;
+    static const ResolveErrorCategory resolve_error_category;
+    return resolve_error_category;
 }
 
 std::error_code make_error_code(ResolveErrors err)
 {
-    return std::error_code(int(err), g_resolve_error_category);
+    return std::error_code(int(err), resolve_error_category());
 }
 
 } // namespace realm::sync::network
