@@ -185,6 +185,24 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
     }
 }
 
+static bool check_for_auth_failure(const app::AppError& error)
+{
+    // Auth failure is returned as a 401 (unauthorized) or 403 (forbidden) response
+    if (error.http_status_code && (*error.http_status_code == 401 || *error.http_status_code == 403))
+        return true;
+
+    return false;
+}
+
+static bool check_for_redirect_response(const app::AppError& error)
+{
+    // Check for unhandled 301/308 redirect response
+    if (error.http_status_code && (*error.http_status_code == 301 || *error.http_status_code == 308))
+        return true;
+
+    return false;
+}
+
 util::UniqueFunction<void(util::Optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
 {
@@ -198,25 +216,25 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
             if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
                 return; // this response came in after the app shut down, ignore it
             }
-            else if (error->error_code == app::make_client_error_code(app::ClientErrorCode::too_many_redirects) ||
-                     (error->http_status_code &&
-                      (*error->http_status_code == 301 || *error->http_status_code == 308))) {
-                // The server has been moved and the redirected location cannot be reached
-                session->handle_bad_auth(session_user, error->error_code,
-                                         "Unabled to refresh access token due to invalid redirect.");
-            }
             else if (error->error_code.category() == app::client_error_category()) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
-                // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in
+                // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
+                // ClientErrorCode::too_many_redirects
                 session->handle_bad_auth(session_user, error->error_code, error->message);
             }
-            else if (error->http_status_code &&
-                     (*error->http_status_code == 401 || *error->http_status_code == 403)) {
+            else if (check_for_auth_failure(*error)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
                 session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
+            }
+            else if (check_for_redirect_response(*error)) {
+                // A 301 or 308 response is an unhandled permanent redirect response (which should not happen) - if
+                // this is received, fail the request with an appropriate error message.
+                // Temporary redirect responses (302, 307) are not supported
+                session->handle_bad_auth(session_user, error->error_code,
+                                         "Unhandled redirect response when trying to reach the server.");
             }
             else {
                 // A refresh request has failed. This is an unexpected non-fatal error and we would
