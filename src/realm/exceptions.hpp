@@ -304,10 +304,10 @@ struct MigrationFailed : LogicError {
     ~MigrationFailed() noexcept override;
 };
 
-struct ObjectAlreadyExists : RuntimeError {
+struct ObjectAlreadyExists : InvalidArgument {
     template <class T, class U>
     ObjectAlreadyExists(const U& object_type, T pk_val)
-        : RuntimeError(
+        : InvalidArgument(
               ErrorCodes::ObjectAlreadyExists,
               util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'",
                            object_type, pk_val))

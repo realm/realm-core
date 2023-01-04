@@ -41,7 +41,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case MultipleSyncAgents:
         case NoSubscriptionForWrite:
         case NotCloneable:
-        case ObjectAlreadyExists:
         case OutOfDiskSpace:
         case OutOfMemory:
         case RangeError:
@@ -70,8 +69,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BrokenPromise:
         case ClosedRealm:
         case CrossTableLinkTarget:
-        case IllegalOperation:
-        case InvalidQuery:
+        case IllegalOperation: // TODO problematic sometimes we like it to be illegal argument
         case InvalidSchemaChange:
         case InvalidSchemaVersion:
         case InvalidTableRef:
@@ -90,6 +88,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case WrongTransactionState:
             return ErrorCategory().set(ErrorCategory::logic_error);
 
+
+        case InvalidQuery:
+        case ObjectAlreadyExists:
         case BadServerUrl:
         case IllegalCombination:
         case InvalidArgument:
