@@ -1648,7 +1648,7 @@ public:
         auto& alloc = m_db.m_alloc;
         while (m_should_run) {
             // wait for change
-            bool changed = m_db.wait_for_change_internal(m_should_run);
+            bool changed = m_db.wait_for_change_internal();
             if (!m_should_run)
                 break;
             REALM_ASSERT(changed);
@@ -1662,6 +1662,7 @@ public:
     void start()
     {
         m_should_run = true;
+        m_db.enable_wait_for_change_internal();
         m_thread = std::thread([this]() {
             main();
         });
@@ -1671,7 +1672,7 @@ public:
         if (!m_should_run)
             return;
         m_should_run = false;
-        m_db.wake_wait_for_change();
+        m_db.wait_for_change_internal_release();
         m_thread.join();
     }
 
@@ -1945,13 +1946,14 @@ void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
     m_commit_helper->sync_to_disk(std::move(fn));
 }
 
-void DB::wake_wait_for_change()
+void DB::wait_for_change_internal_release()
 {
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+    m_wait_for_change_internal_enabled = false;
     m_new_commit_available.notify_all();
 }
 
-bool DB::wait_for_change_internal(std::atomic<bool>& wait_enabled)
+bool DB::wait_for_change_internal()
 {
     if (!m_last_encryption_page_reader) {
         return true;
@@ -1959,7 +1961,7 @@ bool DB::wait_for_change_internal(std::atomic<bool>& wait_enabled)
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     while (m_last_encryption_page_reader->m_version == info->latest_version_number &&
-           wait_enabled.load(std::memory_order_relaxed)) {
+           m_wait_for_change_internal_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
     return m_last_encryption_page_reader->m_version != info->latest_version_number;
@@ -2000,6 +2002,13 @@ void DB::enable_wait_for_change()
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
+}
+
+void DB::enable_wait_for_change_internal()
+{
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+    m_wait_for_change_internal_enabled = true;
 }
 
 void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,

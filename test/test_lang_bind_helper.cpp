@@ -3427,6 +3427,7 @@ ONLY(LangBindHelper_ImplicitTransactions_InterProcess)
         REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
             {
+                util::format(std::cout, "Reader[%1](%2) starting.\n", getpid(), i);
                 std::unique_ptr<Replication> hist(make_in_realm_history());
                 DBRef sg = DB::create(*hist, path, DBOptions(key));
                 multiple_trackers_reader_thread(test_context, sg);
