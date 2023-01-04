@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -241,7 +242,7 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Un
 
 } // namespace
 
-static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
+realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
 
@@ -268,6 +269,9 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     }
     else if (category == std::system_category() || category == *realm_basic_system_category) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
+    }
+    else if (category == realm::sync::network::resolve_error_category()) {
+        ret.category = RLM_SYNC_ERROR_CATEGORY_RESOLVE;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;

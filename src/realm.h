@@ -3411,6 +3411,7 @@ typedef enum realm_sync_error_category {
     RLM_SYNC_ERROR_CATEGORY_CLIENT,
     RLM_SYNC_ERROR_CATEGORY_CONNECTION,
     RLM_SYNC_ERROR_CATEGORY_SESSION,
+    RLM_SYNC_ERROR_CATEGORY_RESOLVE,
 
     /**
      * System error - POSIX errno, Win32 HRESULT, etc.
