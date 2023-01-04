@@ -30,6 +30,7 @@
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/network/http.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -187,18 +188,26 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
 
 static bool check_for_auth_failure(const app::AppError& error)
 {
+    using namespace realm::sync;
     // Auth failure is returned as a 401 (unauthorized) or 403 (forbidden) response
-    if (error.http_status_code && (*error.http_status_code == 401 || *error.http_status_code == 403))
-        return true;
+    if (error.http_status_code) {
+        auto status_code = HTTPStatus(*error.http_status_code);
+        if (status_code == HTTPStatus::Unauthorized || status_code == HTTPStatus::Forbidden)
+            return true;
+    }
 
     return false;
 }
 
 static bool check_for_redirect_response(const app::AppError& error)
 {
-    // Check for unhandled 301/308 redirect response
-    if (error.http_status_code && (*error.http_status_code == 301 || *error.http_status_code == 308))
-        return true;
+    using namespace realm::sync;
+    // Check for unhandled 301/308 permanent redirect response
+    if (error.http_status_code) {
+        auto status_code = HTTPStatus(*error.http_status_code);
+        if (status_code == HTTPStatus::MovedPermanently || status_code == HTTPStatus::PermanentRedirect)
+            return true;
+    }
 
     return false;
 }
