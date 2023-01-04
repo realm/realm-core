@@ -405,7 +405,48 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         ++after_reset_count;
     };
 
-    SECTION("Recover: offline writes and subscriptions") {
+    SECTION("Recover: offline writes and subscription (single subscription)") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                // add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+                add_object(local_realm, str_field_value, local_added_int);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto subs = local_realm->get_latest_subscription_set();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                // make sure that the subscription for "foo" survived the reset
+                size_t count_of_foo = count_queries_with_str(subs, util::format("\"%1\"", str_field_value));
+                REQUIRE(subs.state() == sync::SubscriptionSet::State::Complete);
+                REQUIRE(count_of_foo == 1);
+                local_realm->refresh();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto str_col = table->get_column_key("queryable_str_field");
+                auto int_col = table->get_column_key("queryable_int_field");
+                auto tv = table->where().equal(str_col, StringData(str_field_value)).find_all();
+                tv.sort(int_col);
+                // the object we created while offline was recovered, and the remote object was downloaded
+                REQUIRE(tv.size() == 2);
+                CHECK(tv.get_object(0).get<Int>(int_col) == local_added_int);
+                CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
+            })
+            ->run();
+    }
+
+    SECTION("Recover: offline writes and subscriptions (multiple subscriptions)") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;

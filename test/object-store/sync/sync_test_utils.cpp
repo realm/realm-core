@@ -21,6 +21,7 @@
 #include "util/baas_admin_api.hpp"
 
 #include <realm/object-store/object_store.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
@@ -517,26 +518,33 @@ struct BaasFLXClientReset : public TestClientReset {
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
+        const ObjectId pk_of_added_object = ObjectId::gen();
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
-        const ObjectId pk_of_added_object("123456789000000000000000");
-        {
-            if (m_on_setup) {
-                m_on_setup(realm);
-            }
-            constexpr bool create_object = true;
-            subscribe_to_object_by_id(realm, pk_of_added_object, create_object);
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
 
-            wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
-                                       std::string(c_object_schema_name),
-                                       {{std::string(c_id_col_name), pk_of_added_object}});
-            session->log_out();
+        auto table = realm->read_group().get_table(ObjectStore::table_name_for_object_type(c_object_schema_name));
+        REALM_ASSERT(table);
+        mut_subs.insert_or_assign(Query(table));
+        auto subs = std::move(mut_subs).commit();
+        realm->begin_transaction();
+        CppContext c(realm);
+        int64_t r1 = random_int();
+        int64_t r2 = random_int();
+        int64_t r3 = random_int();
+        int64_t sum = uint64_t(r1) + r2 + r3;
 
-            if (m_make_local_changes) {
-                m_make_local_changes(realm);
-            }
-        }
+        Object::create(c, realm, c_object_schema_name,
+                       std::any(AnyDict{{std::string{c_id_col_name}, pk_of_added_object},
+                                        {std::string{c_str_col_name}, std::string{"initial value"}},
+                                        {"list_of_ints_field", std::vector<std::any>{r1, r2, r3}},
+                                        {"sum_of_list_field", sum}}));
+
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        session->log_out();
 
         // cause a client reset by restarting the sync service
         // this causes the server's sync history to be resynthesized
