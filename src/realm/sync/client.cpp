@@ -1059,7 +1059,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
     }
 
     auto self = util::bind_ptr<SessionWrapper>(this);
-    m_client.get_service().post([new_version, self = std::move(self)](Status status) {
+    m_client.post([new_version, self = std::move(self)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
