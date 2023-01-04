@@ -35,6 +35,7 @@
 * Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
 * Improve detection of Windows target architecture when downloading prebuild dependencies. ([#6135](https://github.com/realm/realm-core/issues/6135))
 * App services request ID now logged at info level when sync client connects ([#6143](https://github.com/realm/realm-core/pull/6143]))
+* Add c_api error category for resolve errors instead of reporting unknown category. ([PR #6157](https://github.com/realm/realm-core/pull/6157))
 
 ----------------------------------------------
 

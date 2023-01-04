@@ -57,7 +57,7 @@ public:
 };
 
 /// The error category associated with \ref Errors. The name of this category is
-/// `realm.util.network.ssl`.
+/// `realm.sync.network.ssl`.
 extern ErrorCategory error_category;
 
 inline std::error_code make_error_code(Errors err)

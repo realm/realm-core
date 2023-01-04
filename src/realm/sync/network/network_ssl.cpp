@@ -162,7 +162,7 @@ ErrorCategory error_category;
 
 const char* ErrorCategory::name() const noexcept
 {
-    return "realm.util.network.ssl";
+    return "realm.sync.network.ssl";
 }
 
 
