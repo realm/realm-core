@@ -649,9 +649,8 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
             }
         }
     }
-    if (is_not(m_page_state[local_page_ndx], UpToDate | RefetchRequired))
+    if (is_not(m_page_state[local_page_ndx], UpToDate))
         m_num_decrypted++;
-    clear(m_page_state[local_page_ndx], RefetchRequired);
     set(m_page_state[local_page_ndx], UpToDate);
 }
 
@@ -689,7 +688,6 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
                     // Are a/b/c fullfilled?  Are they sufficient?
                     if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
                         clear(m->m_page_state[local_page_ndx], UpToDate);
-                        set(m->m_page_state[local_page_ndx], RefetchRequired);
                     }
                 }
             }
@@ -815,9 +813,9 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 
     auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
         PageState& ps = m_page_state[page_ndx];
-        if (is(ps, UpToDate | RefetchRequired)) {
+        if (is(ps, UpToDate)) {
             if (is_not(ps, Touched) && is_not(ps, Dirty) && is_not(ps, Writable)) {
-                clear(ps, UpToDate | RefetchRequired);
+                clear(ps, UpToDate);
                 reclaim_page(page_ndx);
                 m_num_decrypted--;
                 done_some_work();

@@ -470,6 +470,7 @@ TEST(Alloc_EncryptionPageRefresher)
     constexpr size_t top_array_size = 12;         // s_group_max_size
     constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
     constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
+    constexpr size_t top_array_free_versions_ndx = 5; // s_free_version_ndx
     constexpr size_t top_array_version_ndx = 6;   // s_version_ndx
 
     enum class RefsType { Allocations, Freelists };
@@ -512,12 +513,16 @@ TEST(Alloc_EncryptionPageRefresher)
         free_positions.create(Node::Type::type_Normal, context_flag, free_space.size(), 0);
         Array free_sizes(alloc);
         free_sizes.create(Node::Type::type_Normal, context_flag, free_space.size(), 0);
+        Array free_versions(alloc);
+        free_versions.create(Node::Type::type_Normal, context_flag, free_space.size(), 0);
         for (size_t i = 0; i < free_space.size(); ++i) {
             free_positions.set(i, free_space[i].begin);
             free_sizes.set(i, free_space[i].end - free_space[i].begin);
+            free_versions.set(i, version);
         }
         top.set_as_ref(top_array_free_pos_ndx, free_positions.get_ref());
         top.set_as_ref(top_array_free_size_ndx, free_sizes.get_ref());
+        top.set_as_ref(top_array_free_versions_ndx, free_versions.get_ref());
         top.set(top_array_version_ndx, RefOrTagged::make_tagged(version));
     };
     auto add_expected_refreshes_for_arrays = [](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
@@ -530,17 +535,20 @@ TEST(Alloc_EncryptionPageRefresher)
             }
             // all top refs up to the max top ref size
             to_refresh.push_back({v.top_ref, v.top_ref + Array::header_size});
-            // the ref + header size of free_pos and free_size
-            Array top(alloc), pos(alloc), sizes(alloc);
+            // the ref + header size of free_pos, free_sizes, and free_versions
+            Array top(alloc), pos(alloc), sizes(alloc), versions(alloc);
             top.init_from_ref(v.top_ref);
             to_refresh.push_back({top.get_ref(), top.get_ref() + top.get_byte_size()});
             pos.init_from_ref(top.get_as_ref(top_array_free_pos_ndx));
             sizes.init_from_ref(top.get_as_ref(top_array_free_size_ndx));
+            versions.init_from_ref(top.get_as_ref(top_array_free_versions_ndx));
             to_refresh.push_back({pos.get_ref(), pos.get_ref() + Array::header_size});
             to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + Array::header_size});
-            // now the full size of pos and size
+            to_refresh.push_back({versions.get_ref(), versions.get_ref() + Array::header_size});
+            // now the full size of pos, size, and versions
             to_refresh.push_back({pos.get_ref(), pos.get_ref() + pos.get_byte_size()});
             to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + sizes.get_byte_size()});
+            to_refresh.push_back({versions.get_ref(), versions.get_ref() + versions.get_byte_size()});
         }
     };
 
@@ -562,9 +570,15 @@ TEST(Alloc_EncryptionPageRefresher)
             actual_allocations.insert(actual_allocations.end(), allocs.begin(), allocs.end());
         });
         std::sort(actual_allocations.begin(), actual_allocations.end(), [](const RefRange& a, const RefRange& b) {
+            if (a.begin == b.begin) {
+                return a.end < b.end;
+            }
             return a.begin < b.begin;
         });
         std::sort(expected_diffs.begin(), expected_diffs.end(), [](const RefRange& a, const RefRange& b) {
+            if (a.begin == b.begin) {
+                return a.end < b.end;
+            }
             return a.begin < b.begin;
         });
         CHECK_EQUAL(actual_allocations.size(), expected_diffs.size());
