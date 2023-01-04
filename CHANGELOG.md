@@ -15,6 +15,7 @@
 * Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
 * Core should not alter the order of the properties for additive schemas. ([#6134](https://github.com/realm/realm-core/issues/6134))
 * Core should not use the version passed in `Realm` constructor to load the schema at some particular version, but only for setting `m_frozen_version`.
+* Fixed possible segfault in sync client where async callback was using object after being deallocated ([#6053](https://github.com/realm/realm-core/issues/6053), since v11.7.0)
  
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
