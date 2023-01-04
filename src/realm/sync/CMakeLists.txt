@@ -55,6 +55,7 @@ set(SYNC_INSTALL_HEADERS
 )
 
 set(NOINST_HEADERS
+    trigger.hpp
     network/default_socket.hpp
     network/network.hpp
     network/network_ssl.hpp

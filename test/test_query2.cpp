@@ -5882,6 +5882,7 @@ TEST(Query_FullText)
 
     // Create the fulltext index
     table->add_fulltext_index(col);
+    CHECK_EQUAL(table->search_index_type(col), IndexType::Fulltext);
 
     table->create_object().set(col, "Alle elsker John");
     table->create_object().set(col, "Johns ven kender John godt");

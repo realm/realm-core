@@ -731,17 +731,16 @@ TEST(Util_Network_SSL_StressTest)
         network::DeadlineTimer write_timer{service};
         bool read_done = false, write_done = false;
         UniqueFunction<void()> shedule_cancellation = [&] {
-            auto handler = [&](std::error_code ec) {
-                REALM_ASSERT(!ec || ec == error::operation_aborted);
-                if (ec == error::operation_aborted)
+            cancellation_timer.async_wait(std::chrono::microseconds(10), [&](Status status) {
+                REALM_ASSERT(status.is_ok() || status == ErrorCodes::OperationAborted);
+                if (status == ErrorCodes::OperationAborted)
                     return;
                 if (read_done && write_done)
                     return;
                 ssl_stream.lowest_layer().cancel();
                 ++stats.num_cancellations;
                 shedule_cancellation();
-            };
-            cancellation_timer.async_wait(std::chrono::microseconds(10), std::move(handler));
+            });
         };
         //        shedule_cancellation();
         char* read_begin = read_buffer.get();
@@ -772,11 +771,10 @@ TEST(Util_Network_SSL_StressTest)
                     read_begin += n;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    read_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         read();
-                    };
-                    read_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     read();
@@ -817,11 +815,10 @@ TEST(Util_Network_SSL_StressTest)
                     write_begin += n;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    write_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         write();
-                    };
-                    write_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     write();

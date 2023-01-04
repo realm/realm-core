@@ -330,17 +330,48 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* co
 
 RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform) noexcept
 {
-    config->platform = std::string(platform);
+    config->device_info.platform = std::string(platform);
 }
 
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version) noexcept
 {
-    config->platform_version = std::string(platform_version);
+    config->device_info.platform_version = std::string(platform_version);
 }
 
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const char* sdk_version) noexcept
 {
-    config->sdk_version = std::string(sdk_version);
+    config->device_info.sdk_version = std::string(sdk_version);
+}
+
+RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) noexcept
+{
+    config->device_info.sdk = std::string(sdk);
+}
+
+RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) noexcept
+{
+    config->device_info.cpu_arch = std::string(cpu_arch);
+}
+
+RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) noexcept
+{
+    config->device_info.device_name = std::string(device_name);
+}
+
+RLM_API void realm_app_config_set_device_version(realm_app_config_t* config, const char* device_version) noexcept
+{
+    config->device_info.device_version = std::string(device_version);
+}
+
+RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config, const char* framework_name) noexcept
+{
+    config->device_info.framework_name = std::string(framework_name);
+}
+
+RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
+                                                    const char* framework_version) noexcept
+{
+    config->device_info.framework_version = std::string(framework_version);
 }
 
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t* app_credentials) noexcept

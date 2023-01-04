@@ -2007,23 +2007,6 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
-static void set_app_config_defaults(app::App::Config& app_config,
-                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
-{
-    if (!app_config.transport)
-        app_config.transport = transport;
-    if (app_config.platform.empty())
-        app_config.platform = "Object Store Test Platform";
-    if (app_config.platform_version.empty())
-        app_config.platform_version = "Object Store Test Platform Version";
-    if (app_config.sdk_version.empty())
-        app_config.sdk_version = "SDK Version";
-    if (app_config.app_id.empty())
-        app_config.app_id = "app_id";
-    if (!app_config.local_app_version)
-        app_config.local_app_version.emplace("A Local App Version");
-}
-
 TEST_CASE("app: sync integration", "[sync][app]") {
     auto logger = std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
@@ -3240,7 +3223,13 @@ private:
                                 {"appVersion", "A Local App Version"},
                                 {"platform", "Object Store Test Platform"},
                                 {"platformVersion", "Object Store Test Platform Version"},
+                                {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
+                                {"cpuArch", "CPU Arch"},
+                                {"deviceName", "Device Name"},
+                                {"deviceVersion", "Device Version"},
+                                {"frameworkName", "Framework Name"},
+                                {"frameworkVersion", "Framework Version"},
                                 {"coreVersion", REALM_VERSION_STRING}}}}));
 
         CHECK(request.timeout_ms == 60000);

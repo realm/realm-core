@@ -25,6 +25,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/trigger.hpp>
 
 
 namespace realm {
@@ -132,6 +133,16 @@ public:
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
+
+    // Functions to post onto the event loop and create an event loop timer using the
+    // SyncSocketProvider
+    void post(SyncSocketProvider::FunctionHandler&& handler);
+    SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
+                                               SyncSocketProvider::FunctionHandler&& handler);
+    using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
+    SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
+
+    // TODO: This function will be removed once the event loop is integrated
     network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
@@ -158,15 +169,16 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    network::Service m_service;
-    std::mt19937_64 m_random;
-    websocket::EZSocketFactory m_socket_factory;
+    // This will be updated to the SyncSocketProvider interface once the integration is complete
+    std::shared_ptr<websocket::DefaultSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
-
     const bool m_one_connection_per_session;
-    network::Trigger m_actualize_and_finalize;
-    network::DeadlineTimer m_keep_running_timer;
+
+    // TODO: m_service will be removed once the event loop is integrated
+    network::Service& m_service;
+    std::mt19937_64 m_random;
+    SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
     // session_multiplex_ident), and it survives from one connection object to
@@ -218,7 +230,6 @@ private:
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
 
-    void start_keep_running_timer();
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
     void actualize_and_finalize_session_wrappers();
@@ -301,6 +312,8 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
+
+// TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
 class ClientImpl::Connection final : public websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
@@ -430,10 +443,10 @@ private:
     std::string get_http_request_path() const;
 
     void initiate_reconnect_wait();
-    void handle_reconnect_wait(std::error_code);
+    void handle_reconnect_wait(Status status);
     void initiate_reconnect();
     void initiate_connect_wait();
-    void handle_connect_wait(std::error_code);
+    void handle_connect_wait(Status status);
 
     void handle_connection_established();
     void schedule_urgent_ping();
@@ -449,7 +462,7 @@ private:
     void handle_write_ping();
     void handle_message_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
-    void handle_disconnect_wait(std::error_code);
+    void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_missing_protocol_feature();
@@ -489,7 +502,8 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<websocket::EZSocket> m_websocket;
+    // TODO: This will be updated to WebSocketInterface once the WebSocket integration is complete
+    std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -506,7 +520,7 @@ private:
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
-    network::Trigger m_on_idle;
+    ClientImpl::SyncTrigger m_on_idle;
 
     // activate() has been called
     bool m_activated = false;
@@ -545,16 +559,16 @@ private:
     // before the completion handler of the previous canceled wait operation
     // starts executing. Such an overlap is not allowed for wait operations on
     // the same timer instance.
-    util::Optional<network::DeadlineTimer> m_reconnect_disconnect_timer;
+    SyncSocketProvider::SyncTimer m_reconnect_disconnect_timer;
 
     // Timer for connect operation watchdog. For why this timer is optional, see
     // `m_reconnect_disconnect_timer`.
-    util::Optional<network::DeadlineTimer> m_connect_timer;
+    SyncSocketProvider::SyncTimer m_connect_timer;
 
     // This timer is used to schedule the sending of PING messages, and as a
     // watchdog for timely reception of PONG messages. For why this timer is
     // optional, see `m_reconnect_disconnect_timer`.
-    util::Optional<network::DeadlineTimer> m_heartbeat_timer;
+    SyncSocketProvider::SyncTimer m_heartbeat_timer;
 
     milliseconds_type m_pong_wait_started_at = 0;
     milliseconds_type m_last_ping_sent_at = 0;
@@ -906,7 +920,7 @@ private:
 
     bool m_suspended = false;
 
-    util::Optional<network::DeadlineTimer> m_try_again_activation_timer;
+    SyncSocketProvider::SyncTimer m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
     util::Optional<ProtocolError> m_try_again_error_code;
     util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
@@ -1129,6 +1143,8 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
+
+// TODO: This function will be removed once the event loop is integrated
 inline network::Service& ClientImpl::get_service() noexcept
 {
     return m_service;
@@ -1209,15 +1225,16 @@ inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInf
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
 {
+    REALM_ASSERT(m_on_idle);
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
     }
 }
