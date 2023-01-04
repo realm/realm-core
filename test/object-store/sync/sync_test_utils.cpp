@@ -358,7 +358,7 @@ static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const App
             });
             return pf.future.get() > 0;
         },
-        std::chrono::minutes(15), std::chrono::milliseconds(100));
+        std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -518,33 +518,32 @@ struct BaasFLXClientReset : public TestClientReset {
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
-        const ObjectId pk_of_added_object = ObjectId::gen();
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
-        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        if (m_on_setup) {
+            m_on_setup(realm);
+        }
 
-        auto table = realm->read_group().get_table(ObjectStore::table_name_for_object_type(c_object_schema_name));
-        REALM_ASSERT(table);
-        mut_subs.insert_or_assign(Query(table));
-        auto subs = std::move(mut_subs).commit();
-        realm->begin_transaction();
-        CppContext c(realm);
-        int64_t r1 = random_int();
-        int64_t r2 = random_int();
-        int64_t r3 = random_int();
-        int64_t sum = uint64_t(r1) + r2 + r3;
+        ObjectId pk_of_added_object = [&] {
+            if (m_populate_initial_object) {
+                return m_populate_initial_object(realm);
+            }
 
-        Object::create(c, realm, c_object_schema_name,
-                       std::any(AnyDict{{std::string{c_id_col_name}, pk_of_added_object},
-                                        {std::string{c_str_col_name}, std::string{"initial value"}},
-                                        {"list_of_ints_field", std::vector<std::any>{r1, r2, r3}},
-                                        {"sum_of_list_field", sum}}));
+            auto ret = ObjectId::gen();
+            constexpr bool create_object = true;
+            subscribe_to_object_by_id(realm, ret, create_object);
 
-        realm->commit_transaction();
+            return ret;
+        }();
 
-        wait_for_upload(*realm);
+        wait_for_object_to_persist(m_local_config.sync_config->user, app_session, std::string(c_object_schema_name),
+                                   {{std::string(c_id_col_name), pk_of_added_object}});
         session->log_out();
+
+        if (m_make_local_changes) {
+            m_make_local_changes(realm);
+        }
 
         // cause a client reset by restarting the sync service
         // this causes the server's sync history to be resynthesized
@@ -684,6 +683,12 @@ TestClientReset* TestClientReset::make_local_changes(Callback&& changes_local)
     m_make_local_changes = std::move(changes_local);
     return this;
 }
+TestClientReset* TestClientReset::populate_initial_object(InitialObjectCallback&& callback)
+{
+    m_populate_initial_object = std::move(callback);
+    return this;
+}
+
 TestClientReset* TestClientReset::make_remote_changes(Callback&& changes_remote)
 {
     m_make_remote_changes = std::move(changes_remote);

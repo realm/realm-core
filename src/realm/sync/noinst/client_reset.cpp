@@ -548,8 +548,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
     REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
-    sync::version_type current_version_local = old_version_local.version;
-    wt_local->get_history()->ensure_updated(current_version_local);
+    wt_local->get_history()->ensure_updated(old_version_local.version);
     SaltedFileIdent orig_file_ident;
     {
         sync::version_type old_version_unused;
@@ -562,7 +561,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     bool recover_local_changes = (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard);
 
     if (recover_local_changes) {
-        local_changes = history_local->get_local_changes(current_version_local);
+        local_changes = history_local->get_local_changes(wt_local->get_version());
         logger.info("Local changesets to recover: %1", local_changes.size());
     }
 
@@ -590,7 +589,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history.
         // Note that we do not set the new file ident yet! This is done in the last commit.
-        history_local->set_client_reset_adjustments(current_version_local, orig_file_ident, fresh_server_version,
+        history_local->set_client_reset_adjustments(wt_local->get_version(), orig_file_ident, fresh_server_version,
                                                     recovered_changeset);
         // The local Realm is committed. There are no changes to the remote Realm.
         wt_remote->rollback_and_continue_as_read();
@@ -612,7 +611,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // partially recovered, but interrupted may continue sync the next time it is
         // opened with only partially recovered state while having lost the history of any
         // offline modifications.
-        history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        history_local->set_client_file_ident_in_wt(wt_local->get_version(), client_file_ident);
         wt_local->commit_and_continue_as_read();
     }
     else {
@@ -634,7 +633,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
 
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history and steal the fresh Realm's ident
-        history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
+        history_local->set_client_reset_adjustments(wt_local->get_version(), client_file_ident, fresh_server_version,
                                                     recovered_changeset);
 
         // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
