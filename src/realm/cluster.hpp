@@ -54,11 +54,19 @@ public:
     FieldValues() {}
     FieldValues(std::initializer_list<FieldValue>);
     void insert(ColKey k, Mixed val, bool is_default = false);
-    auto begin() const
+    auto begin() const noexcept
     {
         return m_values.begin();
     }
-    auto end() const
+    auto end() const noexcept
+    {
+        return m_values.end();
+    }
+    auto begin() noexcept
+    {
+        return m_values.begin();
+    }
+    auto end() noexcept
     {
         return m_values.end();
     }
