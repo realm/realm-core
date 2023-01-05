@@ -214,7 +214,10 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
 RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback,
                                                  status_error_code_e status, const char* reason)
 {
-    (*(realm_callback->get()))(Status{static_cast<ErrorCodes::Error>(status), reason});
+    auto complete_status = status == status_error_code_e::STATUS_OK
+                               ? Status::OK()
+                               : Status{static_cast<ErrorCodes::Error>(status), reason};
+    (*(realm_callback->get()))(complete_status);
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
@@ -237,8 +240,10 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 status_error_code_e status, const char* reason)
 {
-    realm_websocket_observer->get()->websocket_closed_handler(was_clean,
-                                                              Status{static_cast<ErrorCodes::Error>(status), reason});
+    auto closed_status = status == status_error_code_e::STATUS_OK
+                             ? Status::OK()
+                             : Status{static_cast<ErrorCodes::Error>(status), reason};
+    realm_websocket_observer->get()->websocket_closed_handler(was_clean, closed_status);
 }
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,
