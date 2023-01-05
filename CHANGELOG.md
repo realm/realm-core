@@ -8,6 +8,7 @@
 * Converting flexible sync realms to bundled and local realms is now supported ([#6076](https://github.com/realm/realm-core/pull/6076))
 * Compensating write errors are now surfaced to the SDK/user after the compensating write has been applied in a download message ([#6095](https://github.com/realm/realm-core/pull/6095)).
 * Normalize sync connection parameters for device information ([#6029](https://github.com/realm/realm-core/issues/6029))
+* Add support for providing custom websocket implementations in the C API ([#5917](https://github.com/realm/realm-core/issues/5917))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
