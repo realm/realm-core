@@ -36,7 +36,7 @@ namespace realm {
     auto type = ObjectSchema::from_core_type(column);
     std::string_view collection_type = column.is_collection() ? collection_type_name(column) : "property";
     const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
-    throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
+    throw InvalidArgument(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
                                         column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
                                         table.get_column_name(column)));
 }

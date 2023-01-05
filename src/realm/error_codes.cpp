@@ -69,7 +69,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BrokenPromise:
         case ClosedRealm:
         case CrossTableLinkTarget:
-        case IllegalOperation: // TODO problematic sometimes we like it to be illegal argument
+        case IllegalOperation:
         case InvalidSchemaChange:
         case InvalidSchemaVersion:
         case InvalidTableRef:
