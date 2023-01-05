@@ -675,7 +675,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
             m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size, m_observer);
         if (actual < size) {
             if (actual >= required) {
-                memset(addr + actual, 0x55, size - actual);
+                 memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
