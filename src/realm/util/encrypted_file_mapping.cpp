@@ -642,7 +642,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
         size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
         if (actual < size) {
             if (actual >= required) {
-                memset(addr + actual, 0x55, size - actual);
+                 memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
@@ -978,8 +978,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
     size_t page_size = 1ULL << m_page_shift;
-    size_t required =
-        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) & (page_size - 1)) + size;
+    size_t required = get_offset_of_address(addr) + size;
     {
         // make sure the first page is available
         PageState& ps = m_page_state[first_accessed_local_page];
@@ -1000,6 +999,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         // We know it's an array, and array headers are 8-byte aligned, so it is
         // included in the first page which was handled above.
         size = header_to_size(static_cast<const char*>(addr));
+        required = get_offset_of_address(addr) + size;
     }
 
     size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
