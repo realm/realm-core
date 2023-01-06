@@ -39,6 +39,7 @@
 * App services request ID now logged at info level when sync client connects ([#6143](https://github.com/realm/realm-core/pull/6143]))
 * Add c_api error category for resolve errors instead of reporting unknown category. ([PR #6157](https://github.com/realm/realm-core/pull/6157))
 * Add permanent redirect (308) as a supported redirect response from the server. ([#6162](https://github.com/realm/realm-core/issues/6162))
+* Integrate DefaultSocketProvider as SyncSocketProvider in sync client. ([PR #6171](https://github.com/realm/realm-core/pull/6171))
 
 ----------------------------------------------
 
