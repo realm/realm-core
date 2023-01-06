@@ -544,6 +544,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     sha_process(s, opad, 64);
     sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
     sha_done(s, dst);
+#elif OPENSSL_VERSION_NUMBER >= 0x10101000L // 1.1.1
+    std::unique_ptr<EVP_MD_CTX, void (*)(EVP_MD_CTX*)> ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), ipad, 64);
+    EVP_DigestUpdate(ctx.get(), static_cast<const uint8_t*>(src), len);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
+
+    ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), opad, 64);
+    EVP_DigestUpdate(ctx.get(), dst, SHA224_DIGEST_LENGTH);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
 #else
     SHA256_CTX ctx;
     SHA224_Init(&ctx);

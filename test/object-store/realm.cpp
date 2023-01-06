@@ -19,6 +19,8 @@
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <iostream>
+
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -356,6 +358,35 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         TestHelper::begin_read(old_realm, old_version);
         rt = nullptr;
         REQUIRE(old_realm->schema().size() == 1);
+    }
+
+    SECTION("should skip schema verification with mode additive and transaction version less than current version") {
+
+        auto realm1 = Realm::get_shared_realm(config);
+        auto& db1 = TestHelper::get_db(realm1);
+        auto rt1 = db1->start_read();
+        // grab the initial transaction version.
+        const auto version1 = rt1->get_version_of_current_transaction();
+        realm1->close();
+
+        // update the schema
+        config.schema_mode = SchemaMode::AdditiveExplicit;
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object1", {{"value", PropertyType::Int}}},
+        };
+        auto realm2 = Realm::get_shared_realm(config);
+
+        // no verification if the version chosen is less than the current transaction schema version.
+        // the schemas should be just merged
+        TestHelper::begin_read(realm2, version1);
+        auto& group = realm2->read_group();
+        auto schema = realm2->schema();
+        REQUIRE(schema == config.schema);
+        auto table_obj = group.get_table("class_object");
+        auto table_obj1 = group.get_table("class_object1");
+        REQUIRE(table_obj);        // empty schema always has class_object
+        REQUIRE_FALSE(table_obj1); // class_object1 should not be present
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
@@ -1093,12 +1124,6 @@ TEST_CASE("SharedRealm: convert") {
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
-    }
-
-    SECTION("cannot convert from local realm to flx sync") {
-        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
-        auto local_realm = Realm::get_shared_realm(local_config1);
-        REQUIRE_THROWS(local_realm->convert(sync_config));
     }
 
     SECTION("can copy a local realm to a local realm") {

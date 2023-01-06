@@ -965,26 +965,30 @@ void Table::add_search_index(ColKey col_key, IndexType type)
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
-    if (type == IndexType::Fulltext) {
-        // Early-out if already indexed
-        if (attr.test(col_attr_FullText_Indexed)) {
-            REALM_ASSERT(has_search_index(col_key));
-            REALM_ASSERT(get_search_index(col_key)->is_fulltext_index());
+
+    switch (type) {
+        case IndexType::None:
+            remove_search_index(col_key);
             return;
-        }
-        if (attr.test(col_attr_Indexed)) {
-            this->remove_search_index(col_key);
-        }
-    }
-    else {
-        if (attr.test(col_attr_Indexed)) {
-            REALM_ASSERT(has_search_index(col_key));
-            REALM_ASSERT(!get_search_index(col_key)->is_fulltext_index());
-            return;
-        }
-        if (attr.test(col_attr_FullText_Indexed)) {
-            this->remove_search_index(col_key);
-        }
+        case IndexType::Fulltext:
+            // Early-out if already indexed
+            if (attr.test(col_attr_FullText_Indexed)) {
+                REALM_ASSERT(search_index_type(col_key) == IndexType::Fulltext);
+                return;
+            }
+            if (attr.test(col_attr_Indexed)) {
+                this->remove_search_index(col_key);
+            }
+            break;
+        case IndexType::General:
+            if (attr.test(col_attr_Indexed)) {
+                REALM_ASSERT(search_index_type(col_key) == IndexType::General);
+                return;
+            }
+            if (attr.test(col_attr_FullText_Indexed)) {
+                this->remove_search_index(col_key);
+            }
+            break;
     }
 
     do_add_search_index(col_key, type);
@@ -1315,9 +1319,12 @@ Table::~Table() noexcept
 }
 
 
-bool Table::has_search_index(ColKey col_key) const noexcept
+IndexType Table::search_index_type(ColKey col_key) const noexcept
 {
-    return m_index_accessors[col_key.get_index().val] != nullptr;
+    if (auto index = m_index_accessors[col_key.get_index().val].get()) {
+        return index->is_fulltext_index() ? IndexType::Fulltext : IndexType::General;
+    }
+    return IndexType::None;
 }
 
 void Table::migrate_column_info()
@@ -2701,8 +2708,12 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         if (col_key.is_nullable()) {
             out << ",\"isOptional\":true";
         }
-        if (has_search_index(col_key)) {
+        auto index_type = search_index_type(col_key);
+        if (index_type == IndexType::General) {
             out << ",\"isIndexed\":true";
+        }
+        if (index_type == IndexType::Fulltext) {
+            out << ",\"isFulltextIndexed\":true";
         }
         out << "}";
         if (i < sz - 1) {
@@ -2753,7 +2764,7 @@ bool Table::operator==(const Table& t) const
         auto name = get_column_name(ck);
         auto other_ck = t.get_column_key(name);
         auto attrs = ck.get_attrs();
-        if (has_search_index(ck) != t.has_search_index(other_ck))
+        if (search_index_type(ck) != t.search_index_type(other_ck))
             return false;
 
         if (!other_ck || other_ck.get_attrs() != attrs) {
@@ -3623,7 +3634,7 @@ void Table::do_set_primary_key_column(ColKey col_key)
 
 bool Table::contains_unique_values(ColKey col) const
 {
-    if (has_search_index(col)) {
+    if (search_index_type(col) == IndexType::General) {
         auto search_index = get_search_index(col);
         return !search_index->has_duplicate_values();
     }
@@ -3896,7 +3907,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     check_column(col_key);
 
-    bool si = has_search_index(col_key);
+    auto index_type = search_index_type(col_key);
     std::string column_name(get_column_name(col_key));
     auto type = col_key.get_type();
     auto attr = col_key.get_attrs();
@@ -3930,8 +3941,8 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     erase_root_column(col_key);
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
-    if (si)
-        do_add_search_index(new_col, IndexType::General);
+    if (index_type != IndexType::None)
+        do_add_search_index(new_col, index_type);
 
     return new_col;
 }

@@ -31,7 +31,37 @@ StringData ErrorCodes::error_string(Error code)
             return "LogicError";
         case ErrorCodes::BrokenPromise:
             return "BrokenPromise";
+        case ErrorCodes::OperationAborted:
+            return "OperationAborted";
+
+        /// WebSocket error codes
+        case ErrorCodes::WebSocket_GoingAway:
+            return "WebSocket: Going Away";
+        case ErrorCodes::WebSocket_ProtocolError:
+            return "WebSocket: Protocol Error";
+        case ErrorCodes::WebSocket_UnsupportedData:
+            return "WebSocket: Unsupported Data";
+        case ErrorCodes::WebSocket_Reserved:
+            return "WebSocket: Reserved";
+        case ErrorCodes::WebSocket_NoStatusReceived:
+            return "WebSocket: No Status Received";
+        case ErrorCodes::WebSocket_AbnormalClosure:
+            return "WebSocket: Abnormal Closure";
+        case ErrorCodes::WebSocket_InvalidPayloadData:
+            return "WebSocket: Invalid Payload Data";
+        case ErrorCodes::WebSocket_PolicyViolation:
+            return "WebSocket: Policy Violation";
+        case ErrorCodes::WebSocket_MessageTooBig:
+            return "WebSocket: Message Too Big";
+        case ErrorCodes::WebSocket_InavalidExtension:
+            return "WebSocket: Invalid Extension";
+        case ErrorCodes::WebSocket_InternalServerError:
+            return "WebSocket: Internal Server Error";
+        case ErrorCodes::WebSocket_TLSHandshakeFailed:
+            return "WebSocket: TLS Handshake Failed";
+
         case ErrorCodes::UnknownError:
+            [[fallthrough]];
         default:
             return "UnknownError";
     }

@@ -1,6 +1,3 @@
 [submodule "external/catch"]
 	path = external/catch
 	url = https://github.com/catchorg/Catch2.git
-[submodule "tools/vcpkg/ports"]
-	path = tools/vcpkg/ports
-	url = https://github.com/microsoft/vcpkg.git

@@ -252,6 +252,10 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     if (!latest_snapshot_version)
         return nullptr;
 
+    const auto current_version = (*realm)->current_transaction_version();
+    if (!current_version || *latest_snapshot_version <= (*current_version).version)
+        return nullptr;
+
     auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
     return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
 }

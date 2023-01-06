@@ -48,9 +48,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
         std::unique_ptr<Replication> hist = make_client_replication();
         DBRef sg = DB::create(*hist, path);
         {
-            WriteTransaction wt(sg);
-            wt.add_table("class_table");
-            wt.commit();
+            auto wt = sg->start_write();
+            wt->add_table_with_primary_key("class_table", type_Int, "id");
+            wt->commit();
         }
     }
     {
@@ -68,9 +68,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
         std::unique_ptr<Replication> hist(make_in_realm_history());
         DBRef sg = DB::create(*hist, path);
         {
-            WriteTransaction wt(sg);
-            wt.add_table("class_table");
-            wt.commit();
+            auto wt = sg->start_write();
+            wt->add_table_with_primary_key("class_table", type_Int, "id");
+            wt->commit();
         }
     }
     {

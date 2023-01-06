@@ -22,10 +22,11 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
-    ../util/network_ssl.cpp
-    ../util/network.cpp
-    ../util/websocket.cpp
-    ../util/ez_websocket.cpp
+    network/default_socket.cpp
+    network/http.cpp
+    network/network.cpp
+    network/network_ssl.cpp
+    network/websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS
@@ -40,6 +41,7 @@ set(SYNC_INSTALL_HEADERS
     changeset.hpp
     client.hpp
     client_base.hpp
+    socket_provider.hpp
     history.hpp
     instruction_applier.hpp
     instruction_replication.hpp
@@ -48,11 +50,16 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+
+    network/http.hpp
 )
 
 set(NOINST_HEADERS
-    ../util/http.hpp
-    ../util/websocket.hpp
+    trigger.hpp
+    network/default_socket.hpp
+    network/network.hpp
+    network/network_ssl.hpp
+    network/websocket.hpp
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
