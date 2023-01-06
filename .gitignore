@@ -97,3 +97,6 @@ compile_commands.json
 # Swift package manager
 /.swiftpm
 /.build
+
+# Rust native build directory
+/target/*

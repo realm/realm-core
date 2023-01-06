@@ -281,6 +281,7 @@ set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
+enable_testing()
 add_subdirectory(src)
 
 # Install the licence and changelog files

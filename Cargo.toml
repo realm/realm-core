@@ -1,0 +1,2 @@
+[workspace]
+members = ["src/rust/sys", "src/rust/core", "src/rust/query", "src/rust/bundle"]

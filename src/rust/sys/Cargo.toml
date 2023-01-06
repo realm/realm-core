@@ -1,0 +1,15 @@
+[package]
+name = "realm-sys"
+version = "0.1.0"
+edition = "2021"
+description = "C++ FFI bindings to Realm Core"
+
+[dependencies]
+cxx = { version = "1.0.85", default-features = false, features = [
+    "alloc",
+    "c++17",
+] }
+
+[build-dependencies]
+cmake = "0.1.49"
+cxx-build = "1.0.85"

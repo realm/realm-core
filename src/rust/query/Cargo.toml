@@ -1,0 +1,11 @@
+[package]
+name = "realm-query"
+version = "0.1.0"
+edition = "2021"
+description = "Realm query engine"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+realm-core = { path = "../core" }
+realm-sys = { path = "../sys" }

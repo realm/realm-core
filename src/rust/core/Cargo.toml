@@ -1,0 +1,12 @@
+[package]
+name = "realm-core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust API to Realm Core"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+realm-sys = { path = "../sys", version = "0.1.0" }
+os_str_bytes = "6.4.1"
+thiserror = "1.0.38"
