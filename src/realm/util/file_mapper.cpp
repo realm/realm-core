@@ -103,7 +103,7 @@ struct mappings_for_file {
 
 // Group the information we need to map a SIGSEGV address to an
 // EncryptedFileMapping for the sake of cache-friendliness with 3+ active
-// mappings (and no worse with only two
+// mappings (and no worse with only two)
 struct mapping_and_addr {
     std::shared_ptr<EncryptedFileMapping> mapping;
     void* addr;
