@@ -1255,7 +1255,6 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
 void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
                                            util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
-    // FIXME: don't refresh the same page more than once!
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
 #ifdef REALM_DEBUG
     struct FreelistTriplet {
@@ -1732,7 +1731,6 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             debug_message += "\nallocations: ";
             debug_message += debug_allocs;
             std::cout << debug_message << std::endl;
-            // std::cout << buffer.substr(0, bytes_read) << std::endl;
             REALM_ASSERT(computed_pages_for_refresh == pages_across_all_versions);
         }
     }

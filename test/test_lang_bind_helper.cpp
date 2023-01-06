@@ -3281,8 +3281,8 @@ private:
 
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-    const int write_thread_count = 70;
-    const int read_thread_count = 30;
+    const int write_thread_count = 7;
+    const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3362,11 +3362,10 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-// NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
-ONLY(LangBindHelper_ImplicitTransactions_InterProcess)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
 {
-    const int write_process_count = 70;
-    const int read_process_count = 30;
+    const int write_process_count = 7;
+    const int read_process_count = 3;
 
     int readpids[read_process_count];
     int writepids[write_process_count];
