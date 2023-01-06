@@ -1328,8 +1328,14 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         array.init_from_ref(ref);
         REALM_ASSERT_EX(array.is_attached(), ref, read_version.version, read_version.top_ref);
         if (!first_version) {
+            // Now that the array header is loaded and up to date, load the byte size
+            // and mark any additional pages as needing refresh.
             size_t bytes_to_refresh = NodeHeader::get_byte_size_from_header(array.get_header());
             do_refresh({{ref, ref + bytes_to_refresh}});
+            // If this array spans multiple pages and those pages have just been marked for
+            // refresh above, then we need to refetch the array into memory. This will trigger
+            // the read barrier on all those pages which refetches those pages from disk if needed.
+            array.init_from_ref(ref);
         }
     };
 
