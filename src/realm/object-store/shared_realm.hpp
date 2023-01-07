@@ -492,6 +492,8 @@ public:
 private:
     struct MakeSharedTag {
     };
+    struct MakeFrozenTag {
+    };
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
@@ -574,6 +576,7 @@ public:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
     Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
           MakeSharedTag);
+    Realm(const Realm&, MakeFrozenTag);
 };
 
 class RealmFileException : public std::runtime_error {
