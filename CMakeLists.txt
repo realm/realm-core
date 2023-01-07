@@ -212,6 +212,11 @@ option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
 option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
+option(REALM_ENCRYPTION_VERIFICATION "Add more encryption verification and debugging information" OFF)
+
+if (CMAKE_BUILD_TYPE MATCHES DEBUG)
+    set(REALM_ENCRYPTION_VERIFICATION ON)
+endif()
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)

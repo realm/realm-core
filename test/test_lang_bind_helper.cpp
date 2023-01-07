@@ -3259,6 +3259,9 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
 struct EncryptedPageValidator {
     EncryptedPageValidator(const std::string& path)
     {
+#if !REALM_ENCRYPTION_VERIFICATION
+        std::cout << "EncryptionPageValidator running without verification turned on\n";
+#endif
         std::string validate_path = path + ".validate";
         if (util::File::exists(validate_path)) {
             util::File::remove(validate_path);

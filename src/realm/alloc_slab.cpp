@@ -1256,7 +1256,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                                            util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     struct FreelistTriplet {
         MemRef positions_ref;
         MemRef lengths_ref;
@@ -1300,8 +1300,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             debug_allocs += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, versions.get(i));
         }
     };
+#endif // REALM_ENCRYPTION_VERIFICATION
 
-#endif
     auto do_refresh = [&](const RefRanges& ranges) {
         if (REALM_UNLIKELY(refresh_hook)) {
             refresh_hook(ranges);
@@ -1309,13 +1309,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         else {
             this->refresh_encrypted_pages(ranges);
         }
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
         if (validator.is_attached()) {
             for (auto& alloc : ranges) {
                 track_pages(computed_pages_for_refresh, alloc);
             }
         }
-#endif // REALM_DEBUG
+#endif // REALM_ENCRYPTION_VERIFICATION
     };
 
     auto load_array = [&do_refresh, &read_locks](Array& array, ref_type ref, const VersionedTopRef& read_version) {
@@ -1350,9 +1350,9 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             // this also means that there is nothing to refresh there, so skip it
             continue;
         }
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
         debug_allocs += util::format("version %1 top ref, free positions and free sizes: ", read_lock.version);
-#endif
+#endif // REALM_ENCRYPTION_VERIFICATION
 
         Array top_array(*this), cur_freelist_positions(*this), cur_freelist_lengths(*this),
             cur_freelist_versions(*this);
@@ -1376,11 +1376,11 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                         cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, read_lock.version,
                         read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
                         (--read_locks.end())->version);
-#if REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
         debug_freelists.emplace(read_lock.version,
                                 FreelistTriplet{cur_freelist_positions.get_mem(), cur_freelist_lengths.get_mem(),
                                                 cur_freelist_versions.get_mem()});
-#endif
+#endif // REALM_ENCRYPTION_VERIFICATION
 
         if (!processed_first_version) {
             processed_first_version = true;
@@ -1436,7 +1436,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             size_t prev_increment = 1;
             size_t cur_increment = 1;
 
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
             if (previous_ndx + 1 < prev_freelist_size) {
                 size_t start = prev_freelist_positions.get(previous_ndx + 1);
                 size_t end = start + prev_freelist_lengths.get(previous_ndx + 1);
@@ -1458,7 +1458,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                     REALM_ASSERT_EX(cur_end <= start, cur_start, prev_end, start, size);
                 }
             }
-#endif // REALM_DEBUG
+#endif // REALM_ENCRYPTION_VERIFICATION
 
             combine_contiguous_entries(previous_ndx, prev_increment, prev_end, prev_freelist_positions,
                                        prev_freelist_lengths, prev_freelist_size);
@@ -1580,12 +1580,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         }
         ++it;
     }
-#if REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     debug_allocs += "allocations: ";
-#endif
+#endif // REALM_ENCRYPTION_VERIFICATION
+
     do_refresh(allocations);
 
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     if (validator.is_attached()) {
         auto parse_int = [](std::string str) -> uint64_t {
             uint64_t pages = 0;
@@ -1734,7 +1735,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             REALM_ASSERT(computed_pages_for_refresh == pages_across_all_versions);
         }
     }
-#endif // REALM_DEBUG
+#endif // REALM_ENCRYPTION_VERIFICATION
 }
 
 void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
