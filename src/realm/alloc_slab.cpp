@@ -1257,12 +1257,11 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 {
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
 #if REALM_ENCRYPTION_VERIFICATION
-    struct FreelistTriplet {
+    struct FreelistInfo {
         MemRef positions_ref;
         MemRef lengths_ref;
-        MemRef versions_ref;
     };
-    std::map<size_t, FreelistTriplet> debug_freelists;
+    std::map<size_t, FreelistInfo> debug_freelists;
     std::set<uint64_t> computed_pages_for_refresh;
     const size_t page_size = util::page_size();
     std::string debug_allocs;
@@ -1284,7 +1283,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         debug_allocs += util::format("[%1, %2], ", alloc.begin, alloc.end);
     };
 
-    auto debug_freelist_info = [&](Array& positions, Array& lengths, Array& versions) {
+    auto debug_freelist_info = [&](Array& positions, Array& lengths) {
         debug_allocs += "\npages refreshed so far: ";
         for (auto page : computed_pages_for_refresh) {
             debug_allocs += util::format("%1, ", page);
@@ -1297,7 +1296,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         for (size_t i = 0; i < positions.size(); ++i) {
             uint64_t pos = positions.get(i);
             uint64_t size = lengths.get(i);
-            debug_allocs += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, versions.get(i));
+            debug_allocs += util::format("{%1 + %2 = %3}, ", pos, size, pos + size);
         }
     };
 #endif // REALM_ENCRYPTION_VERIFICATION
@@ -1354,8 +1353,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         debug_allocs += util::format("version %1 top ref, free positions and free sizes: ", read_lock.version);
 #endif // REALM_ENCRYPTION_VERIFICATION
 
-        Array top_array(*this), cur_freelist_positions(*this), cur_freelist_lengths(*this),
-            cur_freelist_versions(*this);
+        Array top_array(*this), cur_freelist_positions(*this), cur_freelist_lengths(*this);
         load_array(top_array, read_lock.top_ref, read_lock);
         static_assert(Group::s_free_pos_ndx < Group::s_free_size_ndx, "use the lowest index");
         if (top_array.size() <= Group::s_free_pos_ndx) {
@@ -1371,15 +1369,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         const ref_type free_sizes_ref = top_array.get_as_ref(Group::s_free_size_ndx);
         load_array(cur_freelist_positions, free_positions_ref, read_lock);
         load_array(cur_freelist_lengths, free_sizes_ref, read_lock);
-        load_array(cur_freelist_versions, top_array.get_as_ref(Group::s_free_version_ndx), read_lock);
         REALM_ASSERT_EX(cur_freelist_positions.size() == cur_freelist_lengths.size(), cur_freelist_positions.size(),
                         cur_freelist_lengths.size(), free_positions_ref, free_sizes_ref, read_lock.version,
                         read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
                         (--read_locks.end())->version);
 #if REALM_ENCRYPTION_VERIFICATION
         debug_freelists.emplace(read_lock.version,
-                                FreelistTriplet{cur_freelist_positions.get_mem(), cur_freelist_lengths.get_mem(),
-                                                cur_freelist_versions.get_mem()});
+                                FreelistInfo{cur_freelist_positions.get_mem(), cur_freelist_lengths.get_mem()});
 #endif // REALM_ENCRYPTION_VERIFICATION
 
         if (!processed_first_version) {
@@ -1447,13 +1443,12 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                 size_t size = cur_freelist_lengths.get(current_ndx + 1);
                 if (cur_end > start) {
                     debug_allocs += util::format("\nfreelist inconsistency detected at version %1, index %2, current "
-                                                 "{%3 + %4 = %5}[%6], next {%7 + %8 = %9}[%10], during refresh of "
-                                                 "versions %11->%12, computed versions: ",
+                                                 "{%3 + %4 = %5}, next {%6 + %7 = %8}, during refresh of "
+                                                 "versions %9->%10, computed versions: ",
                                                  read_lock.version, current_ndx, cur_start, cur_end - cur_start,
-                                                 cur_end, cur_freelist_versions.get(current_ndx), start, size,
-                                                 start + size, cur_freelist_versions.get(current_ndx + 1),
-                                                 read_locks[0].version, read_locks[read_locks.size() - 1].version);
-                    debug_freelist_info(cur_freelist_positions, cur_freelist_lengths, cur_freelist_versions);
+                                                 cur_end, start, size, start + size, read_locks[0].version,
+                                                 read_locks[read_locks.size() - 1].version);
+                    debug_freelist_info(cur_freelist_positions, cur_freelist_lengths);
                     std::cout << debug_allocs;
                     REALM_ASSERT_EX(cur_end <= start, cur_start, prev_end, start, size);
                 }
@@ -1651,11 +1646,10 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             }
             size_t open_paren = buffer.find("{", suffix_ndx);
             size_t freelist_count = 0;
-            const FreelistTriplet& freelist = debug_freelists.at(read_lock.version);
-            Array positions(*this), lengths(*this), versions(*this);
+            const FreelistInfo& freelist = debug_freelists.at(read_lock.version);
+            Array positions(*this), lengths(*this);
             positions.init_from_mem(freelist.positions_ref);
             lengths.init_from_mem(freelist.lengths_ref);
-            versions.init_from_mem(freelist.versions_ref);
 
             size_t found_freelist_size = positions.size();
             while (open_paren != buffer.npos && open_paren < freelist_end_pos) {
@@ -1670,14 +1664,13 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
                 uint64_t found_begin = positions.get(freelist_count);
                 uint64_t found_length = lengths.get(freelist_count);
-                uint64_t found_version = versions.get(freelist_count);
                 if (actual_begin != found_begin || actual_end != found_begin + found_length) {
-                    debug_freelist_info(positions, lengths, versions);
+                    debug_freelist_info(positions, lengths);
                     std::cout << debug_allocs;
                 }
                 REALM_ASSERT_EX(actual_begin == found_begin && actual_end == found_begin + found_length, actual_begin,
-                                actual_end, found_begin, found_length, found_begin + found_length, found_version,
-                                read_lock.version, freelist_count);
+                                actual_end, found_begin, found_length, found_begin + found_length, read_lock.version,
+                                freelist_count);
                 ++freelist_count;
                 open_paren = buffer.find("{", end);
             }
