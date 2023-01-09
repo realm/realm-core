@@ -1710,13 +1710,9 @@ public:
     void main()
     {
         auto& alloc = m_db.m_alloc;
+        std::optional<uint64_t> change_from;
         while (m_should_run) {
             // wait for change
-            std::optional<uint64_t> change_from;
-            {
-                CheckedLockGuard lock_guard(m_db.m_mutex);
-                change_from = m_db.get_last_refreshed_version();
-            }
             bool changed = true;
             if (change_from) {
                 changed = m_db.wait_for_change_internal(*change_from);
@@ -1729,6 +1725,7 @@ public:
             CheckedLockGuard lock_guard(m_db.m_mutex);
             alloc.update_reader_view(readlock.m_file_size, &m_db,
                                      VersionID{readlock.m_version, readlock.m_reader_idx});
+            change_from = m_db.get_last_refreshed_version();
         }
     }
     void start()
