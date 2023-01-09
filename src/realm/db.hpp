@@ -218,7 +218,7 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-    bool wait_for_change_internal() REQUIRES(!m_mutex);
+    bool wait_for_change_internal(uint64_t change_from_version) REQUIRES(!m_mutex);
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
     /// wake any thread waiting in wait_for_change, but without disabling
@@ -567,7 +567,7 @@ private:
     void release_all_read_locks() noexcept REQUIRES(!m_mutex);
 
     void refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept REQUIRES(m_mutex);
-
+    std::optional<uint64_t> get_last_refreshed_version() noexcept REQUIRES(m_mutex);
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write() REQUIRES(!m_mutex);
     void do_begin_write() REQUIRES(!m_mutex);

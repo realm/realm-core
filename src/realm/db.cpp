@@ -1597,6 +1597,19 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
     }
 }
 
+// caller must hold DB::m_mutex
+std::optional<uint64_t> DB::get_last_refreshed_version() noexcept
+{
+    if (get_encryption_key()) {
+        if (!m_last_encryption_page_reader)
+            return {};
+        return m_last_encryption_page_reader->m_version;
+    }
+    else {
+        return {};
+    }
+}
+
 // Note: close() and close_internal() may be called from the DB::~DB().
 // in that case, they will not throw. Throwing can only happen if called
 // directly.
@@ -1688,7 +1701,7 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
-        // start();
+        start();
     }
     ~PageRefresher()
     {
@@ -1699,7 +1712,15 @@ public:
         auto& alloc = m_db.m_alloc;
         while (m_should_run) {
             // wait for change
-            bool changed = m_db.wait_for_change_internal();
+            std::optional<uint64_t> change_from;
+            {
+                CheckedLockGuard lock_guard(m_db.m_mutex);
+                change_from = m_db.get_last_refreshed_version();
+            }
+            bool changed = true;
+            if (change_from) {
+                changed = m_db.wait_for_change_internal(*change_from);
+            }
             if (!m_should_run)
                 break;
             REALM_ASSERT(changed);
@@ -2004,18 +2025,14 @@ void DB::wait_for_change_internal_release()
     m_new_commit_available.notify_all();
 }
 
-bool DB::wait_for_change_internal()
+bool DB::wait_for_change_internal(uint64_t change_from_version)
 {
-    if (!m_last_encryption_page_reader) {
-        return true;
-    }
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (m_last_encryption_page_reader->m_version == info->latest_version_number &&
-           m_wait_for_change_internal_enabled) {
+    while (change_from_version == info->latest_version_number && m_wait_for_change_internal_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
-    return m_last_encryption_page_reader->m_version != info->latest_version_number;
+    return change_from_version != info->latest_version_number;
 }
 
 bool DB::has_changed(TransactionRef& tr)
