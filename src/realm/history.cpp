@@ -137,13 +137,14 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
                                     BinaryIterator* buffer) const noexcept
 {
-    REALM_ASSERT(begin_version <= end_version);
-    REALM_ASSERT(begin_version >= m_base_version);
-    REALM_ASSERT(end_version <= m_base_version + m_size);
+    REALM_ASSERT_EX(begin_version <= end_version, begin_version, end_version, m_base_version);
+    REALM_ASSERT_EX(begin_version >= m_base_version, begin_version, end_version, m_base_version);
+    REALM_ASSERT_EX(end_version <= m_base_version + m_size, end_version, m_base_version, m_size);
     version_type n_version_type = end_version - begin_version;
     version_type offset_version_type = begin_version - m_base_version;
-    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) &&
-                 !util::int_cast_has_overflow<size_t>(offset_version_type));
+    REALM_ASSERT_EX(!util::int_cast_has_overflow<size_t>(n_version_type) &&
+                        !util::int_cast_has_overflow<size_t>(offset_version_type),
+                    begin_version, end_version, m_base_version);
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)
@@ -160,7 +161,7 @@ void InRealmHistory::set_oldest_bound_version(version_type version)
         // The new changeset is always added before set_oldest_bound_version()
         // is called. Therefore, the trimming operation can never leave the
         // history empty.
-        REALM_ASSERT(num_entries_to_erase < m_size);
+        REALM_ASSERT_EX(num_entries_to_erase < m_size, num_entries_to_erase, m_size);
         for (size_t i = 0; i < num_entries_to_erase; ++i)
             m_changesets->erase(0); // Throws
         m_base_version += num_entries_to_erase;
