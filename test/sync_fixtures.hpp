@@ -4,8 +4,8 @@
 #include <vector>
 #include <sstream>
 
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/string_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
@@ -301,7 +301,7 @@ public:
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(util::Logger& logger, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
+    HTTPRequestClient(util::Logger& logger, const network::Endpoint& endpoint, const HTTPRequest& request)
         : logger{"HTTP client: ", logger}
         , m_endpoint{endpoint}
         , m_http_client{*this, logger}
@@ -319,7 +319,7 @@ public:
 
     // get_response is used to retrieve the response after
     // fetch_response returns.
-    util::HTTPResponse& get_response()
+    HTTPResponse& get_response()
     {
         return m_response;
     }
@@ -340,13 +340,13 @@ public:
     }
 
 private:
-    util::network::Service m_service;
-    util::network::Socket m_socket{m_service};
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
-    util::network::Endpoint m_endpoint;
-    util::HTTPClient<HTTPRequestClient> m_http_client;
-    util::HTTPRequest m_request;
-    util::HTTPResponse m_response;
+    network::Service m_service;
+    network::Socket m_socket{m_service};
+    network::ReadAheadBuffer m_read_ahead_buffer;
+    network::Endpoint m_endpoint;
+    HTTPClient<HTTPRequestClient> m_http_client;
+    HTTPRequest m_request;
+    HTTPResponse m_response;
 
     void initiate_tcp_connect()
     {
@@ -367,7 +367,7 @@ private:
             return;
         }
 
-        m_socket.set_option(util::network::SocketBase::no_delay(true));
+        m_socket.set_option(network::SocketBase::no_delay(true));
         logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
 
 
@@ -376,7 +376,7 @@ private:
 
     void initiate_http_request()
     {
-        auto handler = [this](util::HTTPResponse response, std::error_code ec) {
+        auto handler = [this](HTTPResponse response, std::error_code ec) {
             if (ec != util::error::operation_aborted) {
                 if (ec) {
                     logger.debug("HTTP response error, ec = %1", ec.message());
@@ -389,7 +389,7 @@ private:
         m_http_client.async_request(m_request, handler);
     }
 
-    void handle_http_response(const util::HTTPResponse response)
+    void handle_http_response(const HTTPResponse response)
     {
         logger.debug("HTTP response received, status = %1", int(response.status));
         m_response = response;
@@ -1038,8 +1038,11 @@ inline void RealmFixture::empty_transact()
 inline void RealmFixture::nonempty_transact()
 {
     auto func = [](Transaction& tr) {
-        TableRef table = tr.get_or_add_table("class_Table");
-        table->create_object();
+        TableRef table = tr.get_or_add_table_with_primary_key("class_Table", type_Int, "id");
+        int id = 1;
+        bool did_create = false;
+        while (!did_create)
+            table->create_object_with_primary_key(id++, &did_create);
         return true;
     };
     transact(func);

@@ -156,6 +156,12 @@ Schema set_indexed(Schema schema, StringData object_name, StringData property_na
     return schema;
 }
 
+Schema set_fulltext_indexed(Schema schema, StringData object_name, StringData property_name, bool value)
+{
+    schema.find(object_name)->property_for_name(property_name)->is_fulltext_indexed = value;
+    return schema;
+}
+
 Schema set_optional(Schema schema, StringData object_name, StringData property_name, bool value)
 {
     auto& prop = *schema.find(object_name)->property_for_name(property_name);
@@ -204,6 +210,183 @@ auto create_objects(Table& table, size_t count)
     return keys;
 }
 } // anonymous namespace
+
+TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
+
+    SECTION("Check OS schema returned in additive mode") {
+        InMemoryTestFile config;
+        config.automatic_change_notifications = false;
+        config.schema_mode = SchemaMode::AdditiveExplicit;
+        auto realm = Realm::get_shared_realm(config);
+
+        auto update_schema = [](Realm& r, Schema& s, uint64_t version) {
+            REQUIRE_NOTHROW((r).update_schema(s, version));
+            VERIFY_SCHEMA(r, false);
+            auto schema = (r).schema();
+            for (const auto& other : s) {
+                REQUIRE(schema.find(other.name) != schema.end());
+            }
+        };
+
+        Schema schema1 = {};
+        Schema schema2 = add_table(schema1, {"A", {{"value", PropertyType::Int}}});
+        Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
+        Schema schema4 = add_table(schema3, {"C", {{"value", PropertyType::Int}}});
+        Schema schema5 = add_table(schema4, {"Z", {{"value", PropertyType::Int}}});
+        update_schema(*realm, schema1, 0);
+        REQUIRE(realm->schema().size() == 0);
+        update_schema(*realm, schema2, 0);
+        REQUIRE(realm->schema().size() == 1);
+        update_schema(*realm, schema3, 0);
+        REQUIRE(realm->schema().size() == 2);
+        update_schema(*realm, schema4, 0);
+        REQUIRE(realm->schema().size() == 3);
+        update_schema(*realm, schema5, 0);
+        REQUIRE(realm->schema().size() == 4);
+
+        // schema size is decremented.
+        // after deletion the schema size is decremented but the just deleted object can still be found.
+        // the object that was just deleted is still there, thus find should return a valid iterator
+        SECTION("delete in reverse order") {
+            auto new_schema = schema5;
+            Schema delete_schema = remove_table(new_schema, "Z");
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("Z") != schema.end());
+            delete_schema = remove_table(schema4, "C");
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            delete_schema = remove_table(schema3, "B");
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+            delete_schema = remove_table(schema2, "A");
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+        SECTION("delete 1 element") {
+            auto new_schema = schema5;
+            Schema delete_schema = remove_table(new_schema, "Z");
+            // A B C Z vs A B C ==> Z (other classes)
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+            delete_schema = remove_table(new_schema, "C");
+            schema = realm->schema();
+            // A B C vs A B Z => Z
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+            delete_schema = remove_table(new_schema, "B");
+            // A B Z vs A C Z => B
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+            delete_schema = remove_table(new_schema, "A");
+            // A B Z vs B C Z => A
+            update_schema(*realm, delete_schema, 0);
+            schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+        SECTION("delete 2 elements") {
+            auto new_schema = schema5;
+            Schema delete_schema;
+            delete_schema = remove_table(new_schema, "Z");
+            delete_schema = remove_table(delete_schema, "A");
+            // A B C Z vs B C ==> A,Z (other classes)
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+        SECTION("delete 3 elements") {
+            auto new_schema = schema5;
+            Schema delete_schema;
+            delete_schema = remove_table(new_schema, "Z");
+            delete_schema = remove_table(delete_schema, "A");
+            delete_schema = remove_table(delete_schema, "C");
+            // A B C Z vs B  ==> A,C,Z (other classes)
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+        SECTION("delete all elements") {
+            auto new_schema = schema5;
+            Schema delete_schema;
+            delete_schema = remove_table(new_schema, "Z");
+            delete_schema = remove_table(delete_schema, "A");
+            delete_schema = remove_table(delete_schema, "C");
+            delete_schema = remove_table(delete_schema, "B");
+            // A B C Z vs None  ==> A,C,Z,B (other classes)
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+        SECTION("unsorted schema object names") {
+            InMemoryTestFile config;
+            config.automatic_change_notifications = false;
+            config.schema_mode = SchemaMode::AdditiveExplicit;
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"Z", {{"value", PropertyType::Int}}});
+            Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
+            Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
+            Schema schema5 = add_table(schema4, {"C", {{"value", PropertyType::Int}}});
+            update_schema(*realm, schema5, 0);
+
+            Schema delete_schema;
+            delete_schema = remove_table(schema5, "Z");
+            delete_schema = remove_table(delete_schema, "A");
+            // Z B A C vs Z A => B C (others)
+            update_schema(*realm, delete_schema, 0);
+            auto schema = realm->schema();
+            REQUIRE(schema.size() == 4);
+            REQUIRE(schema.find("C") != schema.end());
+            REQUIRE(schema.find("Z") != schema.end());
+            REQUIRE(schema.find("A") != schema.end());
+            REQUIRE(schema.find("B") != schema.end());
+        }
+    }
+}
 
 TEST_CASE("migration: Automatic") {
     InMemoryTestFile config;
@@ -1060,6 +1243,7 @@ TEST_CASE("migration: Automatic") {
                  {"pk", PropertyType::Int, Property::IsPrimary{true}},
                  {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  {"optional", PropertyType::Int | PropertyType::Nullable},
+                 {"text", PropertyType::String},
              }},
             {"link origin",
              {
@@ -1149,6 +1333,9 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("add index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "optional", true));
+        }
+        SECTION("add fulltext index") {
+            VERIFY_SCHEMA_IN_MIGRATION(set_fulltext_indexed(schema, "object", "text", true));
         }
         SECTION("remove index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "value", false));
@@ -2334,7 +2521,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE_NOTHROW(realm->update_schema(remove_property(schema, "object", "value")));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 2);
         auto const& properties = realm->schema().find("object")->persisted_properties;
-        REQUIRE(properties.size() == 1);
+        REQUIRE(properties.size() == 2);
         auto col_keys = table->get_column_keys();
         REQUIRE(col_keys.size() == 2);
         REQUIRE(properties[0].column_key == col_keys[1]);
@@ -2390,6 +2577,9 @@ TEST_CASE("migration: Additive") {
     }
 
     SECTION("add new columns from different SG") {
+        using vec = std::vector<SchemaChange>;
+        using namespace schema_change;
+
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2399,12 +2589,19 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() == schema);
+        auto schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
     }
 
     SECTION("opening new Realms uses the correct schema after an external change") {
+        using vec = std::vector<SchemaChange>;
+        using namespace schema_change;
+
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2414,9 +2611,13 @@ TEST_CASE("migration: Additive") {
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() == schema);
+        auto schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
 
         // Gets the schema from the RealmCoordinator
         auto realm3 = Realm::get_shared_realm(config);
@@ -2428,10 +2629,17 @@ TEST_CASE("migration: Additive") {
         realm2.reset();
         realm3.reset();
 
+        // In case of additive schemas, changes to an external realm are on purpose
+        // propagated between different realm instances.
         realm = Realm::get_shared_realm(config);
-        REQUIRE(realm->schema() == schema);
+        schema_diff = schema.compare(realm->schema());
+        REQUIRE(schema_diff.size() == 1);
+        REQUIRE(schema_diff == vec{(AddProperty{&*schema.find("object"),
+                                                &realm->schema().find("object")->persisted_properties[2]})});
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        REQUIRE(realm->schema().find("object")->persisted_properties[2].column_key == col_keys[2]);
     }
 
     SECTION("can have different subsets of columns in different Realm instances") {
@@ -2447,11 +2655,11 @@ TEST_CASE("migration: Additive") {
         auto realm3 = Realm::get_shared_realm(config3);
         REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
         REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
-        REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 1);
+        REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 3);
 
         realm->refresh();
         realm2->refresh();
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
         REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
 
         // No schema specified; should see all of them
@@ -2498,7 +2706,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE_THROWS_CONTAINING(
             realm->update_schema(add_property(schema, "object", {"value 3", PropertyType::Float})),
             "Property 'object.value 3' has been changed from 'int' to 'float'.");
-        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 3);
     }
 
     SECTION("update_schema() does not begin a write transaction when extra columns are present") {

@@ -87,6 +87,7 @@ public:
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
+    size_t get_offset_of_address(const void* addr) const;
 
     size_t get_end_index()
     {
@@ -155,6 +156,11 @@ private:
     void validate_page(size_t local_page_ndx) noexcept;
     void validate() noexcept;
 };
+
+inline size_t EncryptedFileMapping::get_offset_of_address(const void* addr) const
+{
+    return reinterpret_cast<size_t>(addr) & ((1 << m_page_shift) - 1);
+}
 
 inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const
 {

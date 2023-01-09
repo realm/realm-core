@@ -109,7 +109,7 @@ struct SharedFileInfo {
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
 
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     util::File validator;
 #endif
 

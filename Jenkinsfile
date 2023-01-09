@@ -547,12 +547,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       CMAKE_BUILD_TYPE: buildType,
       REALM_ENABLE_SYNC: "ON",
       CPACK_SYSTEM_NAME: cpackSystemName,
-      CMAKE_TOOLCHAIN_FILE: '%WORKSPACE%/tools/vcpkg/ports/scripts/buildsystems/vcpkg.cmake',
-      VCPKG_MANIFEST_DIR: '%WORKSPACE%/tools/vcpkg',
-      VCPKG_OVERLAY_TRIPLETS: '%WORKSPACE%/tools/vcpkg/triplets',
-      // set a custom buildtrees path because the default one is too long and msbuild tasks fail
-      VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
-      VCPKG_TARGET_TRIPLET: triplet,
       REALM_VERSION: gitDescribeVersion,
     ]
 

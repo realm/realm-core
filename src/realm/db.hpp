@@ -566,7 +566,6 @@ private:
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept REQUIRES(!m_mutex);
 
-    // Caller must hold DB::m_mutex
     void refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept REQUIRES(m_mutex);
 
     /// return true if write transaction can commence, false otherwise.

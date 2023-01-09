@@ -544,6 +544,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     sha_process(s, opad, 64);
     sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
     sha_done(s, dst);
+#elif OPENSSL_VERSION_NUMBER >= 0x10101000L // 1.1.1
+    std::unique_ptr<EVP_MD_CTX, void (*)(EVP_MD_CTX*)> ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), ipad, 64);
+    EVP_DigestUpdate(ctx.get(), static_cast<const uint8_t*>(src), len);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
+
+    ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), opad, 64);
+    EVP_DigestUpdate(ctx.get(), dst, SHA224_DIGEST_LENGTH);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
 #else
     SHA256_CTX ctx;
     SHA224_Init(&ctx);
@@ -642,7 +654,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
         size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
         if (actual < size) {
             if (actual >= required) {
-                memset(addr + actual, 0x55, size - actual);
+                 memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
@@ -877,7 +889,7 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_page_state.size();
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     std::string debug_msg;
     std::vector<uint64_t> pages_written;
 #endif
@@ -891,14 +903,14 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
         clear(m_page_state[local_page_ndx], Dirty);
+        m_debug_writes[local_page_ndx] = 0;
+#if REALM_ENCRYPTION_VERIFICATION
+        pages_written.push_back(page_ndx_in_file);
         debug_msg += util::format("page %1 (pos %2) has %3 writes\n", page_ndx_in_file,
                                   off_t(page_ndx_in_file << m_page_shift), m_debug_writes[local_page_ndx]);
-        m_debug_writes[local_page_ndx] = 0;
-#ifdef REALM_DEBUG
-        pages_written.push_back(page_ndx_in_file);
 #endif
     }
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
     if (pages_written.size() > 0 && m_file.validator.is_attached()) {
         m_file.validator.seek(m_file.validator.get_size());
         debug_msg += "wrote pages: ";
@@ -908,7 +920,7 @@ void EncryptedFileMapping::flush() noexcept
         debug_msg += std::string("\n");
         m_file.validator.write(debug_msg.data(), debug_msg.size());
     }
-#endif // REALM_DEBUG
+#endif // REALM_ENCRYPTION_VERIFICATION
 
     validate();
 }
@@ -978,8 +990,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
     size_t page_size = 1ULL << m_page_shift;
-    size_t required =
-        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) & (page_size - 1)) + size;
+    size_t required = get_offset_of_address(addr) + size;
     {
         // make sure the first page is available
         PageState& ps = m_page_state[first_accessed_local_page];
@@ -1000,6 +1011,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         // We know it's an array, and array headers are 8-byte aligned, so it is
         // included in the first page which was handled above.
         size = header_to_size(static_cast<const char*>(addr));
+        required = get_offset_of_address(addr) + size;
     }
 
     size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);

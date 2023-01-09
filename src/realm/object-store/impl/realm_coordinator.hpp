@@ -201,8 +201,9 @@ public:
     using NotifierVector = std::vector<std::shared_ptr<_impl::CollectionNotifier>>;
     // Called by NotifierPackage in the cases where we don't know what version
     // we need notifiers for until after we begin advancing (e.g. when
-    // starting a write transaction).
-    std::optional<VersionID> package_notifiers(NotifierVector& notifiers, VersionID::version_type)
+    // starting a write transaction). Will return a Transaction at the packaged
+    // version if any notifiers were packaged, and null otherwise.
+    TransactionRef package_notifiers(NotifierVector& notifiers, VersionID::version_type)
         REQUIRES(!m_notifier_mutex, !m_running_notifiers_mutex);
 
     // testing hook only to verify that notifiers are not being run at times
@@ -240,8 +241,11 @@ private:
 
     util::CheckedMutex m_running_notifiers_mutex;
     // Transaction used for actually running async notifiers
-    // Will have a read transaction iff m_notifiers is non-empty
-    std::shared_ptr<Transaction> m_notifier_sg;
+    // Will be non-null iff m_notifiers is non-empty
+    std::shared_ptr<Transaction> m_notifier_transaction;
+    // Transaction used to pin the version which notifiers are currently ready
+    // to deliver to
+    std::shared_ptr<Transaction> m_notifier_handover_transaction;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
 

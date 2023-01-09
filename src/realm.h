@@ -362,6 +362,7 @@ typedef enum realm_property_flags {
     RLM_PROPERTY_NULLABLE = 1,
     RLM_PROPERTY_PRIMARY_KEY = 2,
     RLM_PROPERTY_INDEXED = 4,
+    RLM_PROPERTY_FULLTEXT_INDEXED = 8,
 } realm_property_flags_e;
 
 
@@ -2909,6 +2910,16 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, u
 RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_device_version(realm_app_config_t* config,
+                                                 const char* device_version) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config,
+                                                 const char* framework_name) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
+                                                    const char* framework_version) RLM_API_NOEXCEPT;
+
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
  * Note: the caller must delete the pointer to the string via realm_release
@@ -3145,7 +3156,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
-    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+    realm_app_void_completion_func_t callback, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Creates a user API key that can be used to authenticate as the current user.
@@ -3400,6 +3411,7 @@ typedef enum realm_sync_error_category {
     RLM_SYNC_ERROR_CATEGORY_CLIENT,
     RLM_SYNC_ERROR_CATEGORY_CONNECTION,
     RLM_SYNC_ERROR_CATEGORY_SESSION,
+    RLM_SYNC_ERROR_CATEGORY_RESOLVE,
 
     /**
      * System error - POSIX errno, Win32 HRESULT, etc.
@@ -3527,6 +3539,12 @@ typedef struct realm_sync_error_user_info {
     const char* value;
 } realm_sync_error_user_info_t;
 
+typedef struct realm_sync_error_compensating_write_info {
+    const char* reason;
+    const char* object_name;
+    realm_value_t primary_key;
+} realm_sync_error_compensating_write_info_t;
+
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
 // Pointers to this struct and its pointer members are only valid inside the scope
@@ -3543,6 +3561,9 @@ typedef struct realm_sync_error {
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
+
+    realm_sync_error_compensating_write_info_t* compensating_writes;
+    size_t compensating_writes_length;
 } realm_sync_error_t;
 
 /**
@@ -3931,9 +3952,11 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
  * needed
  * @param realm_app ptr to realm app.
  * @param sync_path path where the sync files are.
- * @return true if operation was succesful
+ * @param did_run ptr to bool, which will be set to true if operation was successful
+ * @return true if operation was successful
  */
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session's connection state changes.

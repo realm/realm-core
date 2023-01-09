@@ -127,7 +127,7 @@ bool CollectionNotifier::all_callbacks_filtered() const noexcept
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
     : m_realm(std::move(realm))
-    , m_sg_version(Realm::Internal::get_transaction(*m_realm).get_version_of_current_transaction())
+    , m_transaction(m_realm->duplicate())
 {
 }
 
@@ -138,9 +138,14 @@ CollectionNotifier::~CollectionNotifier()
     unregister();
 }
 
+VersionID CollectionNotifier::version() const noexcept
+{
+    return m_transaction->get_version_of_current_transaction();
+}
+
 void CollectionNotifier::release_data() noexcept
 {
-    m_sg = nullptr;
+    m_transaction = nullptr;
 }
 
 static bool all_have_filters(std::vector<NotificationCallback> const& callbacks) noexcept
@@ -279,9 +284,8 @@ void CollectionNotifier::update_related_tables(Table const& table)
 
 void CollectionNotifier::prepare_handover()
 {
-    REALM_ASSERT(m_sg);
-    m_sg_version = m_sg->get_version_of_current_transaction();
-    do_prepare_handover(*m_sg);
+    REALM_ASSERT(m_transaction);
+    do_prepare_handover(*m_transaction);
     add_changes(std::move(m_change));
     m_change = {};
     REALM_ASSERT(m_change.empty());
@@ -366,11 +370,12 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
     m_callback_index = npos;
 }
 
-void CollectionNotifier::attach_to(std::shared_ptr<Transaction> sg)
+void CollectionNotifier::attach_to(std::shared_ptr<Transaction> tr)
 {
     REALM_ASSERT(!m_has_run);
-    do_attach_to(*sg);
-    m_sg = std::move(sg);
+    // Keep the old transaction alive until the end of the function
+    m_transaction.swap(tr);
+    reattach();
 }
 
 Transaction& CollectionNotifier::source_shared_group()
@@ -414,10 +419,17 @@ NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>
 }
 
 NotifierPackage::NotifierPackage(std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
-                                 std::optional<VersionID> version)
-    : m_version(version)
+                                 std::shared_ptr<Transaction> pin_tr)
+    : m_pin_tr(pin_tr)
     , m_notifiers(std::move(notifiers))
 {
+}
+
+std::optional<VersionID> NotifierPackage::version() const noexcept
+{
+    if (m_pin_tr)
+        return m_pin_tr->get_version_of_current_transaction();
+    return std::nullopt;
 }
 
 void NotifierPackage::package_and_wait(VersionID::version_type target_version)
@@ -425,9 +437,9 @@ void NotifierPackage::package_and_wait(VersionID::version_type target_version)
     if (!m_coordinator || !*this)
         return;
 
-    m_version = m_coordinator->package_notifiers(m_notifiers, target_version);
-    if (m_version && m_version->version < target_version)
-        m_version = util::none;
+    m_pin_tr = m_coordinator->package_notifiers(m_notifiers, target_version);
+    if (m_pin_tr && m_pin_tr->get_version_of_current_transaction().version < target_version)
+        m_pin_tr.reset();
 }
 
 void NotifierPackage::before_advance()

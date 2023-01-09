@@ -25,10 +25,11 @@
 #include <deque>
 #include <random>
 
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+
 #include <realm/util/logger.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/network_ssl.hpp>
 
 
 namespace realm {
@@ -47,7 +48,7 @@ std::error_code make_error_code(Error) noexcept;
 
 class Client {
 public:
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = network::Endpoint::port_type;
     using LoginHandler = void(std::error_code, std::string access_token, std::string refresh_token);
     using RefreshHandler = void(std::error_code, std::string access_token);
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
@@ -120,7 +121,7 @@ public:
     /// This functions is thread-safe.
     void refresh(std::string refresh_token, std::function<RefreshHandler>);
 
-    util::network::Service& get_service();
+    network::Service& get_service();
     const std::string& get_auth_address();
     port_type get_auth_port();
     void request_is_done(std::int_fast64_t request_counter);
@@ -134,7 +135,7 @@ private:
     class LoginRequest;
     class RefreshRequest;
 
-    util::network::Service m_service;
+    network::Service m_service;
     const bool m_auth_ssl;
     const std::string m_auth_address;
     const port_type m_auth_port;
@@ -148,7 +149,7 @@ private:
 
     std::mt19937_64 m_random;
 
-    util::network::DeadlineTimer m_keep_running_timer;
+    network::DeadlineTimer m_keep_running_timer;
 
     std::int_fast64_t m_request_counter = 0;
 
