@@ -659,7 +659,7 @@ public:
             r2 = r;
             r2.count_full = r2.count_live = r2.count_frozen = 0;
         }
-        REALM_ASSERT(field_for_type(r2, type) == 0);
+        REALM_ASSERT_EX(field_for_type(r2, type) == 0, type, r2.count_full, r2.count_live, r2.count_frozen);
         field_for_type(r2, type) = 1;
 
         return read_lock;
@@ -1500,6 +1500,9 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             Array top(m_alloc);
             top.init_from_ref(top_ref);
             logical_file_size = Group::get_logical_file_size(top);
+        }
+        if (m_last_encryption_page_reader) {
+            m_version_manager->release_read_lock(*m_last_encryption_page_reader);
         }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
         m_last_encryption_page_reader =
