@@ -96,6 +96,7 @@
 * Freelist may be corrupted if compaction was initiated ([#6054](https://github.com/realm/realm-core/pull/6054), since v13.0.0)
 
 ### Breaking changes
+* Passing an empty `key_path_array` to `add_notification_callback now` now ignores nested property changes. Pass `std::nullopt` to achieve the old meaning. ([#6122](https://github.com/realm/realm-core/pull/6122))
 * Updated `logger_factory` in SyncClientConfig to return a `shared_ptr` instead of a `unique_ptr` ([PR #5980](https://github.com/realm/realm-core/pull/5980))
 * `util::RootLogger` has been replaced with `util::Logger`
 
