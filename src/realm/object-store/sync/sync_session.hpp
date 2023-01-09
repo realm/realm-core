@@ -107,6 +107,7 @@ public:
         Dying,
         Inactive,
         WaitingForAccessToken,
+        Paused,
     };
 
     enum class ConnectionState {
@@ -175,6 +176,7 @@ public:
     // Specifically:
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `Inactive`, recreate it.
+    // If the sync session is currently `Paused`, do nothing - call resume() instead.
     // Otherwise, a no-op.
     void revive_if_needed() REQUIRES(!m_state_mutex, !m_config_mutex);
 
@@ -186,6 +188,13 @@ public:
 
     // Inform the sync session that it should log out.
     void log_out() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+
+    // Closes the sync session so that it will not resume until resume() is called.
+    void pause() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+
+    // Resumes the sync session after it was paused by calling pause(). If the sync session is inactive
+    // for any other reason this will also resume it.
+    void resume() REQUIRES(!m_state_mutex, !m_config_mutex);
 
     // Shut down the synchronization session (sync::Session) and wait for the Realm file to no
     // longer be open on behalf of it.
@@ -357,7 +366,16 @@ private:
     void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_inactive(util::CheckedUniqueLock, std::error_code ec = {}) RELEASE(m_state_mutex)
         REQUIRES(!m_connection_state_mutex);
+    void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+
+    // do_become_inactive is called from both become_paused()/become_inactive() and does all the steps to
+    // shutdown and cleanup the sync session besides setting m_state.
+    void do_become_inactive(util::CheckedUniqueLock, std::error_code ec) RELEASE(m_state_mutex)
+        REQUIRES(!m_connection_state_mutex);
+    // do_revive is called from both revive_if_needed() and resume(). It does all the steps to transition
+    // from a state that is not Active to Active.
+    void do_revive(util::CheckedUniqueLock&& lock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex);
 
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);

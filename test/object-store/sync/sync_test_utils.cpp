@@ -416,7 +416,7 @@ struct BaasClientReset : public TestClientReset {
             wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
                                        {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
 
-            session->log_out();
+            session->pause();
 
             realm->begin_transaction();
             obj.set(col, 4);
@@ -485,7 +485,7 @@ struct BaasClientReset : public TestClientReset {
         }
 
         // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
+        session->resume();
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
@@ -531,7 +531,7 @@ struct BaasFLXClientReset : public TestClientReset {
             wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
                                        std::string(c_object_schema_name),
                                        {{std::string(c_id_col_name), pk_of_added_object}});
-            session->log_out();
+            session->pause();
 
             if (m_make_local_changes) {
                 m_make_local_changes(realm);
@@ -586,7 +586,7 @@ struct BaasFLXClientReset : public TestClientReset {
         }
 
         // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
+        session->resume();
         if (m_on_post_local) {
             m_on_post_local(realm);
         }

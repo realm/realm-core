@@ -1141,7 +1141,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     SECTION("Bad query after bad query") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             auto sync_session = realm->sync_session();
-            sync_session->close();
+            sync_session->pause();
 
             auto subs = create_subscription(realm, "class_TopLevel", "non_queryable_field", [](auto q, auto c) {
                 return q.equal(c, "bar");
@@ -1150,7 +1150,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
                 return q.equal(c, "bar");
             });
 
-            sync_session->revive_if_needed();
+            sync_session->resume();
 
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
             auto sub_res2 =
@@ -1207,7 +1207,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
                 REQUIRE(latest_subs.version() == 1);
                 REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
 
-                session->close();
+                session->pause();
                 promise->emplace_value();
 
                 return SyncClientHookAction::NoAction;
@@ -1343,7 +1343,7 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app]") {
     wait_for_download(*realm);
 
     // Now disconnect the sync session
-    realm->sync_session()->close();
+    realm->sync_session()->pause();
 
     // And move the "foo" object created above into view and create a different diverging copy of it locally.
     auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
@@ -1360,7 +1360,7 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app]") {
     realm->commit_transaction();
 
     // Reconnect the sync session and wait for the subscription that moved "foo" into view to be fully synchronized.
-    realm->sync_session()->revive_if_needed();
+    realm->sync_session()->resume();
     wait_for_upload(*realm);
     wait_for_download(*realm);
     subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
@@ -1415,7 +1415,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
 
         wait_for_upload(*realm);
         wait_for_download(*realm);
-        sync_session->close();
+        sync_session->pause();
 
         // Make it so the subscriptions only match the "foo" object
         {
@@ -1453,7 +1453,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             realm->commit_transaction();
         }
 
-        sync_session->revive_if_needed();
+        sync_session->resume();
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
@@ -1807,7 +1807,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     }
 
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::MoreToCome) {
-                        session->close();
+                        session->pause();
                         promise->emplace_value();
                         return SyncClientHookAction::EarlyReturn;
                     }
@@ -1886,7 +1886,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     }
 
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
-                        session->close();
+                        session->pause();
                         promise->emplace_value();
                         return SyncClientHookAction::EarlyReturn;
                     }
@@ -2378,7 +2378,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
                 REQUIRE(table->find_primary_key(bar_obj_id));
                 REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-                sess->close();
+                sess->pause();
                 promise.get_promise().emplace_value();
                 return SyncClientHookAction::NoAction;
             };
@@ -2413,7 +2413,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         sub_set.refresh();
         REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
 
-        problem_realm->sync_session()->revive_if_needed();
+        problem_realm->sync_session()->resume();
         sub_complete_future.get();
         wait_for_advance(*problem_realm);
 

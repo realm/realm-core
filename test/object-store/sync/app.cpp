@@ -2690,7 +2690,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex mutex;
         bool done = false;
         auto r = Realm::get_shared_realm(config);
-        r->sync_session()->close();
+        r->sync_session()->pause();
 
         // Create 26 MB worth of dogs in 26 transactions, which should work but
         // will result in an error from the server if the changesets are batched
@@ -2710,7 +2710,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!ec);
             done = true;
         });
-        r->sync_session()->revive_if_needed();
+        r->sync_session()->resume();
 
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
@@ -2751,6 +2751,33 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                  "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
+    }
+
+    SECTION("freezing realm does not resume session") {
+        SyncTestFile config(app, partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+
+        auto state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Active);
+
+        realm->sync_session()->pause();
+        state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Paused);
+
+        realm->read_group();
+
+        {
+            auto frozen = realm->freeze();
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
+
+        {
+            auto frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
     }
 
     SECTION("validation") {
