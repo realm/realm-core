@@ -1941,6 +1941,22 @@ struct IterateTableByIndexStringPrimaryKey : IterateTableByIndexNoPrimaryKey {
     }
 };
 
+struct TransactionDuplicate : Benchmark {
+    const char* name() const
+    {
+        return "TransactionDuplicate";
+    }
+
+    void operator()(DBRef db)
+    {
+        auto tr = db->start_read();
+        for (int i = 0; i < 10'000; ++i)
+            tr->duplicate();
+    }
+    void before_each(DBRef) {}
+    void after_each(DBRef) {}
+};
+
 const char* to_lead_cstr(RealmDurability level)
 {
     switch (level) {
@@ -2142,6 +2158,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomDelete);
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
+
+    BENCH(TransactionDuplicate);
 
 #undef BENCH
 #undef BENCH2

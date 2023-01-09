@@ -59,9 +59,10 @@ typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
-typedef struct realm_callback_interface_thread_observer realm_interface_callback_thread_observer_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
+typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata);
+typedef void (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -361,6 +362,7 @@ typedef enum realm_property_flags {
     RLM_PROPERTY_NULLABLE = 1,
     RLM_PROPERTY_PRIMARY_KEY = 2,
     RLM_PROPERTY_INDEXED = 4,
+    RLM_PROPERTY_FULLTEXT_INDEXED = 8,
 } realm_property_flags_e;
 
 
@@ -368,6 +370,7 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
+typedef struct realm_thread_observer_token realm_thread_observer_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
@@ -1118,10 +1121,9 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
  *
  * This calls `advance_read()` at the Core layer.
  *
- * @return True if the realm was successfully refreshed and no exceptions were
- *         thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
-RLM_API bool realm_refresh(realm_t*);
+RLM_API bool realm_refresh(realm_t*, bool* did_refresh);
 
 /**
  * Produce a frozen view of this realm.
@@ -1133,7 +1135,7 @@ RLM_API realm_t* realm_freeze(const realm_t*);
 /**
  * Vacuum the free space from the realm file, reducing its file size.
  *
- * @return True if compaction was successful and no exceptions were thrown.
+ * @return True if no exceptions are thrown, false otherwise.
  */
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
 
@@ -2908,6 +2910,16 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, u
 RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_device_version(realm_app_config_t* config,
+                                                 const char* device_version) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config,
+                                                 const char* framework_name) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
+                                                    const char* framework_version) RLM_API_NOEXCEPT;
+
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
  * Note: the caller must delete the pointer to the string via realm_release
@@ -3144,7 +3156,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
-    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+    realm_app_void_completion_func_t callback, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Creates a user API key that can be used to authenticate as the current user.
@@ -3399,6 +3411,7 @@ typedef enum realm_sync_error_category {
     RLM_SYNC_ERROR_CATEGORY_CLIENT,
     RLM_SYNC_ERROR_CATEGORY_CONNECTION,
     RLM_SYNC_ERROR_CATEGORY_SESSION,
+    RLM_SYNC_ERROR_CATEGORY_RESOLVE,
 
     /**
      * System error - POSIX errno, Win32 HRESULT, etc.
@@ -3526,6 +3539,12 @@ typedef struct realm_sync_error_user_info {
     const char* value;
 } realm_sync_error_user_info_t;
 
+typedef struct realm_sync_error_compensating_write_info {
+    const char* reason;
+    const char* object_name;
+    realm_value_t primary_key;
+} realm_sync_error_compensating_write_info_t;
+
 // This type should never be returned from a function.
 // It's only meant as an asynchronous callback argument.
 // Pointers to this struct and its pointer members are only valid inside the scope
@@ -3542,6 +3561,9 @@ typedef struct realm_sync_error {
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
+
+    realm_sync_error_compensating_write_info_t* compensating_writes;
+    size_t compensating_writes_length;
 } realm_sync_error_t;
 
 /**
@@ -3637,13 +3659,18 @@ RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
                                                  realm_userdata_t userdata,
                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+/// DEPRECATED - Will be removed in a future release
 RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
+/// DEPRECATED - Will be removed in a future release
 RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
+/// DEPRECATED - Will be removed in a future release
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
                                                        realm_userdata_t userdata,
                                                        realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_cancel_waits_on_nonfatal_error(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
+/// DEPRECATED - Will be removed in a future release
 RLM_API void realm_sync_config_set_authorization_header_name(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
+/// DEPRECATED - Will be removed in a future release
 RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name,
                                                       const char* value) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3930,9 +3957,11 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
  * needed
  * @param realm_app ptr to realm app.
  * @param sync_path path where the sync files are.
- * @return true if operation was succesful
+ * @param did_run ptr to bool, which will be set to true if operation was successful
+ * @return true if operation was successful
  */
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session's connection state changes.
@@ -3991,16 +4020,21 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
  * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
  */
-RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
+RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
  * runs.
- * @param thread_observer a ptr to an implementation class that can receive these notifications. If nullptr is passed
- * instead, this will have the effect of unregistering the callback.
+ * @param on_thread_create callback invoked when the object store thread is created
+ * @param on_thread_destroy callback invoked when the object store thread is destroyed
+ * @param on_error callback invoked to signal to the listener that some error has occured.
+ * @return a token that has to be released in order to stop receiving notifications
  */
-RLM_API void realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer)
-    RLM_API_NOEXCEPT;
+RLM_API realm_thread_observer_token_t*
+realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
+                                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t,
+                                           realm_free_userdata_func_t free_userdata);
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 

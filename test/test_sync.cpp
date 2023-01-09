@@ -23,6 +23,9 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/instructions.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
@@ -32,12 +35,9 @@
 #include <realm/sync/transform.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/features.h>
-#include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/websocket.hpp>
 #include <realm/version.hpp>
 
 #include "sync_fixtures.hpp"
@@ -194,7 +194,7 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 
     // Nonempty
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     wait();
 
@@ -203,7 +203,7 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 
     // More
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_bar");
+        wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     wait();
 }
@@ -219,7 +219,7 @@ TEST(Sync_AsyncWaitForUploadCompletionNoPendingLocalChanges)
     Session session = fixture.make_bound_session(db, "/test");
 
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
 
     auto pf = util::make_promise_future<bool>();
@@ -261,7 +261,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     // Upload something via session 2
     Session session_2 = fixture.make_bound_session(db_2, "/test");
     write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
 
@@ -281,7 +281,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 
     // Upload something via session 1
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-        wt.add_table("class_bar");
+        wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
 
@@ -323,13 +323,13 @@ TEST(Sync_AsyncWaitForSyncCompletion)
     // Generate changes to be downloaded (uploading via session 2)
     Session session_2 = fixture.make_bound_session(db_2);
     write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
 
     // Generate changes to be uploaded
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-        wt.add_table("class_bar");
+        wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
 
     // Nontrivial synchronization (upload and download required)
@@ -395,7 +395,7 @@ TEST(Sync_WaitForUploadCompletion)
 
     // Nonempty
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     // Since the Realm is no longer empty, the following wait operation cannot
     // complete until the client has been in contact with the server, and caused
@@ -408,7 +408,7 @@ TEST(Sync_WaitForUploadCompletion)
 
     // More changes
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-        wt.add_table("class_bar");
+        wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session.wait_for_upload_complete_or_client_stopped();
 }
@@ -430,7 +430,7 @@ TEST(Sync_WaitForUploadCompletionAfterEmptyTransaction)
     }
     {
         WriteTransaction wt(db);
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         version_type new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         session.wait_for_upload_complete_or_client_stopped();
@@ -456,7 +456,7 @@ TEST(Sync_WaitForDownloadCompletion)
     // Upload something via session 2
     Session session_2 = fixture.make_bound_session(db_2);
     write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-        wt.add_table("class_foo");
+        wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
     });
     session_2.wait_for_upload_complete_or_client_stopped();
 
@@ -476,7 +476,7 @@ TEST(Sync_WaitForDownloadCompletion)
 
     // Upload something via session 1
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-        wt.add_table("class_bar");
+        wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
 
@@ -591,7 +591,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         session.set_connection_state_change_listener(listener);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_unspecified);
         write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
+            wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
@@ -618,7 +618,7 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_null);
         {
             write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-                wt.add_table("class_foo");
+                wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             });
         }
         session.wait_for_upload_complete_or_client_stopped();
@@ -639,13 +639,13 @@ TEST(Sync_Upload)
 
     {
         write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
         });
         for (int i = 0; i < 100; ++i) {
             WriteTransaction wt(db);
             TableRef table = wt.get_table("class_foo");
-            table->create_object();
+            table->create_object_with_primary_key(i);
             version_type new_version = wt.commit();
             session.nonsync_transact_notify(new_version);
         }
@@ -681,14 +681,14 @@ TEST(Sync_Replication)
 
         // Create schema
         write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
         });
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         for (int i = 0; i < 100; ++i) {
             WriteTransaction wt(db_1);
             TableRef table = wt.get_table("class_foo");
-            table->create_object();
+            table->create_object_with_primary_key(i);
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x7FFFFFFFFFFFFFFF));
             version_type new_version = wt.commit();
@@ -738,7 +738,7 @@ TEST(Sync_Merge)
             WriteTransaction wt(db);
             if (wt.has_table("class_foo"))
                 return;
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
             version_type new_version = wt.commit();
             sess.nonsync_transact_notify(new_version);
@@ -748,13 +748,13 @@ TEST(Sync_Merge)
 
         write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
-            table->create_object().set("i", 5);
-            table->create_object().set("i", 6);
+            table->create_object_with_primary_key(1).set("i", 5);
+            table->create_object_with_primary_key(2).set("i", 6);
         });
         write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
-            table->create_object().set("i", 7);
-            table->create_object().set("i", 8);
+            table->create_object_with_primary_key(3).set("i", 7);
+            table->create_object_with_primary_key(4).set("i", 8);
         });
 
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -834,14 +834,14 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
     test_schema_mismatch(
         test_context,
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             ColKey col_ndx = table->add_column(type_Int, "column");
-            table->create_object().set<int64_t>(col_ndx, 123);
+            table->create_object_with_primary_key(1).set<int64_t>(col_ndx, 123);
         },
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             ColKey col_ndx = table->add_column(type_String, "column");
-            table->create_object().set(col_ndx, "Hello, World!");
+            table->create_object_with_primary_key(2).set(col_ndx, "Hello, World!");
         },
         "Property 'column' in class 'foo' is of type Int on one side and type String on the other.",
         "Property 'column' in class 'foo' is of type String on one side and type Int on the other.");
@@ -853,16 +853,16 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
     test_schema_mismatch(
         test_context,
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             bool nullable = false;
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
-            table->create_object().set<int64_t>(col_ndx, 123);
+            table->create_object_with_primary_key(1).set<int64_t>(col_ndx, 123);
         },
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             bool nullable = true;
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
-            table->create_object().set<int64_t>(col_ndx, 123);
+            table->create_object_with_primary_key(2).set<int64_t>(col_ndx, 123);
         },
         "Property 'column' in class 'foo' is nullable on one side and not on the other.");
 }
@@ -873,13 +873,13 @@ TEST(Sync_DetectSchemaMismatch_Links)
     test_schema_mismatch(
         test_context,
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
-            TableRef target = wt.add_table("class_bar");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+            TableRef target = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
             table->add_column(*target, "column");
         },
         [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
-            TableRef target = wt.add_table("class_baz");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
+            TableRef target = wt.get_group().add_table_with_primary_key("class_baz", type_Int, "id");
             table->add_column(*target, "column");
         },
         "Link property 'column' in class 'foo' points to class 'bar' on one side and to 'baz' on the other.",
@@ -948,13 +948,13 @@ TEST(Sync_LateBind)
 
         Session session_1 = fixture.make_bound_session(db_1);
         write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
+            wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session_1.wait_for_upload_complete_or_client_stopped();
 
         Session session_2 = fixture.make_bound_session(db_2);
         write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-            wt.add_table("class_bar");
+            wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
         });
         session_2.wait_for_upload_complete_or_client_stopped();
 
@@ -990,7 +990,7 @@ TEST(Sync_EarlyUnbind)
     {
         Session session_2 = fixture.make_bound_session(db_2);
         write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
+            wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         });
         session_2.wait_for_upload_complete_or_client_stopped();
         // Session 2 is now connected, but will be abandoned at end of scope
@@ -1024,9 +1024,9 @@ TEST(Sync_FastRebind)
     {
         Session session_2 = fixture.make_bound_session(db_2, "/test");
         WriteTransaction wt(db_2);
-        TableRef table = wt.add_table("class_foo");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         table->add_column(type_Int, "i");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         version_type new_version = wt.commit();
         session_2.nonsync_transact_notify(new_version);
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -1158,21 +1158,21 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     {
         WriteTransaction wt{db_a1};
 
-        TableRef table_target = wt.add_table("class_target");
+        TableRef table_target = wt.get_group().add_table_with_primary_key("class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
         CHECK_EQUAL(col_ndx, 1);
-        Obj row0 = table_target->create_object();
-        Obj row1 = table_target->create_object();
-        Obj row2 = table_target->create_object();
+        Obj row0 = table_target->create_object_with_primary_key(i);
+        Obj row1 = table_target->create_object_with_primary_key(i);
+        Obj row2 = table_target->create_object_with_primary_key(i);
         row0.set(col_ndx, 123);
         row1.set(col_ndx, 456);
         row2.set(col_ndx, 789);
 
-        TableRef table_source = wt.add_table("class_source");
+        TableRef table_source = wt.get_group().add_table_with_primary_key("class_source");
         col_ndx = table_source->add_column_link(type_LinkList, "target_link",
                                                 *table_target);
         CHECK_EQUAL(col_ndx, 1);
-        Obj obj = table_source->create_object();
+        Obj obj = table_source->create_object_with_primary_key(i);
         auto ll = obj.get_linklist(col_ndx);
         ll.insert(0, row2.get_key());
         CHECK_EQUAL(ll.size(), 1);
@@ -1248,21 +1248,21 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     {
         WriteTransaction wt{db_b1};
 
-        TableRef table_target = wt.add_table("class_target");
+        TableRef table_target = wt.get_group().add_table_with_primary_key("class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
         CHECK_EQUAL(col_ndx, 1);
-        table_target->create_object();
-        table_target->create_object();
-        table_target->create_object();
+        table_target->create_object_with_primary_key(i);
+        table_target->create_object_with_primary_key(i);
+        table_target->create_object_with_primary_key(i);
         table_target->begin()->set(col_ndx, 123);
         table_target->get_object(1).set(col_ndx, 456);
         table_target->get_object(2).set(col_ndx, 789);
 
-        TableRef table_source = wt.add_table("class_source");
+        TableRef table_source = wt.get_group().add_table_with_primary_key("class_source");
         col_ndx = table_source->add_column_link(type_LinkList, "target_link",
                                                 *table_target);
         CHECK_EQUAL(col_ndx, 1);
-        table_source->create_object();
+        table_source->create_object_with_primary_key(i);
         auto ll = table_source->get_linklist(col_ndx, 0);
         ll->insert(0, 2);
         CHECK_EQUAL(ll->size(), 1);
@@ -1376,9 +1376,9 @@ TEST(Sync_Randomized)
         write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
             if (wt.has_table("class_foo"))
                 return;
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object();
+            table->create_object_with_primary_key(1);
         });
 
         Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -1387,7 +1387,7 @@ TEST(Sync_Randomized)
             if (random.chance(4, 5)) {
                 TableRef table = wt.get_table("class_foo");
                 if (random.chance(1, 5)) {
-                    table->create_object();
+                    table->create_object_with_primary_key(i);
                 }
                 int value = random.draw_int(-32767, 32767);
                 size_t row_ndx = random.draw_int_mod(table->size());
@@ -1519,14 +1519,14 @@ TEST(Sync_FailingReadsOnClientSide)
         Session session_2 = fixture.make_bound_session(db_2);
 
         write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object();
+            table->create_object_with_primary_key(1);
         });
         write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_bar");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object();
+            table->create_object_with_primary_key(2);
         });
         for (int i = 0; i < 100; ++i) {
             session_1.wait_for_upload_complete_or_client_stopped();
@@ -1579,14 +1579,14 @@ TEST(Sync_FailingReadsOnServerSide)
         Session session_2 = fixture.make_bound_session(db_2);
 
         write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object();
+            table->create_object_with_primary_key(1);
         });
         write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
-            TableRef table = wt.add_table("class_bar");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_bar", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object();
+            table->create_object_with_primary_key(2);
         });
         for (int i = 0; i < 100; ++i) {
             session_1.wait_for_upload_complete_or_client_stopped();
@@ -1632,7 +1632,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
         Session session = fixture.make_bound_session(db, server_path);
         WriteTransaction wt{db};
-        wt.add_table("class_table");
+        wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         fixture.start();
@@ -1676,14 +1676,14 @@ TEST(Sync_HTTP404NotFound)
     util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
-    util::network::Endpoint endpoint = server.listen_endpoint();
+    network::Endpoint endpoint = server.listen_endpoint();
 
     ThreadWrapper server_thread;
     server_thread.start([&] {
         server.run();
     });
 
-    util::HTTPRequest request;
+    HTTPRequest request;
     request.path = "/not-found";
 
     HTTPRequestClient client(*(test_context.logger), endpoint, request);
@@ -1693,9 +1693,9 @@ TEST(Sync_HTTP404NotFound)
 
     server_thread.join();
 
-    const util::HTTPResponse& response = client.get_response();
+    const HTTPResponse& response = client.get_response();
 
-    CHECK(response.status == util::HTTPStatus::NotFound);
+    CHECK(response.status == HTTPStatus::NotFound);
     CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_VERSION_STRING);
 }
 
@@ -1704,8 +1704,8 @@ namespace {
 
 class RequestWithContentLength {
 public:
-    RequestWithContentLength(test_util::unit_test::TestContext& test_context, util::network::Service& service,
-                             const util::network::Endpoint& endpoint, const std::string& content_length,
+    RequestWithContentLength(test_util::unit_test::TestContext& test_context, network::Service& service,
+                             const network::Endpoint& endpoint, const std::string& content_length,
                              const std::string& expected_response_line)
         : test_context{test_context}
         , m_socket{service}
@@ -1751,11 +1751,11 @@ public:
 
 private:
     test_util::unit_test::TestContext& test_context;
-    util::network::Socket m_socket;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
+    network::Socket m_socket;
+    network::ReadAheadBuffer m_read_ahead_buffer;
     static constexpr size_t m_buf_size = 1000;
     char m_buffer[m_buf_size];
-    const util::network::Endpoint& m_endpoint;
+    const network::Endpoint& m_endpoint;
     const std::string m_content_length;
     std::string m_request;
     const std::string m_expected_response_line;
@@ -1780,14 +1780,14 @@ TEST(Sync_HTTP_ContentLength)
     util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
     Server server(server_dir, std::move(public_key), server_config);
     server.start();
-    util::network::Endpoint endpoint = server.listen_endpoint();
+    network::Endpoint endpoint = server.listen_endpoint();
 
     ThreadWrapper server_thread;
     server_thread.start([&] {
         server.run();
     });
 
-    util::network::Service service;
+    network::Service service;
 
     RequestWithContentLength req_0(test_context, service, endpoint, "0", "HTTP/1.1 404 Not Found\r\n");
 
@@ -1825,7 +1825,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
         Session session = fixture.make_bound_session(db, server_path);
         WriteTransaction wt{db};
-        TableRef table = wt.add_table("class_table");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
@@ -1842,7 +1842,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
         Session session = fixture.make_bound_session(db, server_path);
         WriteTransaction wt{db};
         TableRef table = wt.get_table("class_table");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         fixture.start();
@@ -1889,7 +1889,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         Session session_1 = fixture.make_bound_session(db_1, server_path);
         Session session_2 = fixture.make_bound_session(db_2, server_path);
         WriteTransaction wt{db_1};
-        TableRef table = wt.add_table("class_table");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -1907,7 +1907,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         Session session = fixture.make_bound_session(db_1, server_path);
         WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         fixture.start();
@@ -1923,7 +1923,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
         Session session = fixture.make_bound_session(db_2, server_path);
         WriteTransaction wt{db_2};
         TableRef table = wt.get_table("class_table");
-        table->create_object();
+        table->create_object_with_primary_key(2);
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         fixture.start();
@@ -1967,7 +1967,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
         Session session = fixture.make_bound_session(db_1, server_path);
         WriteTransaction wt{db_1};
-        TableRef table = wt.add_table("class_table_1");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table_1", type_Int, "id");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
@@ -2036,7 +2036,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         Session session_2 = fixture.make_bound_session(db_2, server_path);
         Session session_3 = fixture.make_bound_session(db_3, server_path);
         WriteTransaction wt{db_1};
-        TableRef table = wt.add_table("class_table");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -2057,7 +2057,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         Session session_2 = fixture.make_bound_session(db_2, server_path);
         WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         auto new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
         fixture.start();
@@ -2074,7 +2074,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
         Session session = fixture.make_bound_session(db_3, server_path);
         WriteTransaction wt{db_3};
         TableRef table = wt.get_table("class_table");
-        table->create_object();
+        table->create_object_with_primary_key(2);
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         fixture.start();
@@ -2122,6 +2122,7 @@ TEST(Sync_MultipleServers)
         out << server_index << "_" << realm_index << "_" << file_index << ".realm";
         return util::File::resolve(out.str(), dir_2);
     };
+    std::atomic<int> id = 0;
 
     auto run = [&](int server_index, int realm_index, int file_index) {
         try {
@@ -2129,7 +2130,7 @@ TEST(Sync_MultipleServers)
             DBRef db = DB::create(make_client_replication(), path);
             {
                 WriteTransaction wt(db);
-                TableRef table = wt.add_table("class_table");
+                TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
                 table->add_column(type_Int, "server_index");
                 table->add_column(type_Int, "realm_index");
                 table->add_column(type_Int, "file_index");
@@ -2145,7 +2146,7 @@ TEST(Sync_MultipleServers)
                 for (int j = 0; j < num_transacts_per_session; ++j) {
                     WriteTransaction wt(db);
                     TableRef table = wt.get_table("class_table");
-                    Obj obj = table->create_object();
+                    Obj obj = table->create_object_with_primary_key(id.fetch_add(1));
                     obj.set("server_index", server_index);
                     obj.set("realm_index", realm_index);
                     obj.set("file_index", file_index);
@@ -2280,9 +2281,9 @@ TEST_IF(Sync_ReadOnlyClient, false)
     {
         Session session_1 = fixture.make_bound_session(0, db_1, 0, "/test");
         WriteTransaction wt(db_1);
-        auto table = wt.add_table("class_foo");
+        auto table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         table->add_column(type_Int, "i");
-        table->create_object();
+        table->create_object_with_primary_key(1);
         table->begin()->set("i", 123);
         session_1.nonsync_transact_notify(wt.commit());
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -2344,7 +2345,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 
     {
         WriteTransaction wt{db};
-        TableRef tr = wt.add_table("class_table");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
         col_dbl = tr->add_column(type_Double, "double column");
@@ -2358,7 +2359,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
     for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
         WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_table");
-        auto obj = tr->create_object();
+        auto obj = tr->create_object_with_primary_key(i);
         int_fast32_t number = i;
         obj.set<Int>(col_int, number);
         std::string str = "str: " + std::to_string(number);
@@ -2408,12 +2409,12 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 
     {
         WriteTransaction wt{db};
-        TableRef tr = wt.add_table("class_table");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
         col_dbl = tr->add_column(type_Double, "double column");
         col_time = tr->add_column(type_Timestamp, "timestamp column");
-        obj_key = tr->create_object().get_key();
+        obj_key = tr->create_object_with_primary_key(1).get_key();
         wt.commit();
     }
 
@@ -2473,7 +2474,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     {
         {
             WriteTransaction wt{db_upload};
-            TableRef tr = wt.add_table("class_table");
+            TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
             tr->add_column(type_Int, "integer column");
             tr->add_column(type_String, "string column");
             tr->add_column(type_Double, "double column");
@@ -2485,7 +2486,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
             WriteTransaction wt{db_upload};
             TableRef tr = wt.get_table("class_table");
             for (int_fast32_t j = 0; j < number_of_rows_per_transaction; ++j) {
-                Obj obj = tr->create_object();
+                Obj obj = tr->create_object_with_primary_key(i);
                 int_fast32_t number = i * number_of_rows_per_transaction + j;
                 obj.set("integer column", number);
                 std::string str = "str: " + std::to_string(number);
@@ -2574,7 +2575,7 @@ TEST_IF(Sync_4GB_Messages, false)
     session_2.wait_for_download_complete_or_client_stopped();
 
     const size_t single_object_data_size = size_t(1e7); // 10 MB which is below the 16 MB limit
-    const size_t num_objects = size_t(approximate_changeset_size / single_object_data_size + 1);
+    const int num_objects = approximate_changeset_size / single_object_data_size + 1;
 
     const std::string str_a(single_object_data_size, 'a');
     BinaryData bd_a(str_a.data(), single_object_data_size);
@@ -2588,10 +2589,10 @@ TEST_IF(Sync_4GB_Messages, false)
     {
         WriteTransaction wt{db_1};
 
-        TableRef tr = wt.add_table("class_simple_data");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_simple_data", type_Int, "id");
         auto col_key = tr->add_column(type_Binary, "binary column");
-        for (size_t i = 0; i < num_objects; ++i) {
-            Obj obj = tr->create_object();
+        for (int i = 0; i < num_objects; ++i) {
+            Obj obj = tr->create_object_with_primary_key(i);
             switch (i % 3) {
                 case 0:
                     obj.set(col_key, bd_a);
@@ -2673,7 +2674,7 @@ TEST(Sync_Permissions)
 
     // Insert some dummy data
     WriteTransaction wt_valid{db_valid};
-    wt_valid.add_table("class_a");
+    wt_valid.get_group().add_table_with_primary_key("class_a", type_Int, "id");
     session_valid.nonsync_transact_notify(wt_valid.commit());
     session_valid.wait_for_upload_complete_or_client_stopped();
 
@@ -3074,7 +3075,7 @@ TEST(Sync_UploadDownloadProgress_1)
         uint_fast64_t commit_version;
         {
             WriteTransaction wt{db};
-            TableRef tr = wt.add_table("class_table");
+            TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
             tr->add_column(type_Int, "integer column");
             commit_version = wt.commit();
             session.nonsync_transact_notify(commit_version);
@@ -3093,7 +3094,7 @@ TEST(Sync_UploadDownloadProgress_1)
         {
             WriteTransaction wt{db};
             TableRef tr = wt.get_table("class_table");
-            tr->create_object().set("integer column", 42);
+            tr->create_object_with_primary_key(1).set("integer column", 42);
             commit_version = wt.commit();
             session.nonsync_transact_notify(commit_version);
         }
@@ -3250,7 +3251,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_2, 0);
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-        TableRef tr = wt.add_table("class_table");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         tr->add_column(type_Int, "integer column");
     });
 
@@ -3276,17 +3277,17 @@ TEST(Sync_UploadDownloadProgress_2)
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
-        tr->create_object().set("integer column", 42);
+        tr->create_object_with_primary_key(1).set("integer column", 42);
     });
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
-        tr->create_object().set("integer column", 44);
+        tr->create_object_with_primary_key(2).set("integer column", 44);
     });
 
     write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
-        tr->create_object().set("integer column", 43);
+        tr->create_object_with_primary_key(3).set("integer column", 43);
     });
 
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -3386,7 +3387,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     {
         WriteTransaction wt{db};
-        TableRef tr = wt.add_table("class_table");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         tr->add_column(type_Int, "integer column");
         wt.commit();
     }
@@ -3484,7 +3485,7 @@ TEST(Sync_UploadDownloadProgress_3)
     {
         WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_table");
-        tr->create_object().set("integer column", 42);
+        tr->create_object_with_primary_key(123).set("integer column", 42);
         commited_version = wt.commit();
         session.nonsync_transact_notify(commited_version);
     }
@@ -3523,9 +3524,9 @@ TEST(Sync_UploadDownloadProgress_4)
 
     {
         WriteTransaction wt{db_1};
-        TableRef tr = wt.add_table("class_table");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         auto col = tr->add_column(type_Binary, "binary column");
-        tr->create_object();
+        tr->create_object_with_primary_key(1);
         std::string str(size_t(5e5), 'a');
         BinaryData bd(str.data(), str.size());
         tr->begin()->set(col, bd);
@@ -3536,7 +3537,7 @@ TEST(Sync_UploadDownloadProgress_4)
         WriteTransaction wt{db_1};
         TableRef tr = wt.get_table("class_table");
         auto col = tr->get_column_key("binary column");
-        tr->create_object();
+        tr->create_object_with_primary_key(2);
         std::string str(size_t(1e6), 'a');
         BinaryData bd(str.data(), str.size());
         tr->begin()->set(col, bd);
@@ -3918,14 +3919,14 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 
     {
         WriteTransaction wt(db_1);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[0], 'a');
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[1], 'b');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(1).set("column name", bd_1);
+        table->create_object_with_primary_key(2).set("column name", bd_2);
         wt.commit();
     }
 
@@ -3936,21 +3937,21 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[3], 'd');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(3).set("column name", bd_1);
+        table->create_object_with_primary_key(4).set("column name", bd_2);
         wt.commit();
     }
 
     {
         WriteTransaction wt(db_2);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[4], 'e');
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[5], 'f');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(5).set("column name", bd_1);
+        table->create_object_with_primary_key(6).set("column name", bd_2);
         wt.commit();
     }
 
@@ -3961,8 +3962,8 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[7], 'h');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(7).set("column name", bd_1);
+        table->create_object_with_primary_key(8).set("column name", bd_2);
         wt.commit();
     }
 
@@ -4072,14 +4073,14 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
     {
         WriteTransaction wt(db_1);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[0], 'a');
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[1], 'b');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(1).set("column name", bd_1);
+        table->create_object_with_primary_key(2).set("column name", bd_2);
         wt.commit();
     }
 
@@ -4090,21 +4091,21 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[3], 'd');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(3).set("column name", bd_1);
+        table->create_object_with_primary_key(4).set("column name", bd_2);
         wt.commit();
     }
 
     {
         WriteTransaction wt(db_2);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[4], 'e');
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[5], 'f');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(5).set("column name", bd_1);
+        table->create_object_with_primary_key(6).set("column name", bd_2);
         wt.commit();
     }
 
@@ -4115,8 +4116,8 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         BinaryData bd_1(str_1.data(), str_1.size());
         std::string str_2(binary_sizes[7], 'h');
         BinaryData bd_2(str_2.data(), str_2.size());
-        table->create_object().set("column name", bd_1);
-        table->create_object().set("column name", bd_2);
+        table->create_object_with_primary_key(7).set("column name", bd_1);
+        table->create_object_with_primary_key(8).set("column name", bd_2);
         wt.commit();
     }
 
@@ -4218,7 +4219,7 @@ TEST(Sync_MergeLargeChangesets)
 
     {
         WriteTransaction wt(db_1);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         table->add_column(type_Int, "integer column");
         wt.commit();
@@ -4226,7 +4227,7 @@ TEST(Sync_MergeLargeChangesets)
 
     {
         WriteTransaction wt(db_2);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Binary, "column name");
         table->add_column(type_Int, "integer column");
         wt.commit();
@@ -4236,7 +4237,7 @@ TEST(Sync_MergeLargeChangesets)
         WriteTransaction wt(db_1);
         TableRef table = wt.get_table("class_table name");
         for (int i = 0; i < number_of_rows; ++i) {
-            table->create_object();
+            table->create_object_with_primary_key(i);
         }
         std::string str(100000, 'a');
         BinaryData bd(str.data(), str.size());
@@ -4251,7 +4252,7 @@ TEST(Sync_MergeLargeChangesets)
         WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_table name");
         for (int i = 0; i < number_of_rows; ++i) {
-            table->create_object();
+            table->create_object_with_primary_key(i + number_of_rows);
         }
         std::string str(100000, 'b');
         BinaryData bd(str.data(), str.size());
@@ -4296,16 +4297,18 @@ TEST(Sync_MergeMultipleChangesets)
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
 
+    std::atomic<int> id = 0;
+
     {
         WriteTransaction wt(db_1);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Int, "integer column");
         wt.commit();
     }
 
     {
         WriteTransaction wt(db_2);
-        TableRef table = wt.add_table("class_table name");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table name", type_Int, "id");
         table->add_column(type_Int, "integer column");
         wt.commit();
     }
@@ -4315,7 +4318,7 @@ TEST(Sync_MergeMultipleChangesets)
             WriteTransaction wt(db_1);
             TableRef table = wt.get_table("class_table name");
             for (int j = 0; j < number_of_instructions; ++j) {
-                auto obj = table->create_object();
+                auto obj = table->create_object_with_primary_key(id.fetch_add(1));
                 obj.set("integer column", 2 * j);
             }
             wt.commit();
@@ -4327,7 +4330,7 @@ TEST(Sync_MergeMultipleChangesets)
             WriteTransaction wt(db_2);
             TableRef table = wt.get_table("class_table name");
             for (int j = 0; j < number_of_instructions; ++j) {
-                auto obj = table->create_object();
+                auto obj = table->create_object_with_primary_key(id.fetch_add(1));
                 obj.set("integer column", 2 * j + 1);
             }
             wt.commit();
@@ -4503,9 +4506,9 @@ TEST(Sync_Quadratic_Merge)
     // n_operations - 3 add_int instructions.
     auto create_data = [](DBRef db, size_t n_operations) {
         WriteTransaction wt(db);
-        TableRef table = wt.add_table("class_table");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Int, "i");
-        Obj obj = table->create_object();
+        Obj obj = table->create_object_with_primary_key(1);
         for (size_t i = 0; i < n_operations - 3; ++i)
             obj.add_int("i", 1);
         wt.commit();
@@ -4544,7 +4547,7 @@ TEST(Sync_BatchedUploadMessages)
 
     {
         WriteTransaction wt{db};
-        TableRef tr = wt.add_table("class_foo");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         tr->add_column(type_Int, "integer column");
         wt.commit();
     }
@@ -4554,7 +4557,7 @@ TEST(Sync_BatchedUploadMessages)
     for (int i = 0; i < 400; ++i) {
         WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_foo");
-        tr->create_object().set("integer column", i);
+        tr->create_object_with_primary_key(i).set("integer column", i);
         wt.commit();
     }
 
@@ -4597,10 +4600,10 @@ TEST(Sync_UploadLogCompactionEnabled)
     // same fields.
     {
         WriteTransaction wt{db_1};
-        TableRef tr = wt.add_table("class_foo");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         tr->add_column(type_Int, "integer column");
-        Obj obj0 = tr->create_object();
-        Obj obj1 = tr->create_object();
+        Obj obj0 = tr->create_object_with_primary_key(0);
+        Obj obj1 = tr->create_object_with_primary_key(1);
         for (int i = 0; i < 10000; ++i) {
             obj0.set("integer column", i);
             obj1.set("integer column", 2 * i);
@@ -4656,10 +4659,10 @@ TEST(Sync_UploadLogCompactionDisabled)
     // same fields.
     {
         WriteTransaction wt{db_1};
-        TableRef tr = wt.add_table("class_foo");
+        TableRef tr = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
         auto col_int = tr->add_column(type_Int, "integer column");
-        Obj obj0 = tr->create_object();
-        Obj obj1 = tr->create_object();
+        Obj obj0 = tr->create_object_with_primary_key(0);
+        Obj obj1 = tr->create_object_with_primary_key(1);
         for (int i = 0; i < 10000; ++i) {
             obj0.set(col_int, i);
             obj1.set(col_int, 2 * i);
@@ -4710,9 +4713,9 @@ TEST(Sync_ReadOnlyClientSideHistoryTrim)
     ColKey col_ndx_blob_data;
     {
         WriteTransaction wt{db_1};
-        TableRef blobs = wt.add_table("class_Blob");
+        TableRef blobs = wt.get_group().add_table_with_primary_key("class_Blob", type_Int, "id");
         col_ndx_blob_data = blobs->add_column(type_Binary, "data");
-        blobs->create_object();
+        blobs->create_object_with_primary_key(1);
         wt.commit();
     }
 
@@ -4754,14 +4757,14 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
     {
         WriteTransaction wt{db_1};
 
-        TableRef table_target = wt.add_table("class_target");
+        TableRef table_target = wt.get_group().add_table_with_primary_key("class_target", type_Int, "id");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
-        auto k0 = table_target->create_object().set(col_ndx, 123).get_key();
-        auto k1 = table_target->create_object().set(col_ndx, 456).get_key();
+        auto k0 = table_target->create_object_with_primary_key(1).set(col_ndx, 123).get_key();
+        auto k1 = table_target->create_object_with_primary_key(2).set(col_ndx, 456).get_key();
 
-        TableRef table_source = wt.add_table("class_source");
+        TableRef table_source = wt.get_group().add_table_with_primary_key("class_source", type_Int, "id");
         col_ndx = table_source->add_column_list(*table_target, "target_link");
-        Obj obj = table_source->create_object();
+        Obj obj = table_source->create_object_with_primary_key(1);
         LnkLst ll = obj.get_linklist(col_ndx);
         ll.insert(0, k0);
         ll.set(0, k1);
@@ -4797,11 +4800,11 @@ TEST(Sync_MultipleContainerColumns)
     {
         WriteTransaction wt{db_1};
 
-        TableRef table = wt.add_table("class_Table");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_Table", type_Int, "id");
         table->add_column_list(type_String, "array1");
         table->add_column_list(type_String, "array2");
 
-        Obj row = table->create_object();
+        Obj row = table->create_object_with_primary_key(1);
         {
             Lst<StringData> array1 = row.get_list<StringData>("array1");
             array1.clear();
@@ -4916,19 +4919,19 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
     fixture.start();
 
     {
-        WriteTransaction wt{db};
-        auto table = wt.add_table("class_table");
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("class_table", type_Int, "id");
         ColKey col = table->add_column(type_Binary, "data");
 
         // Create enough data that our changeset cannot be stored contiguously
         // by BinaryColumn (> 16MB).
         std::size_t data_size = 8 * 1024 * 1024;
         std::string data(data_size, '\0');
-        for (std::size_t i = 0; i < 8; ++i) {
-            table->create_object().set(col, BinaryData{data.data(), data.size()});
+        for (int i = 0; i < 8; ++i) {
+            table->create_object_with_primary_key(i).set(col, BinaryData{data.data(), data.size()});
         }
 
-        wt.commit();
+        wt->commit();
 
         Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test");
@@ -4973,11 +4976,11 @@ TEST(Sync_ServerSideModify_Randomize)
             WriteTransaction wt{db_1};
             TableRef table = wt.get_table("class_foo");
             if (!table) {
-                table = wt.add_table("class_foo");
+                table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
                 table->add_column(type_Int, "i");
             }
             if (i % 2 == 0)
-                table->create_object();
+                table->create_object_with_primary_key(0 - i);
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x0'7FFF'FFFF'FFFF'FFFF));
             wt.commit();
@@ -4992,11 +4995,11 @@ TEST(Sync_ServerSideModify_Randomize)
             WriteTransaction wt{db_2};
             TableRef table = wt.get_table("class_foo");
             if (!table) {
-                table = wt.add_table("class_foo");
+                table = wt.get_group().add_table_with_primary_key("class_foo", type_Int, "id");
                 table->add_column(type_Int, "i");
             }
             if (i % 2 == 0)
-                table->create_object();
+                table->create_object_with_primary_key(i);
             ;
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x0'7FFF'FFFF'FFFF'FFFF));
@@ -5138,9 +5141,9 @@ TEST(Sync_BadChangeset)
 
         {
             WriteTransaction wt(db);
-            TableRef table = wt.add_table("class_Foo");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
             table->add_column(type_Int, "i");
-            table->create_object().set_all(123);
+            table->create_object_with_primary_key(5).set_all(123);
             const ChangesetEncoder::Buffer& buffer = get_replication(db).get_instruction_encoder().buffer();
             char bad_instruction = 0x3e;
             const_cast<ChangesetEncoder::Buffer&>(buffer).append(&bad_instruction, 1);
@@ -5188,10 +5191,10 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
 
         {
             WriteTransaction wt(db);
-            TableRef table = wt.add_table("class_table");
+            TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
             table->add_column(type_Int, "prógram");
             table->add_column(type_Int, "program");
-            auto obj = table->create_object();
+            auto obj = table->create_object_with_primary_key(1);
             obj.add_int("program", 42);
             wt.commit();
         }
@@ -5476,7 +5479,7 @@ TEST(Sync_ServerSideEncryption)
     TEST_CLIENT_DB(db);
     {
         WriteTransaction wt(db);
-        wt.add_table("class_Test");
+        wt.get_group().add_table_with_primary_key("class_Test", type_Int, "id");
         wt.commit();
     }
 
@@ -5561,14 +5564,14 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     {
         WriteTransaction wt{db_1};
 
-        TableRef table_source = wt.add_table("class_source");
-        TableRef table_target = wt.add_table("class_target");
+        TableRef table_source = wt.get_group().add_table_with_primary_key("class_source", type_Int, "id");
+        TableRef table_target = wt.get_group().add_table_with_primary_key("class_target", type_Int, "id");
         auto col_key = table_source->add_column_list(*table_target, "target_link");
 
-        auto k0 = table_target->create_object().get_key();
-        auto k1 = table_target->create_object().get_key();
+        auto k0 = table_target->create_object_with_primary_key(1).get_key();
+        auto k1 = table_target->create_object_with_primary_key(2).get_key();
 
-        auto ll = table_source->create_object().get_linklist_ptr(col_key);
+        auto ll = table_source->create_object_with_primary_key(0).get_linklist_ptr(col_key);
         ll->add(k0);
         ll->add(k1);
         CHECK_EQUAL(ll->size(), 2);
@@ -5654,9 +5657,9 @@ TEST(Sync_CreateObjects_EraseObjects)
     Session session_2 = fixture.make_bound_session(db_2);
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
-        TableRef table = wt.add_table("class_persons");
-        table->create_object();
-        table->create_object();
+        TableRef table = wt.get_group().add_table_with_primary_key("class_persons", type_Int, "id");
+        table->create_object_with_primary_key(1);
+        table->create_object_with_primary_key(2);
     });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -6556,7 +6559,7 @@ TEST(Sync_MergeStringPrimaryKey)
     std::string real_path_1, real_path_2;
 
     auto create_schema = [&](Transaction& group) {
-        TableRef table_0 = group.add_table("class_table_0");
+        TableRef table_0 = group.add_table_with_primary_key("class_table_0", type_Int, "id");
         table_0->add_column(type_Int, "int");
         table_0->add_column(type_Bool, "bool");
         table_0->add_column(type_Float, "float");

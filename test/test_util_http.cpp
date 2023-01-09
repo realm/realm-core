@@ -1,12 +1,12 @@
 #include "test.hpp"
 
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
 
 #include <thread>
 
 using namespace realm;
-using namespace realm::util;
+using namespace realm::sync;
 
 namespace {
 
@@ -127,8 +127,8 @@ TEST(HTTP_RequestResponse)
     ep = acceptor.local_endpoint();
     acceptor.listen();
 
-    Optional<HTTPRequest> received_request;
-    Optional<HTTPResponse> received_response;
+    util::Optional<HTTPRequest> received_request;
+    util::Optional<HTTPResponse> received_response;
 
     std::thread server_thread{[&] {
         BufferedSocket c(server);

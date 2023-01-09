@@ -19,7 +19,6 @@
 #pragma once
 
 #include "realm/db.hpp"
-#include "realm/list.hpp"
 #include "realm/obj.hpp"
 #include "realm/query.hpp"
 #include "realm/timestamp.hpp"
@@ -42,46 +41,33 @@ class SubscriptionStore;
 // send to the server in a QUERY or IDENT message.
 class Subscription {
 public:
-    // Returns the unique ID for this subscription.
-    ObjectId id() const;
+    // The unique ID for this subscription.
+    ObjectId id;
 
-    // Returns the timestamp of when this subscription was originally created.
-    Timestamp created_at() const;
+    // The timestamp of when this subscription was originally created.
+    Timestamp created_at;
 
-    // Returns the timestamp of the last time this subscription was updated by calling update_query.
-    Timestamp updated_at() const;
+    // The timestamp of the last time this subscription was updated by calling update_query.
+    Timestamp updated_at;
 
-    // Returns whether the subscription was created as an anonymous subscription or a named subscription.
-    bool has_name() const;
+    // The name of the subscription that was set when it was created, or util::none if it was created without a name.
+    util::Optional<std::string> name;
 
-    // Returns the name of the subscription that was set when it was created.
-    std::string_view name() const;
+    // The name of the object class of the query for this subscription.
+    std::string object_class_name;
 
-    // Returns the name of the object class of the query for this subscription.
-    std::string_view object_class_name() const;
-
-    // Returns a stringified version of the query associated with this subscription.
-    std::string_view query_string() const;
+    // A stringified version of the query associated with this subscription.
+    std::string query_string;
 
     // Returns whether the 2 subscriptions passed have the same id.
     friend bool operator==(const Subscription& lhs, const Subscription& rhs)
     {
-        return lhs.id() == rhs.id();
+        return lhs.id == rhs.id;
     }
 
-private:
-    friend class SubscriptionSet;
-    friend class MutableSubscriptionSet;
-
+    Subscription() = default;
     Subscription(const SubscriptionStore* parent, Obj obj);
     Subscription(util::Optional<std::string> name, std::string object_class_name, std::string query_str);
-
-    ObjectId m_id;
-    Timestamp m_created_at;
-    Timestamp m_updated_at;
-    util::Optional<std::string> m_name;
-    std::string m_object_class_name;
-    std::string m_query_string;
 };
 
 // SubscriptionSets contain a set of unique queries by either name or Query object that will be constructed into a
@@ -151,8 +137,8 @@ public:
         return o;
     }
 
-    using iterator = std::vector<Subscription>::iterator;
     using const_iterator = std::vector<Subscription>::const_iterator;
+    using iterator = const_iterator; // Note: no mutable access provided through iterators.
 
     // This will make a copy of this subscription set with the next available version number and return it as
     // a mutable SubscriptionSet to be updated. The new SubscriptionSet's state will be Uncommitted. This
@@ -164,6 +150,8 @@ public:
     // set to skip a state (i.e. go from Pending to Complete or Pending to Superseded), and the future value
     // will the the state it actually reached.
     util::Future<State> get_state_change_notification(State notify_when) const;
+    void get_state_change_notification(
+        State notify_when, util::UniqueFunction<void(util::Optional<State>, util::Optional<Status>)> callback) const;
 
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
@@ -180,16 +168,16 @@ public:
     // Returns the number of subscriptions in the set.
     size_t size() const;
 
-    // A const_iterator interface for finding/working with individual subscriptions.
-    const_iterator begin() const;
-    const_iterator end() const;
+    // An iterator interface for finding/working with individual subscriptions.
+    iterator begin() const;
+    iterator end() const;
 
-    Subscription at(size_t index) const;
+    const Subscription& at(size_t index) const;
 
-    // Returns a const_iterator to the query matching either the name or Query object, or end() if no such
+    // Returns a pointer to the Subscription matching either the name or Query object, or nullptr if no such
     // subscription exists.
-    const_iterator find(StringData name) const;
-    const_iterator find(const Query& query) const;
+    const Subscription* find(StringData name) const;
+    const Subscription* find(const Query& query) const;
 
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
@@ -228,9 +216,6 @@ public:
     // Erases all subscriptions in the subscription set.
     void clear();
 
-    iterator begin();
-    iterator end();
-
     // Inserts a new subscription into the set if one does not exist already - returns an iterator to the
     // subscription and a bool that is true if a new subscription was actually created. The SubscriptionSet
     // must be in the Uncommitted state to call this - otherwise this will throw.
@@ -258,7 +243,11 @@ public:
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
-    iterator erase(const_iterator it);
+    iterator erase(iterator it);
+
+    // Erases the subscription identified by the argument, if any. Returns true if anything was removed.
+    bool erase(StringData name);
+    bool erase(const Query& query);
 
     // Updates the state of the transaction and optionally updates its error information.
     //
@@ -270,11 +259,8 @@ public:
     void update_state(State state, util::Optional<std::string_view> error_str = util::none);
 
     // This commits any changes to the subscription set and returns an this subscription set as an immutable view
-    // from after the commit.
-    //
-    // This must be called as an r-value, like this:
-    //     auto sub_set = std::move(mut_sub_set).commit();
-    SubscriptionSet commit() &&;
+    // from after the commit. This MutableSubscriptionSet object must not be used after calling commit().
+    SubscriptionSet commit();
 
 protected:
     friend class SubscriptionStore;
