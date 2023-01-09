@@ -10,8 +10,8 @@ namespace {
 class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
-                         std::mt19937_64& random, const std::string user_agent, EZObserver& observer,
-                         EZEndpoint&& endpoint)
+                         std::mt19937_64& random, const std::string user_agent, WebSocketObserver& observer,
+                         WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
         , m_random{random}
@@ -60,7 +60,7 @@ private:
             m_app_services_coid = it->second;
         }
         auto it = headers.find("Sec-WebSocket-Protocol");
-        m_observer.websocket_handshake_completion_handler(it == headers.end() ? empty : it->second);
+        m_observer.websocket_connected_handler(it == headers.end() ? empty : it->second);
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
@@ -87,7 +87,7 @@ private:
     }
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
-        return m_observer.websocket_binary_message_received(ptr, size);
+        return m_observer.websocket_binary_message_received(util::Span<const char>(ptr, size));
     }
 
     void initiate_resolve();
@@ -115,9 +115,9 @@ private:
     const std::string m_user_agent;
     std::string m_app_services_coid;
 
-    EZObserver& m_observer;
+    WebSocketObserver& m_observer;
 
-    const EZEndpoint m_endpoint;
+    const WebSocketEndpoint m_endpoint;
     util::Optional<network::Resolver> m_resolver;
     util::Optional<network::Socket> m_socket;
     util::Optional<network::ssl::Context> m_ssl_context;
@@ -357,12 +357,22 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
     auto host = m_endpoint.port == default_port ? m_endpoint.address
                                                 : util::format("%1:%2", m_endpoint.address, m_endpoint.port);
 
-    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), m_endpoint.protocols,
+    // Convert the list of protocols to a string
+    std::ostringstream protocol_list;
+    protocol_list.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    protocol_list.imbue(std::locale::classic());
+    if (m_endpoint.protocols.size() > 1)
+        std::copy(m_endpoint.protocols.begin(), m_endpoint.protocols.end() - 1,
+                  std::ostream_iterator<std::string>(protocol_list, ", "));
+    protocol_list << m_endpoint.protocols.back();
+
+    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), protocol_list.str(),
                                           std::move(headers)); // Throws
 }
 } // namespace
 
-std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect_legacy(EZObserver* observer, EZEndpoint&& endpoint)
+std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(WebSocketObserver* observer,
+                                                                   WebSocketEndpoint&& endpoint)
 {
     return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, *m_service, m_random, m_user_agent, *observer,
                                                   std::move(endpoint));

@@ -385,6 +385,22 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
         }
+
+        SECTION("frozen realm schema can be updated if it is a subset of OS schema") {
+            InMemoryTestFile config;
+            config.automatic_change_notifications = false;
+            config.schema_mode = SchemaMode::AdditiveExplicit;
+            auto realm = Realm::get_shared_realm(config);
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"Z", {{"value", PropertyType::Int}}});
+            Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
+            Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
+            update_schema(*realm, schema4, 0);
+            auto frozen_realm = realm->freeze();
+            auto subset_schema = remove_table(schema4, "Z");
+            update_schema(*realm, subset_schema, 0);
+            REQUIRE_NOTHROW(frozen_realm->update_schema(realm->schema()));
+        }
     }
 }
 

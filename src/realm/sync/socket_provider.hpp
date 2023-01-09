@@ -139,6 +139,11 @@ public:
     /// timer. The timer will also be canceled if the Timer object returned is
     /// destroyed.
     virtual SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
+
+    /// Temporary functions added to support the default socket provider until
+    /// it is fully integrated. Will be removed in future PRs.
+    virtual void run() {}
+    virtual void stop() {}
 };
 
 /// Struct that defines the endpoint to create a new websocket connection.
@@ -152,6 +157,14 @@ struct WebSocketEndpoint {
     std::string path;                   // Includes access token in query.
     std::vector<std::string> protocols; // Array of one or more websocket protocols
     bool is_ssl;                        // true if SSL should be used
+
+    /// DEPRECATED - These will be removed in a future release
+    /// These fields are deprecated and should not be used by custom socket provider implementations
+    std::map<std::string, std::string> headers; // Only includes "custom" headers.
+    bool verify_servers_ssl_certificate;
+    util::Optional<std::string> ssl_trust_certificate_path;
+    std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
+    util::Optional<SyncConfig::ProxyConfig> proxy;
 };
 
 
@@ -235,6 +248,17 @@ struct WebSocketObserver {
     ///         is returned, the WebSocket object will be destroyed at some point
     ///         in the future.
     virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
+
+    //@{
+    /// DEPRECATED - Will be removed in a future release
+    /// These functions are deprecated and should not be called by custom socket provider implementations
+    virtual void websocket_connect_error_handler(std::error_code) = 0;
+    virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
+    virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
+    virtual void websocket_handshake_error_handler(std::error_code, const std::string_view* body) = 0;
+    virtual void websocket_protocol_error_handler(std::error_code) = 0;
+    virtual bool websocket_close_message_received(std::error_code error_code, StringData message) = 0;
+    //@}
 };
 
 } // namespace realm::sync

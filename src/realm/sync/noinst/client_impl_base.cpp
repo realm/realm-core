@@ -111,11 +111,14 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
-    , m_socket_provider{std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string())}
+    , m_socket_provider{[&]() -> std::shared_ptr<SyncSocketProvider> {
+        if (config.socket_provider)
+            return config.socket_provider;
+
+        return std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string());
+    }()}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
-    // TODO: migrate service thread to DefaultSocketProvider
-    , m_service{m_socket_provider->get_service()}
     , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.
@@ -314,7 +317,7 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-void Connection::websocket_handshake_completion_handler(const std::string& protocol)
+void Connection::websocket_connected_handler(const std::string& protocol)
 {
     if (!protocol.empty()) {
         std::string_view expected_prefix =
@@ -411,7 +414,7 @@ void Connection::websocket_protocol_error_handler(std::error_code ec)
 }
 
 
-bool Connection::websocket_binary_message_received(const char* data, std::size_t size)
+bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
     std::error_code ec;
     using sf = SimulatedFailure;
@@ -420,7 +423,7 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
         return bool(m_websocket);
     }
 
-    handle_message_received(data, size);
+    handle_message_received(data);
     return bool(m_websocket);
 }
 
@@ -653,11 +656,8 @@ void Connection::initiate_reconnect()
     // change it if the outcome ends up being success or failure.
     m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
 
-    std::string sec_websocket_protocol;
+    std::vector<std::string> sec_websocket_protocol;
     {
-        std::ostringstream out;
-        out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-        out.imbue(std::locale::classic());
         auto protocol_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
         int min = get_oldest_supported_protocol_version();
@@ -665,24 +665,19 @@ void Connection::initiate_reconnect()
         REALM_ASSERT(min <= max);
         // List protocol version in descending order to ensure that the server
         // selects the highest possible version.
-        int version = max;
-        for (;;) {
-            out << protocol_prefix << version; // Throws
-            if (version == min)
-                break;
-            out << ", "; // Throws
-            --version;
+        for (int version = max; version >= min; --version) {
+            sec_websocket_protocol.push_back(util::format("%1%2", protocol_prefix, version)); // Throws
         }
-        sec_websocket_protocol = std::move(out).str();
     }
 
-    m_websocket = m_client.m_socket_provider->connect_legacy(
-        this, websocket::EZEndpoint{
+    m_websocket = m_client.m_socket_provider->connect(
+        this, WebSocketEndpoint{
                   m_address,
                   m_port,
                   get_http_request_path(),
                   std::move(sec_websocket_protocol),
                   is_ssl(m_protocol_envelope),
+                  /// DEPRECATED - The following will be removed in a future release
                   {m_custom_http_headers.begin(), m_custom_http_headers.end()},
                   m_verify_servers_ssl_certificate,
                   m_ssl_trust_certificate_path,
@@ -970,11 +965,11 @@ void Connection::handle_write_ping()
 }
 
 
-void Connection::handle_message_received(const char* data, std::size_t size)
+void Connection::handle_message_received(util::Span<const char> data)
 {
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
-    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
+    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data.data(), data.size()));
 }
 
 

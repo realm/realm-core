@@ -2219,7 +2219,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
                     redir_transport->simulated_response = {
-                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                        308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 3) {
@@ -2271,7 +2271,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
                 redir_transport->simulated_response = {
-                    301,
+                    request_count % 2 == 1 ? 308 : 301,
                     0,
                     {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
                     "Some body data"};
