@@ -42,8 +42,10 @@ struct SyncClient {
         : m_client([&] {
             sync::Client::Config c;
             c.logger = logger;
+            c.socket_provider = config.socket_provider;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
+            /// DEPRECATED - Will be removed in a future release
             c.user_agent_application_info =
                 util::format("%1 %2", config.user_agent_binding_info, config.user_agent_application_info);
 

@@ -177,6 +177,7 @@ struct SyncConfig {
     size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
     // {@
+    /// DEPRECATED - Will be removed in a future release
     // The following parameters are only used by the default SyncSocket implementation. Custom SyncSocket
     // implementations must handle these directly, if these features are supported.
     util::Optional<std::string> authorization_header_name; // not used
