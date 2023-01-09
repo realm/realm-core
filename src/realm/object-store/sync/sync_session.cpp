@@ -129,7 +129,7 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
 
 void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code ec)
 {
-    REALM_ASSERT(m_state != State::Inactive && m_state != State::Paused);
+    REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
     do_become_inactive(std::move(lock), ec);
@@ -137,7 +137,7 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
 
 void SyncSession::become_paused(util::CheckedUniqueLock lock)
 {
-    REALM_ASSERT(m_state != State::Paused && m_state != State::Inactive);
+    REALM_ASSERT(m_state != State::Paused);
     m_state = State::Paused;
 
     do_become_inactive(std::move(lock), {});
@@ -666,7 +666,7 @@ void SyncSession::handle_error(SyncError error)
 
     // Dont't bother invoking m_config.error_handler if the sync is inactive.
     // It does not make sense to call the handler when the session is closed.
-    if (m_state == State::Inactive) {
+    if (m_state == State::Inactive || m_state == State::Paused) {
         return;
     }
 
@@ -1024,9 +1024,13 @@ void SyncSession::close(util::CheckedUniqueLock lock)
         case State::Paused:
             m_state_mutex.unlock(lock);
             break;
-        case State::Inactive:
+        case State::Inactive: {
+            if (m_sync_manager) {
+                m_sync_manager->unregister_session(m_db->get_path());
+            }
             m_state_mutex.unlock(lock);
             break;
+        }
         case State::WaitingForAccessToken:
             // Immediately kill the session.
             become_inactive(std::move(lock));
@@ -1044,7 +1048,7 @@ void SyncSession::shutdown_and_wait()
         // Realm file to be closed. This works so long as this SyncSession object remains in the
         // `inactive` state after the invocation of shutdown_and_wait().
         util::CheckedUniqueLock lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             become_inactive(std::move(lock));
         }
     }
@@ -1161,18 +1165,20 @@ void SyncSession::update_configuration(SyncConfig new_config)
 {
     while (true) {
         util::CheckedUniqueLock state_lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             // Changing the state releases the lock, which means that by the
             // time we reacquire the lock the state may have changed again
             // (either due to one of the callbacks being invoked or another
             // thread coincidentally doing something). We just attempt to keep
             // switching it to inactive until it stays there.
-            become_inactive(std::move(state_lock));
+            if (m_state != State::Paused) {
+                become_inactive(std::move(state_lock));
+            }
             continue;
         }
 
         util::CheckedUniqueLock config_lock(m_config_mutex);
-        REALM_ASSERT(m_state == State::Inactive);
+        REALM_ASSERT(m_state == State::Inactive || m_state == State::Paused);
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.sync_config->user == new_config.user);
         m_config.sync_config = std::make_shared<SyncConfig>(std::move(new_config));
