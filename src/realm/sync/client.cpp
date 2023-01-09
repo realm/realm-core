@@ -1920,10 +1920,79 @@ const std::error_category& client_error_category() noexcept
     return g_error_category;
 }
 
-
 std::error_code make_error_code(ClientError error_code) noexcept
 {
     return std::error_code{int(error_code), g_error_category};
+}
+
+ProtocolError client_error_to_protocol_error(ClientError error_code)
+{
+    switch (error_code) {
+        case ClientError::bad_changeset:
+            return ProtocolError::bad_changeset;
+        case ClientError::bad_progress:
+            return ProtocolError::bad_progress;
+        case ClientError::connection_closed:
+            [[fallthrough]];
+        case ClientError::unknown_message:
+            [[fallthrough]];
+        case ClientError::bad_syntax:
+            [[fallthrough]];
+        case ClientError::limits_exceeded:
+            [[fallthrough]];
+        case ClientError::bad_session_ident:
+            [[fallthrough]];
+        case ClientError::bad_message_order:
+            [[fallthrough]];
+        case ClientError::bad_client_file_ident:
+            [[fallthrough]];
+        case ClientError::bad_changeset_header_syntax:
+            [[fallthrough]];
+        case ClientError::bad_changeset_size:
+            [[fallthrough]];
+        case ClientError::bad_origin_file_ident:
+            [[fallthrough]];
+        case ClientError::bad_server_version:
+            [[fallthrough]];
+        case ClientError::bad_request_ident:
+            [[fallthrough]];
+        case ClientError::bad_error_code:
+            [[fallthrough]];
+        case ClientError::bad_compression:
+            [[fallthrough]];
+        case ClientError::bad_client_version:
+            [[fallthrough]];
+        case ClientError::ssl_server_cert_rejected:
+            [[fallthrough]];
+        case ClientError::pong_timeout:
+            [[fallthrough]];
+        case ClientError::bad_client_file_ident_salt:
+            [[fallthrough]];
+        case ClientError::bad_file_ident:
+            [[fallthrough]];
+        case ClientError::connect_timeout:
+            [[fallthrough]];
+        case ClientError::bad_timestamp:
+            [[fallthrough]];
+        case ClientError::bad_protocol_from_server:
+            [[fallthrough]];
+        case ClientError::client_too_old_for_server:
+            [[fallthrough]];
+        case ClientError::client_too_new_for_server:
+            [[fallthrough]];
+        case ClientError::protocol_mismatch:
+            [[fallthrough]];
+        case ClientError::bad_state_message:
+            [[fallthrough]];
+        case ClientError::missing_protocol_feature:
+            [[fallthrough]];
+        case ClientError::http_tunnel_failed:
+            [[fallthrough]];
+        case ClientError::auto_client_reset_failure:
+            REALM_TERMINATE(
+                util::format("There is no ProtocolError equivalent for ClientError '%1'", int(error_code)).c_str());
+    }
+    REALM_TERMINATE("Invalid client error");
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)

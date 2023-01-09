@@ -1757,7 +1757,8 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    // Do not send upload messages if an error was detected by the client.
+    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version) && !m_wait_for_error_timer) {
         return send_upload_message(); // Throws
     }
 }
@@ -2041,15 +2042,16 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    std::error_code ec = m_client_error->code();
+    auto client_error = m_client_error->code();
+    auto protocol_error = client_error_to_protocol_error(client_error);
     auto message = m_client_error->what();
 
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, (int)protocol_error,
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = message;
-    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
+    protocol.make_json_error_message(out, session_ident, (int)protocol_error, error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;

@@ -2177,7 +2177,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         REQUIRE_NOTHROW(wait_for_error_to_persist(
             harness->session().app_session(),
             "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
-            "on one side, but not on the other. (ProtocolErrorCode=112)"));
+            "on one side, but not on the other. (ProtocolErrorCode=212)"));
     }
 
     SECTION("basic embedded object construction") {
@@ -2309,7 +2309,7 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     error_future.get();
 
     REQUIRE_NOTHROW(
-        wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=112)"));
+        wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=212)"));
 }
 
 TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {

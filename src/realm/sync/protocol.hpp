@@ -291,7 +291,7 @@ enum class ProtocolError {
     bad_server_version           = 209, // Bad server version (IDENT, UPLOAD, TRANSACT)
     bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
     diverging_histories          = 211, // Diverging histories (IDENT)
-    bad_changeset                = 212, // Bad changeset (UPLOAD)
+    bad_changeset                = 212, // Bad changeset (UPLOAD, ERROR)
     partial_sync_disabled        = 214, // Partial sync disabled (BIND)
     unsupported_session_feature  = 215, // Unsupported session-level feature
     bad_origin_file_ident        = 216, // Bad origin file identifier (UPLOAD)
@@ -315,6 +315,7 @@ enum class ProtocolError {
     compensating_write           = 231, // Client attempted a write that is disallowed by permissions, or modifies and
                                         // object outside the current query, and the server undid the modification
                                         // (UPLOAD)
+    bad_progress                 = 232, // Bad progress information (ERROR)
 
     // clang-format on
 };

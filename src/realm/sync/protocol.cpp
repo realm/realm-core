@@ -97,8 +97,8 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "The client and server disagree about the history (Diverging histories (IDENT)). Please wipe the "
                    "file on the client to resume synchronization";
         case ProtocolError::bad_changeset:
-            return "The server sent a changeset that could not be integrated (Bad changeset (UPLOAD)). This is "
-                   "likely due to corruption of the client-side file. Please restore the file on the client by "
+            return "The server sent a changeset that could not be integrated (Bad changeset (UPLOAD, ERROR)). This "
+                   "is likely due to corruption of the client-side file. Please restore the file on the client by "
                    "wiping it and resuming synchronization";
         case ProtocolError::partial_sync_disabled:
             return "Query-based sync is disabled";
@@ -140,7 +140,8 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::compensating_write:
             return "Client attempted a write that is disallowed by permissions, or modifies an object outside the "
                    "current query, and the server undid the change";
-            ;
+        case ProtocolError::bad_progress:
+            return "Bad progress information (DOWNLOAD)";
     }
     return nullptr;
 }

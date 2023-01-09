@@ -111,6 +111,8 @@ enum class ClientError {
 const std::error_category& client_error_category() noexcept;
 
 std::error_code make_error_code(ClientError) noexcept;
+
+ProtocolError client_error_to_protocol_error(ClientError);
 } // namespace realm::sync
 
 namespace std {
