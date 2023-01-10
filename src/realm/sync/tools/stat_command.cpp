@@ -782,7 +782,7 @@ int main(int argc, char* argv[])
                 }
                 if (table->is_nullable(col))
                     std::cout << " (nullable)";
-                if (table->has_search_index(col))
+                if (table->get_search_index(col))
                     std::cout << " (indexed)";
                 std::cout << "\n";
             }

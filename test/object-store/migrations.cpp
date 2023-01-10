@@ -156,6 +156,12 @@ Schema set_indexed(Schema schema, StringData object_name, StringData property_na
     return schema;
 }
 
+Schema set_fulltext_indexed(Schema schema, StringData object_name, StringData property_name, bool value)
+{
+    schema.find(object_name)->property_for_name(property_name)->is_fulltext_indexed = value;
+    return schema;
+}
+
 Schema set_optional(Schema schema, StringData object_name, StringData property_name, bool value)
 {
     auto& prop = *schema.find(object_name)->property_for_name(property_name);
@@ -378,6 +384,22 @@ TEST_CASE("migration: Additive mode returns OS schema - Automatic migration") {
             REQUIRE(schema.find("Z") != schema.end());
             REQUIRE(schema.find("A") != schema.end());
             REQUIRE(schema.find("B") != schema.end());
+        }
+
+        SECTION("frozen realm schema can be updated if it is a subset of OS schema") {
+            InMemoryTestFile config;
+            config.automatic_change_notifications = false;
+            config.schema_mode = SchemaMode::AdditiveExplicit;
+            auto realm = Realm::get_shared_realm(config);
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"Z", {{"value", PropertyType::Int}}});
+            Schema schema3 = add_table(schema2, {"B", {{"value", PropertyType::Int}}});
+            Schema schema4 = add_table(schema3, {"A", {{"value", PropertyType::Int}}});
+            update_schema(*realm, schema4, 0);
+            auto frozen_realm = realm->freeze();
+            auto subset_schema = remove_table(schema4, "Z");
+            update_schema(*realm, subset_schema, 0);
+            REQUIRE_NOTHROW(frozen_realm->update_schema(realm->schema()));
         }
     }
 }
@@ -1237,6 +1259,7 @@ TEST_CASE("migration: Automatic") {
                  {"pk", PropertyType::Int, Property::IsPrimary{true}},
                  {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  {"optional", PropertyType::Int | PropertyType::Nullable},
+                 {"text", PropertyType::String},
              }},
             {"link origin",
              {
@@ -1326,6 +1349,9 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("add index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "optional", true));
+        }
+        SECTION("add fulltext index") {
+            VERIFY_SCHEMA_IN_MIGRATION(set_fulltext_indexed(schema, "object", "text", true));
         }
         SECTION("remove index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "value", false));

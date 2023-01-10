@@ -927,8 +927,10 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
 void App::handle_possible_redirect_response(Request&& request, const Response& response,
                                             UniqueFunction<void(const Response&)>&& completion)
 {
+    using namespace realm::sync;
     // If the response contains a redirection, then process it
-    if (sync::HTTPStatus(response.http_status_code) == sync::HTTPStatus::MovedPermanently) {
+    auto status_code = HTTPStatus(response.http_status_code);
+    if (status_code == HTTPStatus::MovedPermanently || status_code == HTTPStatus::PermanentRedirect) {
         handle_redirect_response(std::move(request), response, std::move(completion));
     }
     else {

@@ -712,6 +712,7 @@ TEST_CASE("list") {
         // - some callbacks have filters
         // - all callbacks have filters
         CollectionChangeSet collection_change_set_without_filter;
+        CollectionChangeSet collection_change_set_with_empty_filter;
         CollectionChangeSet collection_change_set_with_filter_on_target_value;
 
         // Note that in case not all callbacks have filters we do accept false positive notifications by design.
@@ -804,6 +805,73 @@ TEST_CASE("list") {
                 write([&] {
                     list.get(0).set(col_target_value, 42);
                 });
+            }
+        }
+
+        SECTION("callback with empty keypatharray") {
+            auto shallow_require_change = [&] {
+                auto token = list.add_notification_callback(
+                    [&](CollectionChangeSet c) {
+                        collection_change_set_with_empty_filter = c;
+                    },
+                    KeyPathArray());
+                advance_and_notify(*r);
+                return token;
+            };
+
+            auto shallow_require_no_change = [&] {
+                bool first = true;
+                auto token = list.add_notification_callback(
+                    [&first](CollectionChangeSet) mutable {
+                        REQUIRE(first);
+                        first = false;
+                    },
+                    KeyPathArray());
+                advance_and_notify(*r);
+                return token;
+            };
+
+            SECTION("modifying table 'target', property 'value' "
+                    "-> does NOT send a notification for 'value'") {
+                auto token = shallow_require_no_change();
+                write([&] {
+                    list.get(0).set(col_target_value, 42);
+                });
+            }
+
+            SECTION("modifying table 'target', property 'value' "
+                    "-> does NOT send a notification for 'value'") {
+                auto token = shallow_require_no_change();
+                write([&] {
+                    list.get(0).set(col_target_value, 42);
+                });
+            }
+
+            SECTION("deleting a target row with shallow listener sends a change notification") {
+                auto token = shallow_require_change();
+                write([&] {
+                    list.remove(5);
+                });
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.deletions, 5);
+            }
+
+            SECTION("adding a row with shallow listener sends a change notifcation") {
+                auto token = shallow_require_change();
+                write([&] {
+                    Obj obj = target->get_object(target_keys[5]);
+                    list.add(obj);
+                });
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.insertions, 10);
+            }
+
+            SECTION("moving a row with shallow listener sends a change notifcation") {
+                auto token = shallow_require_change();
+                write([&] {
+                    list.move(5, 8);
+                });
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.insertions, 8);
+                REQUIRE_INDICES(collection_change_set_with_empty_filter.deletions, 5);
+                REQUIRE_MOVES(collection_change_set_with_empty_filter, {5, 8});
             }
         }
 

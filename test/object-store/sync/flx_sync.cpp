@@ -405,7 +405,65 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         ++after_reset_count;
     };
 
-    SECTION("Recover: offline writes and subscriptions") {
+    SECTION("Recover: offline writes and subscription (single subscription)") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->populate_initial_object([&](SharedRealm realm) {
+                auto pk_of_added_object = ObjectId::gen();
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = realm->read_group().get_table(ObjectStore::table_name_for_object_type("TopLevel"));
+                REALM_ASSERT(table);
+                mut_subs.insert_or_assign(Query(table));
+                mut_subs.commit();
+
+                realm->begin_transaction();
+                CppContext c(realm);
+                int64_t r1 = random_int();
+                int64_t r2 = random_int();
+                int64_t r3 = random_int();
+                int64_t sum = uint64_t(r1) + r2 + r3;
+
+                Object::create(c, realm, "TopLevel",
+                               std::any(AnyDict{{"_id"s, pk_of_added_object},
+                                                {"queryable_str_field"s, "initial value"s},
+                                                {"list_of_ints_field", std::vector<std::any>{r1, r2, r3}},
+                                                {"sum_of_list_field", sum}}));
+
+                realm->commit_transaction();
+                return pk_of_added_object;
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                add_object(local_realm, str_field_value, local_added_int);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                wait_for_advance(*local_realm);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto str_col = table->get_column_key("queryable_str_field");
+                auto int_col = table->get_column_key("queryable_int_field");
+                auto tv = table->where().equal(str_col, StringData(str_field_value)).find_all();
+                tv.sort(int_col);
+                // the object we created while offline was recovered, and the remote object was downloaded
+                REQUIRE(tv.size() == 2);
+                CHECK(tv.get_object(0).get<Int>(int_col) == local_added_int);
+                CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
+            })
+            ->run();
+    }
+
+    SECTION("Recover: offline writes and subscriptions (multiple subscriptions)") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();
         config_local.sync_config->notify_after_client_reset = reset_handler;

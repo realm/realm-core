@@ -576,7 +576,7 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
             return translate_less_critical(ref_translation_ptr, ref);
         }
     }
-    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890);
+    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890, ref, idx);
     return nullptr;
 }
 

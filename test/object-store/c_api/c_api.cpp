@@ -3,6 +3,7 @@
 #include <realm.h>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/util/base64.hpp>
 
@@ -23,6 +24,9 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #endif
@@ -111,6 +115,18 @@ realm_value_t rlm_decimal_val(double d)
     val.type = RLM_TYPE_DECIMAL128;
 
     realm::Decimal128 dec{d};
+    val.decimal128.w[0] = dec.raw()->w[0];
+    val.decimal128.w[1] = dec.raw()->w[1];
+
+    return val;
+}
+
+realm_value_t rlm_decimal_nan()
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_DECIMAL128;
+
+    realm::Decimal128 dec = realm::Decimal128::nan("0");
     val.decimal128.w[0] = dec.raw()->w[0];
     val.decimal128.w[1] = dec.raw()->w[1];
 
@@ -620,6 +636,40 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(!error);
         });
     }
+
+    SECTION("realm_sync_error_code to_capi()") {
+        using namespace realm::sync;
+        std::string message;
+
+        std::error_code error_code = make_error_code(sync::ClientError::connection_closed);
+        realm_sync_error_code_t error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
+        CHECK(error.value == int(error_code.value()));
+        CHECK(error_code.message() == error.message);
+        CHECK(message == error.message);
+
+        error_code = make_error_code(sync::ProtocolError::connection_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
+
+        error_code = make_error_code(sync::ProtocolError::session_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
+
+        error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
+
+        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+
+        error_code = make_error_code(util::error::misc_errors::unknown);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
+    }
+
+
 #endif // REALM_ENABLE_AUTH_TESTS
 }
 
@@ -2203,6 +2253,26 @@ TEST_CASE("C API", "[c_api]") {
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
                 CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+            }
+
+            SECTION("decimal NaN") {
+                realm_value_t decimal = rlm_decimal_nan();
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
+                });
+                realm_query_arg_t args[] = {realm_query_arg_t{1, false, &decimal}};
+                auto q_decimal = cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $0", 1, args));
+                realm_value_t out_value;
+                bool out_found;
+                CHECK(realm_query_find_first(q_decimal.get(), &out_value, &out_found));
+                CHECK(out_found);
+                auto link = obj1->obj().get_link();
+                realm_value_t expected;
+                expected.type = RLM_TYPE_LINK;
+                expected.link.target_table = link.get_table_key().value;
+                expected.link.target = link.get_obj_key().value;
+                CHECK(rlm_val_eq(out_value, expected));
             }
 
             SECTION("interpolate all types") {
