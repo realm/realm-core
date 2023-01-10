@@ -271,20 +271,35 @@ TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
     });
     REQUIRE(sessions_are_active(*session));
 
-    // Pause the session and wait for it to be paused.
-    session->pause();
-    EventLoop::main().run_until([&] {
-        return session->state() == SyncSession::State::Paused;
-    });
-    REQUIRE(session->state() == SyncSession::State::Paused);
+    SECTION("making the session inactive and then pausing it should end up in the paused state") {
+        session->force_close();
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
+        REQUIRE(sessions_are_inactive(*session));
 
-    // Pausing it again should be a no-op
-    session->pause();
-    REQUIRE(session->state() == SyncSession::State::Paused);
+        session->pause();
+        EventLoop::main().run_until([&] {
+            return session->state() == SyncSession::State::Paused;
+        });
+        REQUIRE(session->state() == SyncSession::State::Paused);
+    }
 
-    // "Logging out" the session should be a no-op.
-    session->force_close();
-    REQUIRE(session->state() == SyncSession::State::Paused);
+    SECTION("pausing from the active state should end up in the paused state") {
+        session->pause();
+        EventLoop::main().run_until([&] {
+            return session->state() == SyncSession::State::Paused;
+        });
+        REQUIRE(session->state() == SyncSession::State::Paused);
+
+        // Pausing it again should be a no-op
+        session->pause();
+        REQUIRE(session->state() == SyncSession::State::Paused);
+
+        // "Logging out" the session should be a no-op.
+        session->force_close();
+        REQUIRE(session->state() == SyncSession::State::Paused);
+    }
 
     // Reviving the session via revive_if_needed() should be a no-op.
     session->revive_if_needed();
