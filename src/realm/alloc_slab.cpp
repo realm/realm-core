@@ -1301,12 +1301,16 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     };
 #endif // REALM_ENCRYPTION_VERIFICATION
 
+    // optimization: no need to refetch pages from disk more than once per mapping
+    // during advance, this is likely to happen several times when fetching the freelist
+    // positions and sizes as they are written consecutively
+    std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>> pages_refreshed_cache;
     auto do_refresh = [&](const RefRanges& ranges) {
         if (REALM_UNLIKELY(refresh_hook)) {
             refresh_hook(ranges);
         }
         else {
-            this->refresh_encrypted_pages(ranges);
+            this->refresh_encrypted_pages(ranges, &pages_refreshed_cache);
         }
 #if REALM_ENCRYPTION_VERIFICATION
         if (validator.is_attached()) {
@@ -1731,18 +1735,20 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #endif // REALM_ENCRYPTION_VERIFICATION
 }
 
-void SlabAlloc::refresh_encrypted_pages(const RefRanges& ranges)
+void SlabAlloc::refresh_encrypted_pages(
+    const RefRanges& ranges,
+    std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
 {
     // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
             for (auto& r : ranges) {
-                encryption_mark_for_refresh(m, r.begin, r.end);
+                encryption_mark_for_refresh(m, r.begin, r.end, pages_refreshed);
             }
         }
         if (auto m = e.xover_mapping.get_encrypted_mapping()) {
             for (auto& r : ranges) {
-                encryption_mark_for_refresh(m, r.begin, r.end);
+                encryption_mark_for_refresh(m, r.begin, r.end, pages_refreshed);
             }
         }
     }

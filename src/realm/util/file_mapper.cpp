@@ -331,10 +331,12 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
-void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end)
+void encryption_mark_for_refresh(
+    EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end,
+    std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
 {
     UniqueLock lock(mapping_mutex);
-    mapping->mark_for_refresh(ref_start, ref_end);
+    mapping->mark_for_refresh(ref_start, ref_end, pages_refreshed);
 }
 
 namespace {

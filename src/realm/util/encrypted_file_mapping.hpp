@@ -27,12 +27,13 @@
 
 typedef size_t (*Header_to_size)(const char* addr);
 
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace realm::util {
 
 struct SharedFileInfo;
-class EncryptedFileMapping;
 
 class EncryptedFileMapping {
 public:
@@ -67,7 +68,8 @@ public:
     // invoked.
     // The pages specified can not be in the Dirty state.
     // The pages specified will be refetched and re-decrypted by calls to read_barrier.
-    void mark_for_refresh(size_t ref_start, size_t ref_end);
+    void mark_for_refresh(size_t ref_start, size_t ref_end,
+                          std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed);
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping

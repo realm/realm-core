@@ -43,6 +43,7 @@ class Group;
 class GroupWriter;
 
 namespace util {
+class EncryptedFileMapping;
 struct SharedFileInfo;
 }
 
@@ -380,7 +381,9 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void refresh_encrypted_pages(const RefRanges& ranges);
+    void refresh_encrypted_pages(
+        const RefRanges& ranges,
+        std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed);
     void refresh_all_encrypted_pages();
 
 private:

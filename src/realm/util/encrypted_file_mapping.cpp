@@ -666,10 +666,12 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
     set(m_page_state[local_page_ndx], UpToDate);
 }
 
-void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
+void EncryptedFileMapping::mark_for_refresh(
+    size_t ref_start, size_t ref_end,
+    std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
 {
     size_t first_page_ndx = ref_start >> m_page_shift;
-    size_t last_page_ndx = (ref_end - 1) >> m_page_shift; // FIXME: why - 1 ?
+    size_t last_page_ndx = (ref_end - 1) >> m_page_shift;
     for (size_t page_ndx = first_page_ndx; page_ndx <= last_page_ndx; ++page_ndx) {
         for (size_t i = 0; i < m_file.mappings.size(); ++i) {
             EncryptedFileMapping* m = m_file.mappings[i];
@@ -698,7 +700,11 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
                     // b) the writer mush have marked pages for refresh up till latest version,
                     // c) it must have done so while holding the write lock
                     // Are a/b/c fullfilled?  Are they sufficient?
-                    if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable)) {
+                    if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable) &&
+                        (!pages_refreshed || (*pages_refreshed)[m].count(page_ndx) == 0)) {
+                        if (pages_refreshed) {
+                            (*pages_refreshed)[m].insert(page_ndx);
+                        }
                         clear(m->m_page_state[local_page_ndx], UpToDate);
                     }
                 }

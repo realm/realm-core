@@ -191,7 +191,9 @@ void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_
         do_encryption_write_barrier(map.get_addr() + index, sizeof(T) * num_elements, mapping);
     }
 }
-void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end);
+void encryption_mark_for_refresh(
+    EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end,
+    std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed = nullptr);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
