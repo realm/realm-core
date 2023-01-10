@@ -138,7 +138,14 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
 void SyncSession::become_paused(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Paused);
+    auto old_state = m_state;
     m_state = State::Paused;
+
+    // Nothing to do if we're already inactive besides update the state.
+    if (old_state == State::Inactive) {
+        m_state_mutex.unlock(lock);
+        return;
+    }
 
     do_become_inactive(std::move(lock), {});
 }
@@ -952,9 +959,9 @@ void SyncSession::pause()
         case State::Active:
         case State::Dying:
         case State::WaitingForAccessToken:
+        case State::Inactive:
             become_paused(std::move(lock));
             break;
-        case State::Inactive:
         case State::Paused:
             break;
     }
@@ -1171,9 +1178,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
             // (either due to one of the callbacks being invoked or another
             // thread coincidentally doing something). We just attempt to keep
             // switching it to inactive until it stays there.
-            if (m_state != State::Paused) {
-                become_inactive(std::move(state_lock));
-            }
+            become_inactive(std::move(state_lock));
             continue;
         }
 
