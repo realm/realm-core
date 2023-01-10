@@ -125,7 +125,7 @@ public:
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
-    /// These call stop() and run() on the service object (get_service()) respectively.
+    /// These call stop() and run() on the socket provider respectively.
     void stop() noexcept;
     void run();
     // @}
@@ -142,8 +142,6 @@ public:
     using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
-    // TODO: This function will be removed once the event loop is integrated
-    network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
     /// Returns false if the specified URL is invalid.
@@ -170,13 +168,11 @@ private:
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
     // This will be updated to the SyncSocketProvider interface once the integration is complete
-    std::shared_ptr<websocket::DefaultSocketProvider> m_socket_provider;
+    std::shared_ptr<SyncSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
     const bool m_one_connection_per_session;
 
-    // TODO: m_service will be removed once the event loop is integrated
-    network::Service& m_service;
     std::mt19937_64 m_random;
     SyncTrigger m_actualize_and_finalize;
 
@@ -314,7 +310,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 
 // TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
-class ClientImpl::Connection final : public websocket::EZObserver {
+class ClientImpl::Connection final : public WebSocketObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -387,15 +383,24 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in websocket::EZObserver
-    void websocket_handshake_completion_handler(const std::string& protocol) override;
+    // Methods from WebSocketObserver interface for websockets from the Socket Provider
+    void websocket_connected_handler(const std::string& protocol) override;
+    bool websocket_binary_message_received(util::Span<const char> data) override;
+    // Will be implemented when the functions below are removed
+    void websocket_error_handler() override {}
+    bool websocket_closed_handler(bool, Status) override
+    {
+        return false;
+    }
+
+    /// DEPRECATED - Will be removed in a future release
+    // Methods from WebsocketObserver that will be going away soon
     void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
     void websocket_read_or_write_error_handler(std::error_code) override;
     void websocket_handshake_error_handler(std::error_code, const std::string_view*) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
-    bool websocket_binary_message_received(const char*, std::size_t) override;
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -460,7 +465,7 @@ private:
     void send_ping();
     void initiate_write_ping(const OutputBuffer&);
     void handle_write_ping();
-    void handle_message_received(const char* data, std::size_t size);
+    void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code);
@@ -502,15 +507,17 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    // TODO: This will be updated to WebSocketInterface once the WebSocket integration is complete
     std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
+
+    /// DEPRECATED - These will be removed in a future release
     const bool m_verify_servers_ssl_certificate;
     const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;
     const util::Optional<ProxyConfig> m_proxy_config;
+
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
     SyncServerMode m_sync_mode = SyncServerMode::PBS;
@@ -599,6 +606,8 @@ private:
 
     const connection_ident_type m_ident;
     const ServerEndpoint m_server_endpoint;
+
+    /// DEPRECATED - These will be removed in a future release
     const std::string m_authorization_header_name;
     const std::map<std::string, std::string> m_custom_http_headers;
 
@@ -1143,12 +1152,6 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
-
-// TODO: This function will be removed once the event loop is integrated
-inline network::Service& ClientImpl::get_service() noexcept
-{
-    return m_service;
-}
 
 inline std::mt19937_64& ClientImpl::get_random() noexcept
 {

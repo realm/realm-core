@@ -21,6 +21,7 @@
 #include "util/baas_admin_api.hpp"
 
 #include <realm/object-store/object_store.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
@@ -357,7 +358,7 @@ static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const App
             });
             return pf.future.get() > 0;
         },
-        std::chrono::minutes(15), std::chrono::milliseconds(100));
+        std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -520,22 +521,28 @@ struct BaasFLXClientReset : public TestClientReset {
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
-        const ObjectId pk_of_added_object("123456789000000000000000");
-        {
-            if (m_on_setup) {
-                m_on_setup(realm);
+        if (m_on_setup) {
+            m_on_setup(realm);
+        }
+
+        ObjectId pk_of_added_object = [&] {
+            if (m_populate_initial_object) {
+                return m_populate_initial_object(realm);
             }
+
+            auto ret = ObjectId::gen();
             constexpr bool create_object = true;
-            subscribe_to_object_by_id(realm, pk_of_added_object, create_object);
+            subscribe_to_object_by_id(realm, ret, create_object);
 
-            wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
-                                       std::string(c_object_schema_name),
-                                       {{std::string(c_id_col_name), pk_of_added_object}});
-            session->log_out();
+            return ret;
+        }();
 
-            if (m_make_local_changes) {
-                m_make_local_changes(realm);
-            }
+        wait_for_object_to_persist(m_local_config.sync_config->user, app_session, std::string(c_object_schema_name),
+                                   {{std::string(c_id_col_name), pk_of_added_object}});
+        session->log_out();
+
+        if (m_make_local_changes) {
+            m_make_local_changes(realm);
         }
 
         // cause a client reset by restarting the sync service
@@ -676,6 +683,12 @@ TestClientReset* TestClientReset::make_local_changes(Callback&& changes_local)
     m_make_local_changes = std::move(changes_local);
     return this;
 }
+TestClientReset* TestClientReset::populate_initial_object(InitialObjectCallback&& callback)
+{
+    m_populate_initial_object = std::move(callback);
+    return this;
+}
+
 TestClientReset* TestClientReset::make_remote_changes(Callback&& changes_remote)
 {
     m_make_remote_changes = std::move(changes_remote);

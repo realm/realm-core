@@ -820,7 +820,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
     // propagate changes to first page (update may be partial, may also be to last page)
     if (first_accessed_local_page < pages_size) {
-        REALM_ASSERT(is(m_page_state[first_accessed_local_page], UpToDate));
+        REALM_ASSERT_EX(is(m_page_state[first_accessed_local_page], UpToDate),
+                        m_page_state[first_accessed_local_page]);
         if (first_accessed_local_page == last_accessed_local_page) {
             size_t last_offset = last_accessed_address - page_addr(first_accessed_local_page);
             write_and_update_all(first_accessed_local_page, first_offset, last_offset + 1);

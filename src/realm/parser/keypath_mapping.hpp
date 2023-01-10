@@ -72,7 +72,7 @@ public:
     bool remove_table_mapping(std::string alias_to_remove);
     bool has_table_mapping(const std::string& alias) const;
     util::Optional<std::string> get_table_mapping(const std::string name) const;
-    std::string translate(LinkChain&, const std::string& identifier);
+    std::string translate(const LinkChain&, const std::string& identifier);
     std::string translate(ConstTableRef table, const std::string& identifier);
     std::string translate_table_name(const std::string& identifier);
 

@@ -565,7 +565,7 @@ tasks:
 
 - name: object-store-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 2100
+  exec_timeout_secs: 2400
   commands:
   - func: "compile"
     vars:
@@ -596,7 +596,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b master 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 9398abf62ad6876c38cc675bce47b4f96786a1d6 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec

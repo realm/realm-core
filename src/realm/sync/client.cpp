@@ -492,14 +492,14 @@ void ClientImpl::stop() noexcept
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
-    m_service.stop();
+    m_socket_provider->stop();
 }
 
 
 void ClientImpl::run()
 {
     auto ta = util::make_temp_assign(m_running, true);
-    m_service.run(); // Throws
+    m_socket_provider->run();
 }
 
 
@@ -1058,20 +1058,20 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.post([new_version, this](Status status) {
+    auto self = util::bind_ptr<SessionWrapper>(this);
+    m_client.post([new_version, self = std::move(self)](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
-
-        REALM_ASSERT(m_actualized);
-        if (REALM_UNLIKELY(!m_sess)) {
+        REALM_ASSERT(self->m_actualized);
+        if (REALM_UNLIKELY(!self->m_sess)) {
             return; // Already finalized
         }
-
-        m_sess->recognize_sync_version(m_db->get_version_of_latest_snapshot());
-        m_flx_latest_version = new_version;
-        m_sess->on_new_flx_subscription_set(new_version);
+        auto& sess = *self->m_sess;
+        sess.recognize_sync_version(self->m_db->get_version_of_latest_snapshot());
+        self->m_flx_latest_version = new_version;
+        sess.on_new_flx_subscription_set(new_version);
     });
 }
 
@@ -1660,16 +1660,16 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
-    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
-    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
-    , m_ssl_verify_callback{std::move(ssl_verify_callback)}
-    , m_proxy_config{std::move(proxy_config)}
+    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
+    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)} // DEPRECATED
+    , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
+    , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
     , m_sync_mode(sync_mode)
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
-    , m_authorization_header_name{authorization_header_name}
-    , m_custom_http_headers{custom_http_headers}
+    , m_authorization_header_name{authorization_header_name} // DEPRECATED
+    , m_custom_http_headers{custom_http_headers}             // DEPRECATED
 {
     m_on_idle = m_client.create_trigger([this](Status status) {
         if (status == ErrorCodes::OperationAborted)

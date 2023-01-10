@@ -84,8 +84,9 @@ void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType typ
         }
         else {
             auto new_col_key = table->add_column(type, name, col_key.is_nullable());
-            if (t->has_search_index(col_key)) {
-                table->add_search_index(new_col_key);
+            auto index_type = t->search_index_type(col_key);
+            if (index_type != IndexType::None) {
+                table->add_search_index(new_col_key, index_type);
             }
         }
     }

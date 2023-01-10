@@ -132,7 +132,7 @@ std::string KeyPathMapping::translate(ConstTableRef table, const std::string& id
     return alias;
 }
 
-std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& identifier)
+std::string KeyPathMapping::translate(const LinkChain& link_chain, const std::string& identifier)
 {
     auto table = link_chain.get_current_table();
     return translate(table, identifier);

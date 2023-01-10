@@ -1396,20 +1396,11 @@ enum class ResolveErrors {
     socket_type_not_supported
 };
 
-class ResolveErrorCategory : public std::error_category {
-public:
-    const char* name() const noexcept override final;
-    std::string message(int) const override final;
-};
-
 /// The error category associated with ResolveErrors. The name of this category is
-/// `realm.util.network.resolve`.
-extern ResolveErrorCategory resolve_error_category;
+/// `realm.sync.network.resolve`.
+const std::error_category& resolve_error_category() noexcept;
 
-inline std::error_code make_error_code(ResolveErrors err)
-{
-    return std::error_code(int(err), resolve_error_category);
-}
+std::error_code make_error_code(ResolveErrors err);
 
 } // namespace realm::sync::network
 
