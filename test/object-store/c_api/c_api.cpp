@@ -121,6 +121,18 @@ realm_value_t rlm_decimal_val(double d)
     return val;
 }
 
+realm_value_t rlm_decimal_nan()
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_DECIMAL128;
+
+    realm::Decimal128 dec = realm::Decimal128::nan("0");
+    val.decimal128.w[0] = dec.raw()->w[0];
+    val.decimal128.w[1] = dec.raw()->w[1];
+
+    return val;
+}
+
 realm_value_t rlm_uuid_val(const char* str)
 {
     realm_value_t val;
@@ -2241,6 +2253,26 @@ TEST_CASE("C API", "[c_api]") {
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
                 CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+            }
+
+            SECTION("decimal NaN") {
+                realm_value_t decimal = rlm_decimal_nan();
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
+                });
+                realm_query_arg_t args[] = {realm_query_arg_t{1, false, &decimal}};
+                auto q_decimal = cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $0", 1, args));
+                realm_value_t out_value;
+                bool out_found;
+                CHECK(realm_query_find_first(q_decimal.get(), &out_value, &out_found));
+                CHECK(out_found);
+                auto link = obj1->obj().get_link();
+                realm_value_t expected;
+                expected.type = RLM_TYPE_LINK;
+                expected.link.target_table = link.get_table_key().value;
+                expected.link.target = link.get_obj_key().value;
+                CHECK(rlm_val_eq(out_value, expected));
             }
 
             SECTION("interpolate all types") {

@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.2.0 Release notes
+
+### Enhancements
 * Fulltext search index can now be defined on ObjectStore Property (PR [#6100](https://github.com/realm/realm-core/pull/6100))
 * Improve performance of acquiring read locks when a read lock for that version is already held. This speeds up many operations related to change notifications, and particularly refreshing a Realm which has change notifiers registered.
 * Upgrade OpenSSL from 1.1.1n to 3.0.7. ([#6097](https://github.com/realm/realm-core/pull/6097))
@@ -10,7 +32,6 @@
 * Normalize sync connection parameters for device information ([#6029](https://github.com/realm/realm-core/issues/6029))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix `BadVersion` exceptions which could occur when performing multiple writes on one thread while observing change notifications on another thread ([#6069](https://github.com/realm/realm-core/issues/6069), since v13.0.0).
 * Compare actual users (`SyncUser::operator!=`), not pointers (`shared_ptr<SyncUser>::operator!=`). ([#realm/realm-dart#1055](https://github.com/realm/realm-dart/issues/1055), since v10.2.0)
 * Core should not alter the order of the properties for additive schemas. ([#6134](https://github.com/realm/realm-core/issues/6134))
@@ -18,6 +39,7 @@
 * Fixed possible segfault in sync client where async callback was using object after being deallocated ([#6053](https://github.com/realm/realm-core/issues/6053), since v11.7.0)
 * Fixed crash when using client reset with recovery and flexible sync with a single subscription ([#6070](https://github.com/realm/realm-core/issues/6070), since v12.3.0)
 * Fixed crash with wrong transaction state, during realm migration if realm is frozen due to schema mismatch ([#6144](https://github.com/realm/realm-core/issues/6144), since v13.0.0)
+* "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)
  
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
