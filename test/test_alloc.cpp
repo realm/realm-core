@@ -544,11 +544,9 @@ TEST(Alloc_EncryptionPageRefresher)
             versions.init_from_ref(top.get_as_ref(top_array_free_versions_ndx));
             to_refresh.push_back({pos.get_ref(), pos.get_ref() + Array::header_size});
             to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + Array::header_size});
-            to_refresh.push_back({versions.get_ref(), versions.get_ref() + Array::header_size});
             // now the full size of pos, size, and versions
             to_refresh.push_back({pos.get_ref(), pos.get_ref() + pos.get_byte_size()});
             to_refresh.push_back({sizes.get_ref(), sizes.get_ref() + sizes.get_byte_size()});
-            to_refresh.push_back({versions.get_ref(), versions.get_ref() + versions.get_byte_size()});
         }
     };
 
