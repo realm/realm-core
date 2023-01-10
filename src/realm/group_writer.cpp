@@ -1344,8 +1344,8 @@ void GroupWriter::commit(ref_type new_top_ref)
             util::format("commit end version %1, top_ref %2, file size: %3 has freelist: ", m_current_version,
                          new_top_ref, m_logical_size);
         for (size_t i = 0; i < m_free_positions.size(); ++i) {
-            ref_type pos = m_free_positions.get(i);
-            ref_type size = m_free_lengths.get(i);
+            ref_type pos = ref_type(m_free_positions.get(i));
+            ref_type size = ref_type(m_free_lengths.get(i));
             msg += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, m_free_versions.get(i));
         }
         msg += "\n";

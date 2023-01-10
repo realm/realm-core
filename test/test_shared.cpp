@@ -55,7 +55,6 @@
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
-#include "util/misc.hpp"
 
 extern unsigned int unit_test_random_seed;
 
@@ -707,18 +706,16 @@ TEST(Shared_InitialMem_StaleFile)
 }
 
 
-NONCONCURRENT_TEST_IF(Shared_Initial2, testing_supports_fork)
+TEST(Shared_Initial2)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        std::unique_ptr<Replication> hist_r(make_in_realm_history());
-        DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
-        int pid = test_util::fork_and_update_mappings();
-        if (pid == 0) {
+        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+
+        {
             // Open the same db again (in empty state)
-            std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+            DBRef sg2 = DB::create(path, false, DBOptions(crypt_key()));
 
             // Verify that new group is empty
             {
@@ -735,10 +732,6 @@ NONCONCURRENT_TEST_IF(Shared_Initial2, testing_supports_fork)
                 t1->create_object(ObjKey(7)).set_all(1, 2, false, "test");
                 wt.commit();
             }
-            exit(0);
-        }
-        else {
-            test_util::waitpid_checked(pid, 0, "init");
         }
 
         // Verify that the new table has been added
@@ -1691,22 +1684,19 @@ TEST(Shared_SpaceOveruse)
 }
 
 
-NONCONCURRENT_TEST_IF(Shared_Notifications, testing_supports_fork)
+TEST(Shared_Notifications)
 {
     // Create a new shared db
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history());
-    DBRef sg = DB::create(*hist_r, path, DBOptions(crypt_key()));
+    DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
     TransactionRef tr1 = sg->start_read();
 
     // No other instance have changed db since last transaction
     CHECK(!sg->has_changed(tr1));
 
-    int pid = test_util::fork_and_update_mappings();
-    if (pid == 0) {
+    {
         // Open the same db again (in empty state)
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg2 = DB::create(path, false, DBOptions(crypt_key()));
 
         // Verify that new group is empty
         {
@@ -1726,10 +1716,6 @@ NONCONCURRENT_TEST_IF(Shared_Notifications, testing_supports_fork)
             t1->create_object(ObjKey(7)).set_all(1, 2, false, "test");
             wt.commit();
         }
-        exit(0);
-    }
-    else {
-        test_util::waitpid_checked(pid, 0, "add table");
     }
 
     // Db has been changed by other instance

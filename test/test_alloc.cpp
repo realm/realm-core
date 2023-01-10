@@ -487,8 +487,8 @@ TEST(Alloc_EncryptionPageRefresher)
     };
 
 
-    auto make_top_ref_with_allocations = [](SlabAlloc& alloc, RefRanges refs, RefsType type, size_t total_size,
-                                            Array& top, size_t version) {
+    auto make_top_ref_with_allocations = [&](SlabAlloc& alloc, RefRanges refs, RefsType type, size_t total_size,
+                                             Array& top, size_t version) {
         RefRanges free_space;
         if (type == RefsType::Allocations) {
             size_t last_alloc = 0;
@@ -525,8 +525,8 @@ TEST(Alloc_EncryptionPageRefresher)
         top.set_as_ref(top_array_free_versions_ndx, free_versions.get_ref());
         top.set(top_array_version_ndx, RefOrTagged::make_tagged(version));
     };
-    auto add_expected_refreshes_for_arrays = [](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
-                                                RefRanges& to_refresh) {
+    auto add_expected_refreshes_for_arrays = [&](SlabAlloc& alloc, std::vector<VersionedTopRef> top_refs,
+                                                 RefRanges& to_refresh) {
         bool skip_first = true;
         for (auto& v : top_refs) {
             if (skip_first) {

@@ -26,10 +26,9 @@
 #include <set>
 #include <atomic>
 
-#if REALM_ENCRYPTION_VERIFICATION
+#if REALM_ENCRYPTION_VERIFICATION || REALM_DEBUG
 #include <iostream>
-#include <unordered_set>
-#endif // REALM_ENCRYPTION_VERIFICATION
+#endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #include <cstdlib>
@@ -1252,6 +1251,13 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
     rebuild_translations(replace_last_mapping, old_num_mappings);
 }
 
+static inline ref_type get_ref_from_array(Array& array, size_t index)
+{
+    int64_t val = array.get(index);
+    REALM_ASSERT_EX(!int_cast_has_overflow<ref_type>(val), val, index, array.get_ref());
+    return ref_type(val);
+}
+
 void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
                                            util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
@@ -1400,9 +1406,9 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         auto combine_contiguous_entries = [](size_t ndx, size_t& increment, ref_type& end, Array& positions,
                                              Array& sizes, size_t freelist_length) {
             for (size_t i = ndx + 1; i < freelist_length; ++i) {
-                ref_type next_pos = positions.get(i);
+                ref_type next_pos = get_ref_from_array(positions, i);
                 if (end == next_pos) {
-                    end = next_pos + sizes.get(i);
+                    end = next_pos + get_ref_from_array(sizes, i);
                     ++increment;
                 }
                 else {
@@ -1419,10 +1425,10 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         const size_t cur_freelist_size = cur_freelist_positions.size();
         const size_t num_previous_allocations = allocations.size();
         while (previous_ndx < prev_freelist_size && current_ndx < cur_freelist_size) {
-            ref_type prev_start = prev_freelist_positions.get(previous_ndx);
-            ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
-            ref_type cur_start = cur_freelist_positions.get(current_ndx);
-            ref_type cur_end = cur_start + cur_freelist_lengths.get(current_ndx);
+            ref_type prev_start = get_ref_from_array(prev_freelist_positions, previous_ndx);
+            ref_type prev_end = prev_start + get_ref_from_array(prev_freelist_lengths, previous_ndx);
+            ref_type cur_start = get_ref_from_array(cur_freelist_positions, current_ndx);
+            ref_type cur_end = cur_start + get_ref_from_array(cur_freelist_lengths, current_ndx);
 
             // Skip entries with length of zero.
             if (prev_start == prev_end) {
@@ -1438,14 +1444,14 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
 #if REALM_ENCRYPTION_VERIFICATION
             if (previous_ndx + 1 < prev_freelist_size) {
-                size_t start = prev_freelist_positions.get(previous_ndx + 1);
-                size_t end = start + prev_freelist_lengths.get(previous_ndx + 1);
+                ref_type start = get_ref_from_array(prev_freelist_positions, previous_ndx + 1);
+                ref_type end = start + get_ref_from_array(prev_freelist_lengths, previous_ndx + 1);
                 static_cast<void>(end);
                 REALM_ASSERT_EX(prev_end <= start, prev_start, prev_end, start, end, previous_ndx, read_lock.version);
             }
             if (current_ndx + 1 < cur_freelist_size) {
-                size_t start = cur_freelist_positions.get(current_ndx + 1);
-                size_t size = cur_freelist_lengths.get(current_ndx + 1);
+                ref_type start = get_ref_from_array(cur_freelist_positions, current_ndx + 1);
+                ref_type size = get_ref_from_array(cur_freelist_lengths, current_ndx + 1);
                 if (cur_end > start) {
                     debug_allocs += util::format("\nfreelist inconsistency detected at version %1, index %2, current "
                                                  "{%3 + %4 = %5}, next {%6 + %7 = %8}, during refresh of "
@@ -1467,7 +1473,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
             auto add_alloc_for_remainder_of_block = [&]() {
                 if (current_ndx + cur_increment < cur_freelist_size) {
-                    ref_type next_cur_start = cur_freelist_positions.get(current_ndx + cur_increment);
+                    ref_type next_cur_start = get_ref_from_array(cur_freelist_positions, current_ndx + cur_increment);
                     if (next_cur_start < prev_end) {
                         //     -------
                         //  ----  --
@@ -1542,8 +1548,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                             prev_freelist_positions.size());
             REALM_ASSERT_EX(previous_ndx < prev_freelist_lengths.size(), previous_ndx, prev_freelist_lengths.size());
 
-            ref_type prev_start = prev_freelist_positions.get(previous_ndx);
-            ref_type prev_end = prev_start + prev_freelist_lengths.get(previous_ndx);
+            ref_type prev_start = get_ref_from_array(prev_freelist_positions, previous_ndx);
+            ref_type prev_end = prev_start + get_ref_from_array(prev_freelist_lengths, previous_ndx);
             allocations.push_back(RefRange{prev_start, prev_end});
             ++previous_ndx;
         }
@@ -1554,10 +1560,11 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 
     // Between the first and last version, the file size may have changed.
     // If it was expanded, the newly added pages should all be refreshed.
-    // FIXME: If it was contracted, is there no need to refresh those extraneous end pages?
     const uint64_t end_file_size = (--read_locks.end())->file_size;
     if (begin_file_size < end_file_size) {
-        allocations.push_back({begin_file_size, end_file_size});
+        REALM_ASSERT_EX(!int_cast_has_overflow<ref_type>(begin_file_size), begin_file_size, end_file_size);
+        REALM_ASSERT_EX(!int_cast_has_overflow<ref_type>(end_file_size), begin_file_size, end_file_size);
+        allocations.push_back({ref_type(begin_file_size), ref_type(end_file_size)});
     }
 
     // combine adjacent ranges
@@ -1685,7 +1692,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
         // if the file was extended, additional empty pages may not have been explicitly written, but they should be
         // marked for refresh so add them on now.
         if (begin_file_size < end_file_size) {
-            track_pages(pages_across_all_versions, {begin_file_size, end_file_size});
+            track_pages(pages_across_all_versions, {ref_type(begin_file_size), ref_type(end_file_size)});
         }
         // the file header is always changed during commit, but we do not necessarily need to refresh that page
         // if there have been no other modifications because we get the top_refs from the lock file and address them

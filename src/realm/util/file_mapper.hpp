@@ -25,6 +25,9 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/functional.hpp>
 
+#include <unordered_map>
+#include <unordered_set>
+
 namespace realm {
 namespace util {
 
