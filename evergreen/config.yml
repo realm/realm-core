@@ -958,7 +958,7 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=fuzzer,address"
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     enable_fuzzer: On
