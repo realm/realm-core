@@ -26,10 +26,10 @@
 #include <set>
 #include <atomic>
 
-#ifdef REALM_DEBUG
+#if REALM_ENCRYPTION_VERIFICATION
 #include <iostream>
 #include <unordered_set>
-#endif
+#endif // REALM_ENCRYPTION_VERIFICATION
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #include <cstdlib>
@@ -1440,6 +1440,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             if (previous_ndx + 1 < prev_freelist_size) {
                 size_t start = prev_freelist_positions.get(previous_ndx + 1);
                 size_t end = start + prev_freelist_lengths.get(previous_ndx + 1);
+                static_cast<void>(end);
                 REALM_ASSERT_EX(prev_end <= start, prev_start, prev_end, start, end, previous_ndx, read_lock.version);
             }
             if (current_ndx + 1 < cur_freelist_size) {

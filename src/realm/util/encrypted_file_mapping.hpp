@@ -145,7 +145,6 @@ private:
 
 #ifdef REALM_DEBUG
     std::unique_ptr<char[]> m_validate_buffer;
-    std::vector<size_t> m_debug_writes;
 #endif
 
     char* page_addr(size_t local_page_ndx) const noexcept;

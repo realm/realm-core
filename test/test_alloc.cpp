@@ -467,11 +467,11 @@ TEST(Alloc_ToAndFromRef)
 
 TEST(Alloc_EncryptionPageRefresher)
 {
-    constexpr size_t top_array_size = 12;         // s_group_max_size
-    constexpr size_t top_array_free_pos_ndx = 3;  // s_free_pos_ndx
-    constexpr size_t top_array_free_size_ndx = 4; // s_free_size_ndx
+    constexpr size_t top_array_size = 12;             // s_group_max_size
+    constexpr size_t top_array_free_pos_ndx = 3;      // s_free_pos_ndx
+    constexpr size_t top_array_free_size_ndx = 4;     // s_free_size_ndx
     constexpr size_t top_array_free_versions_ndx = 5; // s_free_version_ndx
-    constexpr size_t top_array_version_ndx = 6;   // s_version_ndx
+    constexpr size_t top_array_version_ndx = 6;       // s_version_ndx
 
     enum class RefsType { Allocations, Freelists };
     struct VersionInfo {

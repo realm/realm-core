@@ -2425,7 +2425,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {};
+    struct ObserverError {
+    };
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;

@@ -23,10 +23,11 @@
 #if REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
-#include <chrono>
+#include <thread>
 
 #ifdef REALM_DEBUG
 #include <cstdio>
@@ -307,7 +308,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             std::pair<iv_table, size_t> cur_iv_and_data_hash =
                 std::make_pair(iv, std::hash<std::string_view>{}(page_data));
             if (retry_count != 0) {
-                sched_yield();
+                std::this_thread::yield();
                 if (last_iv_and_data_hash == cur_iv_and_data_hash) {
                     ++num_identical_reads;
                 }
@@ -654,7 +655,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
         size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
         if (actual < size) {
             if (actual >= required) {
-                 memset(addr + actual, 0x55, size - actual);
+                memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
@@ -734,7 +735,6 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         }
     }
     set(m_page_state[local_page_ndx], Dirty);
-    m_debug_writes[local_page_ndx]++;
     clear(m_page_state[local_page_ndx], Writable);
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
@@ -909,11 +909,8 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift));
         clear(m_page_state[local_page_ndx], Dirty);
-        m_debug_writes[local_page_ndx] = 0;
 #if REALM_ENCRYPTION_VERIFICATION
         pages_written.push_back(page_ndx_in_file);
-        debug_msg += util::format("page %1 (pos %2) has %3 writes\n", page_ndx_in_file,
-                                  off_t(page_ndx_in_file << m_page_shift), m_debug_writes[local_page_ndx]);
 #endif
     }
 #if REALM_ENCRYPTION_VERIFICATION
@@ -1047,7 +1044,6 @@ void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     size_t num_pages = new_size >> m_page_shift;
     m_page_state.resize(num_pages, PageState::Clean);
-    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
     m_file.cryptor.set_file_size((off_t)(offset + new_size));
 }
@@ -1071,11 +1067,9 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_num_decrypted = 0;
     m_page_state.clear();
-    m_debug_writes.clear();
     m_chunk_dont_scan.clear();
 
     m_page_state.resize(num_pages, PageState(0));
-    m_debug_writes.resize(num_pages, 0);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
 }
 
