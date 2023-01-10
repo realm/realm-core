@@ -930,7 +930,7 @@ void SyncSession::handle_reconnect()
     }
 }
 
-void SyncSession::log_out()
+void SyncSession::force_close()
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     switch (m_state) {

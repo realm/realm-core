@@ -283,7 +283,7 @@ TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
     REQUIRE(session->state() == SyncSession::State::Paused);
 
     // "Logging out" the session should be a no-op.
-    session->log_out();
+    session->force_close();
     REQUIRE(session->state() == SyncSession::State::Paused);
 
     // Reviving the session via revive_if_needed() should be a no-op.

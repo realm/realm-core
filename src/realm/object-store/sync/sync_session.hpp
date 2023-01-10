@@ -183,11 +183,16 @@ public:
     // Perform any actions needed in response to regaining network connectivity.
     void handle_reconnect() REQUIRES(!m_state_mutex);
 
-    // Inform the sync session that it should close.
+    // Inform the sync session that it should close. This will respect the stop policy specified in
+    // the SyncConfig, so its possible the session will remain open either until all pending local
+    // changes are uploaded or possibly forever.
     void close() REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
-    // Inform the sync session that it should log out.
-    void log_out() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+    // Inform the sync session that it should close immediately, regardless of the stop policy.
+    // The session may resume after calling this if a new Realm is opened for the underlying DB
+    // of the SyncSession. Use pause() to close the sync session until you want to explicitly
+    // resume it.
+    void force_close() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // Closes the sync session so that it will not resume until resume() is called.
     void pause() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
