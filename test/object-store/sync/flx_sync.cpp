@@ -1265,7 +1265,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
                 REQUIRE(latest_subs.version() == 1);
                 REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
 
-                session->pause();
+                session->close();
                 promise->emplace_value();
 
                 return SyncClientHookAction::NoAction;
@@ -1865,7 +1865,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     }
 
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::MoreToCome) {
-                        session->pause();
+                        session->log_out();
                         promise->emplace_value();
                         return SyncClientHookAction::EarlyReturn;
                     }
@@ -1944,7 +1944,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     }
 
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
-                        session->pause();
+                        session->log_out();
                         promise->emplace_value();
                         return SyncClientHookAction::EarlyReturn;
                     }
