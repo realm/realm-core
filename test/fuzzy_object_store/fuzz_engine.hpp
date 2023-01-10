@@ -19,9 +19,15 @@
 #ifndef FUZZ_ENGINE_HPP
 #define FUZZ_ENGINE_HPP
 
-#include <string>
-#include <fstream>
 #include <vector>
+#include <string>
+#include <iostream>
+#include <cstring>
+#include <fstream>
+#include <cstdlib>
+#if REALM_USE_UV
+#include <uv.h>
+#endif
 
 class FuzzConfigurator;
 class FuzzEngine {

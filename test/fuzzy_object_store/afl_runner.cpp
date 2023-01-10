@@ -17,13 +17,6 @@
  **************************************************************************/
 
 #include "fuzz_engine.hpp"
-#include <vector>
-#include <string>
-#include <iostream>
-#include <cstring>
-#if REALM_USE_UV
-#include <uv.h>
-#endif
 
 int main(int argc, const char* argv[])
 {
