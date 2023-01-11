@@ -1,6 +1,7 @@
 #include <realm/sync/client.hpp>
-#include <realm/util/http.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include "test.hpp"
 #include "util/thread_wrapper.hpp"
@@ -9,9 +10,7 @@ using namespace realm;
 using namespace realm::sync;
 using namespace realm::test_util;
 
-using namespace realm::test_util;
-
-using port_type = util::network::Endpoint::port_type;
+using port_type = network::Endpoint::port_type;
 using ConnectionStateChangeListener = Session::ConnectionStateChangeListener;
 using ErrorInfo = Session::ErrorInfo;
 
@@ -33,7 +32,7 @@ public:
 
     void start()
     {
-        m_acceptor.open(util::network::StreamProtocol::ip_v4());
+        m_acceptor.open(network::StreamProtocol::ip_v4());
         m_acceptor.listen();
 
         auto handler = [this](std::error_code ec) {
@@ -53,7 +52,7 @@ public:
         m_service.stop();
     }
 
-    util::network::Endpoint listen_endpoint() const
+    network::Endpoint listen_endpoint() const
     {
         return m_acceptor.local_endpoint();
     }
@@ -69,11 +68,11 @@ public:
     }
 
 private:
-    util::network::Service m_service;
-    util::network::Acceptor m_acceptor;
-    util::network::Socket m_socket;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
-    util::HTTPServer<SurpriseServer> m_http_server;
+    network::Service m_service;
+    network::Acceptor m_acceptor;
+    network::Socket m_socket;
+    network::ReadAheadBuffer m_read_ahead_buffer;
+    HTTPServer<SurpriseServer> m_http_server;
     std::string m_response;
 
     void handle_accept()
@@ -340,7 +339,7 @@ namespace {
 TEST(Handshake_HTTP_Version)
 {
     const std::string server_path = "/http_1_0";
-    std::error_code ec = util::websocket::Error::bad_response_invalid_http;
+    std::error_code ec = websocket::Error::bad_response_invalid_http;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -348,7 +347,7 @@ TEST(Handshake_HTTP_Version)
 TEST(Handshake_InvalidStatusCode)
 {
     const std::string server_path = "/invalid-status-code";
-    std::error_code ec = util::websocket::Error::bad_response_invalid_http;
+    std::error_code ec = websocket::Error::bad_response_invalid_http;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -356,7 +355,7 @@ TEST(Handshake_InvalidStatusCode)
 TEST(Handshake_MissingWebSocketHeaders)
 {
     const std::string server_path = "/missing-websocket-headers";
-    std::error_code ec = util::websocket::Error::bad_response_header_protocol_violation;
+    std::error_code ec = websocket::Error::bad_response_header_protocol_violation;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -364,7 +363,7 @@ TEST(Handshake_MissingWebSocketHeaders)
 TEST(Handshake_200)
 {
     const std::string server_path = "/200";
-    std::error_code ec = util::websocket::Error::bad_response_200_ok;
+    std::error_code ec = websocket::Error::bad_response_200_ok;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -372,7 +371,7 @@ TEST(Handshake_200)
 TEST(Handshake_201)
 {
     const std::string server_path = "/201";
-    std::error_code ec = util::websocket::Error::bad_response_2xx_successful;
+    std::error_code ec = websocket::Error::bad_response_2xx_successful;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -380,7 +379,7 @@ TEST(Handshake_201)
 TEST(Handshake_300)
 {
     const std::string server_path = "/300";
-    std::error_code ec = util::websocket::Error::bad_response_3xx_redirection;
+    std::error_code ec = websocket::Error::bad_response_3xx_redirection;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -388,7 +387,7 @@ TEST(Handshake_300)
 TEST(Handshake_301)
 {
     const std::string server_path = "/301";
-    std::error_code ec = util::websocket::Error::bad_response_301_moved_permanently;
+    std::error_code ec = websocket::Error::bad_response_301_moved_permanently;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -396,7 +395,7 @@ TEST(Handshake_301)
 TEST(Handshake_400)
 {
     const std::string server_path = "/400";
-    std::error_code ec = util::websocket::Error::bad_response_4xx_client_errors;
+    std::error_code ec = websocket::Error::bad_response_4xx_client_errors;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -404,7 +403,7 @@ TEST(Handshake_400)
 TEST(Handshake_401)
 {
     const std::string server_path = "/401";
-    std::error_code ec = util::websocket::Error::bad_response_401_unauthorized;
+    std::error_code ec = websocket::Error::bad_response_401_unauthorized;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -412,7 +411,7 @@ TEST(Handshake_401)
 TEST(Handshake_403)
 {
     const std::string server_path = "/403";
-    std::error_code ec = util::websocket::Error::bad_response_403_forbidden;
+    std::error_code ec = websocket::Error::bad_response_403_forbidden;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -420,7 +419,7 @@ TEST(Handshake_403)
 TEST(Handshake_404)
 {
     const std::string server_path = "/404";
-    std::error_code ec = util::websocket::Error::bad_response_404_not_found;
+    std::error_code ec = websocket::Error::bad_response_404_not_found;
     bool is_fatal = true;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -428,7 +427,7 @@ TEST(Handshake_404)
 TEST(Handshake_500)
 {
     const std::string server_path = "/500";
-    std::error_code ec = util::websocket::Error::bad_response_500_internal_server_error;
+    std::error_code ec = websocket::Error::bad_response_500_internal_server_error;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -436,7 +435,7 @@ TEST(Handshake_500)
 TEST(Handshake_501)
 {
     const std::string server_path = "/501";
-    std::error_code ec = util::websocket::Error::bad_response_5xx_server_error;
+    std::error_code ec = websocket::Error::bad_response_5xx_server_error;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -444,7 +443,7 @@ TEST(Handshake_501)
 TEST(Handshake_502)
 {
     const std::string server_path = "/502";
-    std::error_code ec = util::websocket::Error::bad_response_502_bad_gateway;
+    std::error_code ec = websocket::Error::bad_response_502_bad_gateway;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -452,7 +451,7 @@ TEST(Handshake_502)
 TEST(Handshake_503)
 {
     const std::string server_path = "/503";
-    std::error_code ec = util::websocket::Error::bad_response_503_service_unavailable;
+    std::error_code ec = websocket::Error::bad_response_503_service_unavailable;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -460,7 +459,7 @@ TEST(Handshake_503)
 TEST(Handshake_504)
 {
     const std::string server_path = "/504";
-    std::error_code ec = util::websocket::Error::bad_response_504_gateway_timeout;
+    std::error_code ec = websocket::Error::bad_response_504_gateway_timeout;
     bool is_fatal = false;
     run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -469,7 +468,7 @@ TEST(Handshake_504)
 TEST_IF(Handshake_Timeout, false)
 {
     // const std::string server_path = "/nothing";
-    // std::error_code ec = util::websocket::Error::; // CHANGE
+    // std::error_code ec = websocket::Error::; // CHANGE
     // bool is_fatal = false;
     // run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
@@ -507,7 +506,7 @@ TEST_IF(Handshake_ExternalServer, false)
                                                                                  const ErrorInfo* error_info) {
         if (error_info) {
             CHECK(connection_state == ConnectionState::disconnected);
-            std::error_code ec = util::websocket::Error::bad_response_301_moved_permanently;
+            std::error_code ec = websocket::Error::bad_response_301_moved_permanently;
             CHECK_EQUAL(ec, error_info->error_code);
             CHECK_EQUAL(true, error_info->is_fatal);
             client.stop();

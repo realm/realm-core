@@ -136,7 +136,23 @@ static_assert(!col_type_OldStringEnum.is_valid());
 static_assert(!col_type_OldTable.is_valid());
 static_assert(!col_type_OldDateTime.is_valid());
 
-enum class IndexType { General, Fulltext };
+enum class IndexType { None, General, Fulltext };
+
+inline std::ostream& operator<<(std::ostream& ostr, IndexType type)
+{
+    switch (type) {
+        case IndexType::None:
+            ostr << "no index";
+            break;
+        case IndexType::General:
+            ostr << "search index";
+            break;
+        case IndexType::Fulltext:
+            ostr << "fulltext index";
+            break;
+    }
+    return ostr;
+}
 
 // Column attributes can be combined using bitwise or.
 enum ColumnAttr {

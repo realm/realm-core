@@ -25,6 +25,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/socket_provider.hpp>
 
 #include <memory>
 #include <mutex>
@@ -80,10 +81,18 @@ struct SyncClientConfig {
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
     bool multiplex_sessions = false;
 
+    // The SyncSocket instance used by the Sync Client for event synchronization
+    // and creating WebSockets. If not provided the default implementation will be used.
+    std::shared_ptr<sync::SyncSocketProvider> socket_provider;
+
+    // {@
     // Optional information about the binding/application that is sent as part of the User-Agent
-    // when establishing a connection to the server.
+    // when establishing a connection to the server. These values are only used by the default
+    // SyncSocket implementation. Custom SyncSocket implementations must update the User-Agent
+    // directly, if supported by the platform APIs.
     std::string user_agent_binding_info;
     std::string user_agent_application_info;
+    // @}
 
     SyncClientTimeouts timeouts;
 };

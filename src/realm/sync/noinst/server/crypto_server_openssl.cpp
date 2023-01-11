@@ -3,7 +3,12 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/evp.h>
+
+#if OPENSSL_VERSION_MAJOR >= 3
+#include <openssl/decoder.h>
+#else
 #include <openssl/rsa.h>
+#endif
 
 using namespace realm;
 using namespace realm::sync;
@@ -43,6 +48,19 @@ PKey::~PKey() {}
 
 static key_type load_public_from_bio(BIO* bio)
 {
+#if OPENSSL_VERSION_MAJOR >= 3
+    EVP_PKEY* pkey = nullptr;
+    const char* format = "PEM";      /* NULL for any format */
+    const char* structure = nullptr; /* any structure */
+    const char* key_type = "RSA";    /* NULL for any key */
+    auto ctx = as_unique_ptr(OSSL_DECODER_CTX_new_for_pkey(&pkey, format, structure, key_type,
+                                                           OSSL_KEYMGMT_SELECT_PUBLIC_KEY, nullptr, nullptr),
+                             OSSL_DECODER_CTX_free);
+    if (!OSSL_DECODER_from_bio(ctx.get(), bio)) {
+        throw CryptoError{"Error reading RSA key."};
+    }
+    return as_unique_ptr(pkey, EVP_PKEY_free);
+#else
     pem_password_cb* password_cb = nullptr; // OpenSSL will display a prompt if necessary
     void* password_cb_userdata = nullptr;
 
@@ -56,8 +74,8 @@ static key_type load_public_from_bio(BIO* bio)
     if (EVP_PKEY_assign_RSA(key.get(), rsa.get()) == 0)
         throw CryptoError{"Error assigning RSA key."};
     rsa.release();
-
     return key;
+#endif
 }
 
 PKey PKey::load_public(const std::string& pemfile)

@@ -64,24 +64,26 @@ cmake \
 
 xcodebuild -scheme ALL_BUILD -configuration ${buildType} -destination "${buildDestination}"
 
-function combine_library() {
-    local path="$1"
-    local target="$2"
-    local library="$3"
-    local out_path="$path/${buildType}-${platform}/${library}"
-
-    # Building just arm64 results in the library being created directly in the
-    # final output location rather than in the per-arch directories, but lipo
-    # can't operate in-place so we need to move it aside.
-    mv "$out_path" "${out_path}.tmp"
-    lipo -create -output "$out_path" \
-        "${out_path}.tmp" \
-        "${path}/RealmCore.build/${buildType}-${platform}/${target}.build/Objects-normal/armv7k/Binary/${library}" \
-        "${path}/RealmCore.build/${buildType}-${platform}/${target}.build/Objects-normal/arm64_32/Binary/${library}"
-    rm "${out_path}.tmp"
-}
-
+# When building watchOS and XCODE_14_DEVELOPER_DIR is set, run an additional build with Xcode 14 for the new arm64 architecture slice.
+# TODO: remove when Core switches to Xcode 14 on CI
 if [ -n "$XCODE_14_DEVELOPER_DIR" ] && [ "$platform" == "watchos" ]; then
+    function combine_library() {
+        local path="$1"
+        local target="$2"
+        local library="$3"
+        local out_path="$path/${buildType}-${platform}/${library}"
+
+        # Building just arm64 results in the library being created directly in the
+        # final output location rather than in the per-arch directories, but lipo
+        # can't operate in-place so we need to move it aside.
+        mv "$out_path" "${out_path}.tmp"
+        lipo -create -output "$out_path" \
+            "${out_path}.tmp" \
+            "build/${target}.build/${buildType}-${platform}/Objects-normal/armv7k/Binary/${library}" \
+            "build/${target}.build/${buildType}-${platform}/Objects-normal/arm64_32/Binary/${library}"
+        rm "${out_path}.tmp"
+    }
+
     DEVELOPER_DIR="$XCODE_14_DEVELOPER_DIR" xcodebuild -scheme ALL_BUILD -configuration ${buildType} -sdk watchos -arch arm64
     [[ "$buildType" = "Release" ]] && suffix="" || suffix="-dbg"
     combine_library src/realm/object-store ObjectStore "librealm-object-store${suffix}.a"
@@ -89,16 +91,6 @@ if [ -n "$XCODE_14_DEVELOPER_DIR" ] && [ "$platform" == "watchos" ]; then
     combine_library src/realm/parser QueryParser "librealm-parser${suffix}.a"
     combine_library src/realm/sync Sync "librealm-sync${suffix}.a"
     combine_library src/realm Storage "librealm${suffix}.a"
-
-    # The bid library has a different directory structure from the other ones
-    prefix="src/external/IntelRDFPMathLib20U2/RealmCore.build/${buildType}"
-    out_path="$prefix/Bid.build/libBid.a"
-    mv "$out_path" "${out_path}.tmp"
-    lipo -create -output "$out_path" \
-        "${out_path}.tmp" \
-        "${prefix}-watchos/Bid.build/Objects-normal/armv7k/Binary/libBid.a" \
-        "${prefix}-watchos/Bid.build/Objects-normal/arm64_32/Binary/libBid.a"
-    rm "${out_path}.tmp"
 fi
 
 PLATFORM_NAME="${platform}" EFFECTIVE_PLATFORM_NAME="-${platform}" cpack -C "${buildType}"
