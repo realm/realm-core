@@ -247,15 +247,6 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
 {
     auto ret = realm_sync_error_code_t();
 
-    // HACK: there isn't a good way to get a hold of "our" system category
-    // so we have to make one of "our" error codes to access it
-    const std::error_category* realm_basic_system_category;
-    {
-        using namespace realm::util::error;
-        std::error_code dummy = make_error_code(basic_system_errors::invalid_argument);
-        realm_basic_system_category = &dummy.category();
-    }
-
     const std::error_category& category = error_code.category();
     if (category == realm::sync::client_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
@@ -268,7 +259,7 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
             ret.category = RLM_SYNC_ERROR_CATEGORY_CONNECTION;
         }
     }
-    else if (category == std::system_category() || category == *realm_basic_system_category) {
+    else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
     }
     else if (category == realm::sync::network::resolve_error_category()) {
@@ -286,7 +277,7 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
     return ret;
 }
 
-static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
+std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
 {
     auto error = std::error_code();
     const realm_sync_error_category_e category = sync_error_code.category;
@@ -299,10 +290,11 @@ static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& s
     else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
         error.assign(sync_error_code.value, std::system_category());
     }
+    else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
+        error.assign(sync_error_code.value, realm::sync::network::resolve_error_category());
+    }
     else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
-        using namespace realm::util::error;
-        std::error_code dummy = make_error_code(basic_system_errors::invalid_argument);
-        error.assign(sync_error_code.value, dummy.category());
+        error.assign(sync_error_code.value, realm::util::error::basic_system_error_category());
     }
     return error;
 }
