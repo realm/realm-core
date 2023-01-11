@@ -1,14 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)
 
 ### Breaking changes
+* `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
 * Passing an empty `key_path_array` to `add_notification_callback now` now ignores nested property changes. Pass `std::nullopt` to achieve the old meaning. ([#6122](https://github.com/realm/realm-core/pull/6122))
 
 ### Compatibility

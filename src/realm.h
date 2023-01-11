@@ -3391,6 +3391,7 @@ typedef enum realm_sync_session_state {
     RLM_SYNC_SESSION_STATE_DYING,
     RLM_SYNC_SESSION_STATE_INACTIVE,
     RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN,
+    RLM_SYNC_SESSION_STATE_PAUSED,
 } realm_sync_session_state_e;
 
 typedef enum realm_sync_connection_state {
