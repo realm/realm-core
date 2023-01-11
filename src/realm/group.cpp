@@ -469,8 +469,8 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
-void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, util::Optional<size_t> read_lock_file_size,
-                               util::Optional<uint_fast64_t> read_lock_version)
+void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
+                               std::optional<uint_fast64_t> read_lock_version)
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();

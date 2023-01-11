@@ -1384,7 +1384,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
                         read_lock.top_ref, read_lock.file_size, read_locks.begin()->version,
                         (--read_locks.end())->version);
 #if REALM_ENCRYPTION_VERIFICATION
-        debug_freelists.emplace(read_lock.version,
+        debug_freelists.emplace(size_t(read_lock.version),
                                 FreelistInfo{cur_freelist_positions.get_mem(), cur_freelist_lengths.get_mem()});
 #endif // REALM_ENCRYPTION_VERIFICATION
 

@@ -754,8 +754,6 @@ ref_type GroupWriter::write_group()
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
-                                                    //    m_free_lengths.ensure_minimum_width(value_4);
-                                                    //    m_free_versions.ensure_minimum_width(m_current_version);
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -849,7 +847,6 @@ ref_type GroupWriter::write_group()
     write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
     write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
     write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
-    // FIXME: encryption write barrier?
     REALM_ASSERT_EX(
         free_positions_ref >= reserve_ref && free_positions_ref + free_positions_size <= reserve_ref + used,
         reserve_ref, reserve_ref + used, free_positions_ref, free_positions_ref + free_positions_size, top_ref);
@@ -1311,9 +1308,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
+        // write barrier on the entire `file_header` happens below
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
-        // window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
-        //                                 sizeof(file_header.m_file_format[slot_selector]));
     }
 
     // When running the test suite, device synchronization is disabled
@@ -1326,8 +1322,6 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    // window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
-    //                                 sizeof(file_header.m_top_ref[slot_selector]));
     window->encryption_write_barrier(&file_header, sizeof file_header);
     flush_all_mappings();
     if (!disable_sync) {

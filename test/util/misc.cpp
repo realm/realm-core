@@ -76,6 +76,7 @@ int waitpid_checked(int pid, int options, const std::string& info)
 #else
     constexpr bool not_supported_on_windows = false;
     REALM_ASSERT(not_supported_on_windows);
+    return -1;
 #endif
 }
 
@@ -91,6 +92,7 @@ int fork_and_update_mappings()
 #else
     constexpr bool not_supported_on_windows = false;
     REALM_ASSERT(not_supported_on_windows);
+    return -1;
 #endif
 }
 

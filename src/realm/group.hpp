@@ -821,8 +821,8 @@ private:
     void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
                                 uint64_t file_ident);
     static void validate_top_array(const Array& arr, const SlabAlloc& alloc,
-                                   util::Optional<size_t> read_lock_file_size = util::none,
-                                   util::Optional<uint_fast64_t> read_lock_version = util::none);
+                                   std::optional<size_t> read_lock_file_size = util::none,
+                                   std::optional<uint_fast64_t> read_lock_version = util::none);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
