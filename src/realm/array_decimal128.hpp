@@ -67,8 +67,23 @@ public:
     Decimal128 get(size_t ndx) const
     {
         REALM_ASSERT(ndx < m_size);
-        auto values = reinterpret_cast<Decimal128*>(this->m_data);
-        return values[ndx];
+        switch (m_width) {
+            case 0:
+                return Decimal128(realm::null());
+            case 4: {
+                auto values = reinterpret_cast<Decimal128::Bid32*>(this->m_data);
+                return Decimal128(values[ndx]);
+            }
+            case 8: {
+                auto values = reinterpret_cast<Decimal128::Bid64*>(this->m_data);
+                return Decimal128(values[ndx]);
+            }
+            case 16: {
+                auto values = reinterpret_cast<Decimal128*>(this->m_data);
+                return values[ndx];
+            }
+        }
+        return {};
     }
 
     Mixed get_any(size_t ndx) const override;
@@ -99,6 +114,7 @@ protected:
     {
         return num_items * sizeof(Decimal128) + header_size;
     }
+    size_t upgrade_leaf(uint8_t width);
 };
 
 } // namespace realm

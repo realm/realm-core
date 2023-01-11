@@ -191,12 +191,15 @@ TEST(Decimal_Array)
     arr.add(Decimal128(str0));
     arr.add(Decimal128(str1));
     arr.insert(1, Decimal128(str2));
+    arr.add(Decimal128(realm::null()));
 
     Decimal128 id2(str2);
     CHECK_EQUAL(arr.get(0), Decimal128(str0));
     CHECK_EQUAL(arr.get(1), id2);
     CHECK_EQUAL(arr.get(2), Decimal128(str1));
     CHECK_EQUAL(arr.find_first(id2), 1);
+    CHECK_EQUAL(arr.find_first(Decimal128("1000")), 2);
+    CHECK_EQUAL(arr.find_first(Decimal128(realm::null())), 3);
 
     arr.erase(1);
     CHECK_EQUAL(arr.get(1), Decimal128(str1));
@@ -206,11 +209,69 @@ TEST(Decimal_Array)
     arr.move(arr1, 1);
 
     CHECK_EQUAL(arr.size(), 1);
-    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr1.size(), 2);
     CHECK_EQUAL(arr1.get(0), Decimal128(str1));
+    CHECK_EQUAL(arr1.get(1), Decimal128(realm::null()));
+
+    arr.clear();
+    CHECK_EQUAL(arr.size(), 0);
+
+    arr.add(Decimal128(0));
+    arr.add(Decimal128(realm::null()));
+    CHECK_NOT(arr.is_null(0));
+    CHECK(arr.is_null(1));
 
     arr.destroy();
     arr1.destroy();
+}
+
+TEST(Decimal_ArrayUpdgrade)
+{
+    Decimal128 size_0{realm::null()};
+    Decimal128 size_4{"100"};
+    Decimal128 size_8{"123.456e100"};
+    Decimal128 size_16{"3.141592653589793238462643"};
+
+    ArrayDecimal128 arr(Allocator::get_default());
+    arr.create();
+
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_4); // 0 -> 4
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    arr.add(size_8); // 4 -> 8
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), size_8);
+    arr.add(size_16); // 8 -> 16
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), size_8);
+    CHECK_EQUAL(arr.get(3), size_16);
+
+    arr.clear();
+    arr.add(size_4);
+    CHECK_EQUAL(arr.get(0), size_4);
+    arr.add(size_16); // 4 -> 16
+    CHECK_EQUAL(arr.get(0), size_4);
+    CHECK_EQUAL(arr.get(1), size_16);
+
+    arr.clear();
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_8); // 0 -> 8
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_8);
+
+    arr.clear();
+    arr.add(size_0);
+    CHECK_EQUAL(arr.get(0), size_0);
+    arr.add(size_16); // 0 -> 16
+    CHECK_EQUAL(arr.get(0), size_0);
+    CHECK_EQUAL(arr.get(1), size_16);
+
+    arr.destroy();
 }
 
 TEST(Decimal_Table)

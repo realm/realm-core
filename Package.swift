@@ -253,7 +253,6 @@ let bidExcludes: [String] = [
     "bid32_tan.c",
     "bid32_tanh.c",
     "bid32_tgamma.c",
-    "bid32_to_bid128.c",
     "bid32_to_bid64.c",
     "bid32_to_int16.c",
     "bid32_to_int32.c",

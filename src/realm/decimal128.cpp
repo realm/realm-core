@@ -1437,8 +1437,25 @@ Decimal128::Decimal128(uint64_t val) noexcept
     memcpy(this, &expanded, sizeof(*this));
 }
 
+Decimal128::Decimal128(Bid32 val) noexcept
+{
+    if (val.u == DECIMAL_NULL_32) {
+        m_value = DECIMAL_NULL_128;
+        return;
+    }
+    unsigned flags = 0;
+    BID_UINT32 x(val.u);
+    BID_UINT128 tmp;
+    bid32_to_bid128(&tmp, &x, &flags);
+    memcpy(this, &tmp, sizeof(*this));
+}
+
 Decimal128::Decimal128(Bid64 val) noexcept
 {
+    if (val.w == DECIMAL_NULL_64) {
+        m_value = DECIMAL_NULL_128;
+        return;
+    }
     unsigned flags = 0;
     BID_UINT64 x(val.w);
     BID_UINT128 tmp;
@@ -1730,14 +1747,31 @@ std::string Decimal128::to_string() const noexcept
     return ret;
 }
 
-auto Decimal128::to_bid64() const -> Bid64
+auto Decimal128::to_bid32() const noexcept -> std::optional<Bid32>
 {
+    if (is_null()) {
+        return DECIMAL_NULL_32;
+    }
+    unsigned flags = 0;
+    BID_UINT32 buffer;
+    BID_UINT128 tmp = to_BID_UINT128(*this);
+    bid128_to_bid32(&buffer, &tmp, &flags);
+    if (flags & ~BID_INEXACT_EXCEPTION)
+        return {};
+    return Bid32(buffer);
+}
+
+auto Decimal128::to_bid64() const noexcept -> std::optional<Bid64>
+{
+    if (is_null()) {
+        return DECIMAL_NULL_64;
+    }
     unsigned flags = 0;
     BID_UINT64 buffer;
     BID_UINT128 tmp = to_BID_UINT128(*this);
     bid128_to_bid64(&buffer, &tmp, &flags);
     if (flags & ~BID_INEXACT_EXCEPTION)
-        throw std::overflow_error("Decimal128::to_bid64 failed");
+        return {};
     return Bid64(buffer);
 }
 
@@ -1749,6 +1783,58 @@ void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const no
     exponent = int(exp) - DECIMAL_EXPONENT_BIAS_128;
     coefficient.w[0] = get_coefficient_low();
     coefficient.w[1] = get_coefficient_high();
+}
+
+bool operator==(Decimal128::Bid32 lhs, Decimal128::Bid32 rhs) noexcept
+{
+    static constexpr int DECIMAL_COEFF_BITS_32 = 23;
+    static constexpr int DECIMAL_EXP_BITS_32 = 8;
+    static constexpr unsigned MASK_COEFF_32 = (1 << DECIMAL_COEFF_BITS_32) - 1;
+    static constexpr unsigned MASK_EXP_32 = ((1 << DECIMAL_EXP_BITS_32) - 1) << DECIMAL_COEFF_BITS_32;
+    static constexpr unsigned MASK_SIGN_32 = 1 << (DECIMAL_COEFF_BITS_32 + DECIMAL_EXP_BITS_32);
+
+    uint32_t x = lhs.u;
+    uint32_t y = rhs.u;
+
+    if (x == y) {
+        return true;
+    }
+
+    unsigned sig_x = (x & MASK_COEFF_32);
+    unsigned sig_y = (y & MASK_COEFF_32);
+    bool x_is_zero = (sig_x == 0);
+    bool y_is_zero = (sig_y == 0);
+
+    if (x_is_zero && y_is_zero) {
+        return true;
+    }
+    else if ((x_is_zero && !y_is_zero) || (!x_is_zero && y_is_zero)) {
+        return false;
+    }
+
+    // Check if sign differs
+    if ((x ^ y) & MASK_SIGN_32) {
+        return false;
+    }
+
+    int exp_x = (x & MASK_EXP_32) >> DECIMAL_COEFF_BITS_32;
+    int exp_y = (y & MASK_EXP_32) >> DECIMAL_COEFF_BITS_32;
+
+    // Make exp_y biggest
+    if (exp_x > exp_y) {
+        std::swap(exp_x, exp_y);
+        std::swap(sig_x, sig_y);
+    }
+    if (exp_y - exp_x > 6) {
+        return false;
+    }
+    for (int lcv = 0; lcv < (exp_y - exp_x); lcv++) {
+        sig_y = sig_y * 10;
+        if (sig_y > 9999999) {
+            return false;
+        }
+    }
+    return (sig_y == sig_x);
 }
 
 } // namespace realm
