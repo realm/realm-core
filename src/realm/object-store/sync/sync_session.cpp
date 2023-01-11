@@ -1029,6 +1029,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Paused:
+            // The paused state is sticky, so we don't transition to inactive here if we're already paused.
             m_state_mutex.unlock(lock);
             break;
         case State::Inactive: {
