@@ -194,7 +194,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
             new_subs.insert_or_assign(query_foo);
-            auto subs = std::move(new_subs).commit();
+            auto subs = new_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
@@ -213,7 +213,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             Query new_query_bar(table);
             new_query_bar.equal(col_key, "bar");
             mut_subs.insert_or_assign(new_query_bar);
-            auto subs = std::move(mut_subs).commit();
+            auto subs = mut_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
@@ -225,13 +225,11 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            auto it = mut_subs.find(query_foo);
-            CHECK(it != mut_subs.end());
-            mut_subs.erase(it);
+            CHECK(mut_subs.erase(query_foo));
             Query new_query_bar(table);
             new_query_bar.equal(col_key, "bar");
             mut_subs.insert_or_assign(new_query_bar);
-            auto subs = std::move(mut_subs).commit();
+            auto subs = mut_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
@@ -247,7 +245,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
-            auto subs = std::move(mut_subs).commit();
+            auto subs = mut_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
@@ -352,7 +350,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto mut_sub = sub_set.make_mutable_copy();
             mut_sub.clear();
             mut_sub.insert_or_assign(Query(table).equal(id_col, oid));
-            sub_set = std::move(mut_sub).commit();
+            sub_set = mut_sub.commit();
             add_object(realm, util::format("added _id='%1'", oid), 0, oid);
         }
     };
@@ -363,7 +361,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
         sub_set.insert_or_assign(Query(table).equal(queryable_str_field, StringData(str_field)));
-        auto resulting_set = std::move(sub_set).commit();
+        auto resulting_set = sub_set.commit();
         add_object(realm, str_field, int_field);
         return resulting_set;
     };
@@ -373,14 +371,14 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         auto queryable_str_field = table->get_column_key("non_queryable_field");
         auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
         sub_set.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-        auto resulting_set = std::move(sub_set).commit();
+        auto resulting_set = sub_set.commit();
         return resulting_set;
     };
 
     auto count_queries_with_str = [](sync::SubscriptionSet subs, std::string_view str) {
         size_t count = 0;
         for (auto sub : subs) {
-            if (sub.query_string().find(str) != std::string::npos) {
+            if (sub.query_string.find(str) != std::string::npos) {
                 ++count;
             }
         }
@@ -495,7 +493,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 auto mut_sub = latest_subs.make_mutable_copy();
                 mut_sub.clear();
                 mut_sub.insert_or_assign(Query(table));
-                latest_subs = std::move(mut_sub).commit();
+                latest_subs = mut_sub.commit();
                 latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 local_realm->refresh();
                 REQUIRE(table->size() ==
@@ -802,7 +800,7 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
             new_subs.insert_or_assign(Query(table).equal(col_key, "foo"));
-            auto subs = std::move(new_subs).commit();
+            auto subs = new_subs.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
@@ -901,7 +899,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(make_query(Query(table), queryable_str_field));
-        std::move(new_query).commit();
+        new_query.commit();
     };
 
     SECTION("compensating write because of permission violation") {
@@ -1111,7 +1109,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         auto queryable_field = table->get_column_key(column_name);
         auto new_query = realm->get_active_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(make_query(Query(table), queryable_field));
-        return std::move(new_query).commit();
+        return new_query.commit();
     };
 
     auto check_status = [](auto status) {
@@ -1224,7 +1222,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             auto table = realm->read_group().get_table("class_TopLevel");
             mut_subs.insert_or_assign(Query(table));
-            std::move(mut_subs).commit();
+            mut_subs.commit();
         }
 
         interrupted.get();
@@ -1245,7 +1243,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
-        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     }
 
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
@@ -1283,7 +1281,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
             // auto queryable_int_field = table->get_column_key("queryable_int_field");
             auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
             new_query.insert_or_assign(Query(table));
-            std::move(new_query).commit();
+            new_query.commit();
 
             CppContext c(realm);
             realm->begin_transaction();
@@ -1309,7 +1307,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
             auto queryable_int_field = table->get_column_key("queryable_int_field");
             auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
             new_query.insert_or_assign(Query(table).greater_equal(queryable_int_field, int64_t(5)));
-            auto subs = std::move(new_query).commit();
+            auto subs = new_query.commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
             wait_for_download(*realm);
             Results results(realm, table);
@@ -1354,7 +1352,7 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app]") {
     // And move the "foo" object created above into view and create a different diverging copy of it locally.
     auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
     mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-    auto subs = std::move(mut_subs).commit();
+    auto subs = mut_subs.commit();
 
     realm->begin_transaction();
     CppContext c(realm);
@@ -1400,7 +1398,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         auto queryable_int_field = table->get_column_key("queryable_int_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(Query(table));
-        std::move(new_query).commit();
+        new_query.commit();
 
         auto foo_obj_id = ObjectId::gen();
         auto bar_obj_id = ObjectId::gen();
@@ -1428,7 +1426,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-            std::move(mut_subs).commit();
+            mut_subs.commit();
         }
 
         // Make foo so that it will match the next subscription update. This checks whether you can do
@@ -1447,7 +1445,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
-            std::move(mut_subs).commit();
+            mut_subs.commit();
         }
 
         // Make foo out of view for the current subscription.
@@ -1479,7 +1477,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         auto queryable_int_field = table->get_column_key("queryable_int_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(Query(table));
-        std::move(new_query).commit();
+        new_query.commit();
 
         auto foo_obj_id = ObjectId::gen();
         auto bar_obj_id = ObjectId::gen();
@@ -1505,7 +1503,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-            std::move(mut_subs).commit();
+            mut_subs.commit();
         }
 
         // Make foo so that it will match the next subscription update. This checks whether you can do
@@ -1524,7 +1522,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
-            std::move(mut_subs).commit();
+            mut_subs.commit();
         }
 
         // Make foo out-of-view for the current subscription.
@@ -1554,7 +1552,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
         auto orig_realm = Realm::get_shared_realm(config);
         auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
         mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
-        std::move(mut_subs).commit();
+        mut_subs.commit();
         orig_realm->close();
     }
 
@@ -1632,7 +1630,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     Query new_query_a(table);
     new_query_a.equal(table->get_column_key("_id"), ObjectId::gen());
     latest_subs.insert_or_assign(std::move(new_query_a));
-    std::move(latest_subs).commit();
+    latest_subs.commit();
 
     timed_wait_for([&] {
         std::lock_guard<std::mutex> lk(sync_error_mutex);
@@ -1684,7 +1682,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
                 auto store = session->get_flx_subscription_store();
                 REQUIRE(store);
                 auto mut_subs = store->get_latest().make_mutable_copy();
-                std::move(mut_subs).commit();
+                mut_subs.commit();
             }
         }
     };
@@ -1715,7 +1713,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         auto latest_subs = sub_store->get_latest();
         REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
         REQUIRE(latest_subs.size() == 1);
-        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
+        REQUIRE(latest_subs.at(0).object_class_name == "TopLevel");
     };
 
     auto mutate_realm = [&] {
@@ -1756,7 +1754,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
                 auto table = realm->read_group().get_table("class_TopLevel");
                 mut_subs.insert_or_assign(Query(table));
-                std::move(mut_subs).commit();
+                mut_subs.commit();
             }
 
             interrupted.get();
@@ -1825,7 +1823,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
                 auto table = realm->read_group().get_table("class_TopLevel");
                 mut_subs.insert_or_assign(Query(table));
-                std::move(mut_subs).commit();
+                mut_subs.commit();
             }
 
             interrupted.get();
@@ -1904,7 +1902,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
                 auto table = realm->read_group().get_table("class_TopLevel");
                 mut_subs.insert_or_assign(Query(table));
-                std::move(mut_subs).commit();
+                mut_subs.commit();
             }
 
             interrupted.get();
@@ -2261,7 +2259,7 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     auto table = realm->read_group().get_table("class_TopLevel");
     auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
     new_query.insert_or_assign(Query(table));
-    std::move(new_query).commit();
+    new_query.commit();
 
     error_future.get();
 
@@ -2278,7 +2276,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         new_query.clear();
         auto col = table->get_column_key("queryable_str_field");
         new_query.insert_or_assign(Query(table).equal(col, StringData("bar")).Or().equal(col, StringData("bizz")));
-        return std::move(new_query).commit();
+        return new_query.commit();
     };
 
     auto bar_obj_id = ObjectId::gen();

@@ -421,6 +421,11 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
+struct realm_thread_observer_token : realm::c_api::WrapC {
+    explicit realm_thread_observer_token() = default;
+    ~realm_thread_observer_token();
+};
+
 struct realm_callback_token : realm::c_api::WrapC {
 protected:
     realm_callback_token(realm_t* realm, uint64_t token)
@@ -720,8 +725,6 @@ struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollecti
     {
     }
 };
-
-struct realm_callback_interface_thread_observer : public realm::BindingCallbackThreadObserver {};
 
 #endif // REALM_ENABLE_SYNC
 

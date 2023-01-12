@@ -835,6 +835,8 @@ int Stream::bio_puts(BIO* bio, const char* c_str) noexcept
 long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
 {
     switch (cmd) {
+        case BIO_CTRL_EOF:
+            return 0;
         case BIO_CTRL_PUSH:
         case BIO_CTRL_POP:
             // Ignoring in alignment with `crypto/bio/bss_sock.c` of OpenSSL.
@@ -842,8 +844,9 @@ long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
         case BIO_CTRL_FLUSH:
             // Ignoring in alignment with `crypto/bio/bss_sock.c` of OpenSSL.
             return 1;
+        default:
+            REALM_ASSERT_EX(false, "Got BIO_ctrl with unknown command %d", cmd);
     }
-    REALM_ASSERT(false);
     return 0;
 }
 

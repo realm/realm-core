@@ -268,6 +268,13 @@ TEST(File_MultipleWriters)
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
         File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
 
+        // Place zeroes in selected places
+        for (size_t i = 0; i < count; i += increments) {
+            realm::util::encryption_read_barrier(map1, i);
+            map1.get_addr()[i] = 0;
+            realm::util::encryption_write_barrier(map1, i);
+        }
+
         for (size_t i = 0; i < count; i += increments) {
             realm::util::encryption_read_barrier(map1, i);
             ++map1.get_addr()[i];

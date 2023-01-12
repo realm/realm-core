@@ -241,32 +241,33 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
+size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
-    while (size > 0) {
-        ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+    size_t bytes_read = 0;
+    while (bytes_read < size) {
+        ssize_t actual = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
-        if (bytes_read == 0)
-            return false;
+        if (actual == 0)
+            return bytes_read;
 
         iv_table& iv = get_iv_table(fd, pos);
         if (iv.iv1 == 0) {
             // This block has never been written to, so we've just read pre-allocated
             // space. No memset() since the code using this doesn't rely on
             // pre-allocated space being zeroed.
-            return false;
+            return bytes_read;
         }
 
-        if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
+        if (!check_hmac(m_rw_buffer.get(), actual, iv.hmac1)) {
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
                 // Very first write was interrupted
-                return false;
+                return bytes_read;
             }
 
-            if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
+            if (check_hmac(m_rw_buffer.get(), actual, iv.hmac2)) {
                 // Un-bump the IV since the write with the bumped IV never actually
                 // happened
                 memcpy(&iv.iv1, &iv.iv2, 32);
@@ -276,11 +277,11 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 // old hmacs that don't go with this data. ftruncate() is
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
-                for (ssize_t i = 0; i < bytes_read; ++i) {
+                for (ssize_t i = 0; i < actual; ++i) {
                     if (m_rw_buffer[i] != 0)
                         throw DecryptionFailed();
                 }
-                return false;
+                return bytes_read;
             }
         }
 
@@ -302,9 +303,9 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 
         pos += block_size;
         dst += block_size;
-        size -= block_size;
+        bytes_read += block_size;
     }
-    return true;
+    return bytes_read;
 }
 
 void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
@@ -448,6 +449,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     sha_process(s, opad, 64);
     sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
     sha_done(s, dst);
+#elif OPENSSL_VERSION_NUMBER >= 0x10101000L // 1.1.1
+    std::unique_ptr<EVP_MD_CTX, void (*)(EVP_MD_CTX*)> ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), ipad, 64);
+    EVP_DigestUpdate(ctx.get(), static_cast<const uint8_t*>(src), len);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
+
+    ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
+    EVP_DigestInit(ctx.get(), EVP_sha224());
+    EVP_DigestUpdate(ctx.get(), opad, 64);
+    EVP_DigestUpdate(ctx.get(), dst, SHA224_DIGEST_LENGTH);
+    EVP_DigestFinal(ctx.get(), dst, nullptr);
 #else
     SHA256_CTX ctx;
     SHA224_Init(&ctx);
@@ -529,7 +542,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missing)
+void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
 
@@ -538,10 +551,10 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, bool allow_missin
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         size_t size = static_cast<size_t>(1ULL << m_page_shift);
-        bool did_read = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
-        if (!did_read) {
-            if (allow_missing) {
-                memset(addr, 0, size);
+        size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
+        if (actual < size) {
+            if (actual >= required) {
+                memset(addr + actual, 0x55, size - actual);
             }
             else {
                 throw DecryptionFailed();
@@ -831,14 +844,16 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
                                         bool allow_missing)
 {
     size_t first_accessed_local_page = get_local_index_of_address(addr);
-
+    size_t page_size = 1ULL << m_page_shift;
+    size_t required =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) & (page_size - 1)) + size;
     {
         // make sure the first page is available
         PageState& ps = m_page_state[first_accessed_local_page];
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(first_accessed_local_page, allow_missing);
+            refresh_page(first_accessed_local_page, allow_missing ? 0 : required);
     }
 
     // force the page reclaimer to look into pages in this chunk:
@@ -858,6 +873,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     // We already checked first_accessed_local_page above, so we start the loop
     // at first_accessed_local_page + 1 to check the following page.
     for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < pages_size; ++idx) {
+        required -= page_size;
         // force the page reclaimer to look into pages in this chunk
         chunk_ndx = idx >> page_to_chunk_shift;
         if (m_chunk_dont_scan[chunk_ndx])
@@ -867,7 +883,7 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
         if (is_not(ps, Touched))
             set(ps, Touched);
         if (is_not(ps, UpToDate))
-            refresh_page(idx, allow_missing);
+            refresh_page(idx, allow_missing ? 0 : required);
     }
 }
 

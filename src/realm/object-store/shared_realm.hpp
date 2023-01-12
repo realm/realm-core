@@ -135,6 +135,11 @@ struct RealmConfig {
     {
         return schema_mode == SchemaMode::ReadOnly;
     }
+    bool is_schema_additive() const
+    {
+        return schema_mode == SchemaMode::AdditiveExplicit || schema_mode == SchemaMode::AdditiveDiscovered ||
+               schema_mode == SchemaMode::ReadOnly;
+    }
 
     // If false, always return a new Realm instance, and don't return
     // that Realm instance for other requests for a cached Realm. Useful
@@ -241,7 +246,6 @@ public:
     {
         return m_schema_version;
     }
-
 
     void begin_transaction();
     void commit_transaction();

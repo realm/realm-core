@@ -257,8 +257,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != client_schema_version)
                 throw std::runtime_error{"Bad history schema version for client-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_client_file(client_path);
@@ -278,8 +278,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != server_schema_version)
                 throw std::runtime_error{"Bad history schema version for server-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_server_file(server_path);
@@ -445,7 +445,7 @@ TEST(Sync_HistoryCompression)
 
     {
         WriteTransaction wt(db);
-        auto table = wt.add_table("class_table");
+        auto table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Binary, "data");
         wt.commit();
     }
@@ -454,7 +454,7 @@ TEST(Sync_HistoryCompression)
         WriteTransaction wt(db);
         auto table = wt.get_table("class_table");
         auto data = std::make_unique<char[]>(100'000);
-        table->create_object().set("data", BinaryData{data.get(), 100'000});
+        table->create_object_with_primary_key(1).set("data", BinaryData{data.get(), 100'000});
         wt.commit();
     }
 
