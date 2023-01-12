@@ -246,6 +246,7 @@ public:
     static std::string_view error_string(Error code);
     static Error from_string(std::string_view str);
     static std::vector<Error> get_all_codes();
+    static std::vector<std::string_view> get_all_names();
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

@@ -85,9 +85,14 @@ TEST(StatusWith)
 TEST(ErrorCodes)
 {
     auto all_codes = ErrorCodes::get_all_codes();
+    auto all_names = ErrorCodes::get_all_names();
     for (auto code : all_codes) {
         auto code_string = ErrorCodes::error_string(code);
         CHECK_EQUAL(ErrorCodes::from_string(code_string), code);
+    }
+    for (auto name : all_names) {
+        auto code = ErrorCodes::from_string(name);
+        CHECK_EQUAL(ErrorCodes::error_string(code), name);
     }
     CHECK_EQUAL(ErrorCodes::from_string("InvalidDictionary"), ErrorCodes::UnknownError);
     CHECK_EQUAL(ErrorCodes::from_string("Zzzzz"), ErrorCodes::UnknownError);

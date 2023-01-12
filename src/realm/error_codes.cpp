@@ -373,7 +373,7 @@ static const MapElem string_to_error_code[] = {
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
     {"WebSocketAbnormalClosure", ErrorCodes::WebSocketAbnormalClosure},
-    {"WebSocketGoingAway", ErrorCodes::WebSocketAbnormalClosure},
+    {"WebSocketGoingAway", ErrorCodes::WebSocketGoingAway},
     {"WebSocketInavalidExtension", ErrorCodes::WebSocketInavalidExtension},
     {"WebSocketInternalServerError", ErrorCodes::WebSocketInternalServerError},
     {"WebSocketInvalidPayloadData", ErrorCodes::WebSocketInvalidPayloadData},
@@ -448,6 +448,15 @@ std::vector<ErrorCodes::Error> ErrorCodes::get_all_codes()
     std::vector<ErrorCodes::Error> ret;
     for (auto it : string_to_error_code) {
         ret.push_back(it.code);
+    }
+    return ret;
+}
+
+std::vector<std::string_view> ErrorCodes::get_all_names()
+{
+    std::vector<std::string_view> ret;
+    for (auto it : string_to_error_code) {
+        ret.emplace_back(it.name);
     }
     return ret;
 }
