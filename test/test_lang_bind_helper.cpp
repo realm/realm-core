@@ -3275,6 +3275,7 @@ struct EncryptedPageValidator {
     }
     ~EncryptedPageValidator()
     {
+        m_file.close();
         util::File::remove(m_file.get_path());
     }
 

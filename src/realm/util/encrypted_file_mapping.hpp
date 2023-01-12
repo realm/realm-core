@@ -169,7 +169,7 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 
     size_t local_ndx =
         ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
-    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size(), addr, m_addr, m_page_shift);
     return local_ndx;
 }
 

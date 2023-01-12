@@ -432,6 +432,7 @@ private:
     class AsyncCommitHelper;
     class PageRefresher;
     class VersionManager;
+    struct PageRefresherGuard;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {

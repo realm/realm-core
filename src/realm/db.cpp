@@ -776,6 +776,89 @@ std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().stri
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
+class DB::PageRefresher {
+public:
+    PageRefresher(DB& db)
+        : m_db(db)
+    {
+#if REALM_TSAN
+        // The PageRefresher is an optimization and it shows up as benign races in thread
+        // sanitizer runs. The root cause is that `AESCryptor::read` and
+        // `copy_up_to_date_page()` copy entire pages. They may overwrite something which
+        // is being read concurrently. The reason it is benign, is that whenever there is a
+        // race, it overwrites with the same value as is already there, so the reader sees
+        // the correct value. This is all by design.
+        return;
+#endif
+        start();
+    }
+    ~PageRefresher()
+    {
+        stop();
+    }
+    void main()
+    {
+        auto& alloc = m_db.m_alloc;
+        std::optional<uint64_t> change_from;
+        while (m_should_run) {
+            // wait for change
+            bool changed = true;
+            if (change_from) {
+                changed = m_db.wait_for_change_internal(*change_from);
+            }
+            if (!m_should_run)
+                break;
+            REALM_ASSERT(changed);
+            auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
+            ReadLockGuard rlg(m_db, readlock);
+            CheckedLockGuard lock_guard(m_db.m_mutex);
+            alloc.update_reader_view(readlock.m_file_size, &m_db,
+                                     VersionID{readlock.m_version, readlock.m_reader_idx});
+            change_from = m_db.get_last_refreshed_version();
+        }
+    }
+    void start()
+    {
+        m_should_run = true;
+        m_db.enable_wait_for_change_internal();
+        m_thread = std::thread([this]() {
+            main();
+        });
+    }
+    void stop()
+    {
+        if (!m_should_run)
+            return;
+        m_should_run = false;
+        m_db.wait_for_change_internal_release();
+        m_thread.join();
+    }
+
+private:
+    DB& m_db;
+    std::thread m_thread;
+    std::atomic<bool> m_should_run = false;
+};
+
+struct DB::PageRefresherGuard {
+    PageRefresherGuard(DB* db)
+        : m_db(db)
+    {
+        if (m_db->m_page_refresher) {
+            m_db->m_page_refresher->stop();
+        }
+    }
+    ~PageRefresherGuard()
+    {
+        if (m_db->m_page_refresher) {
+            m_db->m_page_refresher->start();
+        }
+    }
+
+private:
+    DB* m_db;
+};
+
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
@@ -1375,7 +1458,6 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
     m_history = std::move(repl);
 }
 
-
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails.
 // Tracked by https://github.com/realm/realm-core/issues/4111
@@ -1420,6 +1502,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     Durability dura = Durability(info->durability);
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
+        DB::PageRefresherGuard temporarily_disable_refresher(this); // must be done before locking m_controlmutex
+
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
         // We must be the ONLY DB object attached if we're to do compaction
@@ -1700,70 +1784,6 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         m_file.close();
     }
 }
-
-class DB::PageRefresher {
-public:
-    PageRefresher(DB& db)
-        : m_db(db)
-    {
-#if REALM_TSAN
-        // The PageRefresher is an optimization and it shows up as benign races in thread
-        // sanitizer runs. The root cause is that `AESCryptor::read` and
-        // `copy_up_to_date_page()` copy entire pages. They may overwrite something which
-        // is being read concurrently. The reason it is benign, is that whenever there is a
-        // race, it overwrites with the same value as is already there, so the reader sees
-        // the correct value. This is all by design.
-        return;
-#endif
-        start();
-    }
-    ~PageRefresher()
-    {
-        stop();
-    }
-    void main()
-    {
-        auto& alloc = m_db.m_alloc;
-        std::optional<uint64_t> change_from;
-        while (m_should_run) {
-            // wait for change
-            bool changed = true;
-            if (change_from) {
-                changed = m_db.wait_for_change_internal(*change_from);
-            }
-            if (!m_should_run)
-                break;
-            REALM_ASSERT(changed);
-            auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
-            ReadLockGuard rlg(m_db, readlock);
-            CheckedLockGuard lock_guard(m_db.m_mutex);
-            alloc.update_reader_view(readlock.m_file_size, &m_db,
-                                     VersionID{readlock.m_version, readlock.m_reader_idx});
-            change_from = m_db.get_last_refreshed_version();
-        }
-    }
-    void start()
-    {
-        m_should_run = true;
-        m_db.enable_wait_for_change_internal();
-        m_thread = std::thread([this]() {
-            main();
-        });
-    }
-    void stop()
-    {
-        if (!m_should_run)
-            return;
-        m_should_run = false;
-        m_db.wait_for_change_internal_release();
-        m_thread.join();
-    }
-
-private:
-    DB& m_db;
-    std::thread m_thread;
-    std::atomic<bool> m_should_run = false;
-};
 
 bool DB::other_writers_waiting_for_lock() const
 {
