@@ -7,5 +7,6 @@ description = "Realm query engine"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cxx = "1.0.86"
 realm-core = { path = "../core" }
 realm-sys = { path = "../sys" }

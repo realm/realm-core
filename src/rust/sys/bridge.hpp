@@ -1,3 +1,5 @@
+#pragma once
+
 #include "realm/db_options.hpp"
 #include "realm/history.hpp"
 #include <realm/alloc.hpp>
@@ -20,11 +22,14 @@ using Obj = realm::Obj;
 using TransactStage = realm::DB::TransactStage;
 using IteratorControl = realm::IteratorControl;
 using Cluster = realm::Cluster;
+using Array = realm::Array;
 
 using Replication = realm::Replication;
 using realm::make_in_realm_history;
 
 using ref_type = realm::ref_type;
+using NodeHeaderType = realm::NodeHeader::Type;
+using NodeHeaderWidthType = realm::NodeHeader::WidthType;
 
 // Shared types (not imported from `realm::`, defined in the bridge, require
 // manual translation).
@@ -49,6 +54,8 @@ realm::TransactionRef db_start_write(const DB&, bool nonblocking);
 void db_delete_files(::rust::Slice<const uint8_t> path, bool& did_delete);
 void db_delete_files_and_lockfile(::rust::Slice<const uint8_t> path, bool& did_delete, bool delete_lockfile);
 
+const Allocator& txn_get_alloc(const Transaction&) noexcept;
+ref_type txn_get_top_ref(const Transaction&) noexcept;
 uint64_t txn_commit(const Transaction&);
 void txn_commit_and_continue_as_read(const Transaction&);
 void txn_commit_and_continue_writing(const Transaction&);
@@ -97,5 +104,11 @@ void obj_set_int(const Obj& obj, ColKey col_key, int64_t value);
 
 ref_type cluster_get_keys_ref(const Cluster& cluster) noexcept;
 ref_type cluster_get_column_ref(const Cluster& cluster, size_t column_ndx) noexcept;
+
+std::unique_ptr<Array> array_new_unattached(const Allocator& alloc)
+{
+    return std::make_unique<Array>(const_cast<Allocator&>(alloc));
+}
+NodeHeaderWidthType array_get_width_type(const Array&) noexcept;
 
 } // namespace realm::rust

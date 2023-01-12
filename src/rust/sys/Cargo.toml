@@ -5,10 +5,7 @@ edition = "2021"
 description = "C++ FFI bindings to Realm Core"
 
 [dependencies]
-cxx = { version = "1.0.85", default-features = false, features = [
-    "alloc",
-    "c++17",
-] }
+cxx = { version = "1.0.85", features = ["c++17"] }
 
 [build-dependencies]
 cmake = "0.1.49"

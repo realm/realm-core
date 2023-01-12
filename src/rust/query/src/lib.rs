@@ -732,3 +732,25 @@ mod tests {
         assert_eq!(matches, [1, 2, 3]);
     }
 }
+
+use realm_core::cxx;
+
+#[cxx::bridge(namespace = "realm::rust")]
+pub mod ffi {
+    extern "Rust" {
+        fn test_call_rust_func(max: i32) -> i32;
+        fn rust_inlined_echo(value: i32) -> i32;
+    }
+}
+
+pub fn test_call_rust_func(max: i32) -> i32 {
+    let mut vec = Vec::new();
+    for i in 0..max {
+        vec.push(i);
+    }
+    vec.into_iter().sum()
+}
+
+fn rust_inlined_echo(value: i32) -> i32 {
+    value
+}

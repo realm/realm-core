@@ -38,7 +38,6 @@
  *
  * Whenever possible, the bindings use methods to reduce boilerplate.
  */
-#![no_std]
 
 #[cxx::bridge(namespace = "realm::rust")]
 mod ffi {
@@ -200,6 +199,22 @@ mod ffi {
         Stop,
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(i32)]
+    pub enum NodeHeaderType {
+        type_Normal,
+        type_InnerBptreeNode,
+        type_HasRefs,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(i32)]
+    pub enum NodeHeaderWidthType {
+        wtype_Bits = 0,
+        wtype_Multiply = 1,
+        wtype_Ignore = 2,
+    }
+
     unsafe extern "C++" {
         include!("bridge.hpp");
         type DBDurability;
@@ -258,6 +273,9 @@ mod ffi {
         fn get_commit_size(self: &Transaction) -> Result<usize>;
         fn get_transact_stage(self: &Transaction) -> TransactStage;
         fn is_frozen(self: &Transaction) -> bool;
+
+        fn txn_get_alloc(txn: &Transaction) -> &Allocator;
+        fn txn_get_top_ref(txn: &Transaction) -> usize; // ref_type
         fn txn_commit(txn: &Transaction) -> Result<u64>;
         fn txn_commit_and_continue_as_read(txn: &Transaction) -> Result<()>;
         fn txn_commit_and_continue_writing(txn: &Transaction) -> Result<()>;
@@ -384,13 +402,43 @@ mod ffi {
         fn obj_set_string(obj: &Obj, col_key: ColKey, value: &str) -> Result<()>;
     }
 
+    unsafe extern "C++" {
+        pub type Array<'alloc>;
+        pub type NodeHeaderType;
+        pub type NodeHeaderWidthType;
+
+        /// Array constructor.
+        fn array_new_unattached<'a>(alloc: &'a Allocator) -> Result<UniquePtr<Array<'a>>>;
+        fn array_get_width_type(array: &Array) -> NodeHeaderWidthType;
+
+        /// Unsafe because the ref must be valid for the allocator that the
+        /// array was initialized with.
+        unsafe fn init_from_ref(self: Pin<&mut Array>, ref_: usize);
+        fn is_attached(self: &Array) -> bool;
+        fn is_read_only(self: &Array) -> bool;
+        fn size(self: &Array) -> usize;
+        fn is_empty(self: &Array) -> bool;
+        fn get_ref(self: &Array) -> usize; // ref_type
+        fn get_header(self: &Array) -> *mut c_char;
+        fn has_parent(self: &Array) -> bool;
+        fn get_ndx_in_parent(self: &Array) -> usize;
+        fn get_type(self: &Array) -> NodeHeaderType;
+        fn get_width(self: &Array) -> usize;
+        fn has_refs(self: &Array) -> bool;
+        fn is_inner_bptree_node(self: &Array) -> bool;
+        fn get_byte_size(self: &Array) -> usize;
+
+        /// Unsafe because no bounds check.
+        unsafe fn get(self: &Array, ndx: usize) -> i64;
+    }
+
     // Free utility functions.
     unsafe extern "C++" {
         fn table_name_to_class_name(table_name: &str) -> &str;
     }
 }
 
-use core::ffi::c_char;
+use std::ffi::c_char;
 
 pub use ffi::*;
 
@@ -473,6 +521,14 @@ impl ObjKey {
 }
 
 impl Transaction {
+    pub fn alloc(&self) -> &Allocator {
+        txn_get_alloc(self)
+    }
+
+    pub fn get_top_ref(&self) -> ref_type {
+        txn_get_top_ref(self)
+    }
+
     pub fn freeze(&self) -> Result<cxx::SharedPtr<Transaction>, cxx::Exception> {
         txn_freeze(self)
     }
@@ -558,5 +614,24 @@ impl Cluster {
 
     pub unsafe fn get_column_ref_unchecked(&self, column_ndx: usize) -> ref_type {
         cluster_get_column_ref(self, column_ndx)
+    }
+}
+
+impl<'a> Array<'a> {
+    pub fn new(alloc: &'a Allocator) -> Result<cxx::UniquePtr<Array<'a>>, cxx::Exception> {
+        array_new_unattached(alloc)
+    }
+
+    pub fn width_type(&self) -> NodeHeaderWidthType {
+        array_get_width_type(self)
+    }
+
+    pub fn width_per_element_in_bits(&self) -> usize {
+        let width = self.get_width();
+        match self.width_type() {
+            NodeHeaderWidthType::wtype_Ignore => 8,
+            NodeHeaderWidthType::wtype_Multiply => width * 8,
+            _ => width,
+        }
     }
 }

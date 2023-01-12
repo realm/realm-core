@@ -1,7 +1,7 @@
 #include "bridge.hpp"
 #include "realm/db_options.hpp"
 #include "realm/version_id.hpp"
-#include "realm-sys/src/lib.rs.h"
+#include "realm-sys.hpp"
 
 namespace realm::rust {
 
@@ -122,6 +122,21 @@ realm::TransactionRef db_start_write(const DB& db, bool nonblocking)
     return const_cast<DB&>(db).start_write(nonblocking);
 }
 
+realm::TransactionRef db_start_frozen(const DB& db, VersionID version)
+{
+    return const_cast<DB&>(db).start_frozen(bridge(version));
+}
+
+const Allocator& txn_get_alloc(const Transaction& txn) noexcept
+{
+    return _impl::GroupFriend::get_alloc(txn);
+}
+
+ref_type txn_get_top_ref(const Transaction& txn) noexcept
+{
+    return _impl::GroupFriend::get_top_ref(txn);
+}
+
 uint64_t txn_commit(const Transaction& txn)
 {
     return const_cast<Transaction&>(txn).commit();
@@ -224,12 +239,24 @@ realm::rust::TableRef txn_get_or_add_table_with_primary_key(const Transaction& t
     return bridge(t);
 }
 
-void txn_remove_table(const Transaction& txn, TableKey key);
-void txn_remove_table_by_name(const Transaction& txn, ::rust::Str name);
+void txn_remove_table(const Transaction& txn, TableKey key)
+{
+    REALM_TERMINATE("TODO");
+}
+
+void txn_remove_table_by_name(const Transaction& txn, ::rust::Str name)
+{
+    REALM_TERMINATE("TODO");
+}
 
 ::rust::Str table_get_name(const Table& table) noexcept
 {
     return bridge(table.get_name());
+}
+
+std::unique_ptr<Obj> table_get_object(const Table&)
+{
+    REALM_TERMINATE("TODO");
 }
 
 std::unique_ptr<Obj> table_create_object(const Table& table)
@@ -261,6 +288,11 @@ bool table_traverse_clusters(const Table& table, char* userdata,
     });
 }
 
+ColKey spec_get_key(const Spec& spec, size_t column_ndx)
+{
+    REALM_TERMINATE("TODO");
+}
+
 ColumnType spec_get_column_type(const Spec& spec, size_t column_ndx) noexcept
 {
     return spec.get_column_type(column_ndx);
@@ -269,6 +301,11 @@ ColumnType spec_get_column_type(const Spec& spec, size_t column_ndx) noexcept
 ::rust::Str spec_get_column_name(const Spec& spec, size_t column_ndx) noexcept
 {
     return bridge(spec.get_column_name(column_ndx));
+}
+
+size_t spec_get_column_index(const Spec& spec, ::rust::Str name) noexcept
+{
+    REALM_TERMINATE("TODO");
 }
 
 ::rust::Str obj_get_string(const Obj& obj, ColKey col_key)
@@ -299,6 +336,22 @@ ref_type cluster_get_keys_ref(const Cluster& cluster) noexcept
 ref_type cluster_get_column_ref(const Cluster& cluster, size_t column_ndx) noexcept
 {
     return to_ref(cluster.Array::get_as_ref(column_ndx + 1));
+}
+
+::rust::Str table_name_to_class_name(::rust::Str) noexcept
+{
+    REALM_TERMINATE("TODO");
+}
+
+::rust::String class_name_to_table_name(::rust::Str) noexcept
+{
+    REALM_TERMINATE("TODO");
+}
+
+NodeHeaderWidthType array_get_width_type(const Array& array) noexcept
+{
+    char* header = array.get_mem().get_addr();
+    return Array::get_wtype_from_header(header);
 }
 
 } // namespace realm::rust
