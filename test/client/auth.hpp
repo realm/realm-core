@@ -25,10 +25,11 @@
 #include <deque>
 #include <random>
 
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+
 #include <realm/util/logger.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/network_ssl.hpp>
 
 
 namespace realm {

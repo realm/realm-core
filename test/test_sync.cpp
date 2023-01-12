@@ -23,6 +23,9 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/instructions.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
@@ -32,12 +35,9 @@
 #include <realm/sync/transform.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/features.h>
-#include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/websocket.hpp>
 #include <realm/version.hpp>
 
 #include "sync_fixtures.hpp"

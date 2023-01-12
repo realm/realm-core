@@ -4,8 +4,8 @@
 #include <vector>
 #include <sstream>
 
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/string_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>

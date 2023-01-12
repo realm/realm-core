@@ -40,6 +40,7 @@ struct ErrorCategory {
         service_error = RLM_ERR_CAT_SERVICE_ERROR,
         http_error = RLM_ERR_CAT_HTTP_ERROR,
         custom_error = RLM_ERR_CAT_CUSTOM_ERROR,
+        websocket_error = RLM_ERR_CAT_WEBSOCKET_ERROR,
     };
     constexpr ErrorCategory() = default;
     constexpr bool test(Type cat)
@@ -104,6 +105,7 @@ public:
         SchemaVersionMismatch = RLM_ERR_SCHEMA_VERSION_MISMATCH,
         NoSubscriptionForWrite = RLM_ERR_NO_SUBSCRIPTION_FOR_WRITE,
         BadVersion = RLM_ERR_BAD_VERSION,
+        OperationAborted = RLM_ERR_OPERATION_ABORTED,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
@@ -222,6 +224,19 @@ public:
         SchemaValidationFailedWrite = RLM_ERR_SCHEMA_VALIDATION_FAILED_WRITE,
         AppUnknownError = RLM_ERR_APP_UNKNOWN,
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
+
+        WebSocketGoingAway = RLM_ERR_WEBSOCKET_GOINGAWAY,
+        WebSocketProtocolError = RLM_ERR_WEBSOCKET_PROTOCOLERROR,
+        WebSocketUnsupportedData = RLM_ERR_WEBSOCKET_UNSUPPORTEDDATA,
+        WebSocketReserved = RLM_ERR_WEBSOCKET_RESERVED,
+        WebSocketNoStatusReceived = RLM_ERR_WEBSOCKET_NOSTATUSRECEIVED,
+        WebSocketAbnormalClosure = RLM_ERR_WEBSOCKET_ABNORMALCLOSURE,
+        WebSocketInvalidPayloadData = RLM_ERR_WEBSOCKET_INVALIDPAYLOADDATA,
+        WebSocketPolicyViolation = RLM_ERR_WEBSOCKET_POLICYVIOLATION,
+        WebSocketMessageTooBig = RLM_ERR_WEBSOCKET_MESSAGETOOBIG,
+        WebSocketInavalidExtension = RLM_ERR_WEBSOCKET_INAVALIDEXTENSION,
+        WebSocketInternalServerError = RLM_ERR_WEBSOCKET_INTERNALSERVERERROR,
+        WebSocketTLSHandshakeFailed = RLM_ERR_WEBSOCKET_TLSHANDSHAKEFAILED, // Used by default WebSocket
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,

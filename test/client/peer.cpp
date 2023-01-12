@@ -4,9 +4,9 @@
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/network.hpp>
-#include <realm/util/network_ssl.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/list.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>

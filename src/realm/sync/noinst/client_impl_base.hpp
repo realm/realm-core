@@ -15,8 +15,8 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network_ssl.hpp>
-#include <realm/util/ez_websocket.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/default_socket.hpp>
 #include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>

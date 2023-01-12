@@ -45,7 +45,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include <chrono>
 #include <condition_variable>

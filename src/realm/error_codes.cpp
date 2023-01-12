@@ -49,6 +49,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case SchemaVersionMismatch:
         case SubscriptionFailed:
         case UnsupportedFileFormatVersion:
+        case OperationAborted:
             return ErrorCategory().set(ErrorCategory::runtime_error);
 
         case DecryptionFailed:
@@ -205,6 +206,20 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
 
+        case WebSocketGoingAway:
+        case WebSocketProtocolError:
+        case WebSocketUnsupportedData:
+        case WebSocketReserved:
+        case WebSocketNoStatusReceived:
+        case WebSocketAbnormalClosure:
+        case WebSocketInvalidPayloadData:
+        case WebSocketPolicyViolation:
+        case WebSocketMessageTooBig:
+        case WebSocketInavalidExtension:
+        case WebSocketInternalServerError:
+        case WebSocketTLSHandshakeFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
+
         case UnknownError:
             break;
     }
@@ -316,6 +331,7 @@ static const MapElem string_to_error_code[] = {
     {"OK", ErrorCodes::OK},
     {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
     {"ObjectTypeMismatch", ErrorCodes::ObjectTypeMismatch},
+    {"OperationAborted", ErrorCodes::OperationAborted},
     {"OutOfBounds", ErrorCodes::OutOfBounds},
     {"OutOfDiskSpace", ErrorCodes::OutOfDiskSpace},
     {"OutOfMemory", ErrorCodes::OutOfMemory},
@@ -356,6 +372,18 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
+    {"WebSocketAbnormalClosure", ErrorCodes::WebSocketAbnormalClosure},
+    {"WebSocketGoingAway", ErrorCodes::WebSocketAbnormalClosure},
+    {"WebSocketInavalidExtension", ErrorCodes::WebSocketInavalidExtension},
+    {"WebSocketInternalServerError", ErrorCodes::WebSocketInternalServerError},
+    {"WebSocketInvalidPayloadData", ErrorCodes::WebSocketInvalidPayloadData},
+    {"WebSocketMessageTooBig", ErrorCodes::WebSocketMessageTooBig},
+    {"WebSocketNoStatusReceived", ErrorCodes::WebSocketNoStatusReceived},
+    {"WebSocketPolicyViolation", ErrorCodes::WebSocketPolicyViolation},
+    {"WebSocketProtocolError", ErrorCodes::WebSocketProtocolError},
+    {"WebSocketReserved", ErrorCodes::WebSocketReserved},
+    {"WebSocketTLSHandshakeFailed", ErrorCodes::WebSocketTLSHandshakeFailed},
+    {"WebSocketUnsupportedData", ErrorCodes::WebSocketUnsupportedData},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
