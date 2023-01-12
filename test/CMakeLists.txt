@@ -46,7 +46,6 @@ set(CORE_TEST_SOURCES
     test_dictionary.cpp
     test_file.cpp
     test_file_locks.cpp
-    test_global_key.cpp
     test_group.cpp
     test_impl_simulated_failure.cpp
     test_index_string.cpp
@@ -189,7 +188,6 @@ if(REALM_ENABLE_SYNC)
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
-        test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp

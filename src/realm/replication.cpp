@@ -139,13 +139,13 @@ void Replication::erase_column(const Table* t, ColKey col_key)
     m_encoder.erase_column(col_key); // Throws
 }
 
-void Replication::create_object(const Table* t, GlobalKey id)
+void Replication::create_object(const Table* t, ObjKey key)
 {
     if (auto logger = get_logger()) {
         logger->log(util::Logger::Level::debug, "Create object '%1'", t->get_class_name());
     }
     select_table(t);                              // Throws
-    m_encoder.create_object(id.get_local_key(0)); // Throws
+    m_encoder.create_object(key);                 // Throws
 }
 
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed pk)

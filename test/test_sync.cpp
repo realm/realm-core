@@ -5548,49 +5548,6 @@ TEST(Sync_ServerSideEncryption)
 }
 
 
-// This test calls row_for_object_id() for various object ids and tests that
-// the right value is returned including that no assertions are hit.
-TEST(Sync_RowForGlobalKey)
-{
-    TEST_CLIENT_DB(db);
-
-    {
-        WriteTransaction wt(db);
-        TableRef table = wt.add_table("class_foo");
-        table->add_column(type_Int, "i");
-        wt.commit();
-    }
-
-    // Check that various object_ids are not in the table.
-    {
-        ReadTransaction rt(db);
-        ConstTableRef table = rt.get_table("class_foo");
-        CHECK(table);
-
-        // Default constructed GlobalKey
-        {
-            GlobalKey object_id;
-            auto row_ndx = table->get_objkey(object_id);
-            CHECK_NOT(row_ndx);
-        }
-
-        // GlobalKey with small lo and hi values
-        {
-            GlobalKey object_id{12, 24};
-            auto row_ndx = table->get_objkey(object_id);
-            CHECK_NOT(row_ndx);
-        }
-
-        // GlobalKey with lo and hi values past the 32 bit limit.
-        {
-            GlobalKey object_id{uint_fast64_t(1) << 50, uint_fast64_t(1) << 52};
-            auto row_ndx = table->get_objkey(object_id);
-            CHECK_NOT(row_ndx);
-        }
-    }
-}
-
-
 TEST(Sync_LogCompaction_EraseObject_LinkList)
 {
     TEST_DIR(dir);

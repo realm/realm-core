@@ -196,8 +196,8 @@ sync::PrimaryKey primary_key_for_row(const Obj& obj)
         REALM_TERMINATE("Missing primary key type support");
     }
 
-    GlobalKey global_key = obj.get_object_id();
-    return global_key;
+    REALM_TERMINATE("Missing primary key");
+    return {};
 }
 
 sync::PrimaryKey primary_key_for_row(const Table& table, ObjKey key)
@@ -259,12 +259,7 @@ ObjKey row_for_primary_key(const Table& table, sync::PrimaryKey key)
         REALM_TERMINATE("row_for_primary_key missing primary key type support");
     }
 
-    if (auto global_key = mpark::get_if<GlobalKey>(&key)) {
-        return table.get_objkey(*global_key);
-    }
-    else {
-        REALM_TERMINATE("row_for_primary_key() with primary key, expected GlobalKey");
-    }
+    REALM_TERMINATE("row_for_primary_key() expected primary key");
     return {};
 }
 

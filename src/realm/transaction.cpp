@@ -562,6 +562,13 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             t->migrate_sets_and_dictionaries();
         }
     }
+    if (current_file_format_version < 24) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->free_collision_table();
+        }
+    }
+
     // NOTE: Additional future upgrade steps go here.
 }
 
