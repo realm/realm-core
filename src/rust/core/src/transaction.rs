@@ -39,6 +39,14 @@ impl Transaction {
         &self.txn
     }
 
+    pub fn alloc(&self) -> &sys::Allocator {
+        self.txn.alloc()
+    }
+
+    pub fn top_ref(&self) -> sys::ref_type {
+        self.txn.get_top_ref()
+    }
+
     pub fn stage(&self) -> sys::TransactStage {
         self.txn.get_transact_stage()
     }

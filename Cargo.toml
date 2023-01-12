@@ -1,2 +1,20 @@
 [workspace]
-members = ["src/rust/sys", "src/rust/core", "src/rust/query", "src/rust/bundle"]
+members = [
+    "src/rust/sys",
+    "src/rust/core",
+    "src/rust/query",
+    "src/rust/bundle",
+    "src/rust/size-analyzer",
+]
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+panic = "abort"
+lto = "thin"
