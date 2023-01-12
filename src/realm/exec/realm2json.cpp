@@ -127,7 +127,7 @@ int main(int argc, char const* argv[])
             options.allow_file_format_upgrade = true;
             options.is_immutable = false;
         }
-        catch (const realm::IncompatibleHistories& e) {
+        catch (const realm::IncompatibleHistories&) {
             hist = realm::sync::make_client_replication();
             options.allow_file_format_upgrade = false;
             options.is_immutable = true;
