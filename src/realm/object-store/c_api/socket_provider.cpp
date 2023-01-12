@@ -47,7 +47,8 @@ public:
                   realm_sync_socket_websocket_async_write_func_t websocket_write_func,
                   realm_sync_socket_websocket_free_func_t websocket_free_func, realm_websocket_observer_t* observer,
                   sync::WebSocketEndpoint&& endpoint)
-        : m_userdata(userdata)
+        : m_observer(observer)
+        , m_userdata(userdata)
         , m_websocket_connect(websocket_connect_func)
         , m_websocket_async_write(websocket_write_func)
         , m_websocket_free(websocket_free_func)
@@ -73,6 +74,7 @@ public:
     ~CAPIWebSocket()
     {
         m_websocket_free(m_userdata, m_socket);
+        realm_release(m_observer);
     }
 
     void async_write_binary(util::Span<const char> data, sync::SyncSocketProvider::FunctionHandler&& handler) final
@@ -84,6 +86,7 @@ public:
 
 private:
     realm_sync_socket_websocket_t m_socket = nullptr;
+    realm_websocket_observer_t* m_observer = nullptr;
     realm_userdata_t m_userdata = nullptr;
 
     realm_sync_socket_connect_func_t m_websocket_connect = nullptr;
