@@ -123,6 +123,17 @@ public:
         return m_observer.websocket_closed_handler(was_clean, status);
     }
 
+    // DEPRECATED
+    void websocket_connect_error_handler(std::error_code) final {}
+    void websocket_ssl_handshake_error_handler(std::error_code) final {}
+    void websocket_read_or_write_error_handler(std::error_code) final {}
+    void websocket_handshake_error_handler(std::error_code, const std::string_view*) final {}
+    void websocket_protocol_error_handler(std::error_code) final {}
+    bool websocket_close_message_received(std::error_code, StringData) final
+    {
+        return false;
+    }
+
 private:
     sync::WebSocketObserver& m_observer;
 };
@@ -253,7 +264,7 @@ RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* real
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,
                                                       realm_sync_socket_t* sync_socket) RLM_API_NOEXCEPT
 {
-    config->sync_socket = *sync_socket;
+    config->socket_provider = *sync_socket;
 }
 
 } // namespace realm::c_api
