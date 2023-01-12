@@ -218,6 +218,7 @@ RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* rea
                                ? Status::OK()
                                : Status{static_cast<ErrorCodes::Error>(status), reason};
     (*(realm_callback->get()))(complete_status);
+    realm_release(realm_callback);
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
