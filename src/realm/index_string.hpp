@@ -22,9 +22,10 @@
 #include <cstring>
 #include <memory>
 #include <array>
+#include <set>
 
 #include <realm/array.hpp>
-#include <realm/table_cluster_tree.hpp>
+#include <realm/cluster_tree.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
@@ -115,23 +116,24 @@ static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
+        , m_type(type)
     {
     }
     size_t size() const
     {
         return m_cluster_tree->size();
     }
-    TableClusterTree::Iterator begin() const
+    ClusterTree::Iterator begin() const
     {
-        return TableClusterTree::Iterator(*m_cluster_tree, 0);
+        return ClusterTree::Iterator(*m_cluster_tree, 0);
     }
 
-    TableClusterTree::Iterator end() const
+    ClusterTree::Iterator end() const
     {
-        return TableClusterTree::Iterator(*m_cluster_tree, size());
+        return ClusterTree::Iterator(*m_cluster_tree, size());
     }
 
 
@@ -140,12 +142,20 @@ public:
     {
         return m_column_key;
     }
-    bool is_nullable() const;
+    bool is_nullable() const
+    {
+        return m_column_key.is_nullable();
+    }
+    bool is_fulltext() const
+    {
+        return m_type == IndexType::Fulltext;
+    }
     Mixed get_value(ObjKey key) const;
 
 private:
-    const TableClusterTree* m_cluster_tree;
+    const ClusterTree* m_cluster_tree;
     ColKey m_column_key;
+    IndexType m_type;
 };
 
 class StringIndex {
@@ -167,8 +177,6 @@ public:
                 type == type_ObjectId || type == type_Mixed || type == type_UUID);
     }
 
-    static ref_type create_empty(Allocator& alloc);
-
     void set_target(const ClusterColumn& target_column) noexcept;
 
     // Accessor concept:
@@ -186,6 +194,10 @@ public:
     // StringIndex interface:
 
     bool is_empty() const;
+    bool is_fulltext_index() const
+    {
+        return this->m_target_column.is_fulltext();
+    }
 
     template <class T>
     void insert(ObjKey key, T value);
@@ -207,6 +219,8 @@ public:
     FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
     size_t count(T value) const;
+
+    void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
 
     void clear();
 
@@ -260,7 +274,7 @@ private:
     };
     StringIndex(inner_node_tag, Allocator&);
 
-    static IndexArray* create_node(Allocator&, bool is_leaf);
+    static std::unique_ptr<IndexArray> create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(ObjKey key, StringData index_data, const Mixed& value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
@@ -295,6 +309,9 @@ private:
                      bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
+    // Erase without getting value from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(ObjKey key, StringData value);
     void do_delete(ObjKey key, StringData, size_t offset);
 
     Mixed get(ObjKey key) const;
@@ -308,8 +325,8 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
-        : m_column(cluster_tree, column_key)
+    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
+        : m_column(cluster_tree, column_key, type)
     {
     }
     SortedListComparator(const ClusterColumn& column)
@@ -344,7 +361,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
     : m_array(create_node(alloc, false)) // Throws
-    , m_target_column(ClusterColumn(nullptr, {}))
+    , m_target_column(ClusterColumn(nullptr, {}, IndexType::General))
 {
 }
 
@@ -415,6 +432,9 @@ void StringIndex::insert(ObjKey key, T value)
     insert_with_offset(key, m.get_index_data(buffer), m, offset); // Throws
 }
 
+template <>
+void StringIndex::insert<StringData>(ObjKey key, StringData value);
+
 template <class T>
 void StringIndex::insert(ObjKey key, util::Optional<T> value)
 {
@@ -445,6 +465,9 @@ void StringIndex::set(ObjKey key, T new_value)
         insert_with_offset(key, index_data, new_value2, offset); // Throws
     }
 }
+
+template <>
+void StringIndex::set<StringData>(ObjKey key, StringData new_value);
 
 template <class T>
 void StringIndex::set(ObjKey key, util::Optional<T> new_value)

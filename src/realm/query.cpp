@@ -935,6 +935,31 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 }
 
 
+Query& Query::fulltext(ColKey column_key, StringData value)
+{
+    auto index = m_table->get_search_index(column_key);
+    if (!(index && index->is_fulltext_index())) {
+        throw IllegalOperation{"Column has no fulltext index"};
+    }
+
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
+    add_node(std::move(node));
+    return *this;
+}
+
+Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
+{
+    auto index = link_map.get_target_table()->get_search_index(column_key);
+    if (!(index && index->is_fulltext_index())) {
+        throw IllegalOperation{"Column has no fulltext index"};
+    }
+
+    auto lm = std::make_unique<LinkMap>(link_map);
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key, std::move(lm))};
+    add_node(std::move(node));
+    return *this;
+}
+
 // Aggregates =================================================================================
 
 bool Query::eval_object(const Obj& obj) const
@@ -1595,6 +1620,20 @@ void* Query::query_thread(void* arg)
 }
 
 #endif // REALM_MULTITHREADQUERY
+
+std::string Query::validate() const
+{
+    if (!m_groups.size())
+        return "";
+
+    if (error_code != "") // errors detected by QueryInterface
+        return error_code;
+
+    if (!root_node())
+        return "Syntax error";
+
+    return root_node()->validate(); // errors detected by QueryEngine
+}
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {

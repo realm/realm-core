@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_FILE
 
+#include <map>
 #include <ostream>
 #include <sstream>
 
@@ -501,6 +502,27 @@ TEST(File_PreallocResizingAPFSBug)
     CHECK_EQUAL(strncmp(input, insert_str, input_size), 0);
 }
 
+TEST(File_parent_dir)
+{
+    std::map<std::string, std::string> mappings = {{"Unicorn🦄/file.cpp", "Unicorn🦄"},
+                                                   {"", ""},
+                                                   {"asdf", ""},
+                                                   {"file.cpp", ""},
+                                                   {"Unicorn🦄", ""},
+                                                   {"parent/file.cpp", "parent"},
+                                                   {"parent//file.cpp", "parent"},
+                                                   {"parent///file.cpp", "parent"},
+                                                   {"parent////file.cpp", "parent"},
+                                                   {"1/2/3/4.cpp", "1/2/3"},
+                                                   {"/1/2/3/4", "/1/2/3"}};
+    for (auto [input, expected] : mappings) {
+        std::string actual = File::parent_dir(input);
+        CHECK_EQUAL(actual, expected);
+        if (actual != expected) {
+            realm::util::format(std::cout, "unexpected result '%1' for input '%2'", actual, input);
+        }
+    }
+}
 
 #ifndef _WIN32
 TEST(File_GetUniqueID)

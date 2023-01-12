@@ -542,6 +542,9 @@ public:
     /// string is interpreted as a relative path.
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
+    /// Same effect as std::filesystem::path::parent_path().
+    static std::string parent_dir(const std::string& path);
+
     using ForEachHandler = util::FunctionRef<bool(const std::string& file, const std::string& dir)>;
 
     /// Scan the specified directory recursivle, and report each file

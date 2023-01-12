@@ -60,7 +60,7 @@ constexpr static std::string_view c_progress_latest_server_version_salt("latest_
 
 } // namespace
 
-PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger* logger)
+PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     : m_db(std::move(db))
     , m_logger(logger)
 {
@@ -138,7 +138,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     auto bootstrap_table = tr->get_table(m_table);
     auto incomplete_bootstraps = Query(bootstrap_table).not_equal(m_query_version, query_version).find_all();
     incomplete_bootstraps.for_each([&](Obj obj) {
-        m_logger->debug("Clearing incomplete bootstrap for query version %1", obj.get<int64_t>(m_query_version));
+        m_logger.debug("Clearing incomplete bootstrap for query version %1", obj.get<int64_t>(m_query_version));
         return IteratorControl::AdvanceToNext;
     });
     incomplete_bootstraps.clear();
@@ -176,13 +176,13 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     if (did_create) {
-        m_logger->trace("Created new pending bootstrap object for query version %1", query_version);
+        m_logger.trace("Created new pending bootstrap object for query version %1", query_version);
     }
     else {
-        m_logger->trace("Added batch to pending bootstrap object for query version %1", query_version);
+        m_logger.trace("Added batch to pending bootstrap object for query version %1", query_version);
     }
     if (progress) {
-        m_logger->trace("Finalized pending bootstrap object for query version %1", query_version);
+        m_logger.trace("Finalized pending bootstrap object for query version %1", query_version);
     }
     m_has_pending = true;
 }
@@ -311,13 +311,13 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
     }
 
     if (changeset_list.is_empty()) {
-        m_logger->trace("Removing pending bootstrap obj for query version %1",
-                        bootstrap_obj.get<int64_t>(m_query_version));
+        m_logger.trace("Removing pending bootstrap obj for query version %1",
+                       bootstrap_obj.get<int64_t>(m_query_version));
         bootstrap_obj.remove();
     }
     else {
-        m_logger->trace("Removing pending bootstrap batch for query version %1. %2 changeset remaining",
-                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
+        m_logger.trace("Removing pending bootstrap batch for query version %1. %2 changeset remaining",
+                       bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 
     m_has_pending = (bootstrap_table->is_empty() == false);

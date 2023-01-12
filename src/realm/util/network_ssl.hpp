@@ -749,9 +749,9 @@ inline Stream::~Stream() noexcept
     ssl_destroy();
 }
 
-inline void Stream::set_logger(util::Logger* logger)
+inline void Stream::set_logger(util::Logger* logger_ptr)
 {
-    this->logger = logger;
+    logger = logger_ptr;
 }
 
 inline void Stream::set_verify_mode(VerifyMode mode)

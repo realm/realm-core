@@ -26,7 +26,6 @@ set(REALM_SOURCES
     collection.cpp
     cluster_tree.cpp
     error_codes.cpp
-    table_cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
     dictionary.cpp
@@ -60,6 +59,7 @@ set(REALM_SOURCES
     obj_list.cpp
     object_id.cpp
     table_view.cpp
+    tokenizer.cpp
     transaction.cpp
     sort_descriptor.cpp
     status.cpp
@@ -94,13 +94,11 @@ set(UTIL_SOURCES
     util/thread.cpp
     util/to_string.cpp
     util/demangle.cpp
-    util/duplicating_logger.cpp
     util/enum.cpp
     util/http.cpp
     util/json_parser.cpp
     util/load_file.cpp
     util/misc_ext_errors.cpp
-    util/parent_dir.cpp
     util/random.cpp
     util/resource_limits.cpp
     util/substitute.cpp
@@ -151,7 +149,6 @@ set(REALM_INSTALL_HEADERS
     db_options.hpp
     decimal128.hpp
     dictionary.hpp
-    dictionary_cluster_tree.hpp
     disable_sync_to_disk.hpp
     error_codes.h
     error_codes.hpp
@@ -187,7 +184,6 @@ set(REALM_INSTALL_HEADERS
     status_with.hpp
     string_data.hpp
     table.hpp
-    table_cluster_tree.hpp
     table_ref.hpp
     table_view.hpp
     transaction.hpp
@@ -274,7 +270,6 @@ set(REALM_NOINST_HEADERS
     util/circular_buffer.hpp
     util/cli_args.hpp
     util/demangle.hpp
-    util/duplicating_logger.hpp
     util/enum.hpp
     util/ez_websocket.hpp
     util/from_chars.hpp
@@ -282,7 +277,6 @@ set(REALM_NOINST_HEADERS
     util/json_parser.hpp
     util/load_file.hpp
     util/network_ssl.hpp
-    util/parent_dir.hpp
     util/platform_info.hpp
     util/quote.hpp
     util/random.hpp
@@ -317,11 +311,14 @@ add_library(Storage STATIC
 )
 add_library(Realm::Storage ALIAS Storage)
 
-set_target_properties(Storage PROPERTIES 
+set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
 target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+if(REALM_USE_FAST_LINKER)
+    target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
+endif()
 
 target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>

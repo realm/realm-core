@@ -125,8 +125,10 @@ TEST_CASE("notifications: async delivery") {
     Results results(r, table->where().greater(col, 0).less(col, 10));
 
     int notification_calls = 0;
-    auto token = results.add_notification_callback([&](CollectionChangeSet) {
+    CollectionChangeSet saved_changes;
+    auto token = results.add_notification_callback([&](CollectionChangeSet changes) {
         ++notification_calls;
+        saved_changes = changes;
     });
 
     auto make_local_change = [&] {
@@ -139,6 +141,13 @@ TEST_CASE("notifications: async delivery") {
         auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
+        r2->commit_transaction();
+    };
+
+    auto make_remote_object_addition = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->create_object().set_all(7);
         r2->commit_transaction();
     };
 
@@ -298,6 +307,19 @@ TEST_CASE("notifications: async delivery") {
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
+        }
+
+        SECTION("Notify of object additions done in long reclaimed versions") {
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            REQUIRE(saved_changes.insertions.count() == 1);
+            for (int j = 0; j < 100; ++j) {
+                make_remote_object_addition();
+            }
+            coordinator->on_change();
+            r->notify();
+            REQUIRE(notification_calls == 3);
+            REQUIRE(saved_changes.insertions.count() == 100);
         }
     }
 

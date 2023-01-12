@@ -1,6 +1,7 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
 
+
 realm_callback_token_realm::~realm_callback_token_realm()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
@@ -167,20 +168,24 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
-RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
-                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                             bool notify_only)
+RLM_API bool realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                     bool notify_only, unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
     return wrap_err([&]() {
-        return (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        auto id = (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 
-RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, bool allow_grouping)
+RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
+                                realm_free_userdata_func_t userdata_free, bool allow_grouping,
+                                unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
         if (err) {
@@ -196,7 +201,10 @@ RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_
         }
     };
     return wrap_err([&]() {
-        return (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        auto id = (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 

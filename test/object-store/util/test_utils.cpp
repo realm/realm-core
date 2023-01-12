@@ -227,15 +227,4 @@ void chmod(const std::string& path, int permissions)
 #endif
 }
 
-std::string get_parent_directory(const std::string& path)
-{
-    std::string parent;
-    size_t last_sep_pos = path.rfind('/', path.size());
-    if (last_sep_pos != std::string::npos) {
-        parent = path.substr(0, last_sep_pos);
-    }
-    REALM_ASSERT_EX(!parent.empty(), path);
-    return parent;
-}
-
 } // namespace realm

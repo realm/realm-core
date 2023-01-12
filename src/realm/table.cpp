@@ -350,6 +350,46 @@ void LinkChain::add(ColKey ck)
 
 // -- Table ---------------------------------------------------------------------------------
 
+Table::Table(Allocator& alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
+    , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
+    , m_repl(&g_dummy_replication)
+    , m_own_ref(this, alloc.get_instance_version())
+{
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+
+    ref_type ref = create_empty_table(m_alloc); // Throws
+    ArrayParent* parent = nullptr;
+    size_t ndx_in_parent = 0;
+    init(ref, parent, ndx_in_parent, true, false);
+}
+
+Table::Table(Replication* const* repl, Allocator& alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
+    , m_index_refs(m_alloc)
+    , m_opposite_table(m_alloc)
+    , m_opposite_column(m_alloc)
+    , m_repl(repl)
+    , m_own_ref(this, alloc.get_instance_version())
+{
+    m_spec.set_parent(&m_top, top_position_for_spec);
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
+    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_cookie = cookie_created;
+}
+
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
@@ -477,6 +517,7 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullabl
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    REALM_ASSERT(key_type != type_Mixed);
     attr.set(col_attr_Dictionary);
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
@@ -673,7 +714,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -875,7 +916,7 @@ void Table::clear_indexes()
     }
 }
 
-void Table::do_add_search_index(ColKey col_key)
+void Table::do_add_search_index(ColKey col_key, IndexType type)
 {
     size_t column_ndx = col_key.get_index().val;
 
@@ -883,7 +924,10 @@ void Table::do_add_search_index(ColKey col_key)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection() ||
+        (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
+        // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
+        // it should probably be a type mismatch exception instead.
         throw IllegalOperation(util::format("Index not supported for this property: %1", get_column_name(col_key)));
     }
 
@@ -894,7 +938,7 @@ void Table::do_add_search_index(ColKey col_key)
 
     // Create the index
     m_index_accessors[column_ndx] =
-        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key), get_alloc()); // Throws
+        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
     StringIndex* index = m_index_accessors[column_ndx].get();
 
     // Insert ref to index
@@ -904,22 +948,39 @@ void Table::do_add_search_index(ColKey col_key)
     populate_search_index(col_key);
 }
 
-void Table::add_search_index(ColKey col_key)
+void Table::add_search_index(ColKey col_key, IndexType type)
 {
     check_column(col_key);
 
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
-    if (attr.test(col_attr_Indexed)) {
-        REALM_ASSERT(has_search_index(col_key));
-        return;
+    if (type == IndexType::Fulltext) {
+        // Early-out if already indexed
+        if (attr.test(col_attr_FullText_Indexed)) {
+            REALM_ASSERT(has_search_index(col_key));
+            REALM_ASSERT(get_search_index(col_key)->is_fulltext_index());
+            return;
+        }
+        if (attr.test(col_attr_Indexed)) {
+            this->remove_search_index(col_key);
+        }
+    }
+    else {
+        if (attr.test(col_attr_Indexed)) {
+            REALM_ASSERT(has_search_index(col_key));
+            REALM_ASSERT(!get_search_index(col_key)->is_fulltext_index());
+            return;
+        }
+        if (attr.test(col_attr_FullText_Indexed)) {
+            this->remove_search_index(col_key);
+        }
     }
 
-    do_add_search_index(col_key);
+    do_add_search_index(col_key, type);
 
     // Update spec
-    attr.set(col_attr_Indexed);
+    attr.set(type == IndexType::Fulltext ? col_attr_FullText_Indexed : col_attr_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
@@ -944,6 +1005,7 @@ void Table::remove_search_index(ColKey col_key)
     auto spec_ndx = leaf_ndx2spec_ndx(column_ndx);
     auto attr = m_spec.get_column_attr(spec_ndx);
     attr.reset(col_attr_Indexed);
+    attr.reset(col_attr_FullText_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
 }
 
@@ -952,7 +1014,7 @@ void Table::enumerate_string_column(ColKey col_key)
     check_column(col_key);
     size_t column_ndx = colkey2spec_ndx(col_key);
     ColumnType type = col_key.get_type();
-    if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
+    if (type == col_type_String && !col_key.is_collection() && !m_spec.is_string_enum_type(column_ndx)) {
         m_clusters.enumerate_string_column(col_key);
     }
 }
@@ -1328,7 +1390,8 @@ void Table::migrate_indexes(ColKey pk_col_key)
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
                     // Otherwise create new index. Will be updated when objects are created
                     m_index_accessors[col_ndx] = std::make_unique<StringIndex>(
-                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
+                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx), IndexType::General),
+                        get_alloc()); // Throws
                     auto index = m_index_accessors[col_ndx].get();
                     index->set_parent(&m_index_refs, col_ndx);
                     m_index_refs.set(col_ndx, index->get_ref());
@@ -1932,6 +1995,30 @@ void Table::finalize_migration(ColKey pk_col_key)
     do_set_primary_key_column(pk_col_key);
 }
 
+void Table::migrate_sets_and_dictionaries()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_dictionary() || (col.is_set() && col.get_type() == col_type_Mixed)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.is_set()) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migrate();
+                }
+                else if (col.is_dictionary()) {
+                    auto dict = obj.get_dictionary(col);
+                    dict.migrate();
+                }
+            }
+        }
+    }
+}
+
 StringData Table::get_name() const noexcept
 {
     const Array& real_top = m_top;
@@ -2057,7 +2144,7 @@ void Table::ensure_graveyard()
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
         MemRef mem = Cluster::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
-        m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
@@ -2475,6 +2562,11 @@ TableView Table::find_all_null(ColKey col_key) const
     return const_cast<Table*>(this)->find_all_null(col_key);
 }
 
+TableView Table::find_all_fulltext(ColKey col_key, StringData terms) const
+{
+    return where().fulltext(col_key, terms).find_all();
+}
+
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
 {
     TableView tv = where().find_all();
@@ -2714,7 +2806,7 @@ void Table::refresh_accessor_tree()
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -2739,23 +2831,25 @@ void Table::refresh_index_accessors()
     // we can not use for_each_column() here, since the columns may have changed
     // and the index accessor vector is not updated correspondingly.
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
-
-        bool has_old_accessor = bool(m_index_accessors[col_ndx]);
         ref_type ref = m_index_refs.get_as_ref(col_ndx);
 
-        if (has_old_accessor && ref == 0) { // accessor drop
+        if (ref == 0) {
+            // accessor drop
             m_index_accessors[col_ndx].reset();
         }
-        else if (has_old_accessor && ref != 0) { // still there, refresh:
+        else {
+            auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_ndx]);
+            bool fulltext = attr.test(col_attr_FullText_Indexed);
             auto col_key = m_leaf_ndx2colkey[col_ndx];
-            ClusterColumn virtual_col(&m_clusters, col_key);
-            m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
-        }
-        else if (!has_old_accessor && ref != 0) { // new index!
-            auto col_key = m_leaf_ndx2colkey[col_ndx];
-            ClusterColumn virtual_col(&m_clusters, col_key);
-            m_index_accessors[col_ndx] =
-                std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            ClusterColumn virtual_col(&m_clusters, col_key, fulltext ? IndexType::Fulltext : IndexType::General);
+
+            if (m_index_accessors[col_ndx]) { // still there, refresh:
+                m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
+            }
+            else { // new index!
+                m_index_accessors[col_ndx] =
+                    std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            }
         }
     }
 }
@@ -3503,7 +3597,7 @@ void Table::do_set_primary_key_column(ColKey col_key)
 
     if (col_key) {
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
-        do_add_search_index(col_key);
+        do_add_search_index(col_key, IndexType::General);
     }
     else {
         m_top.set(top_position_for_pk_col, 0);
@@ -3824,7 +3918,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
     if (si)
-        do_add_search_index(new_col);
+        do_add_search_index(new_col, IndexType::General);
 
     return new_col;
 }

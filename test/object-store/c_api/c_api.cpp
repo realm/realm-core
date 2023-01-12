@@ -591,16 +591,16 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     properties.push_back(link_set);
     properties.push_back(link_dict);
 
-    // realm_property_info_t mixed{
-    //     "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
-    //     "",      "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
-    // };
+    realm_property_info_t mixed{
+        "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
+        "",      "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
+    };
     // realm_property_info_t mixed_list{
     //     "mixed_list", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_LIST,
     //     "",           "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
     // };
 
-    // properties.push_back(mixed);
+    properties.push_back(mixed);
     // properties.push_back(mixed_list);
 
     return properties;
@@ -1192,8 +1192,8 @@ TEST_CASE("C API", "[c_api]") {
             REQUIRE(TestingObj::get().done);
         };
         TestingObj::get().realm = realm;
-
-        realm_async_begin_write(
+        unsigned int transaction_id;
+        auto res = realm_async_begin_write(
             realm,
             [](void*) {
                 auto realm = TestingObj::get().realm;
@@ -1204,17 +1204,19 @@ TEST_CASE("C API", "[c_api]") {
                     },
                     &(TestingObj::get().realm_refresh_callback_called), [](void*) {}));
 
+                unsigned int transaction_id;
                 realm_async_commit(
                     realm,
                     [](void*, bool, const char*) {
                         TestingObj::get().done = true;
                     },
-                    nullptr, nullptr, false);
+                    nullptr, nullptr, false, &transaction_id);
             },
-            nullptr, nullptr, false);
+            nullptr, nullptr, false, &transaction_id);
 
         wait_for_done();
         CHECK(TestingObj::get().realm_refresh_callback_called);
+        CHECK(res);
     }
 
     SECTION("realm async refresh - main use case") {
@@ -1876,6 +1878,7 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["object_id"], object_id, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["uuid"], uuid, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["mixed"], integer, false));
 
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_int"], integer, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_bool"], boolean, false));
@@ -1913,6 +1916,8 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(rlm_val_eq(value, object_id));
             CHECK(realm_get_value(obj1.get(), foo_properties["uuid"], &value));
             CHECK(rlm_val_eq(value, uuid));
+            CHECK(realm_get_value(obj1.get(), foo_properties["mixed"], &value));
+            CHECK(rlm_val_eq(value, integer));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_int"], &value));
             CHECK(rlm_val_eq(value, integer));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_bool"], &value));
@@ -1947,6 +1952,7 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_decimal"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_object_id"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["nullable_uuid"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["mixed"], null, false));
                 CHECK(realm_set_value(obj1.get(), foo_properties["link"], null, false));
             });
 
@@ -1969,6 +1975,8 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_object_id"], &value));
             CHECK(rlm_val_eq(value, null));
             CHECK(realm_get_value(obj1.get(), foo_properties["nullable_uuid"], &value));
+            CHECK(rlm_val_eq(value, null));
+            CHECK(realm_get_value(obj1.get(), foo_properties["mixed"], &value));
             CHECK(rlm_val_eq(value, null));
             CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, null));
@@ -3728,25 +3736,25 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK((inserted && index == 0));
 
                     CHECK(realm_dictionary_insert(nullable_int_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_bool_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_string_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_binary_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_timestamp_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_float_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_double_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_decimal_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_object_id_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                     CHECK(realm_dictionary_insert(nullable_uuid_dict.get(), key2, null, &index, &inserted));
-                    CHECK(inserted);
+                    CHECK((inserted && index == 1));
                 });
 
                 realm_value_t k, value;
@@ -3781,34 +3789,34 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(realm_dictionary_get(uuid_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, uuid));
-                CHECK(realm_dictionary_get(nullable_int_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_int_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, integer));
-                CHECK(realm_dictionary_get(nullable_bool_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_bool_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, boolean));
-                CHECK(realm_dictionary_get(nullable_string_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_string_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, string));
-                CHECK(realm_dictionary_get(nullable_binary_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_binary_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, binary));
-                CHECK(realm_dictionary_get(nullable_timestamp_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_timestamp_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, timestamp));
-                CHECK(realm_dictionary_get(nullable_float_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_float_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, fnum));
-                CHECK(realm_dictionary_get(nullable_double_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_double_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, dnum));
-                CHECK(realm_dictionary_get(nullable_decimal_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_decimal_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, decimal));
-                CHECK(realm_dictionary_get(nullable_object_id_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_object_id_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, object_id));
-                CHECK(realm_dictionary_get(nullable_uuid_dict.get(), 1, &k, &value));
+                CHECK(realm_dictionary_get(nullable_uuid_dict.get(), 0, &k, &value));
                 CHECK(rlm_val_eq(k, key));
                 CHECK(rlm_val_eq(value, uuid));
 
@@ -4853,12 +4861,11 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
 TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
     struct TestTransportUserData {
         TestTransportUserData()
-            : logger(std::make_unique<util::StderrLogger>())
+            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL))
             , transport(std::make_unique<SynchronousTestTransport>())
         {
-            logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
         }
-        std::unique_ptr<util::StderrLogger> logger;
+        std::unique_ptr<util::Logger> logger;
         std::unique_ptr<realm::app::GenericNetworkTransport> transport;
     };
 

@@ -56,6 +56,7 @@ class Array;
 class Expression;
 class Group;
 class Transaction;
+class LinkMap;
 
 namespace metrics {
 class QueryInfo;
@@ -210,6 +211,8 @@ public:
     Query& ends_with(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& contains(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& like(ColKey column_key, StringData value, bool case_sensitive = true);
+    Query& fulltext(ColKey column_key, StringData value);
+    Query& fulltext(ColKey column_key, StringData value, const LinkMap&);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
@@ -305,6 +308,8 @@ public:
     // Returns the current version of the table(s) this query depends on,
     // or empty vector if the query is not associated with a table.
     TableVersions sync_view_if_needed() const;
+
+    std::string validate() const;
 
     std::string get_description() const;
     std::string get_description(util::serializer::SerialisationState& state) const;

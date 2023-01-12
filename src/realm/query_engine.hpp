@@ -224,6 +224,10 @@ public:
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column);
 
+    virtual std::string validate()
+    {
+        return m_child ? m_child->validate() : "";
+    }
 
     ParentNode(const ParentNode& from);
 
@@ -1809,7 +1813,7 @@ protected:
         return BinaryData(s.data(), s.size());
     }
 
-    virtual ObjKey get_key(size_t ndx) = 0;
+    virtual ObjKey get_key(size_t ndx) const = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
 };
@@ -1874,7 +1878,7 @@ public:
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
 
-    ObjKey get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) const override
     {
         if (IntegerColumn* vec = m_index_matches.get()) {
             return ObjKey(vec->get(ndx));
@@ -1952,12 +1956,54 @@ private:
     std::string m_ucase;
     std::string m_lcase;
 
-    ObjKey get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) const override
     {
         return m_index_matches[ndx];
     }
 
     size_t _find_first_local(size_t start, size_t end) override;
+};
+
+
+class LinkMap;
+class StringNodeFulltext : public StringNodeEqualBase {
+public:
+    StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
+
+    void table_changed() override;
+
+    void _search_index_init() override;
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new StringNodeFulltext(*this));
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return "FULLTEXT";
+    }
+
+    const std::vector<ObjKey>& index_based_keys() override
+    {
+        return m_index_matches;
+    }
+
+private:
+    std::vector<ObjKey> m_index_matches;
+    std::unique_ptr<LinkMap> m_link_map;
+
+    StringNodeFulltext(const StringNodeFulltext&);
+
+    ObjKey get_key(size_t ndx) const override
+    {
+        return m_index_matches[ndx];
+    }
+
+    size_t _find_first_local(size_t, size_t) override
+    {
+        REALM_UNREACHABLE();
+    }
 };
 
 // OR node contains at least two node pointers: Two or more conditions to OR
@@ -2086,6 +2132,25 @@ public:
         }
 
         return index;
+    }
+
+    std::string validate() override
+    {
+        if (m_conditions.size() == 0)
+            return "Missing both arguments of OR";
+        if (m_conditions.size() == 1)
+            return "Missing argument of OR";
+        std::string s;
+        if (m_child != 0)
+            s = m_child->validate();
+        if (s != "")
+            return s;
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            s = m_conditions[i]->validate();
+            if (s != "")
+                return s;
+        }
+        return "";
     }
 
     std::unique_ptr<ParentNode> clone() const override

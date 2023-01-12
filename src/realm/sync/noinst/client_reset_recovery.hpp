@@ -206,6 +206,8 @@ protected:
 
 private:
     Transaction& m_frozen_pre_local_state;
+    // Keeping the member variable reference to a logger since the lifetime of this class is
+    // only within the function that created it.
     util::Logger& m_logger;
     InterningBuffer m_intern_keys;
     // Track any recovered operations on lists to make sure that they are allowed.

@@ -877,12 +877,25 @@ TEST(Query_Not)
     table.create_object().set(col_int0, 20);
     table.create_object().set(col_int0, 30);
 
+    // Illegal queries
+    auto q = table.where().group();
+    CHECK_EQUAL(q.validate(), "Syntax error");
+    q = table.where().end_group();
+    CHECK_EQUAL(q.validate(), "Syntax error");
+    q = table.where().Or();
+    CHECK_EQUAL(q.validate(), "Missing both arguments of OR");
+    q = table.where().Or().equal(col_int0, 1);
+    CHECK_EQUAL(q.validate(), "Missing argument of OR");
+    q = table.where().equal(col_int0, 1).Or();
+    CHECK_EQUAL(q.validate(), "Missing argument of OR");
+
     // should apply not to single term, leading to query "not A" with two matching entries:
     realm::Query q0 = table.where().Not().equal(col_int0, 10);
     CHECK_EQUAL(2, q0.count());
 
     // grouping, after not
     realm::Query q0b = table.where().Not().group().equal(col_int0, 10).end_group();
+    CHECK_EQUAL(q0b.validate(), "");
     CHECK_EQUAL(2, q0b.count());
 
     // grouping, surrounding not

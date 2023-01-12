@@ -532,6 +532,21 @@ public:
 #endif
 
 protected:
+    static constexpr size_t s_table_name_ndx = 0;
+    static constexpr size_t s_table_refs_ndx = 1;
+    static constexpr size_t s_file_size_ndx = 2;
+    static constexpr size_t s_free_pos_ndx = 3;
+    static constexpr size_t s_free_size_ndx = 4;
+    static constexpr size_t s_free_version_ndx = 5;
+    static constexpr size_t s_version_ndx = 6;
+    static constexpr size_t s_hist_type_ndx = 7;
+    static constexpr size_t s_hist_ref_ndx = 8;
+    static constexpr size_t s_hist_version_ndx = 9;
+    static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_evacuation_point_ndx = 11;
+
+    static constexpr size_t s_group_max_size = 12;
+
     virtual Replication* const* get_repl() const
     {
         return &Table::g_dummy_replication;
@@ -577,6 +592,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Evacuation point     (optional)            22
     ///
     /// </pre>
     ///
@@ -619,20 +635,6 @@ private:
     std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
 
-    static constexpr size_t s_table_name_ndx = 0;
-    static constexpr size_t s_table_refs_ndx = 1;
-    static constexpr size_t s_file_size_ndx = 2;
-    static constexpr size_t s_free_pos_ndx = 3;
-    static constexpr size_t s_free_size_ndx = 4;
-    static constexpr size_t s_free_version_ndx = 5;
-    static constexpr size_t s_version_ndx = 6;
-    static constexpr size_t s_hist_type_ndx = 7;
-    static constexpr size_t s_hist_ref_ndx = 8;
-    static constexpr size_t s_hist_version_ndx = 9;
-    static constexpr size_t s_sync_file_id_ndx = 10;
-
-    static constexpr size_t s_group_max_size = 11;
-
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
 
@@ -663,7 +665,6 @@ private:
 
     void reset_free_space_tracking();
 
-    void remap(size_t new_file_size);
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     /// Recursively update refs stored in all cached array
@@ -789,6 +790,8 @@ private:
     ///  22 Object keys are no longer generated from primary key values. Search index
     ///     reintroduced.
     ///
+    ///  23 Layout of Set and Dictionary changed.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -796,7 +799,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 22;
+    static constexpr int g_current_file_format_version = 23;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
@@ -811,7 +814,7 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
-
+    static size_t get_logical_file_size(const Array& top) noexcept;
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>
@@ -1088,6 +1091,15 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
     }
     return 0;
 }
+
+inline size_t Group::get_logical_file_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_file_size_ndx) {
+        return (size_t)top.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+    }
+    return 0;
+}
+
 
 inline void Group::set_sync_file_id(uint64_t id)
 {

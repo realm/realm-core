@@ -60,6 +60,7 @@ typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
+typedef struct realm_callback_interface_thread_observer realm_interface_callback_thread_observer_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 
@@ -1013,15 +1014,16 @@ RLM_API bool realm_rollback(realm_t*);
 /**
  * start a new write transaction asynchronously for the realm passed as argument.
  */
-RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t,
-                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                             bool notify_only);
+RLM_API bool realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free, bool notify_only,
+                                     unsigned int* transaction_id);
 
 /**
  * commit a transaction asynchronously for the realm passed as argument.
  */
-RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, bool allow_grouping);
+RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t, realm_userdata_t userdata,
+                                realm_free_userdata_func_t userdata_free, bool allow_grouping,
+                                unsigned int* transaction_id);
 
 /**
  * Cancel the transaction referenced by the token passed as argument and set the optional boolean flag in order to
@@ -3315,9 +3317,6 @@ typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata,
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
-typedef void (*realm_sync_session_state_changed_func_t)(realm_userdata_t userdata,
-                                                        realm_sync_session_state_e old_state,
-                                                        realm_sync_session_state_e new_state);
 typedef void (*realm_sync_progress_func_t)(realm_userdata_t userdata, uint64_t transferred_bytes,
                                            uint64_t total_bytes);
 typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm_sync_session_t*,
@@ -3343,6 +3342,10 @@ typedef enum realm_flx_sync_subscription_set_state {
 } realm_flx_sync_subscription_set_state_e;
 typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
                                                            realm_flx_sync_subscription_set_state_e state);
+
+typedef struct realm_async_open_task_progress_notification_token realm_async_open_task_progress_notification_token_t;
+typedef struct realm_sync_session_connection_state_notification_token
+    realm_sync_session_connection_state_notification_token_t;
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3618,11 +3621,10 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_o
                                          realm_userdata_t userdata,
                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
-RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
-    realm_async_open_task_t*, realm_sync_progress_func_t, realm_userdata_t userdata,
-    realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
-                                                                         uint64_t token) RLM_API_NOEXCEPT;
+RLM_API realm_async_open_task_progress_notification_token_t*
+realm_async_open_task_register_download_progress_notifier(realm_async_open_task_t*, realm_sync_progress_func_t,
+                                                          realm_userdata_t userdata,
+                                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 /**
  * Get the sync session for a specific realm.
  *
@@ -3695,19 +3697,12 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, con
 /**
  * Register a callback that will be invoked every time the session's connection state changes.
  *
- * @return A token value that can be used to unregiser the callback.
+ * @return a notification token object. Dispose it to stop receiving notifications.
  */
-RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
+RLM_API realm_sync_session_connection_state_notification_token_t*
+realm_sync_session_register_connection_state_change_callback(
     realm_sync_session_t*, realm_sync_connection_state_changed_func_t, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
-/**
- * Unregister a callback that will be invoked every time the session's connection state changes.
- * @param session ptr to a valid sync session
- * @param token the token returned by `realm_sync_session_register_connection_state_change_callback`
- */
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
-                                                                            uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked every time the session reports progress.
@@ -3717,20 +3712,11 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
  *                     Otherwise, the number of downloaded or uploaded bytes will always be reported
  *                     relative to the number of downloadable or uploadable bytes at the point in time
  *                     when the notifier was registered.
- * @return A token value that can be used to unregiser the notifier.
+ * @return a notification token object. Dispose it to stop receiving notifications.
  */
-RLM_API uint64_t realm_sync_session_register_progress_notifier(
+RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
-
-/**
- * Unregister a callback that will be invoked every time the session reports progress.
- * @param session ptr to a valid sync session
- * @param token the token returned by `realm_sync_session_register_progress_notifier`
- */
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session,
-                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
@@ -3767,6 +3753,14 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
+/**
+ * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
+ * runs.
+ * @param thread_observer a ptr to an implementation class that can receive these notifications. If nullptr is passed
+ * instead, this will have the effect of unregistering the callback.
+ */
+RLM_API void realm_set_binding_callback_thread_observer(realm_interface_callback_thread_observer_t* thread_observer)
+    RLM_API_NOEXCEPT;
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
