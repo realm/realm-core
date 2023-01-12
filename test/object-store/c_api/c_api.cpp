@@ -676,9 +676,10 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.category() == std::system_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
-        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        error_code = make_error_code(sync::network::ResolveErrors::socket_type_not_supported);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+        CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
 
         ec_check = c_api::sync_error_to_error_code(error);
         CHECK(ec_check.category() == realm::sync::network::resolve_error_category());

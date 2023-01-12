@@ -241,12 +241,16 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found) == RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found_try_again) == RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found) ==
+              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found_try_again) ==
+              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN);
 static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_data) == RLM_SYNC_ERROR_RESOLVE_NO_DATA);
 static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_recovery) == RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::service_not_found) == RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::socket_type_not_supported) == RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::service_not_found) ==
+              RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::socket_type_not_supported) ==
+              RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
 
 } // namespace
 
