@@ -1603,7 +1603,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             iss >> pages;
             return pages;
         };
-        constexpr size_t buffer_size = 100000;
+        constexpr size_t buffer_size = 50000;
         std::string buffer(buffer_size, 0);
         size_t file_read_pos = 0;
         size_t bytes_read = validator.read(buffer.data(), buffer_size);
@@ -1738,7 +1738,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             debug_message += "\nallocations: ";
             debug_message += debug_allocs;
             debug_message += "\nwriter's truth:\n";
-            debug_message += buffer.substr(0, buffer_size);
+            debug_message += buffer.substr(0, buffer.rfind("\n"));
             std::cout << debug_message << std::endl;
             REALM_ASSERT(computed_pages_for_refresh == pages_across_all_versions);
         }
