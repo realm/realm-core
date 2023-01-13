@@ -1662,7 +1662,7 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
     m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
                         pending_reset->time);
     util::bind_ptr<SessionWrapper> self(this);
-    async_wait_for(true, true, [self = std::move(self), pending_reset = pending_reset.value()](std::error_code ec) {
+    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](std::error_code ec) {
         if (ec == util::error::operation_aborted) {
             return;
         }
