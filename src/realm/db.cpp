@@ -781,15 +781,6 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
-#if REALM_TSAN
-        // The PageRefresher is an optimization and it shows up as benign races in thread
-        // sanitizer runs. The root cause is that `AESCryptor::read` and
-        // `copy_up_to_date_page()` copy entire pages. They may overwrite something which
-        // is being read concurrently. The reason it is benign, is that whenever there is a
-        // race, it overwrites with the same value as is already there, so the reader sees
-        // the correct value. This is all by design.
-        return;
-#endif
         start();
     }
     ~PageRefresher()

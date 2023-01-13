@@ -194,6 +194,7 @@ functions:
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
           fi
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
 
           cd build
           $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
