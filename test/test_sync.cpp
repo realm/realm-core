@@ -2970,7 +2970,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     config.reconnect_mode = ReconnectMode::testing;
     Client client(config);
-    client.run();
 
     auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
@@ -3120,7 +3119,6 @@ TEST(Sync_UploadDownloadProgress_1)
         config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
-        client.run();
 
         Session session(client, db, nullptr);
 
@@ -3386,7 +3384,6 @@ TEST(Sync_UploadDownloadProgress_3)
     client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
-    client.run();
 
     // when connecting to the C++ server, use URL prefix:
     Session::Config config;
@@ -3682,7 +3679,6 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     Client client(client_config);
-    client.run();
 
     Session::Config session_config;
     session_config.server_address = "localhost";
@@ -4329,12 +4325,9 @@ TEST(Sync_MergeMultipleChangesets)
         TEST_DIR(dir);
         MultiClientServerFixture fixture(2, 1, dir, test_context);
 
+        // Start server and upload changes of first client.
         Session session_1 = fixture.make_session(0, db_1);
         fixture.bind_session(session_1, 0, "/test");
-        Session session_2 = fixture.make_session(1, db_2);
-        fixture.bind_session(session_2, 0, "/test");
-
-        // Start server and upload changes of first client.
         fixture.start_server(0);
         fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -4344,6 +4337,8 @@ TEST(Sync_MergeMultipleChangesets)
 
         // Start the second client and upload their changes.
         // Wait to integrate changes from the first client.
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
@@ -5042,7 +5037,6 @@ TEST_IF(Sync_SSL_Certificates, false)
         client_config.logger = client_logger;
         client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
-        client.run();
 
         Session::Config session_config;
         session_config.server_address = server_address[i];

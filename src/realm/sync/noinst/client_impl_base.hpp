@@ -136,11 +136,8 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    // @{
-    /// These call stop() and run() on the socket provider respectively.
-    void run() noexcept;
+    /// This calls stop() on the socket provider respectively.
     void stop() noexcept;
-    // @}
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;

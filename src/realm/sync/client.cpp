@@ -491,19 +491,14 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
-    util::LockGuard lock{m_mutex};
-    if (m_stopped)
-        return;
-    m_stopped = true;
-    m_socket_provider->stop(false);
-    m_wait_or_client_stopped_cond.notify_all();
-}
-
-
-void ClientImpl::run() noexcept
-{
-    util::LockGuard lock{m_mutex};
-    m_socket_provider->start();
+    {
+        util::LockGuard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+        m_wait_or_client_stopped_cond.notify_all();
+    }
+    m_socket_provider->stop();
 }
 
 
@@ -1838,12 +1833,6 @@ Client::Client(Client&& client) noexcept
 
 
 Client::~Client() noexcept {}
-
-
-void Client::run() noexcept
-{
-    m_impl->run();
-}
 
 
 void Client::stop() noexcept

@@ -845,7 +845,6 @@ private:
                                  random_int<uint_fast64_t>()); // Seed from global generator
             });
         }
-        client.run();
     }
 };
 

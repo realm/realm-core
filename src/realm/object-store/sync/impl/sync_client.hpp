@@ -74,12 +74,10 @@ struct SyncClient {
     {
         if (!m_reachability_observer.start_observing())
             m_logger.error("Failed to set up network reachability observer");
-        m_client.run();
     }
 #else
     {
         static_cast<void>(weak_sync_manager);
-        m_client.run();
     }
 #endif
 
