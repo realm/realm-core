@@ -1796,7 +1796,7 @@ TEST_CASE("audit integration tests") {
                 std::move(mut_subs).commit();
             }
 
-            realm->sync_session()->log_out();
+            realm->sync_session()->force_close();
             generate_event(realm, 0);
             get_audit_events_from_baas(session, *config.audit_config->audit_user, 1);
         }

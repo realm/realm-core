@@ -312,7 +312,6 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
             *table_deleted = true;
         }
         return true;
-        ;
     });
 }
 

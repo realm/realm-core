@@ -403,7 +403,6 @@ private:
 
     void initialize(DB& db) noexcept
     {
-        REALM_ASSERT(!m_db);
         m_db = &db;
     }
 

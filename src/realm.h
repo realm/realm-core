@@ -396,6 +396,46 @@ typedef bool (*realm_scheduler_is_same_as_func_t)(const realm_userdata_t schedul
 typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(realm_userdata_t userdata);
 typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(realm_userdata_t userdata);
 
+/* Sync Socket Provider types */
+typedef struct realm_websocket_endpoint {
+    const char* address;    // Host address
+    uint16_t port;          // Host port number
+    const char* path;       // Includes access token in query.
+    const char** protocols; // Array of one or more websocket protocols
+    size_t num_protocols;   // Number of protocols in array
+    bool is_ssl;            // true if SSL should be used
+} realm_websocket_endpoint_t;
+
+typedef struct realm_sync_socket realm_sync_socket_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_callback_t;
+typedef void* realm_sync_socket_timer_t;
+typedef void* realm_sync_socket_websocket_t;
+typedef struct realm_websocket_observer realm_websocket_observer_t;
+
+typedef void (*realm_sync_socket_post_func_t)(realm_userdata_t userdata,
+                                              realm_sync_socket_callback_t* realm_callback);
+
+typedef realm_sync_socket_timer_t (*realm_sync_socket_create_timer_func_t)(
+    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_callback_t* realm_callback);
+
+typedef void (*realm_sync_socket_timer_canceled_func_t)(realm_userdata_t userdata,
+                                                        realm_sync_socket_timer_t timer_userdata);
+
+typedef void (*realm_sync_socket_timer_free_func_t)(realm_userdata_t userdata,
+                                                    realm_sync_socket_timer_t timer_userdata);
+
+typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
+    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
+    realm_websocket_observer_t* realm_websocket_observer);
+
+typedef void (*realm_sync_socket_websocket_async_write_func_t)(realm_userdata_t userdata,
+                                                               realm_sync_socket_websocket_t websocket_userdata,
+                                                               const char* data, size_t size,
+                                                               realm_sync_socket_callback_t* realm_callback);
+
+typedef void (*realm_sync_socket_websocket_free_func_t)(realm_userdata_t userdata,
+                                                        realm_sync_socket_websocket_t websocket_userdata);
+
 /**
  * Get the VersionID of the current transaction.
  *
@@ -3391,6 +3431,7 @@ typedef enum realm_sync_session_state {
     RLM_SYNC_SESSION_STATE_DYING,
     RLM_SYNC_SESSION_STATE_INACTIVE,
     RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN,
+    RLM_SYNC_SESSION_STATE_PAUSED,
 } realm_sync_session_state_e;
 
 typedef enum realm_sync_connection_state {
@@ -4254,5 +4295,53 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
+typedef enum status_error_code {
+    STATUS_OK = 0,
+    STATUS_UNKNOWN_ERROR = 1,
+    STATUS_RUNTIME_ERROR = 2,
+    STATUS_LOGIC_ERROR = 3,
+    STATUS_BROKEN_PROMISE = 4,
+    STATUS_OPERATION_ABORTED = 5,
+
+    /// WEBSOCKET ERRORS
+    // STATUS_WEBSOCKET_OK = 1000 IS NOT USED, JUST USE OK INSTEAD
+    STATUS_WEBSOCKET_GOING_AWAY = 1001,
+    STATUS_WEBSOCKET_PROTOCOL_ERROR = 1002,
+    STATUS_WEBSOCKET_UNSUPPORTED_DATA = 1003,
+    STATUS_WEBSOCKET_RESERVED = 1004,
+    STATUS_WEBSOCKET_NO_STATUS_RECEIVED = 1005,
+    STATUS_WEBSOCKET_ABNORMAL_CLOSURE = 1006,
+    STATUS_WEBSOCKET_INVALID_PAYLOAD_DATA = 1007,
+    STATUS_WEBSOCKET_POLICY_VIOLATION = 1008,
+    STATUS_WEBSOCKET_MESSAGE_TOO_BIG = 1009,
+    STATUS_WEBSOCKET_INAVALID_EXTENSION = 1010,
+    STATUS_WEBSOCKET_INTERNAL_SERVER_ERROR = 1011,
+    STATUS_WEBSOCKET_TLS_HANDSHAKE_FAILED = 1015, // USED BY DEFAULT WEBSOCKET
+} status_error_code_e;
+
+RLM_API realm_sync_socket_t* realm_sync_socket_new(
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_sync_socket_post_func_t post_func,
+    realm_sync_socket_create_timer_func_t create_timer_func,
+    realm_sync_socket_timer_canceled_func_t cancel_timer_func, realm_sync_socket_timer_free_func_t free_timer_func,
+    realm_sync_socket_connect_func_t websocket_connect_func,
+    realm_sync_socket_websocket_async_write_func_t websocket_write_func,
+    realm_sync_socket_websocket_free_func_t websocket_free_func);
+
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
+                                                 status_error_code_e status, const char* reason);
+
+RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
+                                                   const char* protocol);
+
+RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm_websocket_observer);
+
+RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+                                                 const char* data, size_t data_size);
+
+RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+                                                status_error_code_e status, const char* reason);
+
+RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
+                                                      realm_sync_socket_t*) RLM_API_NOEXCEPT;
 
 #endif // REALM_H
