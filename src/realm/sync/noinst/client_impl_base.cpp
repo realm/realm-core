@@ -184,7 +184,7 @@ ClientImpl::ClientImpl(ClientConfig config)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         actualize_and_finalize_session_wrappers(); // Throws
     });
@@ -622,7 +622,7 @@ void Connection::handle_reconnect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     m_reconnect_delay_in_progress = false;
@@ -708,7 +708,7 @@ void Connection::handle_connect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
@@ -807,7 +807,7 @@ void Connection::initiate_ping_delay(milliseconds_type now)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_ping_delay();                                                             // Throws
     });                                                                                  // Throws
@@ -842,7 +842,7 @@ void Connection::initiate_pong_timeout()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_pong_timeout(); // Throws
     });                        // Throws
@@ -864,7 +864,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_write_message(); // Throws
     });                         // Throws
@@ -948,7 +948,7 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_write_ping(); // Throws
     });                      // Throws
@@ -998,7 +998,7 @@ void Connection::handle_disconnect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     m_disconnect_delay_in_progress = false;
@@ -2494,7 +2494,7 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
             if (status == ErrorCodes::OperationAborted)
                 return;
             else if (!status.is_ok())
-                throw ExceptionForStatus(status);
+                throw Exception(status);
 
             m_try_again_activation_timer.reset();
             if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {

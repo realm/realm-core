@@ -1634,8 +1634,8 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
 
     CHECK(!realm->sync_session()->get_flx_subscription_store());
 
-    CHECK_THROWS_AS(realm->get_active_subscription_set(), std::runtime_error);
-    CHECK_THROWS_AS(realm->get_latest_subscription_set(), std::runtime_error);
+    CHECK_THROWS_AS(realm->get_active_subscription_set(), IllegalOperation);
+    CHECK_THROWS_AS(realm->get_latest_subscription_set(), IllegalOperation);
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
@@ -2815,7 +2815,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::unique_lock<std::mutex> lk(errors_mutex);
-        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::compensating_write));
+        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::compensating_write));
         for (const auto& compensating_write : error.compensating_writes_info) {
             auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
                                               [&](const auto& pair) {

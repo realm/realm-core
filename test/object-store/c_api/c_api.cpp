@@ -643,30 +643,30 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         std::string message;
 
         std::error_code error_code = make_error_code(sync::ClientError::connection_closed);
-        realm_sync_error_code_t error = c_api::to_capi(error_code, message);
+        realm_sync_error_code_t error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
         CHECK(error.value == int(error_code.value()));
         CHECK(error_code.message() == error.message);
         CHECK(message == error.message);
 
         error_code = make_error_code(sync::ProtocolError::connection_closed);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
 
         error_code = make_error_code(sync::ProtocolError::session_closed);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
 
         error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
 
         error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
 
         error_code = make_error_code(util::error::misc_errors::unknown);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
     }
 

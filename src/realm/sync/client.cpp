@@ -409,7 +409,7 @@ void ClientImpl::cancel_reconnect_delay()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         for (auto& p : m_server_slots) {
             ServerSlot& slot = p.second;
@@ -467,7 +467,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         util::LockGuard lock{m_mutex};
         m_sessions_terminated = true;
@@ -982,7 +982,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
@@ -1063,7 +1063,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             return; // Already finalized
@@ -1196,7 +1196,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1218,7 +1218,7 @@ void SessionWrapper::cancel_reconnect_delay()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1242,7 +1242,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
@@ -1289,7 +1289,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
@@ -1332,7 +1332,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
@@ -1368,7 +1368,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1675,7 +1675,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(m_activated);
         if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {

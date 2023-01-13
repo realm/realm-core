@@ -2517,8 +2517,9 @@ TEST_CASE("SharedRealm: close()") {
 
 #if REALM_ENABLE_SYNC
         REQUIRE_FALSE(realm->sync_session());
-        REQUIRE_EXCEPTION(realm->get_latest_subscription_set(), ClosedRealm, msg);
-        REQUIRE_EXCEPTION(realm->get_active_subscription_set(), ClosedRealm, msg);
+        msg = "Flexible sync is not enabled";
+        REQUIRE_EXCEPTION(realm->get_latest_subscription_set(), IllegalOperation, msg);
+        REQUIRE_EXCEPTION(realm->get_active_subscription_set(), IllegalOperation, msg);
 #endif
     }
 
