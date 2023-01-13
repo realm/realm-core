@@ -1747,6 +1747,7 @@ void SlabAlloc::refresh_encrypted_pages(
     const RefRanges& ranges,
     std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
 {
+#if REALM_ENABLE_ENCRYPTION
     // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
@@ -1761,10 +1762,15 @@ void SlabAlloc::refresh_encrypted_pages(
         }
     }
     verify();
+#else
+    static_cast<void>(ranges);
+    static_cast<void>(pages_refreshed);
+#endif // REALM_ENABLE_ENCRYPTION
 }
 
 void SlabAlloc::refresh_all_encrypted_pages()
 {
+#if REALM_ENABLE_ENCRYPTION
     // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
@@ -1775,6 +1781,7 @@ void SlabAlloc::refresh_all_encrypted_pages()
         }
     }
     verify();
+#endif // REALM_ENABLE_ENCRYPTION
 }
 
 size_t SlabAlloc::get_allocated_size() const noexcept
