@@ -103,7 +103,7 @@ struct mappings_for_file {
 
 // Group the information we need to map a SIGSEGV address to an
 // EncryptedFileMapping for the sake of cache-friendliness with 3+ active
-// mappings (and no worse with only two
+// mappings (and no worse with only two)
 struct mapping_and_addr {
     std::shared_ptr<EncryptedFileMapping> mapping;
     void* addr;
@@ -499,19 +499,18 @@ SharedFileInfo* get_file_info_for_file(File& file)
 
 
 namespace {
-EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
-                                  const char* encryption_key)
+EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes& file, size_t file_offset)
 {
 #ifndef _WIN32
     struct stat st;
 
-    if (fstat(fd, &st)) {
+    if (fstat(file.fd, &st)) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::system_error(err, std::system_category(), "fstat() failed");
     }
 #endif
 
-    size_t fs = to_size_t(File::get_size_static(fd));
+    size_t fs = to_size_t(File::get_size_static(file.fd));
     if (fs > 0 && fs < page_size())
         throw DecryptionFailed();
 
@@ -520,7 +519,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
 #ifdef _WIN32
-        if (File::is_same_file_static(it->handle, fd))
+        if (File::is_same_file_static(it->handle, file.fd))
             break;
 #else
         if (it->inode == st.st_ino && it->device == st.st_dev)
@@ -534,22 +533,22 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
     if (it == mappings_by_file.end()) {
         mappings_by_file.reserve(mappings_by_file.size() + 1);
         mappings_for_file f;
-        f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(encryption_key));
+        f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(file.encryption_key));
 
+        FileDesc fd_duped;
 #ifdef _WIN32
-        FileDesc fd2;
-        if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd2, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        if (!DuplicateHandle(GetCurrentProcess(), file.fd, GetCurrentProcess(), &fd_duped, 0, FALSE,
+                             DUPLICATE_SAME_ACCESS))
             throw std::system_error(GetLastError(), std::system_category(), "DuplicateHandle() failed");
-        fd = fd2;
-        f.info->fd = f.handle = fd;
+        f.info->fd = f.handle = fd_duped;
 #else
-        fd = dup(fd);
+        fd_duped = dup(file.fd);
 
-        if (fd == -1) {
+        if (fd_duped == -1) {
             int err = errno; // Eliminate any risk of clobbering
             throw std::system_error(err, std::system_category(), "dup() failed");
         }
-        f.info->fd = fd;
+        f.info->fd = fd_duped;
         f.device = st.st_dev;
         f.inode = st.st_ino;
 #endif
@@ -558,14 +557,14 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         it = mappings_by_file.end() - 1;
     }
     else {
-        it->info->cryptor.check_key(reinterpret_cast<const uint8_t*>(encryption_key));
+        it->info->cryptor.check_key(reinterpret_cast<const uint8_t*>(file.encryption_key));
     }
 
     try {
         mapping_and_addr m;
         m.addr = addr;
         m.size = size;
-        m.mapping = std::make_shared<EncryptedFileMapping>(*it->info, file_offset, addr, size, access);
+        m.mapping = std::make_shared<EncryptedFileMapping>(*it->info, file_offset, addr, size, file.access);
         mappings_by_addr.push_back(m); // can't throw due to reserve() above
         return m.mapping.get();
     }
@@ -612,27 +611,25 @@ void remove_mapping(void* addr, size_t size)
 }
 } // anonymous namespace
 
-void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
-           EncryptedFileMapping*& mapping)
+void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
-    if (encryption_key) {
+    if (file.encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
-        mapping = add_mapping(addr, size, fd, offset, access, encryption_key);
+        mapping = add_mapping(addr, size, file, offset);
         return addr;
     }
     else {
         mapping = nullptr;
-        return mmap(fd, size, access, offset, nullptr);
+        return mmap(file, size, offset);
     }
 }
 
 
-EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
-                                      const char* encryption_key)
+EncryptedFileMapping* reserve_mapping(void* addr, const FileAttributes& file, size_t offset)
 {
-    return add_mapping(addr, 0, fd, offset, access, encryption_key);
+    return add_mapping(addr, 0, file, offset);
 }
 
 void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
@@ -650,15 +647,15 @@ void remove_encrypted_mapping(void* addr, size_t size)
     remove_mapping(addr, size);
 }
 
-void* mmap_reserve(FileDesc fd, size_t reservation_size, File::AccessMode access, size_t offset_in_file,
-                   const char* enc_key, EncryptedFileMapping*& mapping)
+void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t offset_in_file,
+                   EncryptedFileMapping*& mapping)
 {
-    auto addr = mmap_reserve(fd, reservation_size, offset_in_file);
-    if (enc_key) {
+    auto addr = mmap_reserve(file.fd, reservation_size, offset_in_file);
+    if (file.encryption_key) {
         REALM_ASSERT(reservation_size == round_up_to_page_size(reservation_size));
         // we create a mapping for the entire reserved area. This causes full initialization of some fairly
         // large std::vectors, which it would be nice to avoid. This is left as a future optimization.
-        mapping = add_mapping(addr, reservation_size, fd, offset_in_file, access, enc_key);
+        mapping = add_mapping(addr, reservation_size, file, offset_in_file);
     }
     else {
         mapping = nullptr;
@@ -784,25 +781,25 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
 }
 
 
-void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
+void* mmap(const FileAttributes& file, size_t size, size_t offset)
 {
     _impl::SimulatedFailure::trigger_mmap(size);
 #if REALM_ENABLE_ENCRYPTION
-    if (encryption_key) {
+    if (file.encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
-        add_mapping(addr, size, fd, offset, access, encryption_key);
+        add_mapping(addr, size, file, offset);
         return addr;
     }
     else
 #else
-    REALM_ASSERT(!encryption_key);
+    REALM_ASSERT(!file.encryption_key);
 #endif
     {
 
 #ifndef _WIN32
         int prot = PROT_READ;
-        switch (access) {
+        switch (file.access) {
             case File::access_ReadWrite:
                 prot |= PROT_WRITE;
                 break;
@@ -810,7 +807,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                 break;
         }
 
-        void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, fd, offset);
+        void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, file.fd, offset);
         if (addr != MAP_FAILED)
             return addr;
 
@@ -828,7 +825,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
 
         DWORD protect = PAGE_READONLY;
         DWORD desired_access = FILE_MAP_READ;
-        switch (access) {
+        switch (file.access) {
             case File::access_ReadOnly:
                 break;
             case File::access_ReadWrite:
@@ -839,7 +836,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
         LARGE_INTEGER large_int;
         if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
             throw std::runtime_error("Map size is too large");
-        HANDLE map_handle = CreateFileMappingFromApp(fd, 0, protect, offset + size, nullptr);
+        HANDLE map_handle = CreateFileMappingFromApp(file.fd, 0, protect, offset + size, nullptr);
         if (!map_handle)
             throw AddressSpaceExhausted(get_errno_msg("CreateFileMapping() failed: ", GetLastError()) +
                                         " size: " + util::to_string(size) + " offset: " + util::to_string(offset));
@@ -878,11 +875,10 @@ void munmap(void* addr, size_t size)
 #endif
 }
 
-void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size,
-             const char* encryption_key)
+void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size)
 {
 #if REALM_ENABLE_ENCRYPTION
-    if (encryption_key) {
+    if (file.encryption_key) {
         LockGuard lock(mapping_mutex);
         size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
@@ -911,8 +907,6 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
         // the encryption key which is an error.
         REALM_UNREACHABLE();
     }
-#else
-    static_cast<void>(encryption_key);
 #endif
 
 #ifdef _GNU_SOURCE
@@ -936,7 +930,7 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
     }
 #endif
 
-    void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
+    void* new_addr = mmap(file, new_size, file_offset);
 
 #ifdef _WIN32
     if (!UnmapViewOfFile(old_addr))

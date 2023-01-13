@@ -303,7 +303,7 @@ size_t ResultsSection::size()
 }
 
 NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                            KeyPathArray key_path_array) &
+                                                            std::optional<KeyPathArray> key_path_array) &
 {
     return m_parent->add_notification_callback_for_section(m_key, std::move(callback), key_path_array);
 }
@@ -441,14 +441,14 @@ ResultsSection SectionedResults::operator[](Mixed key)
 }
 
 NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                              KeyPathArray key_path_array) &
+                                                              std::optional<KeyPathArray> key_path_array) &
 {
     return m_results.add_notification_callback(SectionedResultsNotificationHandler(*this, std::move(callback)),
                                                std::move(key_path_array));
 }
 
 NotificationToken SectionedResults::add_notification_callback_for_section(
-    Mixed section_key, SectionedResultsNotificatonCallback callback, KeyPathArray key_path_array)
+    Mixed section_key, SectionedResultsNotificatonCallback callback, std::optional<KeyPathArray> key_path_array)
 {
     return m_results.add_notification_callback(
         SectionedResultsNotificationHandler(*this, std::move(callback), section_key), std::move(key_path_array));

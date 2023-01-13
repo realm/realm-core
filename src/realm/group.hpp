@@ -852,6 +852,7 @@ private:
     friend class Transaction;
     friend class TableKeyIterator;
     friend class CascadeState;
+    friend class SlabAlloc;
 };
 
 class TableKeyIterator {

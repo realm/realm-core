@@ -52,7 +52,7 @@
 #include <process.h>
 #endif
 
-//#define REALM_ENABLE_LOGFILE
+// #define REALM_ENABLE_LOGFILE
 
 
 using namespace realm;
@@ -541,6 +541,18 @@ public:
 
     void release_read_lock(const ReadLockInfo& read_lock)
     {
+        {
+            std::lock_guard lock(m_local_mutex);
+            REALM_ASSERT(read_lock.m_reader_idx < m_local_readers.size());
+            auto& r = m_local_readers[read_lock.m_reader_idx];
+            auto& f = field_for_type(r, read_lock.m_type);
+            REALM_ASSERT(f > 0);
+            if (--f > 0)
+                return;
+            if (r.count_live == 0 && r.count_full == 0 && r.count_frozen == 0)
+                r.version = 0;
+        }
+
         std::lock_guard lock(m_mutex);
         // we should not need to call ensure_full_reader_mapping,
         // since releasing a read lock means it has been grabbed
@@ -548,31 +560,22 @@ public:
         REALM_ASSERT(read_lock.m_reader_idx < m_local_max_entry);
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
-        switch (read_lock.m_type) {
-            case ReadLockInfo::Frozen: {
-                --r.count_frozen;
-                break;
-            }
-            case ReadLockInfo::Live: {
-                --r.count_live;
-                break;
-            }
-            case ReadLockInfo::Full: {
-                --r.count_full;
-                break;
-            }
-        }
+        --field_for_type(r, read_lock.m_type);
     }
 
     ReadLockInfo grab_read_lock(ReadLockInfo::Type type, VersionID version_id = {})
     {
         ReadLockInfo read_lock;
-        std::lock_guard lock(m_mutex);
-        ensure_full_reader_mapping();
+        if (try_grab_local_read_lock(read_lock, type, version_id))
+            return read_lock;
+
         const bool pick_specific = version_id.version != VersionID().version;
+
+        std::lock_guard lock(m_mutex);
         auto newest = m_info->readers.newest.load();
         REALM_ASSERT(newest != VersionList::nil);
         read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
+        ensure_full_reader_mapping();
         bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
         auto& r = m_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
@@ -583,24 +586,18 @@ public:
             if (type != ReadLockInfo::Frozen && r.count_live == 0)
                 throw BadVersion(version_id.version);
         }
-        switch (type) {
-            case ReadLockInfo::Frozen: {
-                ++r.count_frozen;
-                break;
-            }
-            case ReadLockInfo::Live: {
-                ++r.count_live;
-                break;
-            }
-            case ReadLockInfo::Full: {
-                ++r.count_full;
-                break;
-            }
+        populate_read_lock(read_lock, r, type);
+
+        std::lock_guard local_lock(m_local_mutex);
+        grow_local_cache(read_lock.m_reader_idx + 1);
+        auto& r2 = m_local_readers[read_lock.m_reader_idx];
+        if (!r2.is_active()) {
+            r2 = r;
+            r2.count_full = r2.count_live = r2.count_frozen = 0;
         }
-        read_lock.m_type = type;
-        read_lock.m_version = r.version;
-        read_lock.m_top_ref = static_cast<ref_type>(r.current_top);
-        read_lock.m_file_size = static_cast<size_t>(r.filesize);
+        REALM_ASSERT(field_for_type(r2, type) == 0);
+        field_for_type(r2, type) = 1;
+
         return read_lock;
     }
 
@@ -646,6 +643,60 @@ private:
             m_info = m_reader_map.get_addr();
         }
     }
+
+    void grow_local_cache(size_t new_size)
+    {
+        if (new_size > m_local_readers.size())
+            m_local_readers.resize(new_size, VersionList::ReadCount{});
+    }
+
+    void populate_read_lock(ReadLockInfo& read_lock, VersionList::ReadCount& r, ReadLockInfo::Type type)
+    {
+        ++field_for_type(r, type);
+        read_lock.m_type = type;
+        read_lock.m_version = r.version;
+        read_lock.m_top_ref = static_cast<ref_type>(r.current_top);
+        read_lock.m_file_size = static_cast<size_t>(r.filesize);
+    }
+
+    bool try_grab_local_read_lock(ReadLockInfo& read_lock, ReadLockInfo::Type type, VersionID version_id)
+    {
+        const bool pick_specific = version_id.version != VersionID().version;
+        auto index = pick_specific ? version_id.index : m_info->readers.newest.load();
+        std::lock_guard local_lock(m_local_mutex);
+        if (index >= m_local_readers.size())
+            return false;
+
+        auto& r = m_local_readers[index];
+        if (!r.is_active())
+            return false;
+        if (pick_specific && r.version != version_id.version)
+            return false;
+        if (field_for_type(r, type) == 0)
+            return false;
+
+        read_lock.m_reader_idx = index;
+        populate_read_lock(read_lock, r, type);
+        return true;
+    }
+
+    static uint32_t& field_for_type(VersionList::ReadCount& r, ReadLockInfo::Type type)
+    {
+        switch (type) {
+            case ReadLockInfo::Frozen:
+                return r.count_frozen;
+            case ReadLockInfo::Live:
+                return r.count_live;
+            case ReadLockInfo::Full:
+                return r.count_full;
+            default:
+                REALM_UNREACHABLE(); // silence a warning
+        }
+    }
+
+    std::mutex m_local_mutex;
+    std::vector<VersionList::ReadCount> m_local_readers;
+
     unsigned int m_local_max_entry;
     SharedInfo* m_info;
     File& m_file;

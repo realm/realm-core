@@ -397,10 +397,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm2 = Realm::get_shared_realm(config);
 
         // no verification if the version chosen is less than the current transaction schema version.
+        // the schemas should be just merged
         TestHelper::begin_read(realm2, version1);
         auto& group = realm2->read_group();
         auto schema = realm2->schema();
-        REQUIRE(schema != config.schema);
+        REQUIRE(schema == config.schema);
         auto table_obj = group.get_table("class_object");
         auto table_obj1 = group.get_table("class_object1");
         REQUIRE(table_obj);        // empty schema always has class_object
@@ -1149,13 +1150,6 @@ TEST_CASE("SharedRealm: convert") {
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
-    }
-
-    SECTION("cannot convert from local realm to flx sync") {
-        SyncTestFile sync_config(tsm.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
-        auto local_realm = Realm::get_shared_realm(local_config1);
-        REQUIRE_EXCEPTION(local_realm->convert(sync_config), IllegalOperation,
-                          "Cannot convert Realms to flexible sync Realms");
     }
 
     SECTION("can copy a local realm to a local realm") {

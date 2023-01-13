@@ -54,7 +54,7 @@ struct SchemaChangePrinter {
         out << "}";                                                                                                  \
     }
 
-    REALM_SC_PRINT(AddIndex, v.object, v.property)
+    REALM_SC_PRINT(AddIndex, v.object, v.property, v.type)
     REALM_SC_PRINT(AddProperty, v.object, v.property)
     REALM_SC_PRINT(AddTable, v.object)
     REALM_SC_PRINT(RemoveTable, v.object)
@@ -230,6 +230,9 @@ TEST_CASE("ObjectSchema") {
 
         asymmetric->add_column(type_Int, "int");
 
+        auto col_fulltext = table->add_column(type_String, "fulltext");
+        table->add_fulltext_index(col_fulltext);
+
         ObjectSchema os(g, "table", table->get_key());
         REQUIRE(os.table_key == table->get_key());
         ObjectSchema os1(g, "embedded", {});
@@ -352,6 +355,9 @@ TEST_CASE("ObjectSchema") {
                          Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed uuid?", UUID | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
+        Property* fulltextprop;
+        REQUIRE((fulltextprop = os.property_for_name("fulltext")));
+        REQUIRE((*fulltextprop == Property{"fulltext", Property::IsFulltextIndexed{true}}));
     }
 }
 
@@ -1195,7 +1201,23 @@ TEST_CASE("Schema") {
                 {"object", {{"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}}}};
             auto object_schema = &*schema1.find("object");
             REQUIRE(schema1.compare(schema2) ==
-                    vec{(AddIndex{object_schema, &object_schema->persisted_properties[0]})});
+                    vec{(AddIndex{object_schema, &object_schema->persisted_properties[0], IndexType::General})});
+        }
+
+        SECTION("add fulltext index") {
+            Schema schema1 = {{"object", {{"text", PropertyType::String}}}};
+            Schema schema2 = {{"object", {{"text", Property::IsFulltextIndexed{true}}}}};
+            auto object_schema = &*schema1.find("object");
+            REQUIRE(schema1.compare(schema2) ==
+                    vec{(AddIndex{object_schema, &object_schema->persisted_properties[0], IndexType::Fulltext})});
+        }
+
+        SECTION("remove fulltext index") {
+            Schema schema1 = {{"object", {{"text", Property::IsFulltextIndexed{true}}}}};
+            Schema schema2 = {{"object", {{"text", PropertyType::String}}}};
+            auto object_schema = &*schema1.find("object");
+            REQUIRE(schema1.compare(schema2) ==
+                    vec{(RemoveIndex{object_schema, &object_schema->persisted_properties[0]})});
         }
 
         SECTION("remove index") {
@@ -1215,7 +1237,7 @@ TEST_CASE("Schema") {
             auto object_schema = &*schema1.find("object");
             REQUIRE(schema1.compare(schema2) ==
                     (vec{MakePropertyNullable{object_schema, &object_schema->persisted_properties[0]},
-                         AddIndex{object_schema, &object_schema->persisted_properties[0]}}));
+                         AddIndex{object_schema, &object_schema->persisted_properties[0], IndexType::General}}));
         }
 
         SECTION("add index and change type") {

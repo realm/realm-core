@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -71,6 +72,7 @@ static_assert(realm_sync_session_state_e(SyncSession::State::Dying) == RLM_SYNC_
 static_assert(realm_sync_session_state_e(SyncSession::State::Inactive) == RLM_SYNC_SESSION_STATE_INACTIVE);
 static_assert(realm_sync_session_state_e(SyncSession::State::WaitingForAccessToken) ==
               RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN);
+static_assert(realm_sync_session_state_e(SyncSession::State::Paused) == RLM_SYNC_SESSION_STATE_PAUSED);
 
 static_assert(realm_sync_connection_state_e(SyncSession::ConnectionState::Disconnected) ==
               RLM_SYNC_CONNECTION_STATE_DISCONNECTED);
@@ -117,7 +119,7 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Un
 
 } // namespace
 
-static realm_sync_error_code_t to_capi(const Status& status, std::string& message)
+realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
 
@@ -145,6 +147,9 @@ static realm_sync_error_code_t to_capi(const Status& status, std::string& messag
     }
     else if (category == std::system_category() || category == *realm_basic_system_category) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
+    }
+    else if (category == realm::sync::network::resolve_error_category()) {
+        ret.category = RLM_SYNC_ERROR_CATEGORY_RESOLVE;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
@@ -783,18 +788,20 @@ RLM_API const char* realm_sync_session_get_file_path(const realm_sync_session_t*
 
 RLM_API void realm_sync_session_pause(realm_sync_session_t* session) noexcept
 {
-    (*session)->log_out();
+    (*session)->pause();
 }
 
 RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 {
-    (*session)->revive_if_needed();
+    (*session)->resume();
 }
 
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char* sync_path) noexcept
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        return (*app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        return true;
     });
 }
 

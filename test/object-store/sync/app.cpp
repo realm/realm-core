@@ -2005,23 +2005,6 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
-static void set_app_config_defaults(app::App::Config& app_config,
-                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
-{
-    if (!app_config.transport)
-        app_config.transport = transport;
-    if (app_config.platform.empty())
-        app_config.platform = "Object Store Test Platform";
-    if (app_config.platform_version.empty())
-        app_config.platform_version = "Object Store Test Platform Version";
-    if (app_config.sdk_version.empty())
-        app_config.sdk_version = "SDK Version";
-    if (app_config.app_id.empty())
-        app_config.app_id = "app_id";
-    if (!app_config.local_app_version)
-        app_config.local_app_version.emplace("A Local App Version");
-}
-
 TEST_CASE("app: sync integration", "[sync][app]") {
     auto logger = std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
@@ -2234,7 +2217,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
                     redir_transport->simulated_response = {
-                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                        308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 3) {
@@ -2286,7 +2269,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
                 redir_transport->simulated_response = {
-                    301,
+                    request_count % 2 == 1 ? 308 : 301,
                     0,
                     {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
                     "Some body data"};
@@ -2707,7 +2690,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex mutex;
         bool done = false;
         auto r = Realm::get_shared_realm(config);
-        r->sync_session()->close();
+        r->sync_session()->pause();
 
         // Create 26 MB worth of dogs in 26 transactions, which should work but
         // will result in an error from the server if the changesets are batched
@@ -2727,7 +2710,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!ec.get_std_error_code());
             done = true;
         });
-        r->sync_session()->revive_if_needed();
+        r->sync_session()->resume();
 
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
@@ -2768,6 +2751,33 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                   "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
+    }
+
+    SECTION("freezing realm does not resume session") {
+        SyncTestFile config(app, partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+
+        auto state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Active);
+
+        realm->sync_session()->pause();
+        state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Paused);
+
+        realm->read_group();
+
+        {
+            auto frozen = realm->freeze();
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
+
+        {
+            auto frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
     }
 
     SECTION("validation") {
@@ -3240,7 +3250,13 @@ private:
                                 {"appVersion", "A Local App Version"},
                                 {"platform", "Object Store Test Platform"},
                                 {"platformVersion", "Object Store Test Platform Version"},
+                                {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
+                                {"cpuArch", "CPU Arch"},
+                                {"deviceName", "Device Name"},
+                                {"deviceVersion", "Device Version"},
+                                {"frameworkName", "Framework Name"},
+                                {"frameworkVersion", "Framework Version"},
                                 {"coreVersion", REALM_VERSION_STRING}}}}));
 
         CHECK(request.timeout_ms == 60000);

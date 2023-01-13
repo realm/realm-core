@@ -527,7 +527,8 @@ public:
 
     bool has_search_index() const override
     {
-        return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+        return this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) ==
+               IndexType::General;
     }
 
     const std::vector<ObjKey>& index_based_keys() override
@@ -1232,7 +1233,7 @@ public:
 
     bool has_search_index() const override
     {
-        return this->m_table->has_search_index(BaseType::m_condition_column_key);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1437,7 +1438,7 @@ public:
 
     void table_changed() override
     {
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
 
     bool has_search_index() const override
@@ -1830,8 +1831,7 @@ public:
     void table_changed() override
     {
         StringNodeBase::table_changed();
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key) ||
-                             m_table.unchecked_ptr()->get_primary_key_column() == m_condition_column_key;
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
 
     void _search_index_init() override;
@@ -1924,7 +1924,7 @@ public:
     void table_changed() override
     {
         StringNodeBase::table_changed();
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
     void _search_index_init() override;
 

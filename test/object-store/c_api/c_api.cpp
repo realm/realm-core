@@ -3,6 +3,7 @@
 #include <realm.h>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/util/base64.hpp>
 
@@ -23,6 +24,10 @@
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
+#include <realm/object-store/sync/app_utils.hpp>
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/network/network.hpp>
+#include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #endif
@@ -111,6 +116,18 @@ realm_value_t rlm_decimal_val(double d)
     val.type = RLM_TYPE_DECIMAL128;
 
     realm::Decimal128 dec{d};
+    val.decimal128.w[0] = dec.raw()->w[0];
+    val.decimal128.w[1] = dec.raw()->w[1];
+
+    return val;
+}
+
+realm_value_t rlm_decimal_nan()
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_DECIMAL128;
+
+    realm::Decimal128 dec = realm::Decimal128::nan("0");
     val.decimal128.w[0] = dec.raw()->w[0];
     val.decimal128.w[1] = dec.raw()->w[1];
 
@@ -246,6 +263,119 @@ CPtr<T> clone_cptr(const T* ptr)
             realm_clear_last_error();                                                                                \
         }                                                                                                            \
     } while (false);
+
+#if REALM_ENABLE_AUTH_TESTS
+class CApiUnitTestTransport : public app::GenericNetworkTransport {
+    std::string m_provider_type;
+
+public:
+    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
+        : m_provider_type(provider_type)
+    {
+        profile_0 = nlohmann::json({{"name", "profile_0_name"},
+                                    {"first_name", "profile_0_first_name"},
+                                    {"last_name", "profile_0_last_name"},
+                                    {"email", "profile_0_email"},
+                                    {"picture_url", "profile_0_picture_url"},
+                                    {"gender", "profile_0_gender"},
+                                    {"birthday", "profile_0_birthday"},
+                                    {"min_age", "profile_0_min_age"},
+                                    {"max_age", "profile_0_max_age"}});
+    }
+
+    void set_provider_type(const std::string& provider_type)
+    {
+        m_provider_type = provider_type;
+    }
+
+    const std::string access_token =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2Rldklk"
+        "IjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoi"
+        "NWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+    const std::string user_id = "awelfkewjfewkefkeafj";
+    const std::string identity_0_id = "eflkjf393flkj33fjf3";
+    const std::string identity_1_id = "aewfjklewfwoifejjef";
+    nlohmann::json profile_0;
+
+
+private:
+    void handle_profile(const app::Request&, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        std::string response =
+            nlohmann::json({{"user_id", user_id},
+                            {"identities",
+                             {{{"id", identity_0_id}, {"provider_type", m_provider_type}, {"provider_id", "lol"}},
+                              {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
+                            {"data", profile_0}})
+                .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+    void handle_login(const app::Request& request, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        CHECK(request.method == app::HttpMethod::post);
+        auto item = app::AppUtils::find_header("Content-Type", request.headers);
+        CHECK(item);
+        CHECK(item->second == "application/json;charset=utf-8");
+        // Verify against
+        CHECK(nlohmann::json::parse(request.body)["options"] ==
+              nlohmann::json({{"device",
+                               {{"appId", "app_id_123"},
+                                {"appVersion", "some_app_version"},
+                                {"platform", "some_platform_name"},
+                                {"platformVersion", "some_platform_version"},
+                                {"sdk", "some_sdk_name"},
+                                {"sdkVersion", "some_sdk_version"},
+                                {"cpuArch", "some_cpu_arch"},
+                                {"deviceName", "some_device_name"},
+                                {"deviceVersion", "some_device_version"},
+                                {"frameworkName", "some_framework_name"},
+                                {"frameworkVersion", "some_framework_version"},
+                                {"coreVersion", REALM_VERSION_STRING}}}}));
+
+        CHECK(request.timeout_ms == 60000);
+
+        std::string response = nlohmann::json({{"access_token", access_token},
+                                               {"refresh_token", access_token},
+                                               {"user_id", user_id},
+                                               {"device_id", "Panda Bear"}})
+                                   .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+    void handle_location(const app::Request&, util::UniqueFunction<void(const app::Response&)>&& completion)
+    {
+        std::string response = nlohmann::json({{"deployment_model", "this"},
+                                               {"hostname", "field"},
+                                               {"ws_hostname", "shouldn't"},
+                                               {"location", "matter"}})
+                                   .dump();
+
+        completion(app::Response{200, 0, {}, response});
+    }
+
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (request.url.find("/login") != std::string::npos) {
+            handle_login(request, std::move(completion));
+        }
+        else if (request.url.find("/profile") != std::string::npos) {
+            handle_profile(request, std::move(completion));
+        }
+        else if (request.url.find("/location") != std::string::npos && request.method == app::HttpMethod::get) {
+            handle_location(request, std::move(completion));
+        }
+        else {
+            completion(app::Response{200, 0, {}, "something arbitrary"});
+        }
+    }
+};
+#endif // REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("C API (C)", "[c_api]") {
     TestFile file;
@@ -450,6 +580,98 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(std::string{realm_config_get_fifo_path(config.get())} == "test_path.FIFO");
         }
     }
+
+#if REALM_ENABLE_AUTH_TESTS
+    SECTION("realm_app_config_t") {
+        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        auto http_transport = realm_http_transport(transport);
+        auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
+        CHECK(app_config.get() != nullptr);
+        CHECK(app_config->app_id == "app_id_123");
+        CHECK(app_config->transport == transport);
+
+        realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
+        CHECK(app_config->base_url == "https://path/to/app");
+
+        realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
+        CHECK(app_config->local_app_name == "some_app_name");
+
+        realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
+        CHECK(app_config->local_app_version == "some_app_version");
+
+        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
+        CHECK(app_config->default_request_timeout_ms == 2500);
+
+        realm_app_config_set_platform(app_config.get(), "some_platform_name");
+        CHECK(app_config->device_info.platform == "some_platform_name");
+
+        realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
+        CHECK(app_config->device_info.platform_version == "some_platform_version");
+
+        realm_app_config_set_sdk_version(app_config.get(), "some_sdk_version");
+        CHECK(app_config->device_info.sdk_version == "some_sdk_version");
+
+        realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
+        CHECK(app_config->device_info.sdk == "some_sdk_name");
+
+        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
+        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
+
+        realm_app_config_set_device_name(app_config.get(), "some_device_name");
+        CHECK(app_config->device_info.device_name == "some_device_name");
+
+        realm_app_config_set_device_version(app_config.get(), "some_device_version");
+        CHECK(app_config->device_info.device_version == "some_device_version");
+
+        realm_app_config_set_framework_name(app_config.get(), "some_framework_name");
+        CHECK(app_config->device_info.framework_name == "some_framework_name");
+
+        realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
+        CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        auto test_app = std::make_shared<app::App>(*app_config);
+        auto credentials = app::AppCredentials::anonymous();
+        // Verify the values above are included in the login request
+        test_app->log_in_with_credentials(credentials, [&](const std::shared_ptr<realm::SyncUser>&,
+                                                           realm::util::Optional<realm::app::AppError> error) {
+            CHECK(!error);
+        });
+    }
+
+    SECTION("realm_sync_error_code to_capi()") {
+        using namespace realm::sync;
+        std::string message;
+
+        std::error_code error_code = make_error_code(sync::ClientError::connection_closed);
+        realm_sync_error_code_t error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
+        CHECK(error.value == int(error_code.value()));
+        CHECK(error_code.message() == error.message);
+        CHECK(message == error.message);
+
+        error_code = make_error_code(sync::ProtocolError::connection_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
+
+        error_code = make_error_code(sync::ProtocolError::session_closed);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
+
+        error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
+
+        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+
+        error_code = make_error_code(util::error::misc_errors::unknown);
+        error = c_api::to_capi(error_code, message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
+    }
+
+
+#endif // REALM_ENABLE_AUTH_TESTS
 }
 
 namespace {
@@ -2044,6 +2266,26 @@ TEST_CASE("C API", "[c_api]") {
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
                 CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+            }
+
+            SECTION("decimal NaN") {
+                realm_value_t decimal = rlm_decimal_nan();
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
+                });
+                realm_query_arg_t args[] = {realm_query_arg_t{1, false, &decimal}};
+                auto q_decimal = cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $0", 1, args));
+                realm_value_t out_value;
+                bool out_found;
+                CHECK(realm_query_find_first(q_decimal.get(), &out_value, &out_found));
+                CHECK(out_found);
+                auto link = obj1->obj().get_link();
+                realm_value_t expected;
+                expected.type = RLM_TYPE_LINK;
+                expected.link.target_table = link.get_table_key().value;
+                expected.link.target = link.get_obj_key().value;
+                CHECK(rlm_val_eq(out_value, expected));
             }
 
             SECTION("interpolate all types") {
@@ -4670,7 +4912,8 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         void reset_realm(const char* path)
         {
             realm_app_t realm_app{m_app};
-            realm_sync_immediately_run_file_actions(&realm_app, path);
+            bool did_run;
+            realm_sync_immediately_run_file_actions(&realm_app, path, &did_run);
         }
         static ResetRealmFiles& instance()
         {

@@ -154,7 +154,7 @@ private:
 };
 
 
-bool get_tokens_from_login(const util::HTTPResponse& res, std::string& access_token, std::string& refresh_token)
+bool get_tokens_from_login(const sync::HTTPResponse& res, std::string& access_token, std::string& refresh_token)
 {
     util::JSONParser json_parser{res.body};
     bool is_refresh = false;
@@ -170,7 +170,7 @@ bool get_tokens_from_login(const util::HTTPResponse& res, std::string& access_to
 }
 
 
-bool get_access_token_from_refresh(const util::HTTPResponse& res, std::string& access_token)
+bool get_access_token_from_refresh(const sync::HTTPResponse& res, std::string& access_token)
 {
     util::JSONParser json_parser{res.body};
     bool is_refresh = true;
@@ -223,7 +223,7 @@ public:
 protected:
     Client& m_client;
     const std::int_fast64_t m_request_counter;
-    util::Optional<util::HTTPClient<Request>> m_http_client;
+    util::Optional<sync::HTTPClient<Request>> m_http_client;
 
     void disconnect_and_wait();
     void disconnect();
@@ -232,18 +232,18 @@ protected:
 
 private:
     // Used for reconnects.
-    util::network::DeadlineTimer m_wait_timer;
+    sync::network::DeadlineTimer m_wait_timer;
 
-    util::Optional<util::network::Resolver> m_resolver;
-    util::Optional<util::network::Socket> m_socket;
-    util::Optional<util::network::ssl::Context> m_ssl_context;
-    util::Optional<util::network::ssl::Stream> m_ssl_stream;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
+    util::Optional<sync::network::Resolver> m_resolver;
+    util::Optional<sync::network::Socket> m_socket;
+    util::Optional<sync::network::ssl::Context> m_ssl_context;
+    util::Optional<sync::network::ssl::Stream> m_ssl_stream;
+    sync::network::ReadAheadBuffer m_read_ahead_buffer;
 
     void initiate_resolve();
-    void handle_resolve(std::error_code, util::network::Endpoint::List);
-    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t i);
-    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t i);
+    void handle_resolve(std::error_code, sync::network::Endpoint::List);
+    void initiate_tcp_connect(sync::network::Endpoint::List, std::size_t i);
+    void handle_tcp_connect(std::error_code, sync::network::Endpoint::List, std::size_t i);
     void initiate_ssl_handshake();
     void handle_ssl_handshake(std::error_code);
 
@@ -279,7 +279,7 @@ private:
 
     void do_initiate_http_request() override final;
 
-    void handle_http_request(const util::HTTPResponse&, std::error_code);
+    void handle_http_request(const sync::HTTPResponse&, std::error_code);
 };
 
 
@@ -296,7 +296,7 @@ private:
 
     void do_initiate_http_request() override final;
 
-    void handle_http_request(const util::HTTPResponse&, std::error_code);
+    void handle_http_request(const sync::HTTPResponse&, std::error_code);
 };
 
 
@@ -306,7 +306,7 @@ Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std
     , m_auth_ssl{auth_ssl}
     , m_auth_address{std::move(auth_address)}
     , m_auth_port{auth_port}
-    , m_http_host{util::make_http_host(auth_ssl, auth_address, auth_port)} // Throws
+    , m_http_host{sync::make_http_host(auth_ssl, auth_address, auth_port)} // Throws
     , m_max_number_of_connections{config.max_number_of_connections}
     , m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
@@ -362,7 +362,7 @@ void Client::refresh(std::string refresh_token, std::function<RefreshHandler> ha
 }
 
 
-util::network::Service& Client::get_service()
+sync::network::Service& Client::get_service()
 {
     return m_service;
 }
@@ -514,8 +514,8 @@ void Client::Request::initiate_resolve()
 
     logger.debug("Resolving [%1]:%2", auth_address, auth_port);
 
-    util::network::Resolver::Query query(auth_address, util::to_string(auth_port));
-    auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
+    sync::network::Resolver::Query query(auth_address, util::to_string(auth_port));
+    auto handler = [this](std::error_code ec, sync::network::Endpoint::List endpoints) {
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints));
     };
@@ -524,7 +524,7 @@ void Client::Request::initiate_resolve()
 }
 
 
-void Client::Request::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
+void Client::Request::handle_resolve(std::error_code ec, sync::network::Endpoint::List endpoints)
 {
     m_resolver = none;
     if (ec) {
@@ -536,11 +536,11 @@ void Client::Request::handle_resolve(std::error_code ec, util::network::Endpoint
 }
 
 
-void Client::Request::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
+void Client::Request::initiate_tcp_connect(sync::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
-    util::network::Endpoint ep = *(endpoints.begin() + i);
+    sync::network::Endpoint ep = *(endpoints.begin() + i);
     logger.debug("Connecting to endpoint [%1]:%2 (%3/%4)", ep.address(), ep.port(), (i + 1), endpoints.size());
 
     auto handler = [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
@@ -552,10 +552,10 @@ void Client::Request::initiate_tcp_connect(util::network::Endpoint::List endpoin
 }
 
 
-void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
+void Client::Request::handle_tcp_connect(std::error_code ec, sync::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
-    const util::network::Endpoint& ep = *(endpoints.begin() + i);
+    const sync::network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
         logger.debug("Failed to connect to endpoint [%1]:%2: %3", ep.address(), ep.port(), ec.message());
         std::size_t i_2 = i + 1;
@@ -570,7 +570,7 @@ void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endp
     }
 
     REALM_ASSERT(m_socket);
-    util::network::Endpoint ep_2 = m_socket->local_endpoint();
+    sync::network::Endpoint ep_2 = m_socket->local_endpoint();
     logger.debug("Connected to endpoint [%1]:%2 (from [%3]:%4)", ep.address(), ep.port(), ep_2.address(),
                  ep_2.port()); // Throws
 
@@ -585,7 +585,7 @@ void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endp
 
 void Client::Request::initiate_ssl_handshake()
 {
-    using namespace util::network::ssl;
+    using namespace sync::network::ssl;
 
     if (!m_ssl_context) {
         m_ssl_context.emplace(); // Throws
@@ -738,8 +738,8 @@ void Client::LoginRequest::do_initiate_http_request()
         path = m_client.m_app_request_path + "/auth/providers/anon-user/login"; // Throws
         body = "{\"provider\": \"anon-user\"}";                                 // Throws
     }
-    util::HTTPRequest req;
-    req.method = util::HTTPMethod::Post;
+    sync::HTTPRequest req;
+    req.method = sync::HTTPMethod::Post;
     req.path = std::move(path);
     req.body = std::move(body);
     req.headers["Content-Type"] = "application/json; charset=utf-8";   // Throws
@@ -747,7 +747,7 @@ void Client::LoginRequest::do_initiate_http_request()
     req.headers["Accept"] = "application/json";                        // Throws
     req.headers["Host"] = m_client.m_http_host;                        // Throws
 
-    auto handler = [this](util::HTTPResponse res, std::error_code ec) {
+    auto handler = [this](sync::HTTPResponse res, std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_http_request(res, ec); // Throws
     };
@@ -755,14 +755,14 @@ void Client::LoginRequest::do_initiate_http_request()
 }
 
 
-void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, std::error_code ec)
+void Client::LoginRequest::handle_http_request(const sync::HTTPResponse& res, std::error_code ec)
 {
     if (ec)
         return disconnect_and_wait();
 
     logger.trace("Login response: %1", res);
 
-    if (res.status == util::HTTPStatus::Ok) {
+    if (res.status == sync::HTTPStatus::Ok) {
         logger.debug("Login was successful");
         std::string access_token, refresh_token;
         if (get_tokens_from_login(res, access_token, refresh_token)) {           // Throws
@@ -776,7 +776,7 @@ void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, st
             finalize();
         }
     }
-    else if (res.status == util::HTTPStatus::Unauthorized) {
+    else if (res.status == sync::HTTPStatus::Unauthorized) {
         logger.debug("Login failed: Unauthorized");
         call_handler(make_error_code(Error::unauthorized), {}, {}); // Throws
         finalize();
@@ -808,14 +808,14 @@ void Client::RefreshRequest::call_handler(std::error_code ec, std::string access
 void Client::RefreshRequest::do_initiate_http_request()
 {
     logger.debug("Requesting access token refresh"); // Throws
-    util::HTTPRequest req;
-    req.method = util::HTTPMethod::Post;
+    sync::HTTPRequest req;
+    req.method = sync::HTTPMethod::Post;
     req.path = m_client.m_request_base_path + "/auth/session"; // Throws
     req.headers["Accept"] = "application/json";                // Throws
     req.headers["Authorization"] = "Bearer " + m_refresh_token;
     req.headers["Host"] = m_client.m_http_host; // Throws
 
-    auto handler = [this](util::HTTPResponse res, std::error_code ec) {
+    auto handler = [this](sync::HTTPResponse res, std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_http_request(res, ec); // Throws
     };
@@ -823,14 +823,14 @@ void Client::RefreshRequest::do_initiate_http_request()
 }
 
 
-void Client::RefreshRequest::handle_http_request(const util::HTTPResponse& res, std::error_code ec)
+void Client::RefreshRequest::handle_http_request(const sync::HTTPResponse& res, std::error_code ec)
 {
     if (ec)
         return disconnect_and_wait();
 
     logger.trace("Refresh response: %1", res);
 
-    if (res.status == util::HTTPStatus::Created) {
+    if (res.status == sync::HTTPStatus::Created) {
         logger.debug("Refresh was successful");
         std::string access_token;
         if (get_access_token_from_refresh(res, access_token)) { // Throws
@@ -844,7 +844,7 @@ void Client::RefreshRequest::handle_http_request(const util::HTTPResponse& res, 
             finalize();
         }
     }
-    else if (res.status == util::HTTPStatus::Unauthorized) {
+    else if (res.status == sync::HTTPStatus::Unauthorized) {
         logger.debug("Refresh failed: Unauthorized");
         call_handler(make_error_code(Error::unauthorized), {}); // Throws
         finalize();

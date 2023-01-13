@@ -1781,7 +1781,7 @@ public:
     bool has_search_index() const final
     {
         auto target_table = m_link_map.get_target_table();
-        return target_table->get_primary_key_column() == m_column_key || target_table->has_search_index(m_column_key);
+        return target_table->search_index_type(m_column_key) == IndexType::General;
     }
 
     std::vector<ObjKey> find_all(Mixed value) const final

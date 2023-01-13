@@ -3,6 +3,7 @@
 #include <thread>
 #include <iostream>
 
+#include <realm/status.hpp>
 #include <realm/sync/network/network.hpp>
 
 #include "../util/timer.hpp"
@@ -10,7 +11,7 @@
 #include "../util/benchmark_results.hpp"
 
 using namespace realm;
-using namespace realm::util;
+using namespace realm::sync;
 using namespace realm::test_util;
 
 
@@ -80,7 +81,7 @@ private:
         if (m_num_posts == 0)
             return;
         --m_num_posts;
-        m_service.post([=]() {
+        m_service.post([=](Status) {
             initiate();
         });
     }

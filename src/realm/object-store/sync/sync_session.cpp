@@ -30,6 +30,7 @@
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/network/http.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -131,6 +132,26 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
+    do_become_inactive(std::move(lock), status);
+}
+
+void SyncSession::become_paused(util::CheckedUniqueLock lock)
+{
+    REALM_ASSERT(m_state != State::Paused);
+    auto old_state = m_state;
+    m_state = State::Paused;
+
+    // Nothing to do if we're already inactive besides update the state.
+    if (old_state == State::Inactive) {
+        m_state_mutex.unlock(lock);
+        return;
+    }
+
+    do_become_inactive(std::move(lock), Status::OK());
+}
+
+void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status)
+{
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
     // we are not able to get the callback.
@@ -185,6 +206,32 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     }
 }
 
+static bool check_for_auth_failure(const app::AppError& error)
+{
+    using namespace realm::sync;
+    // Auth failure is returned as a 401 (unauthorized) or 403 (forbidden) response
+    if (error.additional_status_code) {
+        auto status_code = HTTPStatus(*error.additional_status_code);
+        if (status_code == HTTPStatus::Unauthorized || status_code == HTTPStatus::Forbidden)
+            return true;
+    }
+
+    return false;
+}
+
+static bool check_for_redirect_response(const app::AppError& error)
+{
+    using namespace realm::sync;
+    // Check for unhandled 301/308 permanent redirect response
+    if (error.additional_status_code) {
+        auto status_code = HTTPStatus(*error.additional_status_code);
+        if (status_code == HTTPStatus::MovedPermanently || status_code == HTTPStatus::PermanentRedirect)
+            return true;
+    }
+
+    return false;
+}
+
 util::UniqueFunction<void(util::Optional<app::AppError>)>
 SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
 {
@@ -201,16 +248,23 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
             else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
-                // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in
+                // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
+                // ClientErrorCode::too_many_redirects
                 session->handle_bad_auth(session_user, error->to_status(), error->reason());
             }
-            else if (error->additional_status_code &&
-                     (*error->additional_status_code == 401 || *error->additional_status_code == 403)) {
+            else if (check_for_auth_failure(*error)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
                 session->handle_bad_auth(session_user, error->to_status(),
                                          "Unable to refresh the user access token.");
+            }
+            else if (check_for_redirect_response(*error)) {
+                // A 301 or 308 response is an unhandled permanent redirect response (which should not happen) - if
+                // this is received, fail the request with an appropriate error message.
+                // Temporary redirect responses (302, 307) are not supported
+                session->handle_bad_auth(session_user, error->to_status(),
+                                         "Unhandled redirect response when trying to reach the server.");
             }
             else {
                 // A refresh request has failed. This is an unexpected non-fatal error and we would
@@ -599,7 +653,7 @@ void SyncSession::handle_error(SyncError error)
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        if (error_code == util::websocket::make_error_code(util::websocket::Error::bad_response_401_unauthorized)) {
+        if (error_code == sync::websocket::make_error_code(sync::websocket::Error::bad_response_401_unauthorized)) {
             if (auto u = user()) {
                 u->refresh_custom_data(handle_refresh(shared_from_this()));
                 return;
@@ -620,7 +674,7 @@ void SyncSession::handle_error(SyncError error)
 
     // Dont't bother invoking m_config.error_handler if the sync is inactive.
     // It does not make sense to call the handler when the session is closed.
-    if (m_state == State::Inactive) {
+    if (m_state == State::Inactive || m_state == State::Paused) {
         return;
     }
 
@@ -849,6 +903,7 @@ void SyncSession::nonsync_transact_notify(sync::version_type version)
             break;
         case State::Dying:
         case State::Inactive:
+        case State::Paused:
             break;
     }
 }
@@ -859,25 +914,12 @@ void SyncSession::revive_if_needed()
     switch (m_state) {
         case State::Active:
         case State::WaitingForAccessToken:
+        case State::Paused:
             return;
         case State::Dying:
-        case State::Inactive: {
-            // Revive.
-            auto u = user();
-            if (!u || !u->access_token_refresh_required()) {
-                become_active();
-                return;
-            }
-
-            become_waiting_for_access_token();
-            // Release the lock for SDKs with a single threaded
-            // networking implementation such as our test suite
-            // so that the update can trigger a state change from
-            // the completion handler.
-            lock.unlock();
-            initiate_access_token_refresh();
+        case State::Inactive:
+            do_revive(std::move(lock));
             break;
-        }
     }
 }
 
@@ -891,11 +933,12 @@ void SyncSession::handle_reconnect()
         case State::Dying:
         case State::Inactive:
         case State::WaitingForAccessToken:
+        case State::Paused:
             break;
     }
 }
 
-void SyncSession::log_out()
+void SyncSession::force_close()
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     switch (m_state) {
@@ -905,8 +948,57 @@ void SyncSession::log_out()
             become_inactive(std::move(lock));
             break;
         case State::Inactive:
+        case State::Paused:
             break;
     }
+}
+
+void SyncSession::pause()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+        case State::Dying:
+        case State::WaitingForAccessToken:
+        case State::Inactive:
+            become_paused(std::move(lock));
+            break;
+        case State::Paused:
+            break;
+    }
+}
+
+void SyncSession::resume()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+        case State::WaitingForAccessToken:
+            return;
+        case State::Paused:
+        case State::Dying:
+        case State::Inactive:
+            do_revive(std::move(lock));
+            break;
+    }
+}
+
+void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
+{
+    auto u = user();
+    if (!u || !u->access_token_refresh_required()) {
+        become_active();
+        m_state_mutex.unlock(lock);
+        return;
+    }
+
+    become_waiting_for_access_token();
+    // Release the lock for SDKs with a single threaded
+    // networking implementation such as our test suite
+    // so that the update can trigger a state change from
+    // the completion handler.
+    m_state_mutex.unlock(lock);
+    initiate_access_token_refresh();
 }
 
 void SyncSession::close()
@@ -937,6 +1029,10 @@ void SyncSession::close(util::CheckedUniqueLock lock)
         case State::Dying:
             m_state_mutex.unlock(lock);
             break;
+        case State::Paused:
+            // The paused state is sticky, so we don't transition to inactive here if we're already paused.
+            m_state_mutex.unlock(lock);
+            break;
         case State::Inactive: {
             if (m_sync_manager) {
                 m_sync_manager->unregister_session(m_db->get_path());
@@ -961,7 +1057,7 @@ void SyncSession::shutdown_and_wait()
         // Realm file to be closed. This works so long as this SyncSession object remains in the
         // `inactive` state after the invocation of shutdown_and_wait().
         util::CheckedUniqueLock lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             become_inactive(std::move(lock));
         }
     }
@@ -1079,7 +1175,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
 {
     while (true) {
         util::CheckedUniqueLock state_lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             // Changing the state releases the lock, which means that by the
             // time we reacquire the lock the state may have changed again
             // (either due to one of the callbacks being invoked or another
@@ -1090,7 +1186,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
         }
 
         util::CheckedUniqueLock config_lock(m_config_mutex);
-        REALM_ASSERT(m_state == State::Inactive);
+        REALM_ASSERT(m_state == State::Inactive || m_state == State::Paused);
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.sync_config->user == new_config.user);
         m_config.sync_config = std::make_shared<SyncConfig>(std::move(new_config));

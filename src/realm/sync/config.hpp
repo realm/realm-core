@@ -134,6 +134,7 @@ enum class SyncClientHookEvent {
     DownloadMessageIntegrated,
     BootstrapMessageProcessed,
     BootstrapProcessed,
+    ErrorMessageReceived,
 };
 
 enum class SyncClientHookAction {
@@ -148,6 +149,7 @@ struct SyncClientHookData {
     int64_t query_version;
     sync::DownloadBatchState batch_state;
     size_t num_changesets;
+    const sync::ProtocolErrorInfo* error_info = nullptr;
 };
 
 struct SyncConfig {
@@ -174,6 +176,7 @@ struct SyncConfig {
     size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
     // {@
+    /// DEPRECATED - Will be removed in a future release
     // The following parameters are only used by the default SyncSocket implementation. Custom SyncSocket
     // implementations must handle these directly, if these features are supported.
     util::Optional<std::string> authorization_header_name; // not used

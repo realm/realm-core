@@ -249,12 +249,12 @@ public:
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
-    void
-    integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                util::Span<const RemoteChangeset> changesets, VersionInfo& new_version,
-                                DownloadBatchState download_type, util::Logger&,
-                                util::UniqueFunction<void(const TransactionRef&, size_t)> run_in_write_tr = nullptr,
-                                SyncTransactReporter* transact_reporter = nullptr);
+    void integrate_server_changesets(
+        const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+        util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
+        util::Logger&,
+        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr,
+        SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
@@ -403,7 +403,6 @@ private:
 
     void initialize(DB& db) noexcept
     {
-        REALM_ASSERT(!m_db);
         m_db = &db;
     }
 

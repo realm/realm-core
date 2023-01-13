@@ -1012,6 +1012,76 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                     });
                 }
             }
+
+            SECTION("callback with empty keypatharray") {
+                auto shallow_require_change = [&] {
+                    auto token = link_set.add_notification_callback(
+                        [&](CollectionChangeSet c) {
+                            change = c;
+                        },
+                        KeyPathArray());
+                    advance_and_notify(*r);
+                    return token;
+                };
+
+                auto shallow_require_no_change = [&] {
+                    bool first = true;
+                    auto token = link_set.add_notification_callback(
+                        [&first](CollectionChangeSet) mutable {
+                            REQUIRE(first);
+                            first = false;
+                        },
+                        KeyPathArray());
+                    advance_and_notify(*r);
+                    return token;
+                };
+
+                SECTION("modifying table 'target', property 'value' "
+                        "-> does NOT send a notification for 'value'") {
+                    auto token2 = shallow_require_no_change();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                }
+
+                SECTION("modifying table 'target', property 'value' "
+                        "-> does NOT send a notification for 'value2'") {
+                    auto token2 = shallow_require_no_change();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                }
+
+                SECTION("modifying the set sends change notifications, shallow") {
+                    Obj target1, target2, target3;
+                    write([&] {
+                        link_set.remove_all();
+                    });
+                    REQUIRE(link_set.size() == 0);
+                    write([&]() {
+                        target1 = table2->create_object_with_primary_key(123);
+                        target2 = table2->create_object_with_primary_key(456);
+                        target3 = table2->create_object_with_primary_key(789);
+                    });
+
+                    auto token = shallow_require_change();
+
+                    write([&]() {
+                        CHECK(link_set.insert(target1).second);
+                        CHECK(!link_set.insert(target1).second);
+                        CHECK(link_set.insert(target2).second);
+                        CHECK(link_set.insert(target3).second);
+                    });
+
+                    REQUIRE(link_set.size() == 3);
+
+                    write([&] {
+                        CHECK(link_set.remove(target2).second);
+                    });
+                    REQUIRE_INDICES(change.deletions, 1);
+                    REQUIRE(!change.collection_was_cleared);
+                }
+            }
         }
     }
 

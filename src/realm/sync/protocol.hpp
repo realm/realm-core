@@ -238,6 +238,8 @@ struct ProtocolErrorInfo {
     bool client_reset_recovery_is_disabled = false;
     util::Optional<bool> should_client_reset;
     util::Optional<std::string> log_url;
+    version_type compensating_write_server_version = 0;
+    version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     util::Optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
@@ -375,16 +377,6 @@ inline bool are_mutually_consistent(UploadCursor a, UploadCursor b) noexcept
 constexpr bool is_session_level_error(ProtocolError error)
 {
     return int(error) >= 200 && int(error) <= 299;
-}
-
-constexpr bool session_level_error_requires_suspend(ProtocolError error)
-{
-    switch (error) {
-        case ProtocolError::compensating_write:
-            return false;
-        default:
-            return true;
-    }
 }
 
 inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action action)

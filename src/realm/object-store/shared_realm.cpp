@@ -81,7 +81,7 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     , m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        m_transaction = coordinator->begin_read(version.value_or(VersionID{}));
+        m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
@@ -194,22 +194,24 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
-    verify_open();
-    // If there is a subscription store, then return the latest set
-    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
-        return flx_sub_store->get_latest();
+    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
+        throw IllegalOperation("Flexible sync is not enabled");
     }
-    throw std::runtime_error("Flexible sync is not enabled");
+    // If there is a subscription store, then return the active set
+    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
+    REALM_ASSERT(flx_sub_store);
+    return flx_sub_store->get_latest();
 }
 
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
-    verify_open();
-    // If there is a subscription store, then return the active set
-    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
-        return flx_sub_store->get_active();
+    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
+        throw IllegalOperation("Flexible sync is not enabled");
     }
-    throw std::runtime_error("Flexible sync is not enabled");
+    // If there is a subscription store, then return the active set
+    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
+    REALM_ASSERT(flx_sub_store);
+    return flx_sub_store->get_active();
 }
 #endif
 
@@ -256,7 +258,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
         // no verification of schema changes when opening a past version of the schema
-        m_schema = std::move(schema);
+        m_schema.copy_keys_from(schema, m_config.is_schema_additive());
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
@@ -1093,9 +1095,19 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     verify_open();
 
 #if REALM_ENABLE_SYNC
-    if (config.sync_config && config.sync_config->flx_sync_requested) {
-        throw IllegalOperation("Cannot convert Realms to flexible sync Realms");
+    auto src_is_flx_sync = m_config.sync_config && m_config.sync_config->flx_sync_requested;
+    auto dst_is_flx_sync = config.sync_config && config.sync_config->flx_sync_requested;
+    auto dst_is_pbs_sync = config.sync_config && !config.sync_config->flx_sync_requested;
+
+    if (dst_is_flx_sync && !src_is_flx_sync) {
+        throw IllegalOperation(
+            "Realm cannot be converted to a flexible sync realm unless flexible sync is already enabled");
     }
+    if (dst_is_pbs_sync && src_is_flx_sync) {
+        throw IllegalOperation(
+            "Realm cannot be converted from a flexible sync realm to a partition based sync realm");
+    }
+
 #endif
 
     if (merge_into_existing && util::File::exists(config.path)) {
@@ -1299,9 +1311,9 @@ SharedRealm Realm::freeze()
     auto config = m_config;
     auto version = read_transaction_version();
     config.scheduler = util::Scheduler::make_frozen(version);
-    config.schema = m_schema;
-    config.schema_version = m_schema_version;
-    return Realm::get_frozen_realm(std::move(config), version);
+    auto frozen_realm = Realm::get_frozen_realm(std::move(config), version);
+    frozen_realm->set_schema(frozen_realm->m_schema, m_schema);
+    return frozen_realm;
 }
 
 void Realm::close()

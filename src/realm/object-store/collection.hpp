@@ -105,7 +105,7 @@ public:
      * @return A `NotificationToken` that is used to identify this callback.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     const CollectionBase& get_impl() const
     {
