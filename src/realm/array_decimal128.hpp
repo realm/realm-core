@@ -61,7 +61,7 @@ public:
 
     bool is_null(size_t ndx) const
     {
-        return this->get_width() == 0 || get(ndx).is_null();
+        return m_width == 0 || get(ndx).is_null();
     }
 
     Decimal128 get(size_t ndx) const
@@ -108,6 +108,11 @@ public:
     }
 
     size_t find_first(Decimal128 value, size_t begin = 0, size_t end = npos) const noexcept;
+
+    uint8_t get_width() const noexcept
+    {
+        return m_width;
+    }
 
 protected:
     size_t calc_byte_len(size_t num_items, size_t) const override

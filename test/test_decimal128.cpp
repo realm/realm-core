@@ -184,6 +184,7 @@ TEST(Decimal_Array)
     const char str0[] = "12345.67";
     const char str1[] = "1000.00";
     const char str2[] = "-45";
+    const char str3[] = "123.456e100";
 
     ArrayDecimal128 arr(Allocator::get_default());
     arr.create();
@@ -213,6 +214,17 @@ TEST(Decimal_Array)
     CHECK_EQUAL(arr1.get(0), Decimal128(str1));
     CHECK_EQUAL(arr1.get(1), Decimal128(realm::null()));
 
+    arr.add(Decimal128(str3)); // size 8
+    arr1.move(arr, 1);
+
+    CHECK_EQUAL(arr.size(), 3);
+    CHECK_EQUAL(arr1.size(), 1);
+    CHECK_EQUAL(arr.get(0), Decimal128(str0));
+    CHECK_EQUAL(arr.get(1), Decimal128(str3));
+    CHECK_EQUAL(arr.get(2), Decimal128(realm::null()));
+    CHECK_EQUAL(arr1.get(0), Decimal128(str1));
+    CHECK_EQUAL(arr.find_first(Decimal128("123.456000e100")), 1);
+
     arr.clear();
     CHECK_EQUAL(arr.size(), 0);
 
@@ -229,7 +241,11 @@ TEST(Decimal_ArrayUpdgrade)
 {
     Decimal128 size_0{realm::null()};
     Decimal128 size_4{"100"};
+    Decimal128 large_size_4("8388607e90");
+    Decimal128 small_size_4("8388607e-90");
     Decimal128 size_8{"123.456e100"};
+    Decimal128 large_size_8("9007199254740991e369");
+    Decimal128 small_size_8("9007199254740991e-369");
     Decimal128 size_16{"3.141592653589793238462643"};
 
     ArrayDecimal128 arr(Allocator::get_default());
@@ -238,17 +254,33 @@ TEST(Decimal_ArrayUpdgrade)
     arr.add(size_0);
     CHECK_EQUAL(arr.get(0), size_0);
     arr.add(size_4); // 0 -> 4
+    arr.add(large_size_4);
+    arr.add(small_size_4);
+    CHECK_EQUAL(arr.get_width(), 4);
     CHECK_EQUAL(arr.get(0), size_0);
     CHECK_EQUAL(arr.get(1), size_4);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
     arr.add(size_8); // 4 -> 8
+    arr.add(large_size_8);
+    arr.add(small_size_8);
+    CHECK_EQUAL(arr.get_width(), 8);
     CHECK_EQUAL(arr.get(0), size_0);
     CHECK_EQUAL(arr.get(1), size_4);
-    CHECK_EQUAL(arr.get(2), size_8);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
+    CHECK_EQUAL(arr.get(4), size_8);
+    CHECK_EQUAL(arr.get(5), large_size_8);
+    CHECK_EQUAL(arr.get(6), small_size_8);
     arr.add(size_16); // 8 -> 16
     CHECK_EQUAL(arr.get(0), size_0);
     CHECK_EQUAL(arr.get(1), size_4);
-    CHECK_EQUAL(arr.get(2), size_8);
-    CHECK_EQUAL(arr.get(3), size_16);
+    CHECK_EQUAL(arr.get(2), large_size_4);
+    CHECK_EQUAL(arr.get(3), small_size_4);
+    CHECK_EQUAL(arr.get(4), size_8);
+    CHECK_EQUAL(arr.get(5), large_size_8);
+    CHECK_EQUAL(arr.get(6), small_size_8);
+    CHECK_EQUAL(arr.get(7), size_16);
 
     arr.clear();
     arr.add(size_4);

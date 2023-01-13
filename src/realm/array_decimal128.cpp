@@ -35,10 +35,10 @@ uint8_t min_width(const Decimal128& value)
 
     value.unpack(coefficient, exponent, sign);
     if (coefficient.w[1] == 0) {
-        if (coefficient.w[0] < (1ull << 23) && exponent > -95 && exponent < 96) {
+        if (coefficient.w[0] < (1ull << 23) && exponent > -91 && exponent < 91) {
             return 4;
         }
-        if (coefficient.w[0] < (1ull << 53) && exponent > -383 && exponent < 384) {
+        if (coefficient.w[0] < (1ull << 53) && exponent > -370 && exponent < 370) {
             return 8;
         }
     }
@@ -154,15 +154,17 @@ void ArrayDecimal128::move(ArrayDecimal128& dst_arr, size_t ndx)
     if (elements_to_move) {
         if (m_width >= dst_arr.m_width) {
             dst_arr.upgrade_leaf(m_width);
+            const auto old_dst_size = dst_arr.m_size;
+            dst_arr.alloc(old_dst_size + elements_to_move, m_width);
+            auto dst = dst_arr.m_data + old_dst_size * m_width;
+            auto src = m_data + ndx * m_width;
+            memmove(dst, src, elements_to_move * m_width);
         }
         else {
-            upgrade_leaf(dst_arr.m_width);
+            for (size_t i = 0; i < elements_to_move; i++) {
+                dst_arr.add(get(ndx + i));
+            }
         }
-        const auto old_dst_size = dst_arr.m_size;
-        dst_arr.alloc(old_dst_size + elements_to_move, m_width);
-        auto dst = dst_arr.m_data + old_dst_size * m_width;
-        auto src = m_data + ndx * m_width;
-        memmove(dst, src, elements_to_move * sizeof(Decimal128));
     }
     truncate(ndx);
 }
