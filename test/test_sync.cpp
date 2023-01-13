@@ -363,14 +363,21 @@ TEST(Sync_AsyncWaitCancellation)
         CHECK_EQUAL(util::error::operation_aborted, ec);
         bowl.add_stone();
     };
+    auto&& [pause_future, pause_promise] = util::make_promise_future<void>();
     {
+        fixture.get_client().post_for_testing([test_promise = std::move(pause_promise)](const Status&) mutable {
+            // Block the client's event loop thread to stop traffic with the server before
+            // creating the session
+            test_promise.get();
+        });
         Session session = fixture.make_bound_session(db, "/test");
         session.async_wait_for_upload_completion(upload_completion_handler);
         session.async_wait_for_download_completion(download_completion_handler);
         session.async_wait_for_sync_completion(sync_completion_handler);
         // Destruction of session cancels wait operations
     }
-
+    // Resume the client event loop thread
+    pause_future.emplace_value();
     fixture.start();
     bowl.get_stone();
     bowl.get_stone();
