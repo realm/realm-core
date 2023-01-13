@@ -492,7 +492,6 @@ void Connection::initiate_reconnect_wait()
     }
     else {
         // Compute a new reconnect delay
-
         bool zero_delay = false;
         switch (m_client.get_reconnect_mode()) {
             case ReconnectMode::normal:
@@ -536,8 +535,27 @@ void Connection::initiate_reconnect_wait()
                         delay = max_delay;
                     break;
                 case ConnectionTerminationReason::server_said_try_again_later:
-                    delay = max_delay;
                     record_delay_as_zero = true;
+                    if (m_reconnect_info.resumption_delay_info) {
+                        const auto& resumption_delay_info = m_reconnect_info.resumption_delay_info;
+                        auto& current_try_again_delay_interval = m_reconnect_info.current_try_again_delay_interval;
+                        if (!current_try_again_delay_interval) {
+                            delay = resumption_delay_info->resumption_delay_interval.count();
+                            current_try_again_delay_interval = resumption_delay_info->resumption_delay_interval;
+                        }
+                        else if (current_try_again_delay_interval >=
+                                 resumption_delay_info->max_resumption_delay_interval) {
+                            delay = resumption_delay_info->max_resumption_delay_interval.count();
+                        }
+                        else {
+                            *current_try_again_delay_interval *=
+                                resumption_delay_info->resumption_delay_backoff_multiplier;
+                            delay = current_try_again_delay_interval->count();
+                        }
+                    }
+                    else {
+                        delay = max_delay;
+                    }
                     break;
                 case ConnectionTerminationReason::ssl_certificate_rejected:
                 case ConnectionTerminationReason::ssl_protocol_violation:
@@ -809,9 +827,9 @@ void Connection::initiate_ping_delay(milliseconds_type now)
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        handle_ping_delay();                                                             // Throws
-    });                                                                                  // Throws
-    logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
+        handle_ping_delay();                                    // Throws
+    });                                                         // Throws
+    logger.debug("Will emit a ping in %1 milliseconds", delay); // Throws
 }
 
 
@@ -1093,6 +1111,8 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
     else {
         m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
     }
+
+    m_reconnect_info.resumption_delay_info = info.resumption_delay_interval;
 
     // When the server asks us to reconnect later, it is important to make the
     // reconnect delay start at the time of the reception of the ERROR message,
@@ -1571,6 +1591,7 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
+    bool has_pending_client_reset = false;
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         // The reason we need a mutable reference from get_client_reset_config() is because we
         // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
@@ -1597,8 +1618,9 @@ void Session::activate()
         }
 
         if (!m_client_reset_operation) {
-            const ClientReplication& repl = access_realm();                                           // Throws
-            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+            const ClientReplication& repl = access_realm(); // Throws
+            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress,
+                                          &has_pending_client_reset); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1627,6 +1649,10 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         on_suspended(SessionErrorInfo{error.code(), false});
         m_conn.one_less_active_unsuspended_session(); // Throws
+    }
+
+    if (has_pending_client_reset) {
+        handle_pending_client_reset_acknowledgement();
     }
 }
 
@@ -2160,7 +2186,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+        bool has_pending_client_reset = false;
+        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress,
+                                      &has_pending_client_reset); // Throws
         REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
                         client_file_ident.ident);
         REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
@@ -2181,6 +2209,10 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
+
+        if (has_pending_client_reset) {
+            handle_pending_client_reset_acknowledgement();
+        }
         return true;
     };
     // if a client reset happens, it will take care of setting the file ident

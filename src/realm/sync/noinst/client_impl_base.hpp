@@ -107,6 +107,9 @@ public:
         // true. See receive_pong().
         bool m_scheduled_reset = false;
 
+        util::Optional<ResumptionDelayInfo> resumption_delay_info;
+        util::Optional<std::chrono::milliseconds> current_try_again_delay_interval;
+
         friend class Connection;
     };
 
@@ -909,6 +912,8 @@ private:
 
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
+
+    void handle_pending_client_reset_acknowledgement();
 
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
