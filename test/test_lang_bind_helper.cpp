@@ -1535,6 +1535,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         ConstTableRef gamma = rt->get_table("gamma");
         ConstTableRef delta = rt->get_table("delta");
         ConstTableRef epsilon = rt->get_table("epsilon");
+        CHECK(alpha);
+        CHECK(beta);
+        CHECK(gamma);
+        CHECK(delta);
+        CHECK(epsilon);
     }
     // Remove table with columns, but no link columns, and table is not a link
     // target.
@@ -1599,6 +1604,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         ConstTableRef delta = rt->get_table("delta");
         ConstTableRef epsilon = rt->get_table("epsilon");
         CHECK_EQUAL(3, rt->size());
+        CHECK_NOT(alpha);
         CHECK_NOT(beta);
         CHECK(gamma);
         CHECK(delta);
@@ -1633,6 +1639,8 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
         ConstTableRef delta = rt->get_table("delta");
         ConstTableRef epsilon = rt->get_table("epsilon");
         CHECK_EQUAL(2, rt->size());
+        CHECK_NOT(alpha);
+        CHECK_NOT(beta);
         CHECK_NOT(gamma);
         CHECK(delta);
         CHECK(epsilon);
@@ -1665,6 +1673,9 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     ConstTableRef epsilon = rt->get_table("epsilon");
 
     CHECK_EQUAL(2, rt->size());
+    CHECK_NOT(alpha);
+    CHECK_NOT(beta);
+    CHECK_NOT(gamma);
     CHECK(delta);
     CHECK(epsilon);
 }
