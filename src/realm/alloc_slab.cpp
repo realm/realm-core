@@ -1228,9 +1228,6 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
         }
     }
 
-    if (db) {
-        db->refresh_encrypted_mappings(version, *this);
-    }
     rebuild_freelists_from_slab();
 
     // Build the fast path mapping
@@ -1249,6 +1246,10 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
     // scheduling queue.
     //
     rebuild_translations(replace_last_mapping, old_num_mappings);
+
+    if (db) {
+        db->refresh_encrypted_mappings(version, *this);
+    }
 }
 
 static inline ref_type get_ref_from_array(Array& array, size_t index)
