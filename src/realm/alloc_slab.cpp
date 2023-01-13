@@ -1737,6 +1737,8 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             }
             debug_message += "\nallocations: ";
             debug_message += debug_allocs;
+            debug_message += "\nwriter's truth:\n";
+            debug_message += buffer.substr(0, buffer_size);
             std::cout << debug_message << std::endl;
             REALM_ASSERT(computed_pages_for_refresh == pages_across_all_versions);
         }
