@@ -809,7 +809,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testi
         auto table = wt.get_table("stats");
         CHECK(table);
         CHECK_EQUAL(table->size(), 1);
-        reported_used_space = table->begin()->get<int64_t>("used_space");
+        reported_used_space = size_t(table->begin()->get<int64_t>("used_space"));
     }
 
     rt->advance_read();

@@ -922,7 +922,6 @@ void EncryptedFileMapping::flush() noexcept
         }
         debug_msg += std::string("\n");
         m_file.validator.write(debug_msg.data(), debug_msg.size());
-        m_file.validator.sync();
     }
 #endif // REALM_ENCRYPTION_VERIFICATION
 

@@ -564,13 +564,14 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         f.info->fd = fd_duped;
         f.device = st.st_dev;
         f.inode = st.st_ino;
+#endif // conditonal on _WIN32
+
 #if REALM_ENCRYPTION_VERIFICATION
         std::string validator_path = file.path + ".validate";
         if (!file.path.empty() && util::File::exists(validator_path)) {
             f.info->validator.open(validator_path, util::File::Mode::mode_Append);
         }
 #endif // REALM_ENCRYPTION_VERIFICATION
-#endif
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
