@@ -797,11 +797,16 @@ void SessionImpl::process_pending_flx_bootstrap()
     int64_t query_version = -1;
     size_t changesets_processed = 0;
 
+    // Used to commit each batch after it was transformed.
+    TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
         auto start_time = std::chrono::steady_clock::now();
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // bootstrap store requires a write transaction itself.
+            transact->close();
             bootstrap_store->clear();
             return;
         }
@@ -818,6 +823,7 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
+            transact,
             [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
@@ -837,6 +843,7 @@ void SessionImpl::process_pending_flx_bootstrap()
                     std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
                     pending_batch.remaining_changesets);
     }
+    REALM_ASSERT_3(transact->get_transact_stage(), ==, DB::transact_Reading);
     on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);

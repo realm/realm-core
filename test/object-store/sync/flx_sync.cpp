@@ -49,6 +49,18 @@
 
 using namespace std::string_literals;
 
+namespace realm {
+
+class TestHelper {
+public:
+    static DBRef& get_db(SharedRealm const& shared_realm)
+    {
+        return Realm::Internal::get_db(*shared_realm);
+    }
+};
+
+} // namespace realm
+
 namespace realm::app {
 
 namespace {
@@ -2845,6 +2857,70 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
+}
+
+TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+    fill_large_array_schema(harness);
+
+    std::unique_ptr<std::thread> th;
+    sync::version_type user_commit_version = UINT_FAST64_MAX;
+    SharedRealm realm;
+
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+    auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
+    config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise), &th, &realm,
+                                                     &user_commit_version](std::weak_ptr<SyncSession> weak_session,
+                                                                           const SyncClientHookData& data) {
+        if (data.query_version == 0) {
+            return SyncClientHookAction::NoAction;
+        }
+        if (data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
+            return SyncClientHookAction::NoAction;
+        }
+        auto session = weak_session.lock();
+        if (!session) {
+            return SyncClientHookAction::NoAction;
+        }
+        if (data.batch_state != sync::DownloadBatchState::MoreToCome) {
+            session->force_close();
+            promise->emplace_value();
+            return SyncClientHookAction::NoAction;
+        }
+
+        if (th) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        auto func = [&] {
+            // Attempt to commit a local change after the first bootstrap batch was committed.
+            auto db = TestHelper::get_db(realm);
+            WriteTransaction wt(db);
+            TableRef table = wt.get_table("class_TopLevel");
+            table->create_object_with_primary_key(ObjectId::gen());
+            user_commit_version = wt.commit();
+        };
+        th = std::make_unique<std::thread>(std::move(func));
+
+        return SyncClientHookAction::NoAction;
+    };
+
+    realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    Query query(table);
+    {
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(query);
+        new_subs.commit();
+    }
+    interrupted.get();
+    th->join();
+
+    // The user commit is the last one.
+    auto db = TestHelper::get_db(realm);
+    ReadTransaction rt(db);
+    CHECK(user_commit_version == rt.get_version());
 }
 
 } // namespace realm::app

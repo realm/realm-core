@@ -246,13 +246,17 @@ public:
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
     ///
+    /// \param transact If specified, it is a write transaction to be used to
+    /// commit the server changesets after they were transformed.
+    /// Note: Left in reading state when all tranformed changesets are commited.
+    ///
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
     void integrate_server_changesets(
         const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
-        util::Logger&,
+        util::Logger&, TransactionRef transact = nullptr,
         util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr,
         SyncTransactReporter* transact_reporter = nullptr);
 
@@ -416,7 +420,8 @@ private:
                                                   version_type end_version) const noexcept;
 
     size_t transform_and_apply_server_changesets(util::Span<Changeset> changesets_to_integrate, TransactionRef,
-                                                 util::Logger&, std::uint64_t& downloaded_bytes);
+                                                 util::Logger&, std::uint64_t& downloaded_bytes,
+                                                 bool allow_lock_release);
 
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);

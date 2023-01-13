@@ -1474,7 +1474,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
 
     std::vector<ProtocolErrorInfo> pending_compensating_write_errors;
     history.integrate_server_changesets(
-        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger,
+        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, nullptr,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
         },
