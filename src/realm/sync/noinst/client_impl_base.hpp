@@ -57,6 +57,16 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
+struct ErrorTryAgainBackoffInfo {
+    void update(const ProtocolErrorInfo& info);
+    void reset();
+    std::chrono::milliseconds delay_interval();
+
+    ResumptionDelayInfo delay_info;
+    util::Optional<std::chrono::milliseconds> cur_delay_interval;
+    util::Optional<sync::ProtocolError> triggering_error;
+};
+
 class ClientImpl {
 public:
     enum class ConnectionTerminationReason;
@@ -107,8 +117,7 @@ public:
         // true. See receive_pong().
         bool m_scheduled_reset = false;
 
-        util::Optional<ResumptionDelayInfo> resumption_delay_info;
-        util::Optional<std::chrono::milliseconds> current_try_again_delay_interval;
+        ErrorTryAgainBackoffInfo m_try_again_delay_info;
 
         friend class Connection;
     };
@@ -935,9 +944,7 @@ private:
     bool m_suspended = false;
 
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
-    ResumptionDelayInfo m_try_again_delay_info;
-    util::Optional<ProtocolError> m_try_again_error_code;
-    util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
+    ErrorTryAgainBackoffInfo m_try_again_delay_info;
 
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
@@ -1174,6 +1181,7 @@ inline void ClientImpl::ReconnectInfo::reset() noexcept
     m_time_point = 0;
     m_delay = 0;
     m_scheduled_reset = false;
+    m_try_again_delay_info.reset();
 }
 
 inline ClientImpl& ClientImpl::Connection::get_client() noexcept

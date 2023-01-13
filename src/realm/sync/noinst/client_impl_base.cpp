@@ -43,6 +43,37 @@ using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
+void ErrorTryAgainBackoffInfo::update(const ProtocolErrorInfo& info)
+{
+    if (triggering_error && static_cast<ProtocolError>(info.raw_error_code) == *triggering_error) {
+        return;
+    }
+
+    delay_info = info.resumption_delay_interval.value_or(ResumptionDelayInfo{});
+    cur_delay_interval = util::none;
+    triggering_error = static_cast<ProtocolError>(info.raw_error_code);
+}
+
+void ErrorTryAgainBackoffInfo::reset()
+{
+    triggering_error = util::none;
+    cur_delay_interval = util::none;
+    delay_info = ResumptionDelayInfo{};
+}
+
+std::chrono::milliseconds ErrorTryAgainBackoffInfo::delay_interval()
+{
+    if (!cur_delay_interval) {
+        cur_delay_interval = delay_info.resumption_delay_interval;
+        return *cur_delay_interval;
+    }
+    if (*cur_delay_interval >= delay_info.max_resumption_delay_interval) {
+        return delay_info.max_resumption_delay_interval;
+    }
+    *cur_delay_interval *= delay_info.resumption_delay_backoff_multiplier;
+    return *cur_delay_interval;
+}
+
 bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                       port_type& port, std::string& path) const
 {
@@ -536,26 +567,7 @@ void Connection::initiate_reconnect_wait()
                     break;
                 case ConnectionTerminationReason::server_said_try_again_later:
                     record_delay_as_zero = true;
-                    if (m_reconnect_info.resumption_delay_info) {
-                        const auto& resumption_delay_info = m_reconnect_info.resumption_delay_info;
-                        auto& current_try_again_delay_interval = m_reconnect_info.current_try_again_delay_interval;
-                        if (!current_try_again_delay_interval) {
-                            delay = resumption_delay_info->resumption_delay_interval.count();
-                            current_try_again_delay_interval = resumption_delay_info->resumption_delay_interval;
-                        }
-                        else if (current_try_again_delay_interval >=
-                                 resumption_delay_info->max_resumption_delay_interval) {
-                            delay = resumption_delay_info->max_resumption_delay_interval.count();
-                        }
-                        else {
-                            *current_try_again_delay_interval *=
-                                resumption_delay_info->resumption_delay_backoff_multiplier;
-                            delay = current_try_again_delay_interval->count();
-                        }
-                    }
-                    else {
-                        delay = max_delay;
-                    }
+                    delay = m_reconnect_info.m_try_again_delay_info.delay_interval().count();
                     break;
                 case ConnectionTerminationReason::ssl_certificate_rejected:
                 case ConnectionTerminationReason::ssl_protocol_violation:
@@ -1112,7 +1124,7 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
         m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
     }
 
-    m_reconnect_info.resumption_delay_info = info.resumption_delay_interval;
+    m_reconnect_info.m_try_again_delay_info.update(info);
 
     // When the server asks us to reconnect later, it is important to make the
     // reconnect delay start at the time of the reception of the ERROR message,
@@ -2506,41 +2518,32 @@ std::error_code Session::receive_test_command_response(request_ident_type ident,
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
-    if (error_info.resumption_delay_interval) {
-        m_try_again_delay_info = *error_info.resumption_delay_interval;
-    }
-    if (!m_current_try_again_delay_interval ||
-        (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.raw_error_code))) {
-        m_current_try_again_delay_interval = m_try_again_delay_info.resumption_delay_interval;
-    }
-    else if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
+
+    m_try_again_delay_info.update(error_info);
+    auto try_again_interval = m_try_again_delay_info.delay_interval();
+    if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
         // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
         // backoff behavior would result in waiting up to 5 minutes in between each query change which is
         // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
-        m_current_try_again_delay_interval = std::chrono::milliseconds{1000};
+        try_again_interval = std::chrono::milliseconds{1000};
     }
-    m_try_again_error_code = ProtocolError(error_info.raw_error_code);
-    logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
-    m_try_again_activation_timer =
-        get_client().create_timer(*m_current_try_again_delay_interval, [this](Status status) {
-            if (status == ErrorCodes::OperationAborted)
-                return;
-            else if (!status.is_ok())
-                throw ExceptionForStatus(status);
+    logger.debug("Will attempt to resume session after %1 milliseconds", try_again_interval.count());
+    m_try_again_activation_timer = get_client().create_timer(try_again_interval, [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
 
-            m_try_again_activation_timer.reset();
-            if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {
-                *m_current_try_again_delay_interval *= m_try_again_delay_info.resumption_delay_backoff_multiplier;
-            }
-            cancel_resumption_delay();
-        });
+        m_try_again_activation_timer.reset();
+        cancel_resumption_delay();
+    });
 }
 
 void Session::clear_resumption_delay_state()
 {
     if (m_try_again_activation_timer) {
         logger.debug("Clearing resumption delay state after successful download");
-        m_current_try_again_delay_interval = util::none;
+        m_try_again_delay_info.reset();
     }
 }
 
