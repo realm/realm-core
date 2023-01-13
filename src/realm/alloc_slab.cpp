@@ -1761,7 +1761,7 @@ void SlabAlloc::refresh_encrypted_pages(
             }
         }
     }
-    verify();
+    // unsafe to do outside writing thread: verify();
 #else
     static_cast<void>(ranges);
     static_cast<void>(pages_refreshed);
@@ -1780,7 +1780,7 @@ void SlabAlloc::refresh_all_encrypted_pages()
             encryption_mark_for_refresh(m, 0, e.primary_mapping.get_size());
         }
     }
-    verify();
+    // unsafe to do outside writing thread: verify();
 #endif // REALM_ENABLE_ENCRYPTION
 }
 
