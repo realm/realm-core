@@ -32,6 +32,10 @@
 #include <realm/object-store/util/android/scheduler.hpp>
 #endif
 
+#if EMSCRIPTEN
+#include <realm/object-store/util/wasm/scheduler.hpp>
+#endif
+
 #include <realm/object-store/util/generic/scheduler.hpp>
 
 namespace realm::util {
@@ -124,8 +128,7 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
 #elif REALM_ANDROID
     return make_alooper();
 #elif EMSCRIPTEN
-    // FIXME We don't need notification yet for WASM
-    return make_generic();
+    return make_wasm();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");
@@ -173,5 +176,12 @@ std::shared_ptr<Scheduler> Scheduler::make_uv()
     return std::make_shared<UvMainLoopScheduler>();
 }
 #endif // REALM_HAVE_UV
+
+#if EMSCRIPTEN
+std::shared_ptr<Scheduler> Scheduler::make_wasm()
+{
+    return std::make_shared<WasmScheduler>();
+}
+#endif // EMSCRIPTEN
 
 } // namespace realm::util

@@ -63,6 +63,7 @@ set(HEADERS
     impl/apple/external_commit_helper.hpp
     impl/apple/keychain_helper.hpp
     impl/epoll/external_commit_helper.hpp
+    impl/wasm/external_commit_helper.hpp
     impl/generic/external_commit_helper.hpp
 
     impl/collection_change_builder.hpp
@@ -164,6 +165,8 @@ elseif(REALM_HAVE_EPOLL)
     target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+elseif(EMSCRIPTEN)
+    target_sources(ObjectStore PRIVATE impl/wasm/external_commit_helper.cpp)
 else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()

@@ -124,6 +124,10 @@ public:
     static std::shared_ptr<Scheduler> make_alooper();
 #endif
 
+#if EMSCRIPTEN
+    static std::shared_ptr<Scheduler> make_wasm();
+#endif
+
     /// Register a factory function which can produce custom schedulers when
     /// `Scheduler::make_default()` is called.
     static void set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()>);
