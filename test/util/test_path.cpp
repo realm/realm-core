@@ -18,6 +18,9 @@
 
 #include "test_path.hpp"
 
+#include "misc.hpp"
+#include "spawned_process.hpp"
+
 #include <realm/util/file.hpp>
 
 #include <algorithm>
@@ -176,13 +179,18 @@ std::string get_test_resource_path()
 
 TestPathGuard::TestPathGuard(const std::string& path)
     : m_path(path)
+    , m_do_remove(test_util::SpawnedProcess::is_parent())
 {
-    File::try_remove(m_path);
+    if (m_do_remove) {
+        File::try_remove(m_path);
+    }
 }
 
 TestPathGuard::~TestPathGuard() noexcept
 {
     if (g_keep_files)
+        return;
+    if (!m_do_remove)
         return;
     try {
         if (!m_path.empty())
@@ -262,7 +270,6 @@ DBTestPathGuard::DBTestPathGuard(const std::string& path)
     cleanup();
 }
 
-
 DBTestPathGuard::~DBTestPathGuard() noexcept
 {
     if (!g_keep_files && !m_path.empty())
@@ -271,6 +278,8 @@ DBTestPathGuard::~DBTestPathGuard() noexcept
 
 void DBTestPathGuard::cleanup() const noexcept
 {
+    if (!m_do_remove)
+        return;
     try {
         do_clean_dir(m_path + ".management", ".management");
         if (File::is_dir(m_path + ".management"))

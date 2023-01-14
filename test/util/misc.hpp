@@ -27,9 +27,6 @@ namespace test_util {
 void replace_all(std::string& str, const std::string& from, const std::string& to);
 bool equal_without_cr(std::string s1, std::string s2);
 
-int waitpid_checked(int pid, int options, const std::string& debug_info);
-int fork_and_update_mappings();
-
 } // namespace test_util
 } // namespace realm
 

@@ -108,6 +108,7 @@ public:
 
 protected:
     std::string m_path;
+    bool m_do_remove;
 };
 
 /// The constructor creates the directory if it does not already exist, then

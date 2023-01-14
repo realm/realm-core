@@ -1079,6 +1079,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
             logger.info(str.c_str());
         }
     }
+    if (auto ident = getenv("REALM_CHILD_IDENT")) {
+        logger.info("Spawned process with ident '%1' completed.", ident);
+    }
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {
         auto format = results_summary.num_excluded_tests == 1 ? "Note: One test was excluded!"

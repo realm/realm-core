@@ -6,6 +6,7 @@ set(TEST_UTIL_SOURCES
     quote.cpp
     random.cpp
     resource_limits.cpp
+    spawned_process.cpp
     test_only.cpp
     test_path.cpp
     timer.cpp
@@ -29,6 +30,7 @@ set(TEST_UTIL_HEADERS
     random.hpp
     resource_limits.hpp
     semaphore.hpp
+    spawned_process.hpp
     super_int.hpp
     test_logger.hpp
     test_only.hpp
