@@ -19,6 +19,7 @@
 
 ### Internals
 * Fix failures in Metrics_TransactionTimings core test ([#6164](https://github.com/realm/realm-core/issues/6164))
+* Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 
 ----------------------------------------------
 
