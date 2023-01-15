@@ -77,32 +77,51 @@ public:
     // equivalent to realm_log_level_e in realm.h and must be kept in sync
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
+    static const Level default_log_level;
+
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
-    virtual Level get_level_threshold() noexcept
+    virtual Level get_level_threshold() const noexcept
     {
-        return m_level_threshold;
+        // Don't need strict ordering, mainly that the gets/sets are atomic
+        return m_level_threshold.load(std::memory_order_relaxed);
     }
 
     virtual void set_level_threshold(Level level) noexcept
     {
-        m_level_threshold = level;
+        // Don't need strict ordering, mainly that the gets/sets are atomic
+        m_level_threshold.store(level, std::memory_order_relaxed);
     }
 
     /// Shorthand for `int(level) >= int(m_level_threshold)`.
     inline bool would_log(Level level) const noexcept
     {
-        return static_cast<int>(level) >= static_cast<int>(m_level_threshold);
+        return static_cast<int>(level) >= static_cast<int>(get_level_threshold());
     }
 
     virtual inline ~Logger() noexcept = default;
 
 protected:
-    Logger() noexcept = default;
+    Logger() noexcept
+        : m_threshold_ptr{std::make_unique<std::atomic<Level>>(default_log_level)}
+        , m_level_threshold{*m_threshold_ptr}
+    {
+    }
 
-    Logger(Level level) noexcept
-        : m_level_threshold{level}
+    explicit Logger(Level level) noexcept
+        : m_threshold_ptr{std::make_unique<std::atomic<Level>>(level)}
+        , m_level_threshold{*m_threshold_ptr}
+    {
+    }
+
+    explicit Logger(const std::shared_ptr<Logger>& base_logger) noexcept
+        : m_level_threshold{base_logger->m_level_threshold}
+    {
+    }
+
+    explicit Logger(Logger& base_logger) noexcept
+        : m_level_threshold{base_logger.m_level_threshold}
     {
     }
 
@@ -112,7 +131,8 @@ protected:
 
     static const char* get_level_prefix(Level) noexcept;
 
-    Level m_level_threshold = Logger::Level::info;
+    std::unique_ptr<std::atomic<Level>> m_threshold_ptr;
+    std::atomic<Level>& m_level_threshold;
 
 private:
     template <class... Params>
@@ -124,7 +144,6 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Logger::Level);
 
 template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
-
 
 /// A logger that writes to STDERR, which is thread safe. However, the setting
 /// the threshold level is not thread safe. Wrap this class in a ThreadSafeLogger
@@ -196,9 +215,6 @@ class ThreadSafeLogger : public Logger {
 public:
     explicit ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept;
 
-    Level get_level_threshold() noexcept override;
-    void set_level_threshold(Level level) noexcept override;
-
 protected:
     void do_log(Level, const std::string&) final;
 
@@ -233,7 +249,7 @@ public:
     {
     }
 
-    Level get_level_threshold() noexcept override
+    Level get_level_threshold() const noexcept override
     {
         return Level::off;
     }
@@ -438,20 +454,20 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
 }
 
 inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger->get_level_threshold())
+    : Logger(base_logger)
     , m_base_logger_ptr(base_logger)
 {
 }
 
 inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexcept
-    : Logger(base_logger.get_level_threshold())
+    : Logger(base_logger)
     , m_prefix{std::move(prefix)}
     , m_base_logger{base_logger}
 {
 }
 
 inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger->get_level_threshold())
+    : Logger(base_logger)
     , m_prefix{std::move(prefix)}
     , m_base_logger_ptr(base_logger)
     , m_base_logger{*m_base_logger_ptr}

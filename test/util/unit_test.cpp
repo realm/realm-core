@@ -413,9 +413,10 @@ private:
 class IntraTestLogger : public Logger {
 public:
     IntraTestLogger(Logger& base_logger, Level threshold)
-        : util::Logger(threshold)
+        : util::Logger(base_logger)
         , m_base_logger(base_logger)
     {
+        set_level_threshold(threshold);
     }
 
     void do_log(Logger::Level level, std::string const& message) override final
