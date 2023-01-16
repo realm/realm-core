@@ -1653,6 +1653,13 @@ void DB::release_all_read_locks() noexcept
 // caller must hold DB::m_mutex
 void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
 {
+    // Early out if called with an installed fake readlock.
+    // If called from update_reader_view from attach_shared for an immutable realm,
+    // there is no version manager so we cannot grab a read_lock. Fortunately, we also
+    // do not need one because we do not need to refresh any mappings.
+    if (m_fake_read_lock_if_immutable)
+        return;
+
     if (get_encryption_key()) {
         version_type from;
         {
