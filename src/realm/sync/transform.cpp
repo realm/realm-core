@@ -1406,7 +1406,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 StringData right_pk_name = right_side.get_string(right_spec->pk_field);
                 if (left_pk_name != right_pk_name) {
                     bad_merge(
-                        "Schema mismatch: '%1' has primary key '%2' on one side, but primary key '%2' on the other.",
+                        "Schema mismatch: '%1' has primary key '%2' on one side, but primary key '%3' on the other.",
                         left_name, left_pk_name, right_pk_name);
                 }
 
