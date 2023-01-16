@@ -877,9 +877,17 @@ T Lst<T>::set(size_t ndx, T value)
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_set(*this, ndx, value);
     }
-    if (old != value) {
-        do_set(ndx, value);
-        bump_content_version();
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (!(old.is_same_type(value) && old == value)) {
+            do_set(ndx, value);
+            bump_content_version();
+        }
+    }
+    else {
+        if (old != value) {
+            do_set(ndx, value);
+            bump_content_version();
+        }
     }
     return old;
 }
