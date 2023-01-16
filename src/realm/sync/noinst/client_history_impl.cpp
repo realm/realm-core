@@ -408,8 +408,9 @@ void ClientHistory::integrate_server_changesets(
     const bool allow_lock_release = batch_state == DownloadBatchState::SteadyState;
 
     // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times, depending on the
-    // number of times the sync client yields the write lock to allow the user to commit their changes. In each
-    // iteration, at least one changeset is transformed and committed.
+    // number of times the sync client yields the write lock to allow the user to commit their changes.
+    // In each iteration, at least one changeset is transformed and committed.
+    // In FLX, all changesets are committed at once in the bootstrap phase (i.e, in one iteration).
     while (!changesets_to_integrate.empty()) {
         if (batch_state == DownloadBatchState::SteadyState) {
             transact = m_db->start_write(); // Throws
