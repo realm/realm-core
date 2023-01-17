@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.68"
 clap = { version = "4.0.32", features = ["derive"] }
+rayon = "1.6.1"
 realm-core = { path = "../core" }
