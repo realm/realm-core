@@ -147,6 +147,10 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
         env.append("\0", 1);
         env.append(util::format("UNITTEST_FILTER=%1", test_name));
         env.append("\0", 1);
+        if (getenv("UNITTEST_ENCRYPT_ALL")) {
+            env.append("UNITTEST_ENCRYPT_ALL=1");
+            env.append("\0", 1);
+        }
         env.append(util::format("REALM_CHILD_IDENT=%1", process_ident));
         env.append("\0\0", 2);
         if (!CreateProcess(program_name, // Application name

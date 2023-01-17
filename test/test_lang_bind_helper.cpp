@@ -3396,6 +3396,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
         }
         catch (const std::exception& e) {
             REALM_ASSERT_EX(false, e.what());
+            static_cast<void>(e); // e is unused without assertions on
         }
         exit(0);
     }
