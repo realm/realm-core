@@ -367,6 +367,7 @@ void trigger_client_reset(const AppSession& app_session)
     // this causes the server's sync history to be resynthesized
     auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
     auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+
     REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
     app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
     timed_sleeping_wait_for([&] {
@@ -378,7 +379,10 @@ void trigger_client_reset(const AppSession& app_session)
         app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
     }
 
-    if (app_session.config.flx_sync_config) {
+    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
+    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
+    // our remote changes.
+    if (!app_session.config.flx_sync_config) {
         timed_sleeping_wait_for([&] {
             return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
         });
