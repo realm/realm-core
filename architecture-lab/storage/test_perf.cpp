@@ -30,31 +30,68 @@
 
 #include "db.hpp"
 
+struct chunk {
+    char chars[12];
+    int prefix_index = -1;
+    bool operator==(const chunk& a2) const
+    {
+        return memcmp(chars, a2.chars, 12) == 0 && prefix_index == a2.prefix_index;
+    };
+};
+
+template <>
+struct std::hash<chunk> {
+    std::size_t operator()(chunk const& c) const noexcept
+    {
+        std::size_t ret = c.chars[0] << 56;
+        ret |= (unsigned long)c.chars[1] << 48;
+        ret |= (unsigned long)c.chars[2] << 40;
+        ret |= (unsigned long)c.chars[3] << 32;
+        ret |= (unsigned long)c.chars[4] << 24;
+        ret |= (unsigned long)c.chars[5] << 16;
+        ret |= (unsigned long)c.chars[6] << 8;
+        ret |= (unsigned long)c.chars[7];
+        ret ^= (unsigned long)c.chars[8] << 56;
+        ret ^= (unsigned long)c.chars[9] << 48;
+        ret ^= (unsigned long)c.chars[10] << 40;
+        ret ^= (unsigned long)c.chars[11] << 32;
+        ret ^= (unsigned long)c.prefix_index;
+        // std::cout << " *" << ret << "* " << std::flush;
+        return ret;
+    }
+};
+
 struct string_compressor {
-    std::unordered_map<std::string, int> map;
+    std::vector<chunk> chunks;
+    std::unordered_map<chunk, int> map;
     int handle(std::string tmp)
     {
         total_chars += tmp.size();
-        int retval = next_id;
-        auto it = map.find(tmp);
-        if (it == map.end()) {
-            map[tmp] = retval = next_id++;
-            /*
-                        // build and hash prefixes
-                        if (tmp.size() > 8)
-                            for (int term = (tmp.size() - 1) & ~0x7; term > 0; term -= 8) {
-                                tmp.resize(term);
-                                it = map.find(tmp);
-                                if (it != map.end())
-                                    break;
-                                map[tmp] = next_prefix_id--;
-                            }
-            */
+        int first = 0;
+        int last = 12;
+        int prefix = -1;
+        chunk c;
+        while (first < tmp.size()) {
+            if (last >= tmp.size()) {
+                last = tmp.size();
+                memset(c.chars, 0, 12);
+            }
+            memcpy(c.chars, tmp.data() + first, last - first);
+            c.prefix_index = prefix;
+            auto it = map.find(c);
+            if (it == map.end()) {
+                prefix = chunks.size();
+                map[c] = prefix;
+                chunks.push_back(c);
+            }
+            else {
+                prefix = it->second;
+            }
+            first += 12;
+            last += 12;
         }
-        else {
-            retval = it->second;
-        }
-        return retval;
+        // std::cout << "   " << tmp << " -> " << prefix << std::endl;
+        return prefix;
     }
     int next_id = 0;
     int next_prefix_id = -1;
@@ -215,9 +252,9 @@ int main(int argc, char* argv[])
         }
         for (int i = 0; i < max_fields; ++i) {
             if (compressors[i]) {
-                std::cout << "Field " << i << " with " << compressors[i]->next_id << " unique elements and "
-                          << compressors[i]->map.size() << " chunks from total " << compressors[i]->total_chars
-                          << " chars" << std::endl;
+                std::cout << "Field " << i << " with " << compressors[i]->map.size() << " chunks ("
+                          << compressors[i]->map.size() * sizeof(chunk) << " bytes) from total "
+                          << compressors[i]->total_chars << " chars" << std::endl;
             }
         }
     }
