@@ -29,8 +29,8 @@
 
 class Memory {
 public:
-    static const int chunk_shift = 20;
-    static const int num_chunks = 64*1024;
+    static const int chunk_shift = 24; // chunks are 16MB
+    static const int num_chunks = 32*1024; // max file size is 512GB
     static const uint64_t chunk_size = 1ULL << chunk_shift;
     static const uint64_t chunk_offset_mask = chunk_size - 1;
     static const int num_size_bins = 500;

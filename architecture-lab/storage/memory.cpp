@@ -160,12 +160,14 @@ uint64_t Memory::internal_alloc_in_file(void*& p, size_t real_size)
     if (file_alloc_ref + real_size > file_alloc_limit) {
         // save old chunk!
         write_maps.push_back(file_alloc_base_ptr);
+        //msync(file_alloc_base_ptr, chunk_size, MS_SYNC);
+        //munmap(file_alloc_base_ptr, chunk_size);
         uint64_t new_file_size = file_size + chunk_size;
         int status = ftruncate(fd, new_file_size);
         if (status < 0)
             throw std::runtime_error("failed to extend file for writing");
         file_alloc_base_ptr =
-            reinterpret_cast<char*>(mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, file_size));
+            reinterpret_cast<char*>(mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, file_size));
         if (file_alloc_base_ptr == MAP_FAILED)
             throw std::runtime_error("failed to mmap file for writing");
         file_size = new_file_size;
@@ -193,7 +195,7 @@ void Memory::open_for_write(int new_fd, uint64_t in_file_allocation_start_ref)
     if (status < 0)
         throw std::runtime_error("failed to prepare for write of initial chunk");
     file_alloc_base_ptr = reinterpret_cast<char*>(
-        mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, new_file_size - chunk_size));
+        mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, new_file_size - chunk_size));
     if (file_alloc_base_ptr == MAP_FAILED)
         throw std::runtime_error("failed to setup mmap for write of initial chunk");
     file_size = new_file_size;
