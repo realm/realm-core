@@ -1672,10 +1672,22 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
             return;
         }
 
+        auto wt = self->m_db->start_write();
+        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
+        if (!cur_pending_reset) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed");
+            return;
+        }
+        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
+                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
+            return;
+        }
         logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
                      "Removing cycle detection tracker.",
                      pending_reset.type, pending_reset.time);
-        auto wt = self->m_db->start_write();
         _impl::client_reset::remove_pending_client_resets(wt);
         wt->commit();
     });
