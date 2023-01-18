@@ -6702,8 +6702,9 @@ TEST(Sync_InvalidChangesetFromServer)
 
     VersionInfo version_info;
     util::StderrLogger logger;
+    auto transact = db->start_read();
     CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
-                                                       DownloadBatchState::LastInBatch, logger),
+                                                       DownloadBatchState::LastInBatch, logger, transact),
                    sync::IntegrationException,
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }
