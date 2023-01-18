@@ -68,7 +68,7 @@ void ThreadSafeLogger::do_log(Level level, const std::string& message)
 
 void PrefixLogger::do_log(Level level, const std::string& message)
 {
-    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+    Logger::do_log(m_chained_logger, level, m_prefix + message); // Throws
 }
 
 } // namespace realm::util

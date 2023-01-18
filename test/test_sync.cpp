@@ -1686,7 +1686,7 @@ TEST(Sync_HTTP404NotFound)
     HTTPRequest request;
     request.path = "/not-found";
 
-    HTTPRequestClient client(*(test_context.logger), endpoint, request);
+    HTTPRequestClient client(test_context.logger, endpoint, request);
     client.fetch_response();
 
     server.stop();

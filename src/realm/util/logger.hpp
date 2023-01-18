@@ -104,24 +104,20 @@ public:
 
 protected:
     Logger() noexcept
-        : m_threshold_ptr{std::make_unique<std::atomic<Level>>(default_log_level)}
-        , m_level_threshold{*m_threshold_ptr}
+        : m_threshold_base{Logger::default_log_level}
+        , m_level_threshold{m_threshold_base}
     {
     }
 
     explicit Logger(Level level) noexcept
-        : m_threshold_ptr{std::make_unique<std::atomic<Level>>(level)}
-        , m_level_threshold{*m_threshold_ptr}
+        : m_threshold_base{level}
+        , m_level_threshold{m_threshold_base}
     {
     }
 
     explicit Logger(const std::shared_ptr<Logger>& base_logger) noexcept
-        : m_level_threshold{base_logger->m_level_threshold}
-    {
-    }
-
-    explicit Logger(Logger& base_logger) noexcept
-        : m_level_threshold{base_logger.m_level_threshold}
+        : m_base_logger_ptr{base_logger}
+        , m_level_threshold{m_base_logger_ptr->m_level_threshold}
     {
     }
 
@@ -131,7 +127,16 @@ protected:
 
     static const char* get_level_prefix(Level) noexcept;
 
-    std::unique_ptr<std::atomic<Level>> m_threshold_ptr;
+private:
+    // Only used by the base Logger class
+    std::atomic<Level> m_threshold_base;
+
+protected:
+    // Used by subclasses that link to a base logger
+    std::shared_ptr<Logger> m_base_logger_ptr;
+
+    // Shared level threshold for subclasses that link to a base logger
+    // See PrefixLogger and ThreadSafeLogger
     std::atomic<Level>& m_level_threshold;
 
 private:
@@ -219,7 +224,6 @@ protected:
     void do_log(Level, const std::string&) final;
 
 private:
-    std::shared_ptr<util::Logger> m_base_logger_ptr; // bind for the lifetime of this logger
     Mutex m_mutex;
 };
 
@@ -228,16 +232,19 @@ private:
 /// thread-safe if, and only if the base logger is thread-safe.
 class PrefixLogger : public Logger {
 public:
+    // A PrefixLogger must initially be created from a base Logger shared_ptr
     PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept;
-    PrefixLogger(std::string prefix, Logger& base_logger) noexcept;
+
+    // Used for chaining a series of prefixes together for logging that combines prefix values
+    PrefixLogger(std::string prefix, PrefixLogger& chained_logger) noexcept;
 
 protected:
     void do_log(Level, const std::string&) final;
 
 private:
     const std::string m_prefix;
-    std::shared_ptr<util::Logger> m_base_logger_ptr; // bind for the lifetime of this logger
-    Logger& m_base_logger;
+    // The next logger in the chain for chained PrefixLoggers or the base_logger
+    Logger& m_chained_logger;
 };
 
 
@@ -455,22 +462,26 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
 
 inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept
     : Logger(base_logger)
-    , m_base_logger_ptr(base_logger)
 {
 }
 
-inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexcept
-    : Logger(base_logger)
+// Construct a PrefixLogger from another PrefixLogger object for chaining the prefixes on log output
+inline PrefixLogger::PrefixLogger(std::string prefix, PrefixLogger& prefix_logger) noexcept
+    // Save an alias of the base_logger shared_ptr from the passed in PrefixLogger
+    : Logger(prefix_logger.m_base_logger_ptr)
     , m_prefix{std::move(prefix)}
-    , m_base_logger{base_logger}
+    , m_chained_logger{prefix_logger} // do_log() writes to the chained logger
 {
 }
 
+// Construct a PrefixLogger from any Logger shared_ptr (PrefixLogger, StdErrLogger, etc.)
+// The first PrefixLogger must always be created from a Logger shared_ptr, subsequent PrefixLoggers
+// created, will point back to this logger shared_ptr for referencing the level_threshold when
+// logging output.
 inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger)
+    : Logger(base_logger) // Save an alias of the passed in base_logger shared_ptr
     , m_prefix{std::move(prefix)}
-    , m_base_logger_ptr(base_logger)
-    , m_base_logger{*m_base_logger_ptr}
+    , m_chained_logger{*base_logger} // do_log() writes to the chained logger
 {
 }
 

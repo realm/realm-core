@@ -90,23 +90,38 @@ TEST(Util_Logger_LevelThreshold)
 {
     using namespace realm::util;
     auto base_logger = std::make_shared<StderrLogger>();
+    auto threadsafe_logger = std::make_shared<ThreadSafeLogger>(base_logger);
+    auto prefix_logger = PrefixLogger("test", threadsafe_logger); // created using Logger shared_ptr
+    auto prefix_logger2 = PrefixLogger("test2", prefix_logger);   // created using PrefixLogger
+
     REALM_ASSERT(base_logger->get_level_threshold() == Logger::default_log_level);
-    auto prefix_logger = PrefixLogger("test", base_logger);
+    REALM_ASSERT(threadsafe_logger->get_level_threshold() == Logger::default_log_level);
     REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::default_log_level);
-    auto threadsafe_logger = ThreadSafeLogger(base_logger);
-    REALM_ASSERT(threadsafe_logger.get_level_threshold() == Logger::default_log_level);
+    REALM_ASSERT(prefix_logger2.get_level_threshold() == Logger::default_log_level);
+
     base_logger->set_level_threshold(Logger::Level::error);
     REALM_ASSERT(base_logger->get_level_threshold() == Logger::Level::error);
+    REALM_ASSERT(threadsafe_logger->get_level_threshold() == Logger::Level::error);
     REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::Level::error);
-    REALM_ASSERT(threadsafe_logger.get_level_threshold() == Logger::Level::error);
+    REALM_ASSERT(prefix_logger2.get_level_threshold() == Logger::Level::error);
+
+    threadsafe_logger->set_level_threshold(Logger::Level::trace);
+    REALM_ASSERT(base_logger->get_level_threshold() == Logger::Level::trace);
+    REALM_ASSERT(threadsafe_logger->get_level_threshold() == Logger::Level::trace);
+    REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::Level::trace);
+    REALM_ASSERT(prefix_logger2.get_level_threshold() == Logger::Level::trace);
+
     prefix_logger.set_level_threshold(Logger::Level::debug);
     REALM_ASSERT(base_logger->get_level_threshold() == Logger::Level::debug);
+    REALM_ASSERT(threadsafe_logger->get_level_threshold() == Logger::Level::debug);
     REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::Level::debug);
-    REALM_ASSERT(threadsafe_logger.get_level_threshold() == Logger::Level::debug);
-    threadsafe_logger.set_level_threshold(Logger::Level::trace);
-    REALM_ASSERT(base_logger->get_level_threshold() == Logger::Level::trace);
-    REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::Level::trace);
-    REALM_ASSERT(threadsafe_logger.get_level_threshold() == Logger::Level::trace);
+    REALM_ASSERT(prefix_logger2.get_level_threshold() == Logger::Level::debug);
+
+    prefix_logger2.set_level_threshold(Logger::Level::info);
+    REALM_ASSERT(base_logger->get_level_threshold() == Logger::Level::info);
+    REALM_ASSERT(threadsafe_logger->get_level_threshold() == Logger::Level::info);
+    REALM_ASSERT(prefix_logger.get_level_threshold() == Logger::Level::info);
+    REALM_ASSERT(prefix_logger2.get_level_threshold() == Logger::Level::info);
 }
 
 
@@ -197,18 +212,22 @@ TEST(Util_Logger_File_2)
     }
 }
 
-
 TEST(Util_Logger_Prefix)
 {
     std::ostringstream out_1;
     std::ostringstream out_2;
     {
-        util::StreamLogger root_logger(out_1);
-        util::PrefixLogger logger("Prefix: ", root_logger);
-        logger.info("Foo");
+        auto root_logger = std::make_shared<util::StreamLogger>(out_1);
+        util::PrefixLogger logger1("Prefix: ", root_logger);
+        util::PrefixLogger logger2("Prefix2: ", logger1);
+        logger1.info("Foo");
         out_2 << "Prefix: Foo\n";
-        logger.info("Bar");
+        logger1.info("Bar");
         out_2 << "Prefix: Bar\n";
+        logger2.info("Foo");
+        out_2 << "Prefix: Prefix2: Foo\n";
+        logger2.info("Bar");
+        out_2 << "Prefix: Prefix2: Bar\n";
     }
     CHECK(out_1.str() == out_2.str());
 }
