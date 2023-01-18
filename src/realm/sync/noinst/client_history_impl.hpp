@@ -246,9 +246,10 @@ public:
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
     ///
-    /// \param transact If specified, it is a write transaction to be used to
-    /// commit the server changesets after they were transformed.
-    /// Note: Left in reading state when all tranformed changesets are commited.
+    /// \param transact If specified, it is a transaction to be used to commit
+    /// the server changesets after they were transformed.
+    /// Note: In FLX, the transaction is left in reading state when bootstrap ends.
+    /// In all other cases, the transaction is left in reading state when the function returns.
     ///
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
@@ -256,7 +257,7 @@ public:
     void integrate_server_changesets(
         const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
-        util::Logger&, TransactionRef transact = nullptr,
+        util::Logger&, const TransactionRef& transact,
         util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr,
         SyncTransactReporter* transact_reporter = nullptr);
 

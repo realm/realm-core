@@ -843,7 +843,6 @@ void SessionImpl::process_pending_flx_bootstrap()
                     std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
                     pending_batch.remaining_changesets);
     }
-    REALM_ASSERT_3(transact->get_transact_stage(), ==, DB::transact_Reading);
     on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);

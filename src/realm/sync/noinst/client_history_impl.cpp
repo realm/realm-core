@@ -379,13 +379,14 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
-    util::Logger& logger, TransactionRef transact,
+    util::Logger& logger, const TransactionRef& transact,
     util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
     SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
-    REALM_ASSERT(!transact || (transact->get_transact_stage() == DB::transact_Writing &&
-                               batch_state != DownloadBatchState::SteadyState));
+    REALM_ASSERT(
+        (transact->get_transact_stage() == DB::transact_Writing && batch_state != DownloadBatchState::SteadyState) ||
+        (transact->get_transact_stage() == DB::transact_Reading && batch_state == DownloadBatchState::SteadyState));
     std::vector<Changeset> changesets;
     changesets.resize(incoming_changesets.size()); // Throws
 
@@ -412,8 +413,8 @@ void ClientHistory::integrate_server_changesets(
     // In each iteration, at least one changeset is transformed and committed.
     // In FLX, all changesets are committed at once in the bootstrap phase (i.e, in one iteration).
     while (!changesets_to_integrate.empty()) {
-        if (batch_state == DownloadBatchState::SteadyState) {
-            transact = m_db->start_write(); // Throws
+        if (transact->get_transact_stage() == DB::transact_Reading) {
+            transact->promote_to_write(); // Throws
         }
         VersionID old_version = transact->get_version_of_current_transaction();
         version_type local_version = old_version.version;
@@ -491,6 +492,9 @@ void ClientHistory::integrate_server_changesets(
     }
 
     REALM_ASSERT(new_version.version > 0);
+    REALM_ASSERT(
+        (batch_state == DownloadBatchState::MoreToCome && transact->get_transact_stage() == DB::transact_Writing) ||
+        (batch_state != DownloadBatchState::MoreToCome && transact->get_transact_stage() == DB::transact_Reading));
     version_info.realm_version = new_version.version;
     version_info.sync_version = {new_version.version, 0};
 }

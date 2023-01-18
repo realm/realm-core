@@ -6674,8 +6674,9 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     util::StderrLogger logger;
+    auto transact = db->start_read();
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::SteadyState, logger);
+                                        DownloadBatchState::SteadyState, logger, transact);
 }
 
 TEST(Sync_InvalidChangesetFromServer)
