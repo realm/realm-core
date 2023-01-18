@@ -1676,7 +1676,8 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
         auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
         if (!cur_pending_reset) {
             logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed");
+                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
+                pending_reset.type, pending_reset.time);
             return;
         }
         else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
