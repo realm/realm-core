@@ -509,7 +509,7 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
 //                                   +-------------------------------------------+
 //                                  \/                                           |
 // State Machine: NotStarted -> Starting -> Started -> Running -> Stopping -> Stopped
-//                                  |          |                     /\
+//                                  |          |                     ^
 //                                  +----------+---------------------+
 
 void DefaultSocketProvider::do_state_update(State new_state)
