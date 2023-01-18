@@ -3,7 +3,6 @@
 #include <random>
 #include <system_error>
 #include <map>
-#include <set>
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
@@ -73,7 +72,7 @@ public:
     }
 
 private:
-    enum class State : int { Starting, Started, Running, Stopping, Stopped };
+    enum class State { Starting, Started, Running, Stopping, Stopped };
 
     // Start the event loop
     void start();
@@ -82,8 +81,8 @@ private:
     bool state_wait_for(State expected_state);
     /// Internal function for updating the state and signaling the wait_for_state condvar
     void do_state_update(State new_state);
-
-    std::function<void()> make_event_loop();
+    /// The execution code for the event loop thread
+    void event_loop();
 
     // TODO: Revisit Service::run() so the keep running timer is no longer needed
     void start_keep_running_timer()

@@ -288,7 +288,7 @@ void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_on_idle && m_activated && m_state == ConnectionState::disconnected)
+        if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
