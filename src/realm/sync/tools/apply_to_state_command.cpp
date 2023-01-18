@@ -286,7 +286,7 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
-                             auto transact = local_db->start_read();
+                             auto transact = bool(flx_sync_arg) ? local_db->start_write() : local_db->start_read();
                              history.integrate_server_changesets(download_message.progress,
                                                                  &download_message.downloadable_bytes,
                                                                  download_message.changesets, version_info,
