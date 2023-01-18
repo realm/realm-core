@@ -498,6 +498,7 @@ void ClientImpl::stop() noexcept
         m_stopped = true;
         m_wait_or_client_stopped_cond.notify_all();
     }
+    // TODO: in the future we will need to block here until all the sessions have been torn down
     m_socket_provider->stop();
 }
 
