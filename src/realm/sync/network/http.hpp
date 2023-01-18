@@ -194,8 +194,6 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    // An HTTPParserBase is tied to to an HTTPClient or HTTPServer, which are owned
-    // by either a Websocket or ServerImpl class, so no need for a shared_ptr
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 

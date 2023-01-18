@@ -33,12 +33,13 @@ namespace realm::util {
 /// All messages logged with a level that is lower than the current threshold
 /// will be dropped. For the sake of efficiency, this test happens before the
 /// message is formatted. This class allows for the log level threshold to be
-/// changed over time. The initial log level threshold is Logger::Level::info.
+/// changed over time and any subclasses will share the same reference to a
+/// log level threshold instance. The default log level threshold is
+/// Logger::Level::info and is defined by Logger::default_log_level.
 ///
-/// A logger is not inherently thread-safe, but specific implementations can be
-/// (see ThreadSafeLogger). For a logger to be thread-safe, the implementation
-/// of do_log() must be thread-safe and the referenced LevelThreshold object
-/// must have a thread-safe get() method.
+/// The Logger threshold level is intrinsically thread safe since it uses an
+/// atomic to store the value. However, the do_log() operation is not, so it
+/// is up to the subclass to ensure thread safety of the output operation.
 ///
 /// Examples:
 ///
@@ -74,7 +75,8 @@ public:
     ///             attention to efficiency.
     ///     trace   A version of 'debug' that allows for very high volume
     ///             output.
-    // equivalent to realm_log_level_e in realm.h and must be kept in sync
+    // equivalent to realm_log_level_e in realm.h and must be kept in sync -
+    // this is enforced in logging.cpp.
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
     static const Level default_log_level;
@@ -150,11 +152,8 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Logger::Level);
 template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 
-/// A logger that writes to STDERR, which is thread safe. However, the setting
-/// the threshold level is not thread safe. Wrap this class in a ThreadSafeLogger
-/// to make this class fully thread safe.
-///
-/// Since this class is a subclass of Logger, it contains a modifiable log
+/// A logger that writes to STDERR, which is thread safe.
+/// Since this class is a subclass of Logger, it maintains its own modifiable log
 /// level threshold.
 class StderrLogger : public Logger {
 public:
@@ -172,7 +171,7 @@ protected:
 
 /// A logger that writes to a stream. This logger is not thread-safe.
 ///
-/// Since this class is a subclass of Logger, it contains a modifiable log
+/// Since this class is a subclass of Logger, it maintains its own modifiable log
 /// level threshold.
 class StreamLogger : public Logger {
 public:
@@ -186,9 +185,9 @@ private:
 };
 
 
-/// A logger that writes to a file. This logger is not thread-safe.
+/// A logger that writes to a new file. This logger is not thread-safe.
 ///
-/// Since this class is a subclass of Logger, it contains a modifiable log
+/// Since this class is a subclass of Logger, it maintains its own thread safe log
 /// level threshold.
 class FileLogger : public StreamLogger {
 public:
@@ -201,6 +200,10 @@ private:
     std::ostream m_out;
 };
 
+/// A logger that appends to a file. This logger is not thread-safe.
+///
+/// Since this class is a subclass of Logger, it maintains its own thread safe log
+/// level threshold.
 class AppendToFileLogger : public StreamLogger {
 public:
     explicit AppendToFileLogger(std::string path);
@@ -213,9 +216,8 @@ private:
 };
 
 
-/// A thread-safe logger. This logger ignores the level threshold of the base
-/// logger. Instead, it introduces new a LevelThreshold object with a fixed
-/// value to achieve thread safety.
+/// A thread-safe logger where do_log() is thread safe. The log level is already
+/// thread safe since Logger uses an atomic to store the log level threshold.
 class ThreadSafeLogger : public Logger {
 public:
     explicit ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept;
@@ -228,8 +230,7 @@ private:
 };
 
 
-/// A logger that adds a fixed prefix to each message. This logger is
-/// thread-safe if, and only if the base logger is thread-safe.
+/// A logger that adds a fixed prefix to each message.
 class PrefixLogger : public Logger {
 public:
     // A PrefixLogger must initially be created from a base Logger shared_ptr
@@ -248,7 +249,9 @@ private:
 };
 
 
-// A logger that essentially performs a noop when logging functions are called
+/// A logger that essentially performs a noop when logging functions are called
+/// The log level threshold for this logger is always Logger::Level::off and
+/// cannot be changed.
 class NullLogger : public Logger {
 public:
     NullLogger()
