@@ -102,11 +102,12 @@ int main(int argc, char* argv[])
 {
     const int limit = 1000000;
     constexpr int max_fields = 105;
-    char fields[max_fields + 1] =
+    char compressible[max_fields + 1] =
         "iisissiiiiiiissiiiiiiiiiisiiisiiiissiiisiiiiisiiiisiiiiisiiiiiissiiiiiiiiissiiiiiiiiiisississssssssssiiii";
-    /*
+
     char fields[max_fields + 1] =
-    "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";
+        "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";
+    /*
     {
         std::cout << "Determining field types...." << std::endl;
         std::ifstream infile(argv[1]);
@@ -223,13 +224,13 @@ int main(int argc, char* argv[])
                 std::string tmp;
                 while (std::getline(iss, tmp, '\t')) {
                     // std::cout << num_line << " : " << num_value << " : " << tmp << std::endl;
-                    if (fields[num_value] == 's') {
+                    if (compressible[num_value] == 's') {
                         if (!compressors[num_value]) {
                             compressors[num_value] = std::make_unique<string_compressor>();
                         }
                         auto& compressor = *compressors[num_value];
-                        compressor.handle(tmp);
-                        o.set(f_s[num_value], tmp);
+                        long compressed = compressor.handle(tmp);
+                        o.set(f_i[num_value], compressed);
                     }
                     else if (tmp.empty())
                         o.set(f_i[num_value], 0L);
