@@ -140,11 +140,6 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
             return;
         }
 
-        if (err.error_code == sync::ClientError::auto_client_reset_failure &&
-            err.message == "A fatal error occured during client reset: 'Operation canceled'") {
-            return;
-        }
-
         FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
     };
 

@@ -385,7 +385,9 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         auto mode = config(&SyncConfig::client_resync_mode);
         if (mode == ClientResyncMode::Recover) {
             handle_fresh_realm_downloaded(
-                nullptr, {"A client reset is required but the server does not permit recovery for this client"},
+                nullptr,
+                {ErrorCodes::RuntimeError,
+                 "A client reset is required but the server does not permit recovery for this client"},
                 server_requests_action);
         }
     }
@@ -419,10 +421,10 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             db = DB::create(sync::make_client_replication(), fresh_path, options);
         }
     }
-    catch (std::exception const& e) {
+    catch (...) {
         // Failed to open the fresh path after attempting to delete it, so we
         // just can't do automatic recovery.
-        handle_fresh_realm_downloaded(nullptr, std::string(e.what()), server_requests_action);
+        handle_fresh_realm_downloaded(nullptr, exception_to_status(), server_requests_action);
         return;
     }
 
@@ -461,11 +463,10 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                 fresh_sync_session->force_close();
                 if (auto strong_self = weak_self.lock()) {
                     if (s.is_ok()) {
-                        strong_self->handle_fresh_realm_downloaded(db, none, server_requests_action);
+                        strong_self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action);
                     }
                     else {
-                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status().reason(),
-                                                                   server_requests_action);
+                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status(), server_requests_action);
                     }
                 }
             });
@@ -476,11 +477,16 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             // it immediately
             fresh_sync_session->force_close();
             if (auto strong_self = weak_self.lock()) {
-                if (ec) {
-                    strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), server_requests_action);
+                if (ec == util::error::operation_aborted) {
+                    strong_self->handle_fresh_realm_downloaded(nullptr, {ErrorCodes::OperationAborted, ec.message()},
+                                                               server_requests_action);
+                }
+                else if (ec) {
+                    strong_self->handle_fresh_realm_downloaded(nullptr, {ErrorCodes::RuntimeError, ec.message()},
+                                                               server_requests_action);
                 }
                 else {
-                    strong_self->handle_fresh_realm_downloaded(db, none, server_requests_action);
+                    strong_self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action);
                 }
             }
         });
@@ -488,7 +494,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     fresh_sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
                                                 sync::ProtocolErrorInfo::Action server_requests_action)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
@@ -499,7 +505,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
     // - in FLX mode there was a problem fulfilling the previously active subscription
-    if (error_message) {
+    if (!status.is_ok()) {
+        if (status == ErrorCodes::OperationAborted) {
+            return;
+        }
         lock.unlock();
         if (m_flx_subscription_store) {
             // In DiscardLocal mode, only the active subscription set is preserved
@@ -508,12 +517,13 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
             auto mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
             m_flx_subscription_store->supercede_all_except(mut_sub);
             mut_sub.update_state(sync::SubscriptionSet::State::Error,
-                                 util::make_optional<std::string_view>(*error_message));
+                                 util::make_optional<std::string_view>(status.reason()));
             std::move(mut_sub).commit();
         }
         const bool is_fatal = true;
         SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
-                            util::format("A fatal error occured during client reset: '%1'", error_message), is_fatal);
+                            util::format("A fatal error occured during client reset: '%1'", status.reason()),
+                            is_fatal);
         handle_error(synthetic);
         return;
     }
