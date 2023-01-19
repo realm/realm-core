@@ -17,11 +17,19 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/util/scheduler.hpp>
+#include <emscripten/eventloop.h>
 
 namespace realm::util {
 class WasmScheduler : public realm::util::Scheduler {
 public:
     WasmScheduler() = default;
+
+    ~WasmScheduler()
+    {
+        if (m_timeout) {
+            emscripten_clear_timeout(*m_timeout);
+        }
+    }
 
     bool is_on_thread() const noexcept override
     {
@@ -29,16 +37,27 @@ public:
     }
     bool is_same_as(const Scheduler* other) const noexcept override
     {
-        return true;
+        return reinterpret_cast<const WasmScheduler*>(other) != nullptr;
     }
     bool can_invoke() const noexcept override
     {
         return true;
     }
 
-    void invoke(UniqueFunction<void()>&& fn) override {
-        fn();
+    void invoke(UniqueFunction<void()>&& fn) override
+    {
+        m_queue.push(std::move(fn));
+        if (!m_timeout) {
+            m_timeout = emscripten_set_timeout(timeout_callback, 0, this);
+        }
     }
+private:
+    InvocationQueue m_queue;
+    std::optional<int> m_timeout;
 
+    static void timeout_callback(void* user_data)
+    {
+        reinterpret_cast<WasmScheduler*>(user_data)->m_queue.invoke_all();
+    }
 };
 } // namespace realm::util

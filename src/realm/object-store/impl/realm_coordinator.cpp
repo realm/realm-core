@@ -442,7 +442,9 @@ void RealmCoordinator::open_db()
         }
 
         DBOptions options;
+#if !defined(EMSCRIPTEN) || defined(__EMSCRIPTEN_THREADS__)
         options.enable_async_writes = true;
+#endif
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
 

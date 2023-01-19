@@ -27,12 +27,15 @@ class RealmCoordinator;
 class ExternalCommitHelper {
 public:
     ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&);
+    ~ExternalCommitHelper();
 
     void notify_others();
 
 private:
     RealmCoordinator& m_parent;
+    std::optional<int> m_timeout;
 
+    static void timeout_callback(void* user_data);
 };
 
 } // namespace _impl

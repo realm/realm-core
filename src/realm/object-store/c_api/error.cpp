@@ -254,7 +254,10 @@ void* ErrorStorage::get_and_clear_usercode_error()
 
 ErrorStorage* ErrorStorage::get_thread_local()
 {
-#if !defined(RLM_NO_THREAD_LOCAL)
+#if defined(EMSCRIPTEN) && !defined(__EMSCRIPTEN_THREADS__)
+    static ErrorStorage g_error_storage;
+    return &g_error_storage;
+#elif !defined(RLM_NO_THREAD_LOCAL)
     static thread_local ErrorStorage g_error_storage;
     return &g_error_storage;
 #else

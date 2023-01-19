@@ -88,7 +88,7 @@ set(UTIL_SOURCES
     util/platform_info.cpp
     util/misc_errors.cpp
     util/serializer.cpp
-    "$<$<NOT:$<BOOL:${EMSCRIPTEN}>>:util/sha_crypto.cpp>" # TODO need to find wasm impl of sha functions
+    util/sha_crypto.cpp
     util/terminate.cpp
     util/time.cpp
     util/timestamp_formatter.cpp
@@ -375,10 +375,6 @@ endif()
 
 if(APPLE)
     target_link_libraries(Storage PUBLIC "-lcompression")
-endif()
-
-if(EMSCRIPTEN)
-    target_compile_options(Storage PUBLIC -sUSE_PTHREADS)
 endif()
 
 install(TARGETS Storage EXPORT realm

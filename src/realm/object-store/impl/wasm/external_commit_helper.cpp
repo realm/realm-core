@@ -20,23 +20,33 @@
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
-#include <emscripten.h>
-#include <emscripten/html5.h>
+#include <emscripten/eventloop.h>
 
 using namespace realm;
 using namespace realm::_impl;
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig& config)
+ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&)
     : m_parent(parent)
 {
 }
 
-void notify_coordinator(void *realm_coordinator) {
-   reinterpret_cast<RealmCoordinator*>(realm_coordinator)->on_change();
+ExternalCommitHelper::~ExternalCommitHelper()
+{
+    if (m_timeout) {
+        emscripten_clear_timeout(*m_timeout);
+    }
+}
+
+void ExternalCommitHelper::timeout_callback(void* user_data) {
+   auto helper = reinterpret_cast<ExternalCommitHelper*>(user_data);
+   helper->m_timeout.reset();
+   helper->m_parent.on_change();
 }
 
 void ExternalCommitHelper::notify_others() {
-    printf(">>>>>>>>>>>>> ExternalCommitHelper::notify_others \n");   
-    // TODO clear timeout (emscripten_clear_timeout) when invoking dtor
-    emscripten_set_timeout(notify_coordinator, 0, (void*)&m_parent);
+    if (m_timeout) {
+        emscripten_clear_timeout(*m_timeout);
+    }
+
+    m_timeout = emscripten_set_timeout(timeout_callback, 0, this);
 }
