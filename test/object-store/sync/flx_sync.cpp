@@ -2874,58 +2874,57 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
     auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
-    config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise), &th, &realm,
-                                                     &user_commit_version, &bootstrap_version, &cv, &mutex,
-                                                     &allow_to_commit](std::weak_ptr<SyncSession> weak_session,
-                                                                       const SyncClientHookData& data) {
-        if (data.query_version == 0) {
-            return SyncClientHookAction::NoAction;
-        }
-        if (data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
-            return SyncClientHookAction::NoAction;
-        }
-        auto session = weak_session.lock();
-        if (!session) {
-            return SyncClientHookAction::NoAction;
-        }
-        if (data.batch_state != sync::DownloadBatchState::MoreToCome) {
-            // Read version after bootstrap is done.
-            auto db = TestHelper::get_db(realm);
-            ReadTransaction rt(db);
-            bootstrap_version = rt.get_version();
-            {
-                std::lock_guard<std::mutex> lock(mutex);
-                allow_to_commit = true;
+    config.sync_config->on_sync_client_event_hook =
+        [promise = std::move(shared_promise), &th, &realm, &user_commit_version, &bootstrap_version, &cv, &mutex,
+         &allow_to_commit](std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) {
+            if (data.query_version == 0) {
+                return SyncClientHookAction::NoAction;
             }
-            cv.notify_one();
-            session->force_close();
-            promise->emplace_value();
-            return SyncClientHookAction::NoAction;
-        }
-
-        if (th) {
-            return SyncClientHookAction::NoAction;
-        }
-
-        auto func = [&] {
-            // Attempt to commit a local change after the first bootstrap batch was committed.
-            auto db = TestHelper::get_db(realm);
-            WriteTransaction wt(db);
-            TableRef table = wt.get_table("class_TopLevel");
-            table->create_object_with_primary_key(ObjectId::gen());
-            {
-                std::unique_lock<std::mutex> lock(mutex);
-                // Wait to commit until we read the final bootstrap version.
-                cv.wait(lock, [&] {
-                    return allow_to_commit;
-                });
+            if (data.event != SyncClientHookEvent::DownloadMessageIntegrated) {
+                return SyncClientHookAction::NoAction;
             }
-            user_commit_version = wt.commit();
+            auto session = weak_session.lock();
+            if (!session) {
+                return SyncClientHookAction::NoAction;
+            }
+            if (data.batch_state != sync::DownloadBatchState::MoreToCome) {
+                // Read version after bootstrap is done.
+                auto db = TestHelper::get_db(realm);
+                ReadTransaction rt(db);
+                bootstrap_version = rt.get_version();
+                {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    allow_to_commit = true;
+                }
+                cv.notify_one();
+                session->force_close();
+                promise->emplace_value();
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (th) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto func = [&] {
+                // Attempt to commit a local change after the first bootstrap batch was committed.
+                auto db = TestHelper::get_db(realm);
+                WriteTransaction wt(db);
+                TableRef table = wt.get_table("class_TopLevel");
+                table->create_object_with_primary_key(ObjectId::gen());
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+                    // Wait to commit until we read the final bootstrap version.
+                    cv.wait(lock, [&] {
+                        return allow_to_commit;
+                    });
+                }
+                user_commit_version = wt.commit();
+            };
+            th = std::make_unique<std::thread>(std::move(func));
+
+            return SyncClientHookAction::NoAction;
         };
-        th = std::make_unique<std::thread>(std::move(func));
-
-        return SyncClientHookAction::NoAction;
-    };
 
     realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_TopLevel");
