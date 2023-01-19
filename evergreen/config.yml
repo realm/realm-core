@@ -664,7 +664,7 @@ tasks:
         exit 1
 
 - name: fuzzer
-  cron: @daily
+  cron: daily
   patchable: false
   commands:
   - func: "fetch source"
