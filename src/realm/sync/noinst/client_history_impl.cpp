@@ -229,7 +229,7 @@ util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_wr
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
-                               SyncProgress& progress) const
+                               SyncProgress& progress, bool* has_pending_client_reset) const
 {
     TransactionRef rt = m_db->start_read(); // Throws
     version_type current_client_version_2 = rt->get_version();
@@ -262,6 +262,10 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
     REALM_ASSERT(current_client_version >= s_initial_version + 0);
     if (current_client_version == s_initial_version + 0)
         current_client_version = 0;
+
+    if (has_pending_client_reset) {
+        *has_pending_client_reset = _impl::client_reset::has_pending_reset(rt).has_value();
+    }
 }
 
 
@@ -782,7 +786,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 
 
 void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                         TransactionRef wt)
+                                         TransactionRef)
 {
     Array& root = m_arrays->root;
 
@@ -831,16 +835,7 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
         root.set(s_progress_upload_server_version_iip,
                  RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
     }
-    if (previous_upload_client_version < progress.upload.client_version) {
-        // This is part of the client reset cycle detection.
-        // A client reset operation will write a flag to an internal table indicating that
-        // the changes there are a result of a successful reset. However, it is not possible to
-        // know if a recovery has been successful until the changes have been acknowledged by the
-        // server. The situation we want to avoid is that a recovery itself causes another reset
-        // which creates a reset cycle. However, at this point, upload progress has been made
-        // and we can remove the cycle detection flag if there is one.
-        _impl::client_reset::remove_pending_client_resets(wt);
-    }
+
     if (downloadable_bytes) {
         root.set(s_progress_downloadable_bytes_iip,
                  RefOrTagged::make_tagged(*downloadable_bytes)); // Throws

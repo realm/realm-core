@@ -190,6 +190,11 @@ std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& loc
 std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
                                                             const Realm::Config& remote_config,
                                                             const TestAppSession& test_app_session);
+
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                         const std::string& schema_name, const bson::BsonDocument& filter_bson);
+
+void trigger_client_reset(const AppSession& app_session);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
