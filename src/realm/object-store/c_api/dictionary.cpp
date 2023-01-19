@@ -69,7 +69,7 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t* dict, realm_value_t key
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -90,7 +90,7 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dic
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -102,7 +102,7 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* d
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
-            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
         }
 
         StringData k{key.string.data, key.string.size};
@@ -141,7 +141,7 @@ RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const re
     return wrap_err([&]() {
         auto stsr = dynamic_cast<realm_dictionary::thread_safe_reference*>(tsr);
         if (!stsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto dict = stsr->resolve<object_store::Dictionary>(*realm);

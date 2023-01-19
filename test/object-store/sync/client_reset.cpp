@@ -131,7 +131,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
             return;
         }
 
@@ -140,7 +140,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);

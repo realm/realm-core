@@ -245,7 +245,7 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
     return wrap_err([&]() {
         auto otsr = dynamic_cast<realm_object::thread_safe_reference*>(tsr);
         if (!otsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto obj = otsr->resolve<Object>(*realm);

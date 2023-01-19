@@ -133,7 +133,7 @@ RLM_API realm_set_t* realm_set_from_thread_safe_reference(const realm_t* realm, 
     return wrap_err([&]() {
         auto stsr = dynamic_cast<realm_set::thread_safe_reference*>(tsr);
         if (!stsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto set = stsr->resolve<object_store::Set>(*realm);

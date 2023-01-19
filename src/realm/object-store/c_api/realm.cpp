@@ -306,7 +306,8 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
             const auto& schema = (*realm)->schema();
             const auto& object_schema = schema.find(table_name);
             if (object_schema != schema.end()) {
-                throw std::logic_error("Attempt to remove a table that is currently part of the schema");
+                throw LogicError(ErrorCodes::InvalidSchemaChange,
+                                 "Attempt to remove a table that is currently part of the schema");
             }
             (*realm)->read_group().remove_table(table->get_key());
             *table_deleted = true;
@@ -320,7 +321,7 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
     return wrap_err([&]() {
         auto rtsr = dynamic_cast<shared_realm::thread_safe_reference*>(tsr);
         if (!rtsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         // FIXME: This moves out of the ThreadSafeReference, so it isn't

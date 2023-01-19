@@ -1790,7 +1790,7 @@ TEST_CASE("audit integration tests") {
             auto error = expect_error(config, generate_event);
             REQUIRE_THAT(error.what(),
                          Catch::Matchers::ContainsSubstring(
-                             "client connected using partition based sync when app is using flexible sync"));
+                             "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);
         }
 
