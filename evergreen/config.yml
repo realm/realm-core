@@ -666,15 +666,14 @@ tasks:
 - name: fuzzer
   tags: ["for_pull_requests" ]
   exec_timeout_secs: 60
-  patchable: false
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
   - func: "compile"
     vars:
       target_to_build: realm-libfuzz
-  - command: shell.exec
   pre:
+  - command: shell.exec
     params:
       working_dir: realm-core/build/test/fuzzy_object_store/
       shell: bash
