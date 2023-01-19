@@ -457,7 +457,6 @@ Group::~Group() noexcept
 
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
-    // FIXME: refresh encrypted mappings?
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 

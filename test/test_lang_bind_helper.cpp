@@ -3259,7 +3259,7 @@ struct EncryptedPageValidator {
     EncryptedPageValidator(const std::string& path)
     {
 #if !REALM_ENCRYPTION_VERIFICATION
-        std::cout << "EncryptionPageValidator running without verification turned on\n";
+        return; // no sense in running without verification turned on
 #endif
         if (!SpawnedProcess::is_parent())
             return;
@@ -3267,7 +3267,7 @@ struct EncryptedPageValidator {
         if (util::File::exists(validate_path)) {
             util::File::remove(validate_path);
         }
-        std::cout << "encryption validator path: " << validate_path << std::endl;
+        // std::cout << "encryption validator path: " << validate_path << std::endl;
         m_file.open(validate_path, util::File::Mode::mode_Write);
         auto msg = util::format("Begin validation at %1\n", Timestamp(std::chrono::system_clock::now()));
         m_file.write(msg.data(), msg.size());
@@ -3373,7 +3373,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
     std::vector<std::unique_ptr<SpawnedProcess>> readers;
     std::vector<std::unique_ptr<SpawnedProcess>> writers;
     SHARED_GROUP_TEST_PATH(path);
-    auto key = crypt_key(true);
+    auto key = crypt_key();
     auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
     if (process->is_child()) {
         std::signal(SIGSEGV, signal_handler);
@@ -3412,11 +3412,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
             test_util::spawn_process(test_context.test_details.test_name, util::format("writer[%1]", i)));
         if (writers.back()->is_child()) {
             {
-                util::format(std::cout, "Writer[%1](%2) starting.\n", test_util::get_pid(), i);
+                // util::format(std::cout, "Writer[%1](%2) starting.\n", test_util::get_pid(), i);
                 std::unique_ptr<Replication> hist(make_in_realm_history());
                 DBRef sg = DB::create(*hist, path, DBOptions(key));
                 multiple_trackers_writer_thread(sg);
-                util::format(std::cout, "Writer[%1](%2) done.\n", test_util::get_pid(), i);
+                // util::format(std::cout, "Writer[%1](%2) done.\n", test_util::get_pid(), i);
             } // clean up sg before exit
             exit(0);
         }
@@ -3428,11 +3428,11 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
             test_util::spawn_process(test_context.test_details.test_name, util::format("reader[%1]", i)));
         if (readers[i]->is_child()) {
             {
-                util::format(std::cout, "Reader[%1](%2) starting.\n", test_util::get_pid(), i);
+                // util::format(std::cout, "Reader[%1](%2) starting.\n", test_util::get_pid(), i);
                 std::unique_ptr<Replication> hist(make_in_realm_history());
                 DBRef sg = DB::create(*hist, path, DBOptions(key));
                 multiple_trackers_reader_thread(test_context, sg);
-                util::format(std::cout, "Reader[%1] done.\n", i);
+                // util::format(std::cout, "Reader[%1] done.\n", i);
             } // clean up sg before exit
             exit(0);
         }

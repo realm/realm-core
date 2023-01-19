@@ -776,6 +776,9 @@ std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().stri
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
+// This class is used as an optimization to proactively update
+// pages on a background thread rather than having readers constantly
+// require fetching pages when they advance versions.
 class DB::PageRefresher {
 public:
     PageRefresher(DB& db)

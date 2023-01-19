@@ -293,13 +293,12 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     auto retry_start_time = std::chrono::steady_clock::now();
     size_t num_identical_reads = 1;
     auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
-        constexpr auto max_retry_period = std::chrono::seconds(20);
+        constexpr auto max_retry_period = std::chrono::seconds(5);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
         if (elapsed > max_retry_period) {
-            auto str = util::format("Reader starvation detected after %1 seconds (retry_count=%2, from=%3, size=%4)",
+            auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);
-            std::cout << str << std::endl;
             throw DecryptionFailed(str);
         }
         else {
@@ -679,7 +678,7 @@ void EncryptedFileMapping::mark_for_refresh(
             if (m->contains_page(page_ndx)) {
                 size_t local_page_ndx = page_ndx - m->m_first_page;
                 if (is(m->m_page_state[local_page_ndx], UpToDate)) {
-                    // if we collide with a concurrent write (state Writable) we cannot mark
+                    // If we collide with a concurrent write (state Writable) we cannot mark
                     // the page for refresh. If we did, it might be refreshed and any partial
                     // write would be lost.
                     // Same goes for an already written page (state Dirty).
@@ -693,14 +692,13 @@ void EncryptedFileMapping::mark_for_refresh(
                     //
                     // Does the following argument save the day?
                     // Every writer to a page must have refreshed that page as part of executing
-                    // a read barrier. This, it the writer must have done while holding the write
+                    // a read barrier. The writer must have done this while holding the write
                     // lock. Consequently the page must already have been refreshed up to the version
                     // which a reader is requesting. The reader may have deferred mark for request,
                     // but it actually does not need it.
                     // a) there must be a read_barrier for every write_barrier
-                    // b) the writer mush have marked pages for refresh up till latest version,
+                    // b) the writer mush have marked pages for refresh up until the latest version,
                     // c) it must have done so while holding the write lock
-                    // Are a/b/c fullfilled?  Are they sufficient?
                     if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable) &&
                         (!pages_refreshed || (*pages_refreshed)[m].count(page_ndx) == 0)) {
                         if (pages_refreshed) {
