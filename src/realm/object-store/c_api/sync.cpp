@@ -288,26 +288,26 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
     return ret;
 }
 
-std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
+void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, std::error_code* error_code_out)
 {
-    auto error = std::error_code();
-    const realm_sync_error_category_e category = sync_error_code.category;
-    if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
-        error.assign(sync_error_code.value, realm::sync::client_error_category());
+    if (error_code_out) {
+        const realm_sync_error_category_e category = sync_error_code.category;
+        if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
+            error_code_out->assign(sync_error_code.value, realm::sync::client_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
+            error_code_out->assign(sync_error_code.value, realm::sync::protocol_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
+            error_code_out->assign(sync_error_code.value, std::system_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
+            error_code_out->assign(sync_error_code.value, realm::sync::network::resolve_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
+            error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
+        }
     }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
-        error.assign(sync_error_code.value, realm::sync::protocol_error_category());
-    }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
-        error.assign(sync_error_code.value, std::system_category());
-    }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
-        error.assign(sync_error_code.value, realm::sync::network::resolve_error_category());
-    }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
-        error.assign(sync_error_code.value, realm::util::error::basic_system_error_category());
-    }
-    return error;
 }
 
 static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
@@ -1003,7 +1003,8 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     REALM_ASSERT(session);
     realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
                                        error_message};
-    auto err = sync_error_to_error_code(sync_error);
+    std::error_code err;
+    sync_error_to_error_code(sync_error, &err);
     SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
 }
 

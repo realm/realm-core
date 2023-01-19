@@ -648,7 +648,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(error_code.message() == error.message);
         CHECK(message == error.message);
 
-        auto ec_check = c_api::sync_error_to_error_code(error);
+        std::error_code ec_check;
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == realm::sync::client_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
@@ -656,7 +657,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
 
-        ec_check = c_api::sync_error_to_error_code(error);
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == realm::sync::protocol_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
@@ -664,7 +665,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
 
-        ec_check = c_api::sync_error_to_error_code(error);
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == realm::sync::protocol_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
@@ -672,7 +673,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
 
-        ec_check = c_api::sync_error_to_error_code(error);
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == std::system_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
@@ -681,7 +682,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
         CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
 
-        ec_check = c_api::sync_error_to_error_code(error);
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == realm::sync::network::resolve_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
@@ -689,7 +690,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
 
-        ec_check = c_api::sync_error_to_error_code(error);
+        c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == realm::util::error::basic_system_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
     }
