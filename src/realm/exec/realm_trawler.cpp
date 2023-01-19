@@ -261,6 +261,7 @@ public:
             m_column_attributes.init(alloc, spec.get_ref(2));
             if (spec.size() > 5) {
                 // Must be a Core-6 file.
+                m_enum_keys.init(alloc, spec.get_ref(4));
                 m_column_colkeys.init(alloc, spec.get_ref(5));
             }
             else if (spec.size() > 3) {
@@ -331,6 +332,7 @@ private:
     Array m_column_types;
     Array m_column_names;
     Array m_column_attributes;
+    Array m_enum_keys;
     Array m_column_subspecs;
     Array m_column_colkeys;
     Array m_opposite_table;
@@ -580,6 +582,9 @@ void Table::print_columns(const Group& group) const
             type_str += "?";
         if (attr & realm::col_attr_Indexed)
             type_str += " (indexed)";
+        if (m_enum_keys.valid() && m_enum_keys.get_val(i)) {
+            type_str += " (enumerated)";
+        }
         std::string star = (m_pk_col && (m_pk_col == col_key)) ? "*" : "";
         std::cout << "        " << i << ": " << star << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }

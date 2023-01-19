@@ -257,6 +257,62 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
+TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
+    TestSyncManager init_sync_manager;
+    auto app = init_sync_manager.app();
+    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
+                                              dummy_device_id);
+
+    auto session = sync_session(
+        user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+    REQUIRE(sessions_are_active(*session));
+
+    SECTION("making the session inactive and then pausing it should end up in the paused state") {
+        session->force_close();
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
+        REQUIRE(sessions_are_inactive(*session));
+
+        session->pause();
+        EventLoop::main().run_until([&] {
+            return session->state() == SyncSession::State::Paused;
+        });
+        REQUIRE(session->state() == SyncSession::State::Paused);
+    }
+
+    SECTION("pausing from the active state should end up in the paused state") {
+        session->pause();
+        EventLoop::main().run_until([&] {
+            return session->state() == SyncSession::State::Paused;
+        });
+        REQUIRE(session->state() == SyncSession::State::Paused);
+
+        // Pausing it again should be a no-op
+        session->pause();
+        REQUIRE(session->state() == SyncSession::State::Paused);
+
+        // "Logging out" the session should be a no-op.
+        session->force_close();
+        REQUIRE(session->state() == SyncSession::State::Paused);
+    }
+
+    // Reviving the session via revive_if_needed() should be a no-op.
+    session->revive_if_needed();
+    REQUIRE(session->state() == SyncSession::State::Paused);
+
+    // Only resume() can revive a paused session.
+    session->resume();
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+    REQUIRE(sessions_are_active(*session));
+}
+
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();

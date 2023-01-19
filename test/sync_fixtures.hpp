@@ -301,10 +301,11 @@ public:
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(util::Logger& logger, const network::Endpoint& endpoint, const HTTPRequest& request)
-        : logger{"HTTP client: ", logger}
+    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger_ptr, const network::Endpoint& endpoint,
+                      const HTTPRequest& request)
+        : logger{"HTTP client: ", logger_ptr}
         , m_endpoint{endpoint}
-        , m_http_client{*this, logger}
+        , m_http_client{*this, logger_ptr}
         , m_request{request}
     {
     }

@@ -72,6 +72,7 @@ static_assert(realm_sync_session_state_e(SyncSession::State::Dying) == RLM_SYNC_
 static_assert(realm_sync_session_state_e(SyncSession::State::Inactive) == RLM_SYNC_SESSION_STATE_INACTIVE);
 static_assert(realm_sync_session_state_e(SyncSession::State::WaitingForAccessToken) ==
               RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN);
+static_assert(realm_sync_session_state_e(SyncSession::State::Paused) == RLM_SYNC_SESSION_STATE_PAUSED);
 
 static_assert(realm_sync_connection_state_e(SyncSession::ConnectionState::Disconnected) ==
               RLM_SYNC_CONNECTION_STATE_DISCONNECTED);
@@ -909,12 +910,12 @@ RLM_API const char* realm_sync_session_get_file_path(const realm_sync_session_t*
 
 RLM_API void realm_sync_session_pause(realm_sync_session_t* session) noexcept
 {
-    (*session)->log_out();
+    (*session)->pause();
 }
 
 RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 {
-    (*session)->revive_if_needed();
+    (*session)->resume();
 }
 
 RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,

@@ -18,7 +18,7 @@ public:
     virtual ~Config() {}
 
     /// The Socket uses the caller supplied logger for logging.
-    virtual util::Logger& websocket_get_logger() noexcept = 0;
+    virtual const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept = 0;
 
     /// The Socket needs random numbers to satisfy the Websocket protocol.
     /// The caller must supply a random number generator.
