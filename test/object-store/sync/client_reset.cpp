@@ -153,16 +153,14 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             std::any(AnyDict{{"_id", obj_id}, {"value", int64_t(5)}, {partition.property_name, partition.value}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
-        reset_utils::wait_for_object_to_persist_to_atlas(app->current_user(), test_app_session.app_session(),
-                                                         "object", {{"_id", obj_id}, {"value", 5}});
     }
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 }
