@@ -132,7 +132,7 @@ TEST(HTTP_RequestResponse)
 
     std::thread server_thread{[&] {
         BufferedSocket c(server);
-        HTTPServer<BufferedSocket> http(c, *(test_context.logger));
+        HTTPServer<BufferedSocket> http(c, test_context.logger);
         acceptor.async_accept(c, [&](std::error_code ec) {
             CHECK(!ec);
             http.async_receive_request([&](HTTPRequest req, std::error_code ec) {
@@ -156,7 +156,7 @@ TEST(HTTP_RequestResponse)
     {
         network::Service client;
         BufferedSocket c(client);
-        HTTPClient<BufferedSocket> http(c, *(test_context.logger));
+        HTTPClient<BufferedSocket> http(c, test_context.logger);
         c.async_connect(ep, [&](std::error_code ec) {
             CHECK(!ec);
             HTTPRequest req;
@@ -313,8 +313,8 @@ struct FakeHTTPParser : HTTPParserBase {
     StringData body;
     std::error_code error;
 
-    FakeHTTPParser(util::Logger& logger)
-        : HTTPParserBase{logger}
+    FakeHTTPParser(const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParserBase{logger_ptr}
     {
     }
 
@@ -339,7 +339,7 @@ struct FakeHTTPParser : HTTPParserBase {
 
 TEST(HTTPParser_ParseHeaderLine)
 {
-    FakeHTTPParser p{*(test_context.logger)};
+    FakeHTTPParser p{test_context.logger};
 
     struct expect {
         bool success;
