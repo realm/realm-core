@@ -42,7 +42,7 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
                 };
             }
         default:
-            throw std::logic_error("Builtin section algorithm not implemented.");
+            throw LogicError(ErrorCodes::IllegalOperation, "Builtin section algorithm not implemented.");
     }
 }
 

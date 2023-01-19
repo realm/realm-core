@@ -81,7 +81,8 @@ struct WrapC {
 
     virtual realm_thread_safe_reference_t* get_thread_safe_reference() const
     {
-        throw std::logic_error{"Thread safe references cannot be created for this object type"};
+        throw LogicError{ErrorCodes::IllegalOperation,
+                         "Thread safe references cannot be created for this object type"};
     }
 };
 

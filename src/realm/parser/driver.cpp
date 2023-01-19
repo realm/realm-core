@@ -279,7 +279,7 @@ private:
     {
         Arguments::verify_ndx(n);
         if (is_argument_list(n)) {
-            throw std::invalid_argument(
+            throw InvalidQueryArgError(
                 util::format("Request for scalar argument at index %1 but a list was provided", n));
         }
 
@@ -403,8 +403,8 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
     if (!Mixed::is_numeric(left->get_type(), right->get_type())) {
         util::serializer::SerialisationState state;
         std::string op(&m_op, 1);
-        throw std::invalid_argument(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
-                                                 left->description(state), right->description(state)));
+        throw InvalidQueryArgError(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
+                                                left->description(state), right->description(state)));
     }
 
     switch (m_op) {
@@ -445,7 +445,7 @@ Query EqualityNode::visit(ParserDriver* drv)
                 }
                 else {
                     const Group* g = drv->m_base_table->get_parent_group();
-                    throw std::invalid_argument(util::format(
+                    throw InvalidQueryArgError(util::format(
                         "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
                         link_column->link_map().description(drv->m_serializer_state),
                         link_column->link_map().get_target_table()->get_class_name(),

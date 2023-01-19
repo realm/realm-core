@@ -477,7 +477,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         // realm_config_t is not sendable between threads
         auto config = cptr(realm_config_new());
         CHECK(!realm_create_thread_safe_reference(config.get()));
-        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
     }
 
     SECTION("realm_is_frozen() false by default") {
@@ -511,7 +511,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(len == 64);
 
             CHECK(!realm_config_set_encryption_key(config.get(), key, 63));
-            CHECK_ERR(RLM_ERR_LOGIC);
+            CHECK_ERR(RLM_ERR_INVALID_ENCRYPTION_KEY);
         }
 
         SECTION("realm_config_set_schema()") {
@@ -1656,7 +1656,7 @@ TEST_CASE("C API", "[c_api]") {
     SECTION("realm_remove_table()") {
         bool table_deleted = true;
         CHECK(!realm_remove_table(realm, "Foo", &table_deleted));
-        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK_ERR(RLM_ERR_INVALID_SCHEMA_CHANGE);
         CHECK(!table_deleted);
     }
 
@@ -4425,23 +4425,23 @@ TEST_CASE("C API", "[c_api]") {
 
             SECTION("type error") {
                 CHECK(!realm_object_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_list_from_thread_safe_reference(realm, foo_obj_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_set_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_dictionary_from_thread_safe_reference(realm, set_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_results_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_from_thread_safe_reference(list_tsr.get(), nullptr));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             }
 
             SECTION("non-sendable") {
                 auto c = cptr(realm_config_new());
                 CHECK(!realm_create_thread_safe_reference(c.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             }
         }
     }
