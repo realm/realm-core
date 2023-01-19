@@ -118,7 +118,8 @@ public:
     Results get_values() const;
 
     using CBFunc = util::UniqueFunction<void(DictionaryChangeSet)>;
-    NotificationToken add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array = {}) &;
+    NotificationToken
+    add_key_based_notification_callback(CBFunc cb, std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     Iterator begin() const;
     Iterator end() const;
