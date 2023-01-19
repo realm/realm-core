@@ -665,7 +665,6 @@ tasks:
 
 - name: fuzzer
   tags: ["for_pull_requests" ]
-  exec_timeout_secs: 60
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -674,6 +673,7 @@ tasks:
       target_to_build: realm-libfuzz
   pre:
   - command: shell.exec
+    timeout_secs: 120
     params:
       working_dir: realm-core/build/test/fuzzy_object_store/
       shell: bash
