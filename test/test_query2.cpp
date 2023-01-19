@@ -2785,7 +2785,8 @@ TEST_TYPES(Query_Link_MaximumSumAverage, TestLinkList, TestLinkSet, TestDictiona
     // 3: null null null
 
     ObjKeys keys({3, 5, 7, 9});
-    table1->create_objects(keys);
+    for (auto k : keys)
+        table1->create_object(k);
     auto it = table1->begin();
     it->set_all(123, 123.f, 123.);
     (++it)->set_all(456, 456.f, 456.);
@@ -2988,7 +2989,8 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
     // 1: 3 3.0
 
     ObjKeys keys({5, 6});
-    table1->create_objects(keys);
+    for (auto k : keys)
+        table1->create_object(k);
     table1->get_object(keys[0]).set_all(2, 2.0);
     table1->get_object(keys[1]).set_all(3, 3.0);
 
@@ -3060,7 +3062,8 @@ TEST(Query_CompareLinkedColumnVsColumn)
     // 1: 3 3.0
 
     ObjKeys keys({5, 6});
-    table1->create_objects(keys);
+    for (auto k : keys)
+        table1->create_object(k);
     table1->get_object(keys[0]).set_all(2, 2.0);
     table1->get_object(keys[1]).set_all(3, 3.0);
 
@@ -3113,7 +3116,8 @@ TEST(Query_CompareThroughUnaryLinks)
     // 2: 8 8.0 "def"
 
     ObjKeys keys({5, 6, 7});
-    table1->create_objects(keys);
+    for (auto k : keys)
+        table1->create_object(k);
     table1->get_object(keys[0]).set_all(2, 2.0, "abc");
     table1->get_object(keys[1]).set_all(3, 3.0, "def");
     table1->get_object(keys[2]).set_all(8, 8.0, "def");
@@ -3202,7 +3206,8 @@ TEST(Query_LinksToDeletedOrMovedRow)
     auto col_name = target->add_column(type_String, "name");
 
     ObjKeys keys({4, 6, 8});
-    target->create_objects(keys);
+    for (auto k : keys)
+        target->create_object(k);
     target->get_object(keys[0]).set(col_name, "A");
     target->get_object(keys[1]).set(col_name, "B");
     target->get_object(keys[2]).set(col_name, "C");

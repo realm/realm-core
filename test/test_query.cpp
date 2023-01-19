@@ -3918,9 +3918,12 @@ TEST(Query_SortLinkChains)
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
     ObjKeyVector t3_keys({20, 21, 22, 23});
-    t1->create_objects(t1_keys);
-    t2->create_objects(t2_keys);
-    t3->create_objects(t3_keys);
+    for (auto k : t1_keys)
+        t1->create_object(k);
+    for (auto k : t2_keys)
+        t2->create_object(k);
+    for (auto k : t3_keys)
+        t3->create_object(k);
 
     t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {
@@ -4525,8 +4528,10 @@ TEST(Query_DistinctAndSort)
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
-    t1->create_objects(t1_keys);
-    t2->create_objects(t2_keys);
+    for (auto k : t1_keys)
+        t1->create_object(k);
+    for (auto k : t2_keys)
+        t2->create_object(k);
 
     t1->get_object(t1_keys[0]).set_all(1, "A", t2_keys[1]);
     t1->get_object(t1_keys[1]).set_all(1, "A", t2_keys[0]);
@@ -4888,9 +4893,12 @@ TEST(Query_DistinctThroughLinks)
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
     ObjKeyVector t3_keys({20, 21, 22, 23});
-    t1->create_objects(t1_keys);
-    t2->create_objects(t2_keys);
-    t3->create_objects(t3_keys);
+    for (auto k : t1_keys)
+        t1->create_object(k);
+    for (auto k : t2_keys)
+        t2->create_object(k);
+    for (auto k : t3_keys)
+        t3->create_object(k);
 
     t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {

@@ -287,7 +287,7 @@ public:
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
-    void create_objects(const std::vector<ObjKey>& keys);
+    void create_objects(const std::vector<FieldValues>& values);
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {

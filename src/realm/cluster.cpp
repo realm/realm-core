@@ -729,6 +729,103 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     return ret;
 }
 
+template <class T>
+void Cluster::do_insert_rows(ColKey col, ValueIterator begin, size_t to_insert, int index)
+{
+    using U = typename util::RemoveOptional<typename T::value_type>::type;
+
+    T arr(m_alloc);
+    auto col_ndx = col.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
+    set_spec<T>(arr, col_ndx);
+    arr.init_from_parent();
+    auto it = begin;
+    for (size_t i = 0; i < to_insert; ++i, ++it) {
+        arr.add((*it)[index].value.get<U>());
+    }
+}
+
+ref_type Cluster::bulk_insert(ValueIterator begin, ValueIterator end, State& state)
+{
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+    size_t to_insert = size_t(end - begin);
+    if (to_insert + node_size() > cluster_node_size) {
+        to_insert = cluster_node_size - node_size();
+    }
+    if (to_insert) {
+        if (m_keys.is_attached()) {
+            auto last_key = m_keys.get(m_keys.size() - 1);
+            for (size_t i = 0; i < to_insert; i++) {
+                m_keys.add(++last_key);
+            }
+        }
+        else {
+            Array::set(s_key_ref_or_size_index,
+                       Array::get(s_key_ref_or_size_index) + (to_insert << 1)); // Increments size by to_insert
+        }
+
+        const FieldValues& first_row = *begin;
+        size_t index = 0;
+        for (auto& val : first_row) {
+            auto col_key = val.col_key;
+            auto col_ndx = col_key.get_index().val;
+            REALM_ASSERT(index == col_ndx);
+            index++;
+            if (col_key.is_collection()) {
+                ArrayRef arr(m_alloc);
+                arr.set_parent(this, col_ndx + s_first_col_index);
+                arr.init_from_parent();
+                for (size_t i = 0; i < to_insert; i++) {
+                    arr.add(0);
+                }
+                continue;
+            }
+
+            switch (col_key.get_type()) {
+                case col_type_Int:
+                    if (col_key.is_nullable()) {
+                        do_insert_rows<ArrayIntNull>(col_key, begin, to_insert, col_ndx);
+                    }
+                    else {
+                        do_insert_rows<ArrayInteger>(col_key, begin, to_insert, col_ndx);
+                    }
+                    break;
+                case col_type_String:
+                    do_insert_rows<ArrayString>(col_key, begin, to_insert, col_ndx);
+                    break;
+                case col_type_Timestamp:
+                    do_insert_rows<ArrayTimestamp>(col_key, begin, to_insert, col_ndx);
+                    break;
+                default:
+                    REALM_ASSERT_RELEASE(false);
+                    break;
+            }
+        }
+        size_t sz = size();
+        while (index < sz - s_first_col_index) {
+            ArrayBacklink arr(m_alloc);
+            arr.set_parent(this, index++ + s_first_col_index);
+            arr.init_from_parent();
+            for (size_t i = 0; i < to_insert; i++) {
+                arr.add(0);
+            }
+        }
+
+        begin += to_insert;
+    }
+    if (begin == end) {
+        return 0;
+    }
+    Cluster new_leaf(0, m_alloc, m_tree_top);
+    new_leaf.create();
+    new_leaf.bulk_insert(begin, end, state);
+    state.split_key = m_keys.is_attached() ? m_keys.get(cluster_node_size - 1) : cluster_node_size;
+    state.mem = new_leaf.get_mem();
+    state.index = 0;
+    return new_leaf.get_ref();
+}
+
 bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const noexcept
 {
     state.mem = get_mem();

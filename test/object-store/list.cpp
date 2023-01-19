@@ -80,7 +80,8 @@ TEST_CASE("list") {
         lv2->add(target_keys[i]);
 
     ObjKeys other_target_keys({3, 5, 7, 9, 11, 13, 15, 17, 19, 21});
-    other_target->create_objects(other_target_keys);
+    for (auto k : other_target_keys)
+        other_target->create_object(k);
     for (int i = 0; i < 10; ++i)
         other_target->get_object(other_target_keys[i]).set_all(i);
 

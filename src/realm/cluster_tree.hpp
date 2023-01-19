@@ -79,10 +79,6 @@ public:
     {
         return size() == 0;
     }
-    int64_t get_last_key_value() const
-    {
-        return m_root->get_last_key_value();
-    }
     MemRef ensure_writeable(ObjKey k)
     {
         return m_root->ensure_writeable(k);
@@ -131,6 +127,7 @@ public:
 
     // Create and return object
     Obj insert(ObjKey k, const FieldValues& values);
+    void bulk_insert(const std::vector<FieldValues>& values);
 
     // Lookup and return object
     Obj get(ObjKey k) const

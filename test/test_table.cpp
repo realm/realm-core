@@ -3383,7 +3383,8 @@ TEST(Table_object_by_index)
 
     ObjKeys keys({17, 4, 345, 65, 1, 46, 93, 43, 76, 123, 33, 42, 99, 53, 52, 256, 2}); // 17 elements
     std::map<ObjKey, size_t> positions;
-    table.create_objects(keys);
+    for (auto k : keys)
+        table.create_object(k);
     size_t sz = table.size();
     CHECK_EQUAL(sz, keys.size());
     for (size_t i = 0; i < sz; i++) {
@@ -5931,6 +5932,42 @@ TEST(Table_FullTextIndex)
     CHECK(index->is_fulltext_index());
     TableView res = t->find_all_fulltext(col, "spaces with");
     CHECK_EQUAL(2, res.size());
+}
+
+TEST(Table_BulkLoad)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto db = DB::create(make_in_realm_history(), path);
+    auto wt = db->start_write();
+    auto t = wt->add_table("foo");
+    auto col1 = t->add_column(type_String, "str", true);
+    auto col2 = t->add_column(type_Int, "int");
+    auto col3 = t->add_column(type_Timestamp, "date");
+    wt->commit_and_continue_as_read();
+    constexpr size_t batch_size = 4;
+    constexpr size_t nb_rounds = 100;
+    for (size_t round = 0; round < nb_rounds; round++) {
+        wt->promote_to_write();
+        std::vector<FieldValues> values;
+        std::vector<std::string> buffer(batch_size);
+        for (size_t i = 0; i < batch_size; i++) {
+            values.emplace_back();
+            FieldValues& v = values.back();
+            Timestamp t(std::chrono::system_clock::now());
+            buffer[i] = ObjectId::gen().to_string();
+            v.insert(col1, StringData(buffer[i]), false);
+            v.insert(col2, int64_t(i + round * batch_size), false);
+            v.insert(col3, t, false);
+        }
+        t->create_objects(values);
+        wt->commit_and_continue_as_read();
+    }
+    CHECK_EQUAL(t->size(), batch_size * nb_rounds);
+    int64_t val = 0;
+    for (auto o : *t) {
+        CHECK_EQUAL(o.get<Int>(col2), val++);
+    }
+    // wt->to_json(std::cout);
 }
 
 #endif // TEST_TABLE

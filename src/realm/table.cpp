@@ -3386,11 +3386,9 @@ void Table::create_objects(size_t number, std::vector<ObjKey>& keys)
     }
 }
 
-void Table::create_objects(const std::vector<ObjKey>& keys)
+void Table::create_objects(const std::vector<FieldValues>& values)
 {
-    for (auto k : keys) {
-        create_object(k);
-    }
+    m_clusters.bulk_insert(values);
 }
 
 void Table::dump_objects()
