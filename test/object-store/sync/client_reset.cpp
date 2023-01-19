@@ -108,6 +108,87 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
+TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::String},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
+
+    create_user_and_log_in(app);
+    SyncTestFile realm_config(app->current_user(), partition.value, schema);
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+            return;
+        }
+
+        if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
+            err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
+            return;
+        }
+
+        if (err.error_code == sync::ClientError::auto_client_reset_failure &&
+            err.message == "A fatal error occured during client reset: 'Operation canceled'") {
+            return;
+        }
+
+        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+    };
+
+    auto realm = Realm::get_shared_realm(realm_config);
+    auto obj_id = ObjectId::gen();
+    {
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "object",
+                       std::any(AnyDict{{"_id", obj_id},
+                                        {"value", std::string{"hello world"}},
+                                        {partition.property_name, partition.value}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        realm->sync_session()->pause();
+    }
+
+    reset_utils::trigger_client_reset(test_app_session.app_session());
+    {
+        SyncTestFile realm_config(app->current_user(), partition.value, schema);
+        auto second_realm = Realm::get_shared_realm(realm_config);
+
+        second_realm->begin_transaction();
+        CppContext c(second_realm);
+        for (size_t i = 0; i < 100; ++i) {
+            Object::create(c, second_realm, "object",
+                           std::any(AnyDict{{"_id", ObjectId::gen()},
+                                            {"value", random_string(1024 * 128)},
+                                            {partition.property_name, partition.value}}));
+        }
+        second_realm->commit_transaction();
+
+        wait_for_upload(*second_realm);
+    }
+
+    realm->sync_session()->resume();
+    timed_wait_for([&] {
+        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+    });
+    realm->sync_session()->pause();
+    realm->sync_session()->resume();
+    wait_for_download(*realm);
+}
+
 TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
