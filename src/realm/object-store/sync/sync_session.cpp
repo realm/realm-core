@@ -132,6 +132,26 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
+    do_become_inactive(std::move(lock), ec);
+}
+
+void SyncSession::become_paused(util::CheckedUniqueLock lock)
+{
+    REALM_ASSERT(m_state != State::Paused);
+    auto old_state = m_state;
+    m_state = State::Paused;
+
+    // Nothing to do if we're already inactive besides update the state.
+    if (old_state == State::Inactive) {
+        m_state_mutex.unlock(lock);
+        return;
+    }
+
+    do_become_inactive(std::move(lock), {});
+}
+
+void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, std::error_code ec)
+{
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
     // we are not able to get the callback.
@@ -653,7 +673,7 @@ void SyncSession::handle_error(SyncError error)
 
     // Dont't bother invoking m_config.error_handler if the sync is inactive.
     // It does not make sense to call the handler when the session is closed.
-    if (m_state == State::Inactive) {
+    if (m_state == State::Inactive || m_state == State::Paused) {
         return;
     }
 
@@ -882,6 +902,7 @@ void SyncSession::nonsync_transact_notify(sync::version_type version)
             break;
         case State::Dying:
         case State::Inactive:
+        case State::Paused:
             break;
     }
 }
@@ -892,25 +913,12 @@ void SyncSession::revive_if_needed()
     switch (m_state) {
         case State::Active:
         case State::WaitingForAccessToken:
+        case State::Paused:
             return;
         case State::Dying:
-        case State::Inactive: {
-            // Revive.
-            auto u = user();
-            if (!u || !u->access_token_refresh_required()) {
-                become_active();
-                return;
-            }
-
-            become_waiting_for_access_token();
-            // Release the lock for SDKs with a single threaded
-            // networking implementation such as our test suite
-            // so that the update can trigger a state change from
-            // the completion handler.
-            lock.unlock();
-            initiate_access_token_refresh();
+        case State::Inactive:
+            do_revive(std::move(lock));
             break;
-        }
     }
 }
 
@@ -924,11 +932,12 @@ void SyncSession::handle_reconnect()
         case State::Dying:
         case State::Inactive:
         case State::WaitingForAccessToken:
+        case State::Paused:
             break;
     }
 }
 
-void SyncSession::log_out()
+void SyncSession::force_close()
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     switch (m_state) {
@@ -938,8 +947,57 @@ void SyncSession::log_out()
             become_inactive(std::move(lock));
             break;
         case State::Inactive:
+        case State::Paused:
             break;
     }
+}
+
+void SyncSession::pause()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+        case State::Dying:
+        case State::WaitingForAccessToken:
+        case State::Inactive:
+            become_paused(std::move(lock));
+            break;
+        case State::Paused:
+            break;
+    }
+}
+
+void SyncSession::resume()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    switch (m_state) {
+        case State::Active:
+        case State::WaitingForAccessToken:
+            return;
+        case State::Paused:
+        case State::Dying:
+        case State::Inactive:
+            do_revive(std::move(lock));
+            break;
+    }
+}
+
+void SyncSession::do_revive(util::CheckedUniqueLock&& lock)
+{
+    auto u = user();
+    if (!u || !u->access_token_refresh_required()) {
+        become_active();
+        m_state_mutex.unlock(lock);
+        return;
+    }
+
+    become_waiting_for_access_token();
+    // Release the lock for SDKs with a single threaded
+    // networking implementation such as our test suite
+    // so that the update can trigger a state change from
+    // the completion handler.
+    m_state_mutex.unlock(lock);
+    initiate_access_token_refresh();
 }
 
 void SyncSession::close()
@@ -970,6 +1028,10 @@ void SyncSession::close(util::CheckedUniqueLock lock)
         case State::Dying:
             m_state_mutex.unlock(lock);
             break;
+        case State::Paused:
+            // The paused state is sticky, so we don't transition to inactive here if we're already paused.
+            m_state_mutex.unlock(lock);
+            break;
         case State::Inactive: {
             if (m_sync_manager) {
                 m_sync_manager->unregister_session(m_db->get_path());
@@ -994,7 +1056,7 @@ void SyncSession::shutdown_and_wait()
         // Realm file to be closed. This works so long as this SyncSession object remains in the
         // `inactive` state after the invocation of shutdown_and_wait().
         util::CheckedUniqueLock lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             become_inactive(std::move(lock));
         }
     }
@@ -1111,7 +1173,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
 {
     while (true) {
         util::CheckedUniqueLock state_lock(m_state_mutex);
-        if (m_state != State::Inactive) {
+        if (m_state != State::Inactive && m_state != State::Paused) {
             // Changing the state releases the lock, which means that by the
             // time we reacquire the lock the state may have changed again
             // (either due to one of the callbacks being invoked or another
@@ -1122,7 +1184,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
         }
 
         util::CheckedUniqueLock config_lock(m_config_mutex);
-        REALM_ASSERT(m_state == State::Inactive);
+        REALM_ASSERT(m_state == State::Inactive || m_state == State::Paused);
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.sync_config->user == new_config.user);
         m_config.sync_config = std::make_shared<SyncConfig>(std::move(new_config));

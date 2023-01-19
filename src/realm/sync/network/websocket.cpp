@@ -568,8 +568,9 @@ class WebSocket {
 public:
     WebSocket(websocket::Config& config)
         : m_config(config)
-        , m_logger(config.websocket_get_logger())
-        , m_frame_reader(config.websocket_get_logger(), m_is_client)
+        , m_logger_ptr(config.websocket_get_logger())
+        , m_logger{*m_logger_ptr}
+        , m_frame_reader(m_logger, m_is_client)
     {
         m_logger.debug("WebSocket::Websocket()");
     }
@@ -584,7 +585,7 @@ public:
 
         m_sec_websocket_key = make_random_sec_websocket_key(m_config.websocket_get_random());
 
-        m_http_client.reset(new HTTPClient<websocket::Config>(m_config, m_logger));
+        m_http_client.reset(new HTTPClient<websocket::Config>(m_config, m_logger_ptr));
         m_frame_reader.reset();
         HTTPRequest req;
         req.method = HTTPMethod::Get;
@@ -637,7 +638,7 @@ public:
 
         m_stopped = false;
         m_is_client = false;
-        m_http_server.reset(new HTTPServer<websocket::Config>(m_config, m_logger));
+        m_http_server.reset(new HTTPServer<websocket::Config>(m_config, m_logger_ptr));
         m_frame_reader.reset();
 
         auto handler = [this](HTTPRequest request, std::error_code ec) {
@@ -725,7 +726,7 @@ public:
 
 private:
     websocket::Config& m_config;
-    // websocket is owned by the server or websocket factory, so a shared_ptr isn't needed
+    const std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
     FrameReader m_frame_reader;
 

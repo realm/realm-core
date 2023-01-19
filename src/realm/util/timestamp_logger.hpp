@@ -14,7 +14,7 @@ public:
     using Precision = TimestampFormatter::Precision;
     using Config = TimestampFormatter::Config;
 
-    explicit TimestampStderrLogger(Config = {}, Level = Level::info);
+    explicit TimestampStderrLogger(Config = {}, Level = Logger::default_log_level);
 
 protected:
     void do_log(Logger::Level, const std::string& message) final;

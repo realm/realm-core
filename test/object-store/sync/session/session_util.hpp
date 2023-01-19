@@ -43,6 +43,8 @@ struct StringMaker<SyncSession::State> {
                 return "Inactive";
             case SyncSession::State::WaitingForAccessToken:
                 return "WaitingForAccessToken";
+            case SyncSession::State::Paused:
+                return "Paused";
             default:
                 return "Unknown";
         }

@@ -412,19 +412,30 @@ private:
 
 class IntraTestLogger : public Logger {
 public:
-    IntraTestLogger(Logger& base_logger, Level threshold)
-        : util::Logger(threshold)
-        , m_base_logger(base_logger)
+    // Logger with a local log level used for the different test threads
+    IntraTestLogger(const std::shared_ptr<Logger>& base_logger_ptr, Level threshold)
+        : Logger(base_logger_ptr)
+        , m_local_log_level(threshold)
     {
+    }
+
+    Level get_level_threshold() const noexcept override
+    {
+        return m_local_log_level;
+    }
+
+    void set_level_threshold(Level level) noexcept override
+    {
+        m_local_log_level = level;
     }
 
     void do_log(Logger::Level level, std::string const& message) override final
     {
-        Logger::do_log(m_base_logger, level, message); // Throws
+        Logger::do_log(*m_base_logger_ptr, level, message); // Throws
     }
 
-private:
-    Logger& m_base_logger;
+protected:
+    Level m_local_log_level;
 };
 
 
@@ -455,9 +466,10 @@ public:
     int num_ended_threads = 0;
     int last_thread_to_end = -1;
 
-    SharedContextImpl(const TestList& tests, int repetitions, int threads, util::Logger& logger, Reporter& reporter,
-                      bool aof, util::Logger::Level itll)
-        : SharedContext(tests, repetitions, threads, logger)
+    SharedContextImpl(const TestList& tests, int repetitions, int threads,
+                      const std::shared_ptr<util::Logger>& logger_ptr, Reporter& reporter, bool aof,
+                      util::Logger::Level itll)
+        : SharedContext(tests, repetitions, threads, logger_ptr)
         , reporter(reporter)
         , abort_on_failure(aof)
         , intra_test_log_level(itll)
@@ -481,9 +493,10 @@ public:
     std::atomic<long> last_line_seen;
     bool errors_seen;
 
-    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger)
-        : ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.report_logger)
-        , intra_test_logger(std::make_shared<IntraTestLogger>(ThreadContext::report_logger, sc.intra_test_log_level))
+    ThreadContextImpl(SharedContextImpl& sc, int ti, const std::shared_ptr<util::Logger>& attached_logger)
+        : ThreadContext(sc, ti, attached_logger ? attached_logger : sc.report_logger_ptr)
+        , intra_test_logger(
+              std::make_shared<IntraTestLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
         , shared_context(sc)
     {
     }
@@ -544,7 +557,7 @@ bool TestList::run(Config config)
             root_logger = std::make_shared<util::StderrLogger>(); // Throws
         }
     }
-    util::ThreadSafeLogger shared_logger(root_logger);
+    std::shared_ptr<util::Logger> shared_logger = std::make_shared<util::ThreadSafeLogger>(root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -606,7 +619,7 @@ bool TestList::run(Config config)
                                      config.abort_on_failure, config.intra_test_log_level);
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
-    std::vector<std::unique_ptr<util::Logger>> loggers(num_threads);
+    std::vector<std::shared_ptr<util::Logger>> loggers(num_threads);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
         std::ostringstream formatter;
         formatter.imbue(std::locale::classic());
@@ -630,21 +643,21 @@ bool TestList::run(Config config)
                 formatter.str(std::string());
                 formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
-                shared_logger.info("Logging to %1", path);
+                shared_logger->info("Logging to %1", path);
                 loggers[i].reset(new util::FileLogger(path));
             }
         }
     }
     Timer timer;
     if (num_threads == 1) {
-        ThreadContextImpl thread_context(shared_context, 0, loggers[0].get());
+        ThreadContextImpl thread_context(shared_context, 0, loggers[0]);
         thread_context.run();
         thread_context.nonconcur_run();
     }
     else {
         std::vector<std::unique_ptr<ThreadContextImpl>> thread_contexts(num_threads);
         for (int i = 0; i < num_threads; ++i)
-            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
+            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i]));
 
         // First execute regular (concurrent) tests
         {
