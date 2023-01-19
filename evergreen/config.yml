@@ -894,7 +894,6 @@ buildvariants:
     enable_ubsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
-    extra_flags: -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=fuzzer"
     cmake_build_type: RelWithDebInfo
     run_with_encryption: On
     enable_fuzzer: On
