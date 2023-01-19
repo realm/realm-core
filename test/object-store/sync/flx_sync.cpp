@@ -2865,14 +2865,19 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 
     std::unique_ptr<std::thread> th;
     sync::version_type user_commit_version = UINT_FAST64_MAX;
+    sync::version_type bootstrap_version = UINT_FAST64_MAX;
     SharedRealm realm;
+    std::condition_variable cv;
+    std::mutex mutex;
+    bool allow_to_commit = false;
 
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
     auto shared_promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise));
     config.sync_config->on_sync_client_event_hook = [promise = std::move(shared_promise), &th, &realm,
-                                                     &user_commit_version](std::weak_ptr<SyncSession> weak_session,
-                                                                           const SyncClientHookData& data) {
+                                                     &user_commit_version, &bootstrap_version, &cv, &mutex,
+                                                     &allow_to_commit](std::weak_ptr<SyncSession> weak_session,
+                                                                       const SyncClientHookData& data) {
         if (data.query_version == 0) {
             return SyncClientHookAction::NoAction;
         }
@@ -2884,6 +2889,15 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
             return SyncClientHookAction::NoAction;
         }
         if (data.batch_state != sync::DownloadBatchState::MoreToCome) {
+            // Read version after bootstrap is done.
+            auto db = TestHelper::get_db(realm);
+            ReadTransaction rt(db);
+            bootstrap_version = rt.get_version();
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                allow_to_commit = true;
+            }
+            cv.notify_one();
             session->force_close();
             promise->emplace_value();
             return SyncClientHookAction::NoAction;
@@ -2899,6 +2913,13 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
             WriteTransaction wt(db);
             TableRef table = wt.get_table("class_TopLevel");
             table->create_object_with_primary_key(ObjectId::gen());
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                // Wait to commit until we read the final bootstrap version.
+                cv.wait(lock, [&] {
+                    return allow_to_commit;
+                });
+            }
             user_commit_version = wt.commit();
         };
         th = std::make_unique<std::thread>(std::move(func));
@@ -2918,9 +2939,7 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     th->join();
 
     // The user commit is the last one.
-    auto db = TestHelper::get_db(realm);
-    ReadTransaction rt(db);
-    CHECK(user_commit_version == rt.get_version());
+    CHECK(user_commit_version == bootstrap_version + 1);
 }
 
 } // namespace realm::app
