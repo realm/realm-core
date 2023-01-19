@@ -664,7 +664,8 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: ["for_pull_requests" ]
+  cron: @daily
+  patchable: false
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -673,12 +674,14 @@ tasks:
       target_to_build: realm-libfuzz
   pre:
   - command: shell.exec
-    timeout_secs: 120
+    timeout_secs: 3600
     params:
       working_dir: realm-core/build/test/fuzzy_object_store/
       shell: bash
       script: |-
         ./realm_libfuzz
+  timeout:
+  - func: "run hang analyzer"
 
 task_groups:
 - name: compile_test_and_package
@@ -900,6 +903,7 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer
+  #TODO: upload the result on s3
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
