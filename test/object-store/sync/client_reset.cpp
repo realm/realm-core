@@ -144,8 +144,10 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
-    auto obj_id = ObjectId::gen();
+    std::vector<ObjectId> expected_obj_ids;
     {
+        auto obj_id = ObjectId::gen();
+        expected_obj_ids.push_back(obj_id);
         realm->begin_transaction();
         CppContext c(realm);
         Object::create(c, realm, "object",
@@ -154,6 +156,8 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
                                         {partition.property_name, partition.value}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
+        reset_utils::wait_for_object_to_persist_to_atlas(app->current_user(), test_app_session.app_session(),
+                                                         "object", {{"_id", obj_id}});
         realm->sync_session()->pause();
     }
 
@@ -165,8 +169,10 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
         second_realm->begin_transaction();
         CppContext c(second_realm);
         for (size_t i = 0; i < 100; ++i) {
+            auto obj_id = ObjectId::gen();
+            expected_obj_ids.push_back(obj_id);
             Object::create(c, second_realm, "object",
-                           std::any(AnyDict{{"_id", ObjectId::gen()},
+                           std::any(AnyDict{{"_id", obj_id},
                                             {"value", random_string(1024 * 128)},
                                             {partition.property_name, partition.value}}));
         }
@@ -181,7 +187,20 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     });
     realm->sync_session()->pause();
     realm->sync_session()->resume();
+    wait_for_upload(*realm);
     wait_for_download(*realm);
+
+    realm->refresh();
+    auto table = realm->read_group().get_table("class_object");
+    REQUIRE(table->size() == expected_obj_ids.size());
+    std::vector<ObjectId> found_object_ids;
+    for (const auto& obj : *table) {
+        found_object_ids.push_back(obj.get_primary_key().get_object_id());
+    }
+
+    std::stable_sort(expected_obj_ids.begin(), expected_obj_ids.end());
+    std::stable_sort(found_object_ids.begin(), found_object_ids.end());
+    REQUIRE(expected_obj_ids == found_object_ids);
 }
 
 TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset]") {
