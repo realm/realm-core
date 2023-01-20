@@ -230,16 +230,27 @@ functions:
       optional: true
   
   "upload fuzzer results":
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |-
+        cpack=$(pwd)/${cmake_bindir}/cpack
+        if [ -f crash-* ]; then
+          cd realm-core/build/test/fuzzy_object_store/
+          $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-fuzzer-crash-report" ${package_flags|}
+          rm crash-*
+        fi
+
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/fuzzy_object_store/crash-*'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/crash-*'
+      local_file: 'realm-core/build/test/fuzzy_object_store/realm-fuzzer-crash-report.tar.gz'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash-report.tar.gz'
       bucket: mciuploads
       permissions: public-read
-      content_type: text/text
-      display_name: Fuzzer crash input strings
+      content_type: '${content_type|application/x-gzip}'
+      display_name: Fuzzer crash report
       optional: true
   
   "run hang analyzer":
