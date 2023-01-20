@@ -25,7 +25,10 @@
 #include <cassert>
 #include <cstring>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <vector>
+#include <list>
 #include <unordered_map>
 
 #include <sys/types.h>
@@ -51,7 +54,7 @@ template <>
 struct std::hash<chunk> {
     std::size_t operator()(chunk const& c) const noexcept
     {
-        std::size_t ret = c.chars[0] << 56;
+        std::size_t ret = (unsigned long)c.chars[0] << 56;
         ret ^= (unsigned long)c.chars[1] << 48;
         ret ^= (unsigned long)c.chars[2] << 40;
         ret ^= (unsigned long)c.chars[3] << 32;
@@ -162,6 +165,44 @@ struct results {
     }
 };
 
+template <typename work_type>
+class concurrent_queue {
+    std::list<work_type> queue;
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool open = true;
+
+public:
+    void close()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        open = false;
+        changed.notify_all();
+    }
+    void put(work_type work_item)
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        queue.push_back(work_item);
+        changed.notify_all();
+    }
+    work_type get()
+    { // throws if closed and queue empty
+        std::unique_lock<std::mutex> lock(mutex);
+        while (queue.size() == 0 && open) {
+            changed.wait(lock);
+        }
+        if (queue.size() > 0) {
+            auto e = queue.front();
+            queue.pop_front();
+            return e;
+        }
+        if (!open) {
+            throw std::runtime_error("Concurrent queue closed");
+        }
+        exit(-3);
+    }
+};
+
 int main(int argc, char* argv[])
 {
     const int limit = 1000000;
@@ -219,6 +260,7 @@ int main(int argc, char* argv[])
     off_t size = lseek(fd, 0, SEEK_END);
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
+    concurrent_queue<results*> to_writer;
 
     long total_lines = 0;
     std::thread writer([&]() {
@@ -321,11 +363,21 @@ int main(int argc, char* argv[])
                     p->join();
                 }
             }
+            to_writer.put(res);
             end = std::chrono::high_resolution_clock::now();
             ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
             start = end;
             {
+
+                try {
+                    res = to_writer.get();
+                }
+                catch (...) {
+                    std::cout << "Auch!" << std::endl;
+                    exit(1);
+                }
+
                 const Snapshot& s3 = db.open_snapshot();
                 db.release(std::move(s3));
                 Snapshot& s2 = db.create_changes(); // create_changes();
