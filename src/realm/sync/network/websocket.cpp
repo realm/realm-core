@@ -770,6 +770,8 @@ private:
             ec = Error::bad_response_2xx_successful;
         else if (status_code == 301)
             ec = Error::bad_response_301_moved_permanently;
+        else if (status_code == 308)
+            ec = Error::bad_response_308_permanent_redirect;
         else if (status_code >= 300 && status_code < 400)
             ec = Error::bad_response_3xx_redirection;
         else if (status_code == 401)
@@ -945,7 +947,7 @@ private:
             error_message = StringData(data + 2, size - 2);
         }
 
-        std::error_code error_code_with_category{error_code, websocket_close_status_category()};
+        std::error_code error_code_with_category{error_code, close_status_category()};
         return std::make_pair(error_code_with_category, error_message);
     }
 
@@ -1047,6 +1049,8 @@ const char* get_error_message(Error error_code)
             return "Bad WebSocket response 3xx redirection";
         case Error::bad_response_301_moved_permanently:
             return "Bad WebSocket response 301 moved permanently";
+        case Error::bad_response_308_permanent_redirect:
+            return "Bad WebSocket response 308 permanent redirect";
         case Error::bad_response_4xx_client_errors:
             return "Bad WebSocket response 4xx client errors";
         case Error::bad_response_401_unauthorized:
