@@ -26,6 +26,8 @@ namespace realm {
 // This is for example helpful to attach/detach the pthread to the JavaVM in order to be able to perform JNI calls.
 class BindingCallbackThreadObserver {
 public:
+    virtual ~BindingCallbackThreadObserver() = default;
+
     // This method is called just before the thread is started
     virtual void did_create_thread() = 0;
 

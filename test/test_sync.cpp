@@ -11,6 +11,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <chrono>
 
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
@@ -18,6 +19,7 @@
 #include <realm/history.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/list.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/client.hpp>
@@ -3732,8 +3734,6 @@ TEST(Sync_UploadDownloadProgress_6)
     // The check is that we reach this point without deadlocking.
 }
 
-// Event Loop TODO: re-enable test once errors are propogating
-#if 0
 TEST(Sync_MultipleSyncAgentsNotAllowed)
 {
     // At most one sync agent is allowed to participate in a Realm file access
@@ -3743,18 +3743,79 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
-    TEST_CLIENT_DB(db);
-    Client::Config config;
-    config.logger = test_context.logger;
-    config.reconnect_mode = ReconnectMode::testing;
-    Client client{config};
-    Session session_1{client, db, nullptr};
-    Session session_2{client, db, nullptr};
-    session_1.bind("realm://foo/bar", "blablabla");
-    session_2.bind("realm://foo/bar", "blablabla");
-    CHECK_THROW(client.run(), MultipleSyncAgents);
+    struct TestThreadObserver : public BindingCallbackThreadObserver {
+        // This method is called just before the thread is started
+        void did_create_thread() final
+        {
+            create_thread_called = true;
+        }
+
+        // This method is called just before the thread is being destroyed
+        void will_destroy_thread() final
+        {
+            destroy_thread_called = true;
+        }
+
+        // This method is called with any exception thrown by client.run().
+        void handle_error(std::exception const& e) final
+        {
+            std::lock_guard<std::mutex> lock(m_error_mutex);
+            error_message = e.what(); // save a copy of the exception
+            error_cv.notify_all();
+        }
+
+        // Wait up to timeout seconds for the exception passed to handle_error to be
+        // thrown by this function. Returns false if exception was not thrown before timeout.
+        bool wait_for_error(std::chrono::seconds timeout)
+        {
+            std::unique_lock<std::mutex> lock(m_error_mutex);
+            // Skip the wait if the exception has already been processed
+            if (error_message.empty()) {
+                if (!error_cv.wait_for(lock, timeout, [this]() {
+                        return !error_message.empty();
+                    })) {
+                    return false; // wait timed out - exception did not occur
+                }
+            }
+            return true;
+        }
+
+        // Return the captured exception or an empty std::exception if none captured
+        const std::string& get_error()
+        {
+            std::lock_guard<std::mutex> lock(m_error_mutex);
+            return error_message;
+        }
+
+        bool create_thread_called = false;
+        bool destroy_thread_called = false;
+        std::string error_message;
+        std::mutex m_error_mutex;
+        std::condition_variable error_cv;
+    };
+
+    auto callback_observer = std::make_unique<TestThreadObserver>();
+    g_binding_callback_thread_observer = callback_observer.get();
+    {
+        using namespace std::literals::chrono_literals;
+        TEST_CLIENT_DB(db);
+        Client::Config config;
+        config.logger = test_context.logger;
+        config.reconnect_mode = ReconnectMode::testing;
+        Client client{config};
+        Session session_1{client, db, nullptr};
+        Session session_2{client, db, nullptr};
+        session_1.bind("realm://foo/bar", "blablabla");
+        session_2.bind("realm://foo/bar", "blablabla");
+        // Wait up to 10 seconds for the exception to be thrown by event loop
+        CHECK(callback_observer->wait_for_error(10s));
+        CHECK_STRING_CONTAINS(callback_observer->get_error(),
+                              "Multiple sync agents attempted to join the same session");
+    }
+    CHECK(callback_observer->create_thread_called);
+    CHECK(callback_observer->destroy_thread_called);
+    g_binding_callback_thread_observer = nullptr;
 }
-#endif
 
 TEST(Sync_CancelReconnectDelay)
 {

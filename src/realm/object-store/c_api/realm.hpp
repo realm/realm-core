@@ -71,45 +71,59 @@ private:
 
 class CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
 public:
-    using ThreadCallback = util::UniqueFunction<void()>;
-    using ErrorCallback = util::UniqueFunction<void(const char*)>;
+    static void set(realm_on_object_store_thread_callback_t on_thread_create,
+                    realm_on_object_store_thread_callback_t on_thread_destroy,
+                    realm_on_object_store_error_callback_t on_error, realm_userdata_t userdata,
+                    realm_free_userdata_func_t free_userdata)
+    {
+        auto& observer = CBindingThreadObserver::get_instance();
+        observer.m_create_callback = on_thread_create;
+        observer.m_destroy_callback = on_thread_destroy;
+        observer.m_error_callback = on_error;
+        observer.m_user_data = UserdataPtr(userdata, free_userdata);
+        g_binding_callback_thread_observer = &observer;
+    }
 
-    static CBindingThreadObserver& create()
+    static void reset()
+    {
+        g_binding_callback_thread_observer = nullptr;
+        auto& observer = CBindingThreadObserver::get_instance();
+        observer.m_create_callback = nullptr;
+        observer.m_destroy_callback = nullptr;
+        observer.m_error_callback = nullptr;
+        observer.m_user_data.reset();
+    }
+
+    void did_create_thread() override
+    {
+        if (m_create_callback && m_user_data)
+            m_create_callback(m_user_data.get());
+    }
+
+    void will_destroy_thread() override
+    {
+        if (m_destroy_callback && m_user_data)
+            m_destroy_callback(m_user_data.get());
+    }
+
+    void handle_error(std::exception const& e) override
+    {
+        if (m_error_callback && m_user_data)
+            m_error_callback(m_user_data.get(), e.what());
+    }
+
+private:
+    static CBindingThreadObserver& get_instance()
     {
         static CBindingThreadObserver instance;
         return instance;
     }
 
-    void set(ThreadCallback&& on_create, ThreadCallback&& on_destroy, ErrorCallback&& on_error)
-    {
-        m_create_callback = std::move(on_create);
-        m_destroy_callback = std::move(on_destroy);
-        m_error_callback = std::move(on_error);
-    }
-
-    void did_create_thread() override
-    {
-        if (m_create_callback)
-            m_create_callback();
-    }
-
-    void will_destroy_thread() override
-    {
-        if (m_destroy_callback)
-            m_destroy_callback();
-    }
-
-    void handle_error(std::exception const& e) override
-    {
-        if (m_error_callback)
-            m_error_callback(e.what());
-    }
-
-private:
     CBindingThreadObserver() = default;
-    ThreadCallback m_create_callback;
-    ThreadCallback m_destroy_callback;
-    ErrorCallback m_error_callback;
+    realm_on_object_store_thread_callback_t m_create_callback = nullptr;
+    realm_on_object_store_thread_callback_t m_destroy_callback = nullptr;
+    realm_on_object_store_error_callback_t m_error_callback = nullptr;
+    UserdataPtr m_user_data;
 };
 
 #endif // REALM_ENABLE_SYNC

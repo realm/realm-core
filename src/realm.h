@@ -4069,17 +4069,20 @@ typedef struct realm_thread_observer_token realm_thread_observer_token_t;
 
 /**
  * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
- * runs.
+ * runs. There can only be one callback handler registered at a time. Call realm_release() on the returned token
+ * pointer before assigning a new set of callback handlers.
  * @param on_thread_create callback invoked when the object store thread is created
  * @param on_thread_destroy callback invoked when the object store thread is destroyed
  * @param on_error callback invoked to signal to the listener that some error has occured.
+ * @param user_data pointer to user defined data that is provided to each of the callback functions
+ * @param free_userdata callback invoked when the user_data is to be freed
  * @return a token that has to be released in order to stop receiving notifications
  */
 RLM_API realm_thread_observer_token_t*
 realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
                                            realm_on_object_store_thread_callback_t on_thread_destroy,
-                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t,
-                                           realm_free_userdata_func_t free_userdata);
+                                           realm_on_object_store_error_callback_t on_error,
+                                           realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
 
 #endif // REALM_ENABLE_SYNC
 
