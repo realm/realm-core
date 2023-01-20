@@ -118,6 +118,32 @@ struct string_compressor {
     int64_t total_chars = 0;
 };
 
+struct compressor_driver {
+    struct entry {
+        long* res;
+        const char* first;
+        const char* last;
+    };
+    std::vector<entry> work;
+    string_compressor& compressor;
+    compressor_driver(string_compressor& compressor, long size)
+        : compressor(compressor)
+    {
+        work.reserve(size);
+    }
+    void add_to_work(long* res, const char* first, const char* last)
+    {
+        work.push_back({res, first, last});
+    }
+    void perform()
+    {
+        for (auto& entry : work) {
+            *entry.res = compressor.handle(entry.first, entry.last);
+        }
+        work.clear();
+    }
+};
+
 struct results {
     long* values;
     long first_line;
@@ -237,13 +263,16 @@ int main(int argc, char* argv[])
             });
             db.release(std::move(s3));
         }
+        long step_size = 1000000;
         std::cout << std::endl << "Ingesting data (" << total_lines << " objects).... " << std::endl;
         long num_line = 0;
         std::vector<std::unique_ptr<string_compressor>> compressors;
         compressors.resize(105);
+        std::vector<std::unique_ptr<compressor_driver>> drivers;
+        drivers.resize(105);
         const char* read_ptr = (const char*)file_start;
         while (read_ptr < file_start + size) {
-            long limit = std::min(total_lines, num_line + 1000000);
+            long limit = std::min(total_lines, num_line + step_size);
             start = std::chrono::high_resolution_clock::now();
             results* res = new results(num_line, limit - num_line, max_fields);
             while (num_line < limit) {
@@ -260,10 +289,13 @@ int main(int argc, char* argv[])
                     if (compressible[num_value] == 's') {
                         if (!compressors[num_value]) {
                             compressors[num_value] = std::make_unique<string_compressor>();
+                            drivers[num_value] =
+                                std::make_unique<compressor_driver>(*compressors[num_value], 1000000);
                         }
                         auto& compressor = *compressors[num_value];
-                        long compressed = compressor.handle(read_ptr, read_ptr2);
-                        line_results[num_value] = compressed;
+                        // long compressed = compressor.handle(read_ptr, read_ptr2);
+                        // line_results[num_value] = compressed;
+                        drivers[num_value]->add_to_work(line_results + num_value, read_ptr, read_ptr2);
                     }
                     else if (read_ptr == read_ptr2)
                         line_results[num_value] = 0;
@@ -274,6 +306,25 @@ int main(int argc, char* argv[])
                     read_ptr = read_ptr2 + 1;
                 }
             }
+            end = std::chrono::high_resolution_clock::now();
+            std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << std::endl << "   ...read in " << ms.count() << " millisecs" << std::endl;
+            start = end;
+            {
+                std::vector<std::unique_ptr<std::thread>> threads;
+                for (auto& p : drivers) {
+                    if (p) {
+                        threads.push_back(std::make_unique<std::thread>([&]() { p->perform(); }));
+                    }
+                }
+                for (auto& p : threads) {
+                    p->join();
+                }
+            }
+            end = std::chrono::high_resolution_clock::now();
+            ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
+            start = end;
             {
                 const Snapshot& s3 = db.open_snapshot();
                 db.release(std::move(s3));
@@ -286,10 +337,10 @@ int main(int argc, char* argv[])
                     Object o;
                     if (num_value == 0) {
                         auto row = row_order[num_line];
-                        if (!s2.exists(t, row)) {
-                            std::cout << "Weird - " << num_line << " with key " << row.key << " is missing"
-                                      << std::endl;
-                        }
+                        // if (!s2.exists(t, row)) {
+                        //     std::cout << "Weird - " << num_line << " with key " << row.key << " is missing"
+                        //               << std::endl;
+                        // }
                         o = s2.get(t, row);
                     }
                     auto val = *val_ptr++;
@@ -301,16 +352,13 @@ int main(int argc, char* argv[])
                 }
                 delete res;
                 end = std::chrono::high_resolution_clock::now();
-                std::chrono::nanoseconds ns =
-                    std::chrono::duration_cast<std::chrono::nanoseconds>(end - start) / limit;
-                std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
-                s2.print_stat(std::cout);
-                std::cout << "Committing to stable storage" << std::flush;
+                std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << "   ...transaction built in " << ms.count() << " millisecs" << std::endl;
                 start = std::chrono::high_resolution_clock::now();
                 db.commit(std::move(s2));
                 end = std::chrono::high_resolution_clock::now();
-                std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                std::cout << "   ...done in " << ms.count() << " msecs" << std::endl << std::endl;
+                ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << "   ...committed in " << ms.count() << " msecs" << std::endl << std::endl;
             }
         }
         uint64_t from_size = 0;
