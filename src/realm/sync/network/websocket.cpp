@@ -945,7 +945,7 @@ private:
             error_message = StringData(data + 2, size - 2);
         }
 
-        std::error_code error_code_with_category{error_code, websocket::websocket_close_status_category()};
+        std::error_code error_code_with_category{error_code, websocket_close_status_category()};
         return std::make_pair(error_code_with_category, error_message);
     }
 
@@ -1096,48 +1096,6 @@ public:
 
 ErrorCategoryImpl g_error_category;
 
-class CloseStatusErrorCategory : public std::error_category {
-    const char* name() const noexcept final
-    {
-        return "realm::sync::websocket::CloseStatus";
-    }
-    std::string message(int error_code) const final
-    {
-        // Converts an error_code to one of the pre-defined status codes in
-        // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        switch (error_code) {
-            case 1000:
-                return "normal closure";
-            case 1001:
-                return "endpoint going away";
-            case 1002:
-                return "protocol error";
-            case 1003:
-                return "invalid data type";
-            case 1004:
-                return "reserved";
-            case 1005:
-                return "no status code present";
-            case 1006:
-                return "no close control frame sent";
-            case 1007:
-                return "message data type mis-match";
-            case 1008:
-                return "policy violation";
-            case 1009:
-                return "message too big";
-            case 1010:
-                return "missing extension";
-            case 1011:
-                return "unexpected error";
-            case 1015:
-                return "TLS handshake failure";
-            default:
-                return "unknown error";
-        };
-    }
-};
-
 } // unnamed namespace
 
 
@@ -1257,12 +1215,6 @@ util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& re
 const std::error_category& websocket::error_category() noexcept
 {
     return g_error_category;
-}
-
-const std::error_category& websocket::websocket_close_status_category() noexcept
-{
-    static const CloseStatusErrorCategory category = {};
-    return category;
 }
 
 std::error_code websocket::make_error_code(Error error_code) noexcept

@@ -33,6 +33,14 @@ StringData ErrorCodes::error_string(Error code)
             return "BrokenPromise";
         case ErrorCodes::OperationAborted:
             return "OperationAborted";
+        case ErrorCodes::ReadError:
+            return "ReadError";
+        case ErrorCodes::WriteError:
+            return "WriteError";
+        case ErrorCodes::ResolveFailed:
+            return "ResolveFailed";
+        case ErrorCodes::ConnectionFailed:
+            return "ConnectionFailed";
 
         /// WebSocket error codes
         case ErrorCodes::WebSocket_GoingAway:
@@ -60,11 +68,56 @@ StringData ErrorCodes::error_string(Error code)
         case ErrorCodes::WebSocket_TLSHandshakeFailed:
             return "WebSocket: TLS Handshake Failed";
 
+        /// WebSocket Errors - reported by server
+        case ErrorCodes::WebSocket_Unauthorized:
+            return "WebSocket: Unauthorized";
+        case ErrorCodes::WebSocket_Forbidden:
+            return "WebSocket: Forbidden";
+        case ErrorCodes::WebSocket_MovedPermanently:
+            return "WebSocket: Moved Permanently";
+        case ErrorCodes::WebSocket_Client_Too_Old:
+            return "WebSocket: Client Too Old";
+        case ErrorCodes::WebSocket_Client_Too_New:
+            return "WebSocket: Client Too New";
+        case ErrorCodes::WebSocket_Protocol_Mismatch:
+            return "WebSocket: Protocol Mismatch";
+
         case ErrorCodes::UnknownError:
             [[fallthrough]];
         default:
             return "UnknownError";
     }
+}
+
+namespace {
+
+class CloseStatusErrorCategory : public std::error_category {
+    const char* name() const noexcept final
+    {
+        return "realm::sync::websocket::CloseStatus";
+    }
+    std::string message(int error_code) const final
+    {
+        // Converts an error_code to one of the pre-defined status codes in
+        // https://tools.ietf.org/html/rfc6455#section-7.4.1
+        if (error_code == 1000 || error_code == 0) {
+            return ErrorCodes::error_string(ErrorCodes::OK);
+        }
+        return ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code));
+    }
+};
+
+} // unnamed namespace
+
+const std::error_category& websocket_close_status_category() noexcept
+{
+    static const CloseStatusErrorCategory category = {};
+    return category;
+}
+
+std::error_code make_error_code(ErrorCodes::Error error) noexcept
+{
+    return std::error_code{error, websocket_close_status_category()};
 }
 
 } // namespace realm

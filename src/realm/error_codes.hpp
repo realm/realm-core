@@ -36,6 +36,10 @@ public:
         LogicError = 3,
         BrokenPromise = 4,
         OperationAborted = 5,
+        ReadError = 7,
+        WriteError = 8,
+        ResolveFailed = 9,
+        ConnectionFailed = 10,
 
         /// WebSocket Errors
         // WebSocket_OK = 1000 is not used, just use OK instead
@@ -51,9 +55,21 @@ public:
         WebSocket_InavalidExtension = 1010,
         WebSocket_InternalServerError = 1011,
         WebSocket_TLSHandshakeFailed = 1015, // Used by default WebSocket
+
+        /// WebSocket Errors - reported by server
+        WebSocket_Unauthorized = 4001,
+        WebSocket_Forbidden = 4002,
+        WebSocket_MovedPermanently = 4003,
+        WebSocket_Client_Too_Old = 4004,
+        WebSocket_Client_Too_New = 4005,
+        WebSocket_Protocol_Mismatch = 4006,
+        WebSocket_5xx_Server_Errors = 4007,
     };
 
     static StringData error_string(Error code);
 };
+
+const std::error_category& websocket_close_status_category() noexcept;
+std::error_code make_error_code(ErrorCodes::Error) noexcept;
 
 } // namespace realm
