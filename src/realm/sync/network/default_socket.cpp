@@ -78,26 +78,33 @@ private:
                                            const std::string_view* body) override
     {
         ErrorCodes::Error error;
+        bool was_clean;
 
         if (ec == websocket::Error::bad_response_3xx_redirection ||
-            ec == websocket::Error::bad_response_301_moved_permanently) {
+            ec == websocket::Error::bad_response_301_moved_permanently ||
+            ec == websocket::Error::bad_response_308_permanent_redirect) {
             error = ErrorCodes::WebSocket_MovedPermanently;
+            was_clean = true;
         }
         else if (ec == websocket::Error::bad_response_401_unauthorized) {
             error = ErrorCodes::WebSocket_Unauthorized;
+            was_clean = true;
         }
         else if (ec == websocket::Error::bad_response_403_forbidden) {
             error = ErrorCodes::WebSocket_Forbidden;
+            was_clean = true;
         }
         else if (ec == websocket::Error::bad_response_5xx_server_error ||
                  ec == websocket::Error::bad_response_500_internal_server_error ||
                  ec == websocket::Error::bad_response_502_bad_gateway ||
                  ec == websocket::Error::bad_response_503_service_unavailable ||
                  ec == websocket::Error::bad_response_504_gateway_timeout) {
-            error = ErrorCodes::WebSocket_5xx_Server_Errors;
+            error = ErrorCodes::WebSocket_InternalServerError;
+            was_clean = false;
         }
         else {
             error = ErrorCodes::WebSocket_Protocol_Mismatch;
+            was_clean = true;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
                 auto i = body->find(identifier);
@@ -112,13 +119,12 @@ private:
                         error = ErrorCodes::WebSocket_Client_Too_Old;
                     }
                     else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                        error = ErrorCodes::WebSocket_Client_Too_Old;
+                        error = ErrorCodes::WebSocket_Client_Too_New;
                     }
                 }
             }
         }
 
-        constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean, Status{error, ec.message()});
     }
     void websocket_protocol_error_handler(std::error_code ec) override

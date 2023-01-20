@@ -63,13 +63,12 @@ public:
         WebSocket_Client_Too_Old = 4004,
         WebSocket_Client_Too_New = 4005,
         WebSocket_Protocol_Mismatch = 4006,
-        WebSocket_5xx_Server_Errors = 4007,
     };
 
     static StringData error_string(Error code);
 };
 
-const std::error_category& websocket_close_status_category() noexcept;
+const std::error_category& close_status_category() noexcept;
 std::error_code make_error_code(ErrorCodes::Error) noexcept;
 
 } // namespace realm

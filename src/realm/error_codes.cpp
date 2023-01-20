@@ -91,7 +91,7 @@ StringData ErrorCodes::error_string(Error code)
 
 namespace {
 
-class CloseStatusErrorCategory : public std::error_category {
+class StatusErrorCategory : public std::error_category {
     const char* name() const noexcept final
     {
         return "realm::sync::websocket::CloseStatus";
@@ -109,15 +109,15 @@ class CloseStatusErrorCategory : public std::error_category {
 
 } // unnamed namespace
 
-const std::error_category& websocket_close_status_category() noexcept
+const std::error_category& close_status_category() noexcept
 {
-    static const CloseStatusErrorCategory category = {};
+    static const StatusErrorCategory category = {};
     return category;
 }
 
 std::error_code make_error_code(ErrorCodes::Error error) noexcept
 {
-    return std::error_code{error, websocket_close_status_category()};
+    return std::error_code{error, close_status_category()};
 }
 
 } // namespace realm
