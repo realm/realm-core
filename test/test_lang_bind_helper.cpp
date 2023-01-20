@@ -3258,9 +3258,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
 struct EncryptedPageValidator {
     EncryptedPageValidator(const std::string& path)
     {
-#if !REALM_ENCRYPTION_VERIFICATION
-        return; // no sense in running without verification turned on
-#endif
+#if REALM_ENCRYPTION_VERIFICATION
         if (!SpawnedProcess::is_parent())
             return;
         std::string validate_path = path + ".validate";
@@ -3272,11 +3270,16 @@ struct EncryptedPageValidator {
         auto msg = util::format("Begin validation at %1\n", Timestamp(std::chrono::system_clock::now()));
         m_file.write(msg.data(), msg.size());
         m_file.sync();
+#else
+        static_cast<void>(path);
+#endif // REALM_ENCRYPTION_VERIFICATION
     }
     ~EncryptedPageValidator()
     {
-        m_file.close();
-        util::File::remove(m_file.get_path());
+        if (m_file.is_attached()) {
+            m_file.close();
+            util::File::remove(m_file.get_path());
+        }
     }
 
 private:
