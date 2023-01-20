@@ -228,7 +228,7 @@ functions:
       content_type: text/text
       display_name: install baas output
       optional: true
-
+  
   "run hang analyzer":
   - command: shell.exec
     params:
@@ -664,15 +664,8 @@ tasks:
         exit 1
 
 - name: fuzzer
-  cron: daily
-  patchable: false
+  tags: [ "test_suite"]
   commands:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      target_to_build: realm-libfuzz
-  pre:
   - command: shell.exec
     timeout_secs: 3600
     params:
@@ -680,8 +673,6 @@ tasks:
       shell: bash
       script: |-
         ./realm_libfuzz
-  timeout:
-  - func: "run hang analyzer"
 
 task_groups:
 - name: compile_test_and_package
@@ -753,6 +744,21 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - long-running-core-tests
+
+- name: fuzzer-tests
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: realm-libfuzz
+  teardown_task:
+  - func: "upload fuzzer results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - fuzzer
   
 buildvariants:
 - name: ubuntu2004
@@ -902,8 +908,10 @@ buildvariants:
     run_with_encryption: On
     enable_fuzzer: On
   tasks:
-  - name: fuzzer
-  #TODO: upload the result on s3
+  - name: fuzzer-tests
+    cron: "@daily"
+    patchable: false
+
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
