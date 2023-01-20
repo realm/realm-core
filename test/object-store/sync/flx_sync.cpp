@@ -2979,7 +2979,7 @@ TEST_CASE("flx: really big bootstraps", "[sync][flx][app]") {
     // TODO when BAAS-19105 is fixed we should be able to just wait for bootstrapping to be complete. For now though,
     // check that we get the error code we expect.
     auto err = error_pf.future.get();
-    REQUIRE(err.error_code == sync::ClientError::bad_changeset);
+    REQUIRE(err.error_code == sync::ClientError::bad_changeset_size);
 }
 
 } // namespace realm::app

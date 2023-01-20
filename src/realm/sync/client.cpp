@@ -759,7 +759,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
     catch (const LogicError& ex) {
         if (ex.kind() == LogicError::binary_too_big) {
-            IntegrationException ex(ClientError::bad_changeset,
+            IntegrationException ex(ClientError::bad_changeset_size,
                                     "bootstrap changeset too large to store in pending bootstrap store");
             on_integration_failure(ex);
             return true;
