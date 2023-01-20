@@ -27,6 +27,7 @@
 * Fix failures in Metrics_TransactionTimings core test ([#6164](https://github.com/realm/realm-core/issues/6164))
 * Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 * Add c_api error category for resolve errors instead of reporting unknown category, part 2. ([PR #6186](https://github.com/realm/realm-core/pull/6186))
+* Update ClientImpl::Connection and DefaultWebSocketImpl to use the new WebSocketObserver callbacks ([PR #6219](https://github.com/realm/realm-core/pull/6219))
 
 ----------------------------------------------
 
