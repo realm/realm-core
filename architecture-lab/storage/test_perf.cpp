@@ -281,7 +281,8 @@ int main(int argc, char* argv[])
                 auto num_line = res->first_line;
                 auto num_value = 0;
                 auto val_ptr = res->values;
-                while (num_line < res->num_lines) {
+                auto limit = res->first_line + res->num_lines;
+                while (num_line < limit) {
                     Object o;
                     if (num_value == 0) {
                         auto row = row_order[num_line];
