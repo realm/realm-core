@@ -171,8 +171,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_SYNC_LOGGING
-                   auto logger = new util::StderrLogger();
-                   logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
                    m_logger.reset(logger);
 #else
                    // Logging is disabled, use a NullLogger to prevent printing anything

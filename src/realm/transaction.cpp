@@ -271,7 +271,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     }
 }
 
-void Transaction::commit_and_continue_writing()
+VersionID Transaction::commit_and_continue_writing()
 {
     check_attached();
     if (m_transact_stage != DB::transact_Writing)
@@ -280,7 +280,7 @@ void Transaction::commit_and_continue_writing()
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();
 
-    db->do_commit(*this); // Throws
+    DB::version_type version = db->do_commit(*this); // Throws
 
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
@@ -295,6 +295,7 @@ void Transaction::commit_and_continue_writing()
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+    return VersionID{version, lock_after_commit.m_reader_idx};
 }
 
 TransactionRef Transaction::freeze()

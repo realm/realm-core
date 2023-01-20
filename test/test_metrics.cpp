@@ -796,7 +796,10 @@ NONCONCURRENT_TEST(Metrics_TransactionTimings)
                 metrics::TransactionInfo::TransactionType::write_transaction);
     CHECK_GREATER(transactions->at(3).get_transaction_time_nanoseconds(), 10'000);     // > 10us
     CHECK_LESS(transactions->at(3).get_transaction_time_nanoseconds(), 2'000'000'000); // <  2s
-    CHECK_GREATER(transactions->at(3).get_fsync_time_nanoseconds(), 0); // fsync on write takes some time
+    // This check returns 0 for get_fsync_time_nanoseconds if sync to disk is disabled
+    if (!get_disable_sync_to_disk()) {
+        CHECK_GREATER(transactions->at(3).get_fsync_time_nanoseconds(), 0); // fsync on write takes some time
+    }
 }
 
 

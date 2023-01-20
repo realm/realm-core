@@ -267,9 +267,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     util::CheckedUniqueLock lock(m_realm_mutex);
     set_config(config);
     if ((realm = do_get_cached_realm(config))) {
-        if (version) {
-            REALM_ASSERT(realm->read_transaction_version() == *version);
-        }
+        REALM_ASSERT(!version || realm->read_transaction_version() == *version);
         return realm;
     }
     do_get_realm(std::move(config), realm, version, lock);
@@ -289,15 +287,34 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Schedul
     return realm;
 }
 
+std::shared_ptr<Realm> RealmCoordinator::freeze_realm(const Realm& source_realm)
+{
+    std::shared_ptr<Realm> realm;
+    util::CheckedUniqueLock lock(m_realm_mutex);
+
+    auto version = source_realm.read_transaction_version();
+    auto scheduler = util::Scheduler::make_frozen(version);
+    if ((realm = do_get_cached_realm(source_realm.config(), scheduler))) {
+        return realm;
+    }
+
+    auto config = source_realm.config();
+    config.scheduler = scheduler;
+    realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
+    Realm::Internal::copy_schema(*realm, source_realm);
+    m_weak_realm_notifiers.emplace_back(realm, config.cache);
+    return realm;
+}
+
 ThreadSafeReference RealmCoordinator::get_unbound_realm()
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
-    do_get_realm(m_config, realm, none, lock);
+    do_get_realm(RealmConfig(m_config), realm, none, lock);
     return ThreadSafeReference(realm);
 }
 
-void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
     open_db();
@@ -324,6 +341,15 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     if (realm->config().audit_config)
         REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
 #endif
+
+    // Cached frozen Realms need to initialize their schema before releasing
+    // the lock as otherwise they could be read from the cache on another thread
+    // before the schema initialization happens. They'll never perform a write
+    // transaction, so unlike with live Realms this is safe to do.
+    if (config.cache && version && schema) {
+        realm->update_schema(std::move(*schema));
+        schema.reset();
+    }
 
     realm_lock.unlock_unchecked();
     if (schema) {

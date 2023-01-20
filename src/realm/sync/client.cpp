@@ -8,6 +8,7 @@
 #include "realm/util/optional.hpp"
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
@@ -213,6 +214,8 @@ public:
     void on_new_flx_subscription_set(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string body);
+
+    void handle_pending_client_reset_acknowledgement();
 
 private:
     ClientImpl& m_client;
@@ -731,6 +734,11 @@ void SessionImpl::on_resumed()
     m_wrapper.on_resumed(); // Throws
 }
 
+void SessionImpl::handle_pending_client_reset_acknowledgement()
+{
+    m_wrapper.handle_pending_client_reset_acknowledgement();
+}
+
 
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
@@ -797,11 +805,16 @@ void SessionImpl::process_pending_flx_bootstrap()
     int64_t query_version = -1;
     size_t changesets_processed = 0;
 
+    // Used to commit each batch after it was transformed.
+    TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
         auto start_time = std::chrono::steady_clock::now();
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // bootstrap store requires a write transaction itself.
+            transact->close();
             bootstrap_store->clear();
             return;
         }
@@ -818,6 +831,7 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
+            transact,
             [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
@@ -1642,6 +1656,49 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     }
 
     return m_sess->send_test_command(std::move(body));
+}
+
+void SessionWrapper::handle_pending_client_reset_acknowledgement()
+{
+    auto pending_reset = [&] {
+        auto ft = m_db->start_frozen();
+        return _impl::client_reset::has_pending_reset(ft);
+    }();
+    REALM_ASSERT(pending_reset);
+    m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
+                        pending_reset->time);
+    util::bind_ptr<SessionWrapper> self(this);
+    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](std::error_code ec) {
+        if (ec == util::error::operation_aborted) {
+            return;
+        }
+        auto& logger = self->m_sess->logger;
+        if (ec) {
+            logger.error("Error while tracking client reset acknowledgement: %1", ec.message());
+            return;
+        }
+
+        auto wt = self->m_db->start_write();
+        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
+        if (!cur_pending_reset) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
+                pending_reset.type, pending_reset.time);
+            return;
+        }
+        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
+                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
+        }
+        else {
+            logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
+                         "Removing cycle detection tracker.",
+                         pending_reset.type, pending_reset.time);
+        }
+        _impl::client_reset::remove_pending_client_resets(wt);
+        wt->commit();
+    });
 }
 
 // ################ ClientImpl::Connection ################

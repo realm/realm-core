@@ -194,8 +194,7 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
-    // An HTTPParserBase is tied to to an HTTPClient or HTTPServer, which are owned
-    // by either a Websocket or ServerImpl class, so no need for a shared_ptr
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     // FIXME: Generally useful?
@@ -206,8 +205,9 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& logger)
-        : logger{logger}
+    HTTPParserBase(const std::shared_ptr<util::Logger>& logger_ptr)
+        : logger_ptr{logger_ptr}
+        , logger{*logger_ptr}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.
@@ -255,8 +255,8 @@ struct HTTPParserBase {
 
 template <class Socket>
 struct HTTPParser : protected HTTPParserBase {
-    explicit HTTPParser(Socket& socket, util::Logger& logger)
-        : HTTPParserBase(logger)
+    explicit HTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParserBase(logger_ptr)
         , m_socket(socket)
     {
     }
@@ -346,8 +346,8 @@ template <class Socket>
 struct HTTPClient : protected HTTPParser<Socket> {
     using Handler = void(HTTPResponse, std::error_code);
 
-    explicit HTTPClient(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPClient(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
@@ -429,8 +429,8 @@ struct HTTPServer : protected HTTPParser<Socket> {
     using RequestHandler = void(HTTPRequest, std::error_code);
     using RespondHandler = void(std::error_code);
 
-    explicit HTTPServer(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPServer(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
