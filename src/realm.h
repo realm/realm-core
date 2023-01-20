@@ -3562,6 +3562,15 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
 } realm_sync_error_action_e;
 
+typedef enum realm_sync_error_resolve {
+    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND = 1,
+    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN = 2,
+    RLM_SYNC_ERROR_RESOLVE_NO_DATA = 3,
+    RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY = 4,
+    RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND = 5,
+    RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED = 6,
+} realm_sync_error_resolve_e;
+
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
 
