@@ -229,6 +229,19 @@ functions:
       display_name: install baas output
       optional: true
   
+  "upload fuzzer results":
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/build/test/fuzzy_object_store/crash-*'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/crash-*'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: Fuzzer crash input strings
+      optional: true
+  
   "run hang analyzer":
   - command: shell.exec
     params:
