@@ -3697,32 +3697,25 @@ TEST(Sync_UploadDownloadProgress_6)
 
     util::Mutex mutex;
 
-    auto progress_pf = util::make_promise_future<void>();
-
-    auto progress_handler =
-        [this, &mutex, &session, progress_promise = util::CopyablePromiseHolder(std::move(progress_pf.promise))](
-            uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes, uint_fast64_t uploaded_bytes,
-            uint_fast64_t uploadable_bytes, uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
-            CHECK_EQUAL(downloaded_bytes, 0);
-            CHECK_EQUAL(downloadable_bytes, 0);
-            CHECK_EQUAL(uploaded_bytes, 0);
-            CHECK_EQUAL(uploadable_bytes, 0);
-            CHECK_EQUAL(progress_version, 0);
-            CHECK_EQUAL(snapshot_version, 1);
-            util::LockGuard lock{mutex};
-            session.reset();
-            progress_promise.get_promise().emplace_value();
-        };
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+        CHECK_EQUAL(downloaded_bytes, 0);
+        CHECK_EQUAL(downloadable_bytes, 0);
+        CHECK_EQUAL(uploaded_bytes, 0);
+        CHECK_EQUAL(uploadable_bytes, 0);
+        CHECK_EQUAL(progress_version, 0);
+        CHECK_EQUAL(snapshot_version, 1);
+        util::LockGuard lock{mutex};
+        session.reset();
+    };
 
     session->set_progress_handler(progress_handler);
 
-    util::UniqueLock lock{mutex};
-    session->bind();
-    lock.unlock();
-
-    // Wait for the progress to be called
-    progress_pf.future.get();
-    lock.lock();
+    {
+        util::LockGuard lock{mutex};
+        session->bind();
+    }
 
     client.stop();
     server.stop();
@@ -4336,7 +4329,6 @@ TEST(Sync_MergeMultipleChangesets)
         Session session_1 = fixture.make_session(0, db_1);
         fixture.bind_session(session_1, 0, "/test");
         fixture.start_server(0);
-        fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
         // Stop first client.
@@ -4346,7 +4338,6 @@ TEST(Sync_MergeMultipleChangesets)
         // Wait to integrate changes from the first client.
         Session session_2 = fixture.make_session(1, db_2);
         fixture.bind_session(session_2, 0, "/test");
-        fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
     }

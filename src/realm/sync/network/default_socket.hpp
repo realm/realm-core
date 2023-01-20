@@ -78,7 +78,7 @@ private:
     void start();
 
     /// Block until the state reaches the expected or later state - return true if state matches expected state
-    bool state_wait_for(State expected_state);
+    void state_wait_for(State expected_state);
     /// Internal function for updating the state and signaling the wait_for_state condvar
     void do_state_update(State new_state);
     /// The execution code for the event loop thread

@@ -589,15 +589,26 @@ public:
         m_connection_state_change_listeners[client_index] = std::move(handler_2);
     }
 
-    // Must be called before start().
     void set_client_side_error_rate(int client_index, int n, int m)
     {
-        m_simulated_client_error_rates[client_index] = std::make_pair(n, m);
+        REALM_ASSERT(client_index >= 0 && client_index < m_num_clients);
+        auto sim = std::make_pair(n, m);
+        // Save the simulated error rate
+        m_simulated_client_error_rates[client_index] = sim;
+
+        // Post the new simulated error rate
+        using sf = _impl::SimulatedFailure;
+        // Post it onto the event loop to update the event loop thread
+        m_clients[client_index]->post_for_testing([sim = std::move(sim)](Status) {
+            sf::prime_random(sf::sync_client__read_head, sim.first, sim.second,
+                             random_int<uint_fast64_t>()); // Seed from global generator
+        });
     }
 
     // Must be called before start().
     void set_server_side_error_rate(int server_index, int n, int m)
     {
+        REALM_ASSERT(server_index >= 0 && server_index < m_num_servers);
         m_simulated_server_error_rates[server_index] = std::make_pair(n, m);
     }
 
@@ -607,8 +618,6 @@ public:
             m_server_threads[i].start([this, i] {
                 run_server(i);
             });
-        for (int i = 0; i < m_num_clients; ++i)
-            run_client(i);
     }
 
     // Use either the methods below or `start()`.
@@ -618,12 +627,6 @@ public:
         m_server_threads[index].start([this, index] {
             run_server(index);
         });
-    }
-
-    void start_client(int index)
-    {
-        REALM_ASSERT(index >= 0 && index < m_num_clients);
-        run_client(index);
     }
 
     void stop_server(int index)
@@ -831,20 +834,6 @@ private:
             return;
         stop();
         m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i + 1);
-    }
-
-    void run_client(int i)
-    {
-        auto sim = m_simulated_client_error_rates[i];
-        auto& client = get_client(i);
-        if (sim.first != 0) {
-            using sf = _impl::SimulatedFailure;
-            // If we're using a simulated failure, post it onto the event loop
-            client.post_for_testing([sim = m_simulated_client_error_rates[i]](Status) {
-                sf::prime_random(sf::sync_client__read_head, sim.first, sim.second,
-                                 random_int<uint_fast64_t>()); // Seed from global generator
-            });
-        }
     }
 };
 

@@ -441,7 +441,7 @@ void DefaultSocketProvider::event_loop()
 {
     m_logger_ptr->trace("Default event loop: thread running");
     std::unique_lock<std::mutex> lock(m_mutex);
-    // The thread has started - don't return early until after did_create_thread()
+    // The thread has started - don't return early due to stop() until after did_create_thread()
     if (m_state == State::Starting) {
         do_state_update(State::Started);
     }
@@ -452,15 +452,14 @@ void DefaultSocketProvider::event_loop()
         if (g_binding_callback_thread_observer)
             g_binding_callback_thread_observer->will_destroy_thread();
 
-        {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            REALM_ASSERT(m_state == State::Stopping);
-
-            // Reset the service so it can be run again later
-            m_service.reset();
-            do_state_update(State::Stopped);
+        std::lock_guard<std::mutex> lock(m_mutex);
+        // Did we get here due to an unhandled exception?
+        if (m_state != State::Stopping) {
+            m_logger_ptr->error("Default event loop: thread exited unexpectedly");
         }
+        do_state_update(State::Stopped);
     });
+
     if (g_binding_callback_thread_observer)
         g_binding_callback_thread_observer->did_create_thread();
 
@@ -477,6 +476,10 @@ void DefaultSocketProvider::event_loop()
         m_service.run(); // Throws
     }
     catch (const std::exception& e) {
+        lock.lock();
+        // Service is no longer running, event loop thread is stopping
+        do_state_update(State::Stopping);
+        lock.unlock();
         m_logger_ptr->error("Default event loop exception: ", e.what());
         if (g_binding_callback_thread_observer)
             g_binding_callback_thread_observer->handle_error(e);
@@ -506,11 +509,11 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
     }
 }
 
-//                                   +-------------------------------------------+
-//                                  \/                                           |
-// State Machine: NotStarted -> Starting -> Started -> Running -> Stopping -> Stopped
-//                                  |          |                     ^
-//                                  +----------+---------------------+
+//                    +--------------------------------------------------+
+//                   \/                                                  |
+// State Machine: Stopped -> Starting -> Started -> Running -> Stopping -+
+//                              |           |                     ^
+//                              +-----------+---------------------+
 
 void DefaultSocketProvider::do_state_update(State new_state)
 {
@@ -519,25 +522,19 @@ void DefaultSocketProvider::do_state_update(State new_state)
     m_state_cv.notify_all(); // Let any waiters check the state
 }
 
-bool DefaultSocketProvider::state_wait_for(State expected_state)
+void DefaultSocketProvider::state_wait_for(State expected_state)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
-    bool match = false;
-    // Check for condition already met
-    if (m_state == expected_state)
-        return true;
-    if (m_state > expected_state)
-        return false;
+    // Check for condition already met or superseded
+    if (m_state >= expected_state)
+        return;
 
-    m_state_cv.wait(lock, [this, expected_state, &match]() {
+    m_state_cv.wait(lock, [this, expected_state]() {
         // are we there yet?
         if (m_state < expected_state)
             return false;
-        // do the states match, or was it superceded by a different state?
-        match = m_state == expected_state;
         return true;
     });
-    return match;
 }
 
 std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(WebSocketObserver* observer,
