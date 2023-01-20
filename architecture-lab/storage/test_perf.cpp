@@ -149,10 +149,10 @@ struct compressor_driver {
 
 struct results {
     long* values;
-    long first_line;
+    long first_line = -1;
     long num_lines;
     long num_fields;
-    results(long first_line, long num_lines, long num_fields)
+    results(long num_lines, long num_fields)
         : first_line(first_line)
         , num_lines(num_lines)
         , num_fields(num_fields)
@@ -163,6 +163,11 @@ struct results {
     {
         delete values;
     }
+    void finalize(long _first_line, long limit)
+    {
+        first_line = _first_line;
+        num_lines = limit - first_line;
+    };
 };
 
 template <typename work_type>
@@ -260,11 +265,15 @@ int main(int argc, char* argv[])
     off_t size = lseek(fd, 0, SEEK_END);
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
+    long step_size = 1000000;
+    concurrent_queue<results*> to_reader;
+    for (int i = 0; i < 1; ++i)
+        to_reader.put(new results(step_size, max_fields));
     concurrent_queue<results*> to_writer;
 
-    long total_lines = 0;
     std::thread writer([&]() {
         std::cout << "Initial scan / object creation" << std::endl;
+        long total_lines = 0;
         start = std::chrono::high_resolution_clock::now();
         const char* line_start = (const char*)file_start;
         while (line_start < file_start + size) {
@@ -291,10 +300,8 @@ int main(int argc, char* argv[])
         end = std::chrono::high_resolution_clock::now();
         ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         std::cout << "   ...done in " << ms.count() << " msecs" << std::endl << std::endl;
-    });
-    writer.join();
-    // now populate dataset
-    {
+
+
         std::cout << "Optimizing access order..." << std::endl;
         std::vector<Row> row_order;
         row_order.reserve(total_lines);
@@ -305,8 +312,55 @@ int main(int argc, char* argv[])
             });
             db.release(std::move(s3));
         }
-        long step_size = 1000000;
-        std::cout << std::endl << "Ingesting data (" << total_lines << " objects).... " << std::endl;
+        while (1) {
+
+            results* res;
+            try {
+                res = to_writer.get();
+            }
+            catch (...) {
+                std::cout << "Done" << std::endl;
+                break;
+            }
+
+            const Snapshot& s3 = db.open_snapshot();
+            db.release(std::move(s3));
+            Snapshot& s2 = db.create_changes(); // create_changes();
+            auto num_line = res->first_line;
+            auto num_value = 0;
+            auto val_ptr = res->values;
+            auto limit = res->first_line + res->num_lines;
+            while (num_line < limit) {
+                Object o;
+                if (num_value == 0) {
+                    auto row = row_order[num_line];
+                    // if (!s2.exists(t, row)) {
+                    //     std::cout << "Weird - " << num_line << " with key " << row.key << " is missing"
+                    //               << std::endl;
+                    // }
+                    o = s2.get(t, row);
+                }
+                auto val = *val_ptr++;
+                o.set(f_i[num_value++], val);
+                if (num_value == res->num_fields) {
+                    num_value = 0;
+                    num_line++;
+                }
+            }
+            to_reader.put(res);
+            end = std::chrono::high_resolution_clock::now();
+            std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "   ...transaction built in " << ms.count() << " millisecs" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+            db.commit(std::move(s2));
+            end = std::chrono::high_resolution_clock::now();
+            ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "   ...committed in " << ms.count() << " msecs" << std::endl << std::endl;
+        }
+    });
+    // now populate dataset
+    {
+        std::cout << std::endl << "Ingesting data.... " << std::endl;
         long num_line = 0;
         std::vector<std::unique_ptr<string_compressor>> compressors;
         compressors.resize(105);
@@ -314,10 +368,11 @@ int main(int argc, char* argv[])
         drivers.resize(105);
         const char* read_ptr = (const char*)file_start;
         while (read_ptr < file_start + size) {
-            long limit = std::min(total_lines, num_line + step_size);
+            long limit = num_line + step_size;
+            long first_line = num_line;
             start = std::chrono::high_resolution_clock::now();
-            results* res = new results(num_line, limit - num_line, max_fields);
-            while (num_line < limit) {
+            results* res = to_reader.get();
+            while (num_line < limit && read_ptr < file_start + size) {
                 long num_value = 0;
                 if ((num_line % 100000) == 0)
                     std::cout << num_line << " " << std::flush;
@@ -348,6 +403,7 @@ int main(int argc, char* argv[])
                     read_ptr = read_ptr2 + 1;
                 }
             }
+            res->finalize(first_line, num_line);
             end = std::chrono::high_resolution_clock::now();
             std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << std::endl << "   ...read in " << ms.count() << " millisecs" << std::endl;
@@ -367,52 +423,11 @@ int main(int argc, char* argv[])
             end = std::chrono::high_resolution_clock::now();
             ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
-            start = end;
-            {
-
-                try {
-                    res = to_writer.get();
-                }
-                catch (...) {
-                    std::cout << "Auch!" << std::endl;
-                    exit(1);
-                }
-
-                const Snapshot& s3 = db.open_snapshot();
-                db.release(std::move(s3));
-                Snapshot& s2 = db.create_changes(); // create_changes();
-                auto num_line = res->first_line;
-                auto num_value = 0;
-                auto val_ptr = res->values;
-                auto limit = res->first_line + res->num_lines;
-                while (num_line < limit) {
-                    Object o;
-                    if (num_value == 0) {
-                        auto row = row_order[num_line];
-                        // if (!s2.exists(t, row)) {
-                        //     std::cout << "Weird - " << num_line << " with key " << row.key << " is missing"
-                        //               << std::endl;
-                        // }
-                        o = s2.get(t, row);
-                    }
-                    auto val = *val_ptr++;
-                    o.set(f_i[num_value++], val);
-                    if (num_value == res->num_fields) {
-                        num_value = 0;
-                        num_line++;
-                    }
-                }
-                delete res;
-                end = std::chrono::high_resolution_clock::now();
-                std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                std::cout << "   ...transaction built in " << ms.count() << " millisecs" << std::endl;
-                start = std::chrono::high_resolution_clock::now();
-                db.commit(std::move(s2));
-                end = std::chrono::high_resolution_clock::now();
-                ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                std::cout << "   ...committed in " << ms.count() << " msecs" << std::endl << std::endl;
-            }
         }
+        std::cout << "shutting down..." << std::endl;
+        to_writer.close();
+        writer.join();
+
         uint64_t from_size = 0;
         uint64_t to_size = 0;
         for (int i = 0; i < max_fields; ++i) {
