@@ -23,18 +23,21 @@ namespace realm {
 
 namespace {
 
-uint8_t min_width(const Decimal128& value)
+uint8_t min_width(const Decimal128& value, bool zero_width_is_zero)
 {
     Decimal128::Bid128 coefficient;
     int exponent;
     bool sign;
 
     if (value.is_null()) {
-        return 0;
+        return zero_width_is_zero ? 4 : 0;
     }
 
     value.unpack(coefficient, exponent, sign);
     if (coefficient.w[1] == 0) {
+        if (coefficient.w[0] == 0) {
+            return zero_width_is_zero ? 0 : 4;
+        }
         if (coefficient.w[0] < (1ull << 23) && exponent > -91 && exponent < 91) {
             return 4;
         }
@@ -50,7 +53,7 @@ void ArrayDecimal128::set(size_t ndx, Decimal128 value)
 {
     REALM_ASSERT(ndx < m_size);
     copy_on_write();
-    switch (upgrade_leaf(min_width(value))) {
+    switch (upgrade_leaf(min_width(value, Array::get_context_flag()))) {
         case 0:
             break;
         case 4: {
@@ -78,8 +81,13 @@ void ArrayDecimal128::set(size_t ndx, Decimal128 value)
 void ArrayDecimal128::insert(size_t ndx, Decimal128 value)
 {
     REALM_ASSERT(ndx <= m_size);
+    if (m_size == 0 && value == Decimal128()) {
+        // zero width should be interpreted as 0
+        Array::copy_on_write();
+        Array::set_context_flag(true);
+    }
     // Allocate room for the new value
-    switch (upgrade_leaf(min_width(value))) {
+    switch (upgrade_leaf(min_width(value, Array::get_context_flag()))) {
         case 0:
             m_size += 1;
             Array::copy_on_write();
@@ -176,11 +184,19 @@ size_t ArrayDecimal128::find_first(Decimal128 value, size_t start, size_t end) c
         end = sz;
     REALM_ASSERT(start <= sz && end <= sz && start <= end);
 
-    auto width = min_width(value);
+    bool zero_width_is_zero = Array::get_context_flag();
+    auto width = min_width(value, zero_width_is_zero);
     switch (m_width) {
         case 0:
-            if (value.is_null()) {
-                return 0;
+            if (zero_width_is_zero) {
+                if (value == Decimal128()) {
+                    return 0;
+                }
+            }
+            else {
+                if (value.is_null()) {
+                    return 0;
+                }
             }
             break;
         case 4:
@@ -272,14 +288,16 @@ size_t ArrayDecimal128::upgrade_leaf(uint8_t width)
         return width;
     }
 
-    // Width is zero
+    // Upgrade from zero width. Fill with either 0 or null.
+    Decimal128 fill_value = get_context_flag() ? Decimal128(0) : Decimal128(realm::null());
+
     if (width == 4) {
         // Upgrade to 4 bytes
         alloc(m_size, 4);
         auto values = reinterpret_cast<Decimal::Bid32*>(m_data);
-        auto zero = *Decimal128(realm::null()).to_bid32();
+        auto fill = *fill_value.to_bid32();
         for (size_t i = 0; i < m_size; i++) {
-            values[i] = zero;
+            values[i] = fill;
         }
         return 4;
     }
@@ -287,18 +305,17 @@ size_t ArrayDecimal128::upgrade_leaf(uint8_t width)
         // Upgrade to 8 bytes
         alloc(m_size, 8);
         auto values = reinterpret_cast<Decimal::Bid64*>(m_data);
-        auto zero = *Decimal128(realm::null()).to_bid64();
+        auto fill = *fill_value.to_bid64();
         for (size_t i = 0; i < m_size; i++) {
-            values[i] = zero;
+            values[i] = fill;
         }
         return 8;
     }
 
     alloc(m_size, 16);
     auto values = reinterpret_cast<Decimal128*>(m_data);
-    auto zero = Decimal128(realm::null());
     for (size_t i = 0; i < m_size; i++) {
-        values[i] = zero;
+        values[i] = fill_value;
     }
     return 16;
 }

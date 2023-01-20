@@ -69,7 +69,7 @@ public:
         REALM_ASSERT(ndx < m_size);
         switch (m_width) {
             case 0:
-                return Decimal128(realm::null());
+                return get_context_flag() ? Decimal128() : Decimal128(realm::null());
             case 4: {
                 auto values = reinterpret_cast<Decimal128::Bid32*>(this->m_data);
                 return Decimal128(values[ndx]);

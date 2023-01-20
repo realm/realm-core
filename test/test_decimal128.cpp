@@ -188,7 +188,24 @@ TEST(Decimal_Array)
 
     ArrayDecimal128 arr(Allocator::get_default());
     arr.create();
+    arr.add(Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get_width(), 0);
+    CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
+    arr.add(Decimal128());
+    CHECK_EQUAL(arr.get_width(), 4);
+    CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get(1), Decimal128());
 
+    arr.clear();
+    arr.add(Decimal128());
+    CHECK_EQUAL(arr.get_width(), 0);
+    CHECK_EQUAL(arr.get(0), Decimal128());
+    arr.add(Decimal128(realm::null()));
+    CHECK_EQUAL(arr.get_width(), 4);
+    CHECK_EQUAL(arr.get(0), Decimal128());
+    CHECK_EQUAL(arr.get(1), Decimal128(realm::null()));
+
+    arr.clear();
     arr.add(Decimal128(str0));
     arr.add(Decimal128(str1));
     arr.insert(1, Decimal128(str2));
