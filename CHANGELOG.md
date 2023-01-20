@@ -2,6 +2,7 @@
 
 ### Enhancements
 * `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
+* Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -9,10 +10,13 @@
 * Value in List of Mixed would not be updated if new value is Binary and old value is StringData and the values otherwise matches ([#6201](https://github.com/realm/realm-core/issues/6201), since v6.0.0)
 * When client reset with recovery is used and the recovery does not actually result in any new local commits, the sync client may have gotten stuck in a cycle with a `A fatal error occured during client reset: 'A previous 'Recovery' mode reset from <timestamp> did not succeed, giving up on 'Recovery' mode to prevent a cycle'` error message. ([#6195](https://github.com/realm/realm-core/issues/6195), since v11.16.0)
 * Fixed diverging history in flexible sync if writes occur during bootstrap to objects that just came into view ([#5804](https://github.com/realm/realm-core/issues/5804), since v11.7.0)
+* Fix several data races when opening cached frozen Realms. New frozen Realms were added to the cache and the lock released before they were fully initialized, resulting in races if they were immediately read from the cache on another thread ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v6.0.0).
+* Properties and types not present in the requested schema would be missing from the reported schema in several scenarios, such as if the Realm was being opened with a different schema version than the persisted one, and if the new tables or columns were added while the Realm instance did not have an active read transaction ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v13.2.0).
 
 ### Breaking changes
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
 * Passing an empty `key_path_array` to `add_notification_callback now` now ignores nested property changes. Pass `std::nullopt` to achieve the old meaning. ([#6122](https://github.com/realm/realm-core/pull/6122))
+* Whether to report the file's complete schema or only the requested schema is now an option on RealmConfig (schema_subset_mode) rather than always being enabled for Additive schema modes. All schema modes which this applies to are now supported ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -80,7 +84,7 @@
  
 ### Breaking changes
 * FLX Subscription API reworked to better match SDK consumption patterns ([#6065](https://github.com/realm/realm-core/pull/6065)). Not all changes are breaking, but listing them all here together.
-  * `Subscription` is now a plain struct with public fields rather than getter functions    * `has_name()` and `name()` were merged into a single `optional<string> name` field
+  * `Subscription` is now a plain struct with public fields rather than getter functions
   * `has_name()` and `name()` were merged into a single `optional<string> name` field
   * `SubscriptionSet` now uses the same types for `iterator` and `const_iterator` since neither was intended to support direct mutability
   * `SubscriptionSet::get_state_change_notification()` now offers a callback-taking overload
