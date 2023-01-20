@@ -3695,7 +3695,9 @@ TEST(Sync_UploadDownloadProgress_6)
 
     std::unique_ptr<Session> session{new Session{client, db, nullptr, std::move(session_config)}};
 
-    util::Mutex mutex;
+    std::mutex mutex;
+    std::condition_variable progress_cv;
+
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -3706,16 +3708,22 @@ TEST(Sync_UploadDownloadProgress_6)
         CHECK_EQUAL(uploadable_bytes, 0);
         CHECK_EQUAL(progress_version, 0);
         CHECK_EQUAL(snapshot_version, 1);
-        util::LockGuard lock{mutex};
+        std::lock_guard lock{mutex};
         session.reset();
+        progress_cv.notify_all();
     };
 
     session->set_progress_handler(progress_handler);
 
-    {
-        util::LockGuard lock{mutex};
-        session->bind();
-    }
+    std::unique_lock lock{mutex};
+    session->bind();
+
+    // Wait for the progress handler to be called, since client.stop() doesn't
+    // currently wait for the event loop thread to be terminated
+    // TODO: Update this after event loop stop is updated
+    progress_cv.wait_for(lock, std::chrono::seconds(15), [&]() {
+        return session != nullptr;
+    });
 
     client.stop();
     server.stop();
