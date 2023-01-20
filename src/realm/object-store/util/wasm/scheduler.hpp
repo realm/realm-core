@@ -57,7 +57,9 @@ private:
 
     static void timeout_callback(void* user_data)
     {
-        reinterpret_cast<WasmScheduler*>(user_data)->m_queue.invoke_all();
+        auto scheduler = reinterpret_cast<WasmScheduler*>(user_data);
+        scheduler->m_timeout.reset();
+        scheduler->m_queue.invoke_all();
     }
 };
 } // namespace realm::util
