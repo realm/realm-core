@@ -28,6 +28,11 @@
 * Fix failures in Metrics_TransactionTimings core test ([#6164](https://github.com/realm/realm-core/issues/6164))
 * Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 * Add c_api error category for resolve errors instead of reporting unknown category, part 2. ([PR #6186](https://github.com/realm/realm-core/pull/6186))
+* Windows improvements in util/file ([PR #6221](https://github.com/realm/realm-core/pull/6221)):
+  * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
+  * `File::get_unique_id` now works on Windows
+  * Replaced manual path string conversion with `std::filesystem::path`
+
 
 ----------------------------------------------
 
