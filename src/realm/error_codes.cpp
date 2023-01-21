@@ -41,6 +41,10 @@ StringData ErrorCodes::error_string(Error code)
             return "ResolveFailed";
         case ErrorCodes::ConnectionFailed:
             return "ConnectionFailed";
+        case ErrorCodes::Retry:
+            return "Retry";
+        case ErrorCodes::Fatal:
+            return "Fatal";
 
         /// WebSocket error codes
         case ErrorCodes::WebSocket_GoingAway:

@@ -40,6 +40,8 @@ public:
         WriteError = 8,
         ResolveFailed = 9,
         ConnectionFailed = 10,
+        Retry = 11,
+        Fatal = 12,
 
         /// WebSocket Errors
         // WebSocket_OK = 1000 is not used, just use OK instead
@@ -69,6 +71,7 @@ public:
 };
 
 const std::error_category& close_status_category() noexcept;
+
 std::error_code make_error_code(ErrorCodes::Error) noexcept;
 
 } // namespace realm

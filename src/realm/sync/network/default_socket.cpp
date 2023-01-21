@@ -78,21 +78,21 @@ private:
                                            const std::string_view* body) override
     {
         ErrorCodes::Error error;
-        bool was_clean;
+        bool was_clean = true;
 
-        if (ec == websocket::Error::bad_response_3xx_redirection ||
-            ec == websocket::Error::bad_response_301_moved_permanently ||
+        if (ec == websocket::Error::bad_response_301_moved_permanently ||
             ec == websocket::Error::bad_response_308_permanent_redirect) {
             error = ErrorCodes::WebSocket_MovedPermanently;
-            was_clean = true;
+        }
+        else if (ec == websocket::Error::bad_response_3xx_redirection) {
+            error = ErrorCodes::Retry;
+            was_clean = false;
         }
         else if (ec == websocket::Error::bad_response_401_unauthorized) {
             error = ErrorCodes::WebSocket_Unauthorized;
-            was_clean = true;
         }
         else if (ec == websocket::Error::bad_response_403_forbidden) {
             error = ErrorCodes::WebSocket_Forbidden;
-            was_clean = true;
         }
         else if (ec == websocket::Error::bad_response_5xx_server_error ||
                  ec == websocket::Error::bad_response_500_internal_server_error ||
@@ -103,8 +103,8 @@ private:
             was_clean = false;
         }
         else {
-            error = ErrorCodes::WebSocket_Protocol_Mismatch;
-            was_clean = true;
+            error = ErrorCodes::Fatal;
+            was_clean = false;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
                 auto i = body->find(identifier);
@@ -121,6 +121,11 @@ private:
                     else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
                         error = ErrorCodes::WebSocket_Client_Too_New;
                     }
+                    else {
+                        // Other more complicated forms of mismatch
+                        error = ErrorCodes::WebSocket_Protocol_Mismatch;
+                    }
+                    was_clean = true;
                 }
             }
         }

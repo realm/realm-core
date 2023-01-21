@@ -409,6 +409,11 @@ void Connection::websocket_error_handler()
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
+    // Return early.
+    if (status.is_ok()) {
+        return bool(m_websocket);
+    }
+
     auto&& status_code = status.code();
     std::error_code error_code{static_cast<int>(status_code), close_status_category()};
 
@@ -465,10 +470,15 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Unauthorized || status_code == ErrorCodes::WebSocket_Forbidden ||
+    else if (status_code == ErrorCodes::Fatal || status_code == ErrorCodes::WebSocket_Forbidden) {
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
              status_code == ErrorCodes::WebSocket_MovedPermanently ||
              status_code == ErrorCodes::WebSocket_InternalServerError ||
-             status_code == ErrorCodes::WebSocket_AbnormalClosure) {
+             status_code == ErrorCodes::WebSocket_AbnormalClosure || status_code == ErrorCodes::Retry) {
         constexpr bool is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
