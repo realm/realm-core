@@ -3722,7 +3722,7 @@ TEST(Sync_UploadDownloadProgress_6)
     // currently wait for the event loop thread to be terminated
     // TODO: Update this after event loop stop is updated
     progress_cv.wait_for(lock, std::chrono::seconds(15), [&]() {
-        return session != nullptr;
+        return session == nullptr;
     });
 
     client.stop();
