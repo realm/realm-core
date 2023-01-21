@@ -68,7 +68,9 @@ TEST(BasicSystemErrors_Messages)
 
     {
         std::error_code err = make_error_code(error::address_family_not_supported);
+#ifndef _WIN32 // Older versions of the Windows CRT return "Unknown error" for this error instead of an actual message
         CHECK_GREATER(err.message().length(), 0);
+#endif
         CHECK_NOT_EQUAL(err.message(), error_message);
     }
     {
@@ -83,7 +85,9 @@ TEST(BasicSystemErrors_Messages)
     }
     {
         std::error_code err = make_error_code(error::operation_aborted);
+#ifndef _WIN32 // Older versions of the Windows CRT return "Unknown error" for this error instead of an actual message
         CHECK_GREATER(err.message().length(), 0);
+#endif
         CHECK_NOT_EQUAL(err.message(), error_message);
     }
 
