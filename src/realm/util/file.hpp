@@ -598,6 +598,7 @@ public:
     std::string get_path() const;
     // Return false if the file doesn't exist. Otherwise uid will be set.
     static bool get_unique_id(const std::string& path, UniqueID& uid);
+    static UniqueID get_unique_id(FileDesc file);
 
     class ExclusiveLock;
     class SharedLock;
@@ -619,7 +620,7 @@ public:
 
 private:
 #ifdef _WIN32
-    void* m_fd = nullptr;
+    HANDLE m_fd = nullptr;
     bool m_have_lock = false; // Only valid when m_fd is not null
 #else
     int m_fd = -1;

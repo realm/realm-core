@@ -69,11 +69,7 @@ TEST(BasicSystemErrors_Messages)
     {
         std::error_code err = make_error_code(error::address_family_not_supported);
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
-        CHECK_EQUAL(err.message(), error_message);
-#else
         CHECK_NOT_EQUAL(err.message(), error_message);
-#endif
     }
     {
         std::error_code err = make_error_code(error::invalid_argument);
@@ -88,11 +84,7 @@ TEST(BasicSystemErrors_Messages)
     {
         std::error_code err = make_error_code(error::operation_aborted);
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
-        CHECK_EQUAL(err.message(), error_message);
-#else
         CHECK_NOT_EQUAL(err.message(), error_message);
-#endif
     }
 
 #if !REALM_HAVE_CLANG_FEATURE(undefined_behavior_sanitizer)

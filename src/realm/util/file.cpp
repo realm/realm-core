@@ -108,25 +108,6 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     return buffer;
 }
 
-std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
-{
-    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
-    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
-
-    // Construct a 64 bit value that is the number of nanoseconds from the
-    // Windows epoch which is 1601-01-01 00:00:00 UTC
-    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
-    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
-
-    // FILETIME is 100's of nanoseconds since Windows epoch
-    totalMicros /= 10;
-    // Move it from micros since the Windows epoch to micros since the Unix epoch
-    totalMicros -= kEpochDifferenceMicros;
-
-    std::chrono::duration<uint64_t, std::micro> totalMicrosDur(totalMicros);
-    return std::chrono::system_clock::time_point(totalMicrosDur);
-}
-
 struct WindowsFileHandleHolder {
     WindowsFileHandleHolder() = default;
     explicit WindowsFileHandleHolder(HANDLE h)
@@ -304,8 +285,20 @@ bool try_remove_dir_recursive(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    std::filesystem::remove_all(path, error);
-    return !error;
+    auto removed_count = std::filesystem::remove_all(path, error);
+    if (!error) {
+        return removed_count > 0;
+    }
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system ||
+        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
+        error == errc::file_exists || error == errc::directory_not_empty) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
 #else
     {
         bool allow_missing = true;
@@ -1514,7 +1507,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
 void File::copy(const std::string& origin_path, const std::string& target_path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::copy_file(origin_path, target_path); // Throws
+    std::filesystem::copy_file(origin_path, target_path, std::filesystem::copy_options::overwrite_existing); // Throws
 #else
     File origin_file{origin_path, mode_Read};  // Throws
     File target_file{target_path, mode_Write}; // Throws
@@ -1552,29 +1545,7 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
 
 bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 {
-#if defined(_WIN32) // Windows version
-    FILE_ID_INFO fi1;
-    FILE_ID_INFO fi2;
-    if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
-        if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
-            return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 &&
-                   fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
-        }
-    }
-    throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
-
-#else // POSIX version
-
-    struct stat statbuf;
-    if (::fstat(f1, &statbuf) == 0) {
-        dev_t device_id = statbuf.st_dev;
-        ino_t inode_num = statbuf.st_ino;
-        if (::fstat(f2, &statbuf) == 0)
-            return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
-    }
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
-
-#endif
+    return get_unique_id(f1) == get_unique_id(f2);
 }
 
 bool File::is_same_file(const File& f) const
@@ -1587,20 +1558,7 @@ bool File::is_same_file(const File& f) const
 File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32 // Windows version
-    File::UniqueID ret;
-    if (GetFileInformationByHandleEx(m_fd, FileIdInfo, &ret.id_info, sizeof(FILE_ID_INFO)) == 0) {
-        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
-    }
-
-    return ret;
-#else // POSIX version
-    struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) {
-        return UniqueID(statbuf.st_dev, statbuf.st_ino);
-    }
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
-#endif
+    return File::get_unique_id(m_fd);
 }
 
 FileDesc File::get_descriptor() const
@@ -1622,10 +1580,7 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
         throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
     }
 
-    if (GetFileInformationByHandleEx(fileHandle, FileIdInfo, &uid.id_info, sizeof(FILE_ID_INFO)) == 0) {
-        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
-    }
-
+    uid = get_unique_id(fileHandle);
     return true;
 #else // POSIX version
     struct stat statbuf;
@@ -1639,6 +1594,24 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
     if (err == ENOENT)
         return false;
     throw std::system_error(err, std::system_category(), "stat() failed");
+#endif
+}
+
+File::UniqueID File::get_unique_id(FileDesc file)
+{
+#ifdef _WIN32 // Windows version
+    File::UniqueID ret;
+    if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(FILE_ID_INFO)) == 0) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+    }
+
+    return ret;
+#else // POSIX version
+    struct stat statbuf;
+    if (::fstat(file, &statbuf) == 0) {
+        return UniqueID(statbuf.st_dev, statbuf.st_ino);
+    }
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
 }
 
@@ -1881,22 +1854,17 @@ void File::MapBase::flush()
 
 std::time_t File::last_write_time(const std::string& path)
 {
-#ifdef _WIN32
-    WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
-                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                     OPEN_EXISTING, nullptr));
+#if REALM_HAVE_STD_FILESYSTEM
+    auto time = std::filesystem::last_write_time(path);
 
-    if (fileHandle == INVALID_HANDLE_VALUE) {
-        throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
-    }
-
-    FILETIME mtime = {0};
-    if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
-        throw std::system_error(GetLastError(), std::system_category(), "GetFileTime failed");
-    }
-
-    auto tp = file_time_to_system_clock(mtime);
-    return std::chrono::system_clock::to_time_t(tp);
+    using namespace std::chrono;
+#if __cplusplus >= 202002L
+    auto system_time = clock_cast<system_clock>(time);
+#else
+    auto system_time =
+        time_point_cast<system_clock::duration>(time - decltype(time)::clock::now() + system_clock::now());
+#endif
+    return system_clock::to_time_t(system_time);
 #else
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) != 0) {
