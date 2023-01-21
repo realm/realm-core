@@ -1686,7 +1686,7 @@ TEST(Sync_HTTP404NotFound)
     HTTPRequest request;
     request.path = "/not-found";
 
-    HTTPRequestClient client(*(test_context.logger), endpoint, request);
+    HTTPRequestClient client(test_context.logger, endpoint, request);
     client.fetch_response();
 
     server.stop();
@@ -6674,8 +6674,9 @@ TEST(Sync_NonIncreasingServerVersions)
     uint_fast64_t downloadable_bytes = 0;
     VersionInfo version_info;
     util::StderrLogger logger;
+    auto transact = db->start_read();
     history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
-                                        DownloadBatchState::SteadyState, logger);
+                                        DownloadBatchState::SteadyState, logger, transact);
 }
 
 TEST(Sync_InvalidChangesetFromServer)
@@ -6701,8 +6702,9 @@ TEST(Sync_InvalidChangesetFromServer)
 
     VersionInfo version_info;
     util::StderrLogger logger;
+    auto transact = db->start_read();
     CHECK_THROW_EX(history.integrate_server_changesets({}, nullptr, util::Span(&server_changeset, 1), version_info,
-                                                       DownloadBatchState::LastInBatch, logger),
+                                                       DownloadBatchState::SteadyState, logger, transact),
                    sync::IntegrationException,
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }

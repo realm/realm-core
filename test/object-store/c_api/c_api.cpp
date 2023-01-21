@@ -637,7 +637,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         });
     }
 
-    SECTION("realm_sync_error_code to_capi()") {
+    SECTION("realm_sync_error_code") {
         using namespace realm::sync;
         std::string message;
 
@@ -648,25 +648,51 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(error_code.message() == error.message);
         CHECK(message == error.message);
 
+        std::error_code ec_check;
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::client_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
         error_code = make_error_code(sync::ProtocolError::connection_closed);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::protocol_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(sync::ProtocolError::session_closed);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
 
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::protocol_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
         error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
 
-        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == std::system_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
+        error_code = make_error_code(sync::network::ResolveErrors::socket_type_not_supported);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+        CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::network::resolve_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(util::error::misc_errors::unknown);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::util::error::basic_system_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
     }
 
 

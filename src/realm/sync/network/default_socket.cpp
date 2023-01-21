@@ -44,9 +44,9 @@ public:
 private:
     using milliseconds_type = std::int_fast64_t;
 
-    util::Logger& websocket_get_logger() noexcept override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
     {
-        return m_logger;
+        return m_logger_ptr;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
@@ -265,7 +265,7 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
     req.headers.emplace("Host", util::format("%1:%2", m_endpoint.address, m_endpoint.port));
     // TODO handle proxy authorization
 
-    m_proxy_client.emplace(*this, m_logger);
+    m_proxy_client.emplace(*this, m_logger_ptr);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
             m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
