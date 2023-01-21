@@ -1585,25 +1585,6 @@ std::string File::get_path() const
     return m_path;
 }
 
-bool File::is_removed() const
-{
-    REALM_ASSERT_RELEASE(is_attached());
-
-#ifdef _WIN32 // Windows version
-
-    return false; // An open file cannot be deleted on Windows
-
-#else // POSIX version
-
-    struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0)
-        return statbuf.st_nlink == 0;
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
-
-#endif
-}
-
-
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #ifndef _WIN32
