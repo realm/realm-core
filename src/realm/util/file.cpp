@@ -29,11 +29,7 @@
 #include <iostream>
 #include <fcntl.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <io.h>
-#include <direct.h>
-#else
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -53,45 +49,6 @@ using namespace realm;
 using namespace realm::util;
 
 namespace {
-#ifdef _WIN32 // Windows - GetLastError()
-
-#undef max
-
-std::string get_last_error_msg(const char* prefix, DWORD err)
-{
-    std::string buffer;
-    buffer.append(prefix);
-    size_t offset = buffer.size();
-    size_t max_msg_size = 1024;
-    buffer.resize(offset + max_msg_size);
-    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
-    DWORD size =
-        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
-    if (0 < size)
-        return buffer;
-    buffer.resize(offset);
-    buffer.append("Unknown error");
-    return buffer;
-}
-
-std::wstring string_to_wstring(const std::string& str)
-{
-    if (str.empty())
-        return std::wstring();
-    int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-    std::wstring wstr;
-    if (wstr_size) {
-        wstr.resize(wstr_size);
-        if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wstr_size)) {
-            return wstr;
-        }
-    }
-    return std::wstring();
-}
-
-#endif
-
 size_t get_page_size()
 {
 #ifdef _WIN32
@@ -132,6 +89,24 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
 }
 
 #ifdef _WIN32
+
+std::string get_last_error_msg(const char* prefix, DWORD err)
+{
+    std::string buffer;
+    buffer.append(prefix);
+    size_t offset = buffer.size();
+    size_t max_msg_size = 1024;
+    buffer.resize(offset + max_msg_size);
+    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+    DWORD size =
+        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
+    if (0 < size)
+        return buffer;
+    buffer.resize(offset);
+    buffer.append("Unknown error");
+    return buffer;
+}
 
 std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
 {
@@ -190,16 +165,28 @@ namespace util {
 
 bool try_make_dir(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wmkdir(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::create_directory(path, error);
+
+    if (!error) {
+        return result;
+    }
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
+
     switch (err) {
         case EEXIST:
             return false;
@@ -209,6 +196,7 @@ bool try_make_dir(const std::string& path)
         default:
             throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
+#endif
 }
 
 
@@ -223,6 +211,10 @@ void make_dir(const std::string& path)
 
 void make_dir_recursive(std::string path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code ignored;
+    std::filesystem::create_directories(path, ignored);
+#else
     // Skip the first separator as we're assuming an absolute path
     size_t pos = path.find_first_of("/\\");
     if (pos == std::string::npos)
@@ -241,6 +233,7 @@ void make_dir_recursive(std::string path)
             path[sep] = c;
         pos = sep + 1;
     }
+#endif
 }
 
 
@@ -256,14 +249,27 @@ void remove_dir(const std::string& path)
 
 bool try_remove_dir(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wrmdir(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::remove(path, error);
+
+    if (!error) {
+        return result;
+    }
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system ||
+        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
+        error == errc::file_exists || error == errc::directory_not_empty) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("remove_dir() failed: ", err);
     switch (err) {
@@ -279,6 +285,7 @@ bool try_remove_dir(const std::string& path)
         default:
             throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
+#endif
 }
 
 
@@ -295,6 +302,11 @@ void remove_dir_recursive(const std::string& path)
 
 bool try_remove_dir_recursive(const std::string& path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    std::filesystem::remove_all(path, error);
+    return !error;
+#else
     {
         bool allow_missing = true;
         DirScanner ds{path, allow_missing}; // Throws
@@ -310,6 +322,7 @@ bool try_remove_dir_recursive(const std::string& path)
         }
     }
     return try_remove_dir(path); // Throws
+#endif
 }
 
 
@@ -409,8 +422,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    std::wstring ws = string_to_wstring(path);
-    HANDLE handle = CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    HANDLE handle =
+        CreateFile2(std::filesystem::path(path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_fd = handle;
         m_have_lock = false;
@@ -980,11 +993,7 @@ bool File::is_prealloc_supported()
 void File::seek(SizeType position)
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32
     seek_static(m_fd, position);
-#else
-    seek_static(m_fd, position);
-#endif
 }
 
 void File::seek_static(FileDesc fd, SizeType position)
@@ -1365,14 +1374,11 @@ void File::sync_map(FileDesc fd, void* addr, size_t size)
 
 bool File::exists(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_waccess(w_path.c_str(), 0) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::exists(path);
 #else // POSIX
     if (::access(path.c_str(), F_OK) == 0)
         return true;
-#endif
     int err = errno; // Eliminate any risk of clobbering
     switch (err) {
         case EACCES:
@@ -1381,12 +1387,15 @@ bool File::exists(const std::string& path)
             return false;
     }
     throw std::system_error(err, std::system_category(), "access() failed");
+#endif
 }
 
 
 bool File::is_dir(const std::string& path)
 {
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::is_directory(path);
+#elif !defined(_WIN32)
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0)
         return S_ISDIR(statbuf.st_mode);
@@ -1398,9 +1407,6 @@ bool File::is_dir(const std::string& path)
             return false;
     }
     throw std::system_error(err, std::system_category(), "stat() failed");
-#elif REALM_HAVE_STD_FILESYSTEM
-    std::wstring w_path = string_to_wstring(path);
-    return std::filesystem::is_directory(w_path);
 #else
     static_cast<void>(path);
     throw util::runtime_error("Not yet supported");
@@ -1420,14 +1426,27 @@ void File::remove(const std::string& path)
 
 bool File::try_remove(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wunlink(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::remove(path, error);
+
+    if (!error) {
+        return result;
+    }
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system ||
+        error == errc::device_or_resource_busy || error == errc::text_file_busy ||
+        error == errc::operation_not_permitted) {
+        throw PermissionDenied(error.message(), path);
+    }
+    else {
+        throw AccessError(error.message(), path);
+    }
 #else // POSIX
     if (::unlink(path.c_str()) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("unlink() failed: ", err);
     switch (err) {
@@ -1442,15 +1461,33 @@ bool File::try_remove(const std::string& path)
         default:
             throw AccessError(msg, path);
     }
+#endif
 }
 
 
 void File::move(const std::string& old_path, const std::string& new_path)
 {
-#ifdef _WIN32
-    // Can't rename to existing file on Windows
-    try_remove(new_path);
-#endif
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    std::filesystem::rename(old_path, new_path, error);
+
+    if (!error) {
+        return;
+    }
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system || error == errc::text_file_busy ||
+        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
+        error == errc::file_exists || error == errc::directory_not_empty) {
+        throw PermissionDenied(error.message(), old_path);
+    }
+    else if (error == errc::no_such_file_or_directory) {
+        throw NotFound(error.message(), old_path);
+    }
+    else {
+        throw AccessError(error.message(), old_path);
+    }
+#else
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
@@ -1470,11 +1507,15 @@ void File::move(const std::string& old_path, const std::string& new_path)
         default:
             throw AccessError(msg, old_path);
     }
+#endif
 }
 
 
 void File::copy(const std::string& origin_path, const std::string& target_path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::copy_file(origin_path, target_path); // Throws
+#else
     File origin_file{origin_path, mode_Read};  // Throws
     File target_file{target_path, mode_Write}; // Throws
     size_t buffer_size = 4096;
@@ -1485,6 +1526,7 @@ void File::copy(const std::string& origin_path, const std::string& target_path)
         if (n < buffer_size)
             break;
     }
+#endif
 }
 
 
@@ -1546,7 +1588,12 @@ File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
+    File::UniqueID ret;
+    if (GetFileInformationByHandleEx(m_fd, FileIdInfo, &ret.id_info, sizeof(FILE_ID_INFO)) == 0) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+    }
+
+    return ret;
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
@@ -1564,7 +1611,22 @@ FileDesc File::get_descriptor() const
 bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
 {
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                     OPEN_EXISTING, nullptr));
+
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+            return false;
+        }
+        throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
+    }
+
+    if (GetFileInformationByHandleEx(fileHandle, FileIdInfo, &uid.id_info, sizeof(FILE_ID_INFO)) == 0) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+    }
+
+    return true;
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
@@ -1576,7 +1638,7 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
     // File doesn't exist
     if (err == ENOENT)
         return false;
-    throw std::system_error(err, std::system_category(), "fstat() failed");
+    throw std::system_error(err, std::system_category(), "stat() failed");
 #endif
 }
 
@@ -1606,7 +1668,13 @@ bool File::is_removed() const
 
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::path path_(path.empty() ? "." : path);
+    if (path_.is_absolute())
+        return path;
+
+    return (std::filesystem::path(base_dir) / path_).string();
+#elif !defined(_WIN32)
     char dir_sep = '/';
     std::string path_2 = path;
     std::string base_dir_2 = base_dir;
@@ -1641,12 +1709,6 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
-#elif REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::path path_(path.empty() ? "." : path);
-    if (path_.is_absolute())
-        return path;
-
-    return (std::filesystem::path(base_dir) / path_).string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1820,8 +1882,7 @@ void File::MapBase::flush()
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
-    auto wpath = string_to_wstring(path);
-    WindowsFileHandleHolder fileHandle(::CreateFile2(wpath.c_str(), FILE_READ_ATTRIBUTES,
+    WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
                                                      FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                      OPEN_EXISTING, nullptr));
 
@@ -1870,7 +1931,33 @@ File::SizeType File::get_free_space(const std::string& path)
 #endif
 }
 
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
+{
+    try {
+        m_iterator = std::filesystem::directory_iterator(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
+            throw;
+    }
+}
+
+DirScanner::~DirScanner() = default;
+
+bool DirScanner::next(std::string& name)
+{
+    const std::filesystem::directory_iterator end;
+    if (m_iterator != end) {
+        name = m_iterator->path().filename().string();
+        m_iterator++;
+        return true;
+    }
+    return false;
+}
+
+#elif !defined(_WIN32)
 
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
@@ -1941,32 +2028,6 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
-}
-
-#elif REALM_HAVE_STD_FILESYSTEM
-
-DirScanner::DirScanner(const std::string& path, bool allow_missing)
-{
-    try {
-        m_iterator = std::filesystem::directory_iterator(path);
-    }
-    catch (const std::filesystem::filesystem_error& e) {
-        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
-            throw;
-    }
-}
-
-DirScanner::~DirScanner() = default;
-
-bool DirScanner::next(std::string& name)
-{
-    const std::filesystem::directory_iterator end;
-    if (m_iterator != end) {
-        name = m_iterator->path().filename().string();
-        m_iterator++;
-        return true;
-    }
-    return false;
 }
 
 #else

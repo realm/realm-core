@@ -2112,30 +2112,12 @@ TEST_CASE("migration: SoftResetFile") {
         {"object 2", {{"value", PropertyType::Int}}},
     };
 
-// To verify that the file has actually be deleted and recreated, on
-// non-Windows we need to hold an open file handle to the old file to force
-// using a new inode, but on Windows we *can't*
-#ifdef _WIN32
-    auto get_fileid = [&] {
-        // this is wrong for non-ascii but it's what core does
-        std::wstring ws(config.path.begin(), config.path.end());
-        HANDLE handle =
-            CreateFile2(ws.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
-        REQUIRE(handle != INVALID_HANDLE_VALUE);
-        auto close = util::make_scope_exit([=]() noexcept {
-            CloseHandle(handle);
-        });
-
-        BY_HANDLE_FILE_INFORMATION info{};
-        REQUIRE(GetFileInformationByHandle(handle, &info));
-        return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
-    };
-#else
     auto get_fileid = [&] {
         util::File::UniqueID id;
-        util::File::get_unique_id(config.path, id);
-        return id.inode;
+        REQUIRE(util::File::get_unique_id(config.path, id));
+        return id;
     };
+#ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
 #endif
 
@@ -2200,30 +2182,12 @@ TEST_CASE("migration: HardResetFile") {
         {"object 2", {{"value", PropertyType::Int}}},
     };
 
-// To verify that the file has actually be deleted and recreated, on
-// non-Windows we need to hold an open file handle to the old file to force
-// using a new inode, but on Windows we *can't*
-#ifdef _WIN32
-    auto get_fileid = [&] {
-        // this is wrong for non-ascii but it's what core does
-        std::wstring ws(config.path.begin(), config.path.end());
-        HANDLE handle =
-            CreateFile2(ws.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
-        REQUIRE(handle != INVALID_HANDLE_VALUE);
-        auto close = util::make_scope_exit([=]() noexcept {
-            CloseHandle(handle);
-        });
-
-        BY_HANDLE_FILE_INFORMATION info{};
-        REQUIRE(GetFileInformationByHandle(handle, &info));
-        return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
-    };
-#else
     auto get_fileid = [&] {
         util::File::UniqueID id;
-        util::File::get_unique_id(config.path, id);
-        return id.inode;
+        REQUIRE(util::File::get_unique_id(config.path, id));
+        return id;
     };
+#ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
 #endif
 
