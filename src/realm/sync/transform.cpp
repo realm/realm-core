@@ -903,12 +903,12 @@ REALM_NORETURN void bad_merge(const char* msg, Params&&... params)
     throw_bad_merge(util::format(msg, std::forward<Params>(params)...));
 }
 
-REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::ObjectInstruction instr,
+REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::PathInstruction instr,
                               const std::string& msg)
 {
-    StringData table_name = side.get_string(instr.table);
-    auto pk = format_pk(side.m_changeset->get_key(instr.object));
-    bad_merge("%1. Instruction target: %2[%3]", msg, table_name, pk);
+    std::stringstream ss;
+    side.m_changeset->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
+    bad_merge("%1 (instruction target: %2)", msg, ss.str());
 }
 
 template <class LeftInstruction, class RightInstruction, class Enable = void>
