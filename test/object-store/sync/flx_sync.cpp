@@ -2941,6 +2941,47 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     CHECK(user_commit_version == bootstrap_version + 1);
 }
 
+
+TEST_CASE("flx: really big bootstraps", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("harness");
+
+    std::vector<ObjectId> expected_obj_ids;
+    harness.load_initial_data([&](SharedRealm realm) {
+        realm->cancel_transaction();
+        for (size_t n = 0; n < 10; ++n) {
+            realm->begin_transaction();
+            for (size_t i = 0; i < 100; ++i) {
+                expected_obj_ids.push_back(ObjectId::gen());
+                auto& obj_id = expected_obj_ids.back();
+                CppContext c(realm);
+                Object::create(c, realm, "TopLevel",
+                               std::any(AnyDict{{"_id", obj_id},
+                                                {"queryable_str_field", "foo"s},
+                                                {"queryable_int_field", static_cast<int64_t>(5)},
+                                                {"non_queryable_field", random_string(1024 * 128)}}));
+            }
+            realm->commit_transaction();
+        }
+        realm->begin_transaction();
+    });
+
+    SyncTestFile target(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto error_pf = util::make_promise_future<SyncError>();
+    target.sync_config->error_handler = [promise = util::CopyablePromiseHolder(std::move(error_pf.promise))](
+                                            std::shared_ptr<SyncSession>, SyncError err) mutable {
+        promise.get_promise().emplace_value(std::move(err));
+    };
+    auto realm = Realm::get_shared_realm(target);
+    auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    mut_subs.insert_or_assign(Query(realm->read_group().get_table("class_TopLevel")));
+    auto subs = mut_subs.commit();
+
+    // TODO when BAAS-19105 is fixed we should be able to just wait for bootstrapping to be complete. For now though,
+    // check that we get the error code we expect.
+    auto err = error_pf.future.get();
+    REQUIRE(err.error_code == sync::ClientError::bad_changeset_size);
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
