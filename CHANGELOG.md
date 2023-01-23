@@ -3,6 +3,7 @@
 ### Enhancements
 * `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
+* Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -28,11 +29,11 @@
 * Fix failures in Metrics_TransactionTimings core test ([#6164](https://github.com/realm/realm-core/issues/6164))
 * Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 * Add c_api error category for resolve errors instead of reporting unknown category, part 2. ([PR #6186](https://github.com/realm/realm-core/pull/6186))
+* Remove `File::is_removed` ([#6222](https://github.com/realm/realm-core/pull/6222))
 * Windows improvements in util/file ([PR #6221](https://github.com/realm/realm-core/pull/6221)):
   * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
   * `File::get_unique_id` now works on Windows
   * Replaced manual path string conversion with `std::filesystem::path`
-
 
 ----------------------------------------------
 

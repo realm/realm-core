@@ -296,11 +296,6 @@ public:
     }
 };
 
-class SchemaMismatchError : public TransformError {
-public:
-    using TransformError::TransformError;
-};
-
 inline Transformer::RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d,
                                                      timestamp_type ot, file_ident_type fi)
     : remote_version(rv)
