@@ -2,10 +2,10 @@ add_subdirectory(util)
 add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
-# AFL not yet supported by Windows
+# AFL and LIBFUZZER not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
-    add_subdirectory(fuzzy_object_store)
+    add_subdirectory(realm-fuzzer)
 endif()
 
 add_subdirectory(benchmark-common-tasks)

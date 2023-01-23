@@ -26,8 +26,7 @@ struct State {
     size_t pos;
 };
 
-struct EndOfFile {
-};
+struct EndOfFile {};
 
 enum INS {
     ADD_TABLE = 0,

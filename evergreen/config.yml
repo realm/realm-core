@@ -236,7 +236,7 @@ functions:
       script: |-
         cpack=$(pwd)/${cmake_bindir}/cpack
         if [ -f crash-* ]; then
-          cd realm-core/build/test/fuzzy_object_store/
+          cd realm-core/build/test/realm-fuzzer/
           $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-fuzzer-crash-report" ${package_flags|}
           rm crash-*
         fi
@@ -245,7 +245,7 @@ functions:
     params:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/fuzzy_object_store/realm-fuzzer-crash-report.tar.gz'
+      local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash-report.tar.gz'
       remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash-report.tar.gz'
       bucket: mciuploads
       permissions: public-read
@@ -693,10 +693,10 @@ tasks:
   - command: shell.exec
     timeout_secs: 3600
     params:
-      working_dir: realm-core/build/test/fuzzy_object_store/
+      working_dir: realm-core/build/test/realm-fuzzer/
       shell: bash
       script: |-
-        ./realm_libfuzz
+        ./test/realm-fuzzer/realm-libfuzz
 
 task_groups:
 - name: compile_test_and_package
