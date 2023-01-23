@@ -688,7 +688,7 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: [ "test_suite"]
+  tags: ["test_suite", "for_pull_requests"]
   commands:
   - command: shell.exec
     timeout_secs: 3600
@@ -779,8 +779,6 @@ task_groups:
       target_to_build: realm-libfuzz
   teardown_task:
   - func: "upload fuzzer results"
-  timeout:
-  - func: "run hang analyzer"
   tasks:
   - fuzzer
   
