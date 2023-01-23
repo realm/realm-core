@@ -693,10 +693,10 @@ tasks:
   - command: shell.exec
     timeout_secs: 3600
     params:
-      working_dir: realm-core/build/test/realm-fuzzer/
-      shell: bash
+      working_dir: realm-core/build/test/realm-fuzzer
+      shell: /bin/bash
       script: |-
-        ./test/realm-fuzzer/${cmake_build_type|Debug}/realm-libfuzz
+        test/realm-fuzzer/${cmake_build_type|Debug}/realm-libfuzz
 
 task_groups:
 - name: compile_test_and_package
