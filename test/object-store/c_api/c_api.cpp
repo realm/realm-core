@@ -264,6 +264,23 @@ CPtr<T> clone_cptr(const T* ptr)
         }                                                                                                            \
     } while (false);
 
+#define CHECK_ERR_CAT(err, category)                                                                                 \
+    do {                                                                                                             \
+        realm_error_t _err;                                                                                          \
+        _err.message = "";                                                                                           \
+        _err.categories = 0;                                                                                         \
+        _err.error = RLM_ERR_NONE;                                                                                   \
+        CHECK(realm_get_last_error(&_err));                                                                          \
+        CHECK((_err.categories ^ category) == 0);                                                                    \
+        if (_err.error != err) {                                                                                     \
+            CHECK(_err.error == err);                                                                                \
+            CHECK(std::string{_err.message} == "");                                                                  \
+        }                                                                                                            \
+        else {                                                                                                       \
+            realm_clear_last_error();                                                                                \
+        }                                                                                                            \
+    } while (false);
+
 #if REALM_ENABLE_AUTH_TESTS
 class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
@@ -2257,15 +2274,19 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("realm_query_parse() errors") {
                 // Invalid class key
                 CHECK(!realm_query_parse(realm, 123123123, "string == $0", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_NO_SUCH_TABLE);
+                CHECK_ERR_CAT(RLM_ERR_NO_SUCH_TABLE, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid syntax
                 CHECK(!realm_query_parse(realm, class_foo.key, "lel", 0, nullptr));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY_STRING);
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_STRING, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+
+                // Invalid property
+                CHECK(!realm_query_parse(realm, class_foo.key, "strong = 5", 0, nullptr));
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
-                CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
             SECTION("decimal NaN") {

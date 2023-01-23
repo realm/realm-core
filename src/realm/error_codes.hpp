@@ -224,6 +224,7 @@ public:
         SchemaValidationFailedWrite = RLM_ERR_SCHEMA_VALIDATION_FAILED_WRITE,
         AppUnknownError = RLM_ERR_APP_UNKNOWN,
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
+        UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
 
         WebSocketGoingAway = RLM_ERR_WEBSOCKET_GOINGAWAY,
         WebSocketProtocolError = RLM_ERR_WEBSOCKET_PROTOCOLERROR,
