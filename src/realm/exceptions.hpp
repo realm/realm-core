@@ -390,9 +390,9 @@ struct SyntaxError : InvalidArgument {
 
 /// Exception thrown when binding a syntactically valid query string in a
 /// context where it does not make sense.
-struct InvalidQueryError : LogicError {
+struct InvalidQueryError : InvalidArgument {
     InvalidQueryError(std::string_view msg)
-        : LogicError(ErrorCodes::InvalidQuery, msg)
+        : InvalidArgument(ErrorCodes::InvalidQuery, msg)
     {
     }
     ~InvalidQueryError() noexcept override;

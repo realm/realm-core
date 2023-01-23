@@ -72,7 +72,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ClosedRealm:
         case CrossTableLinkTarget:
         case IllegalOperation:
-        case InvalidQuery:
         case InvalidSchemaChange:
         case InvalidSchemaVersion:
         case InvalidTableRef:
@@ -99,6 +98,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidEncryptionKey:
         case InvalidName:
         case InvalidProperty:
+        case InvalidQuery:
         case InvalidQueryArg:
         case InvalidSortDescriptor:
         case KeyNotFound:
@@ -198,6 +198,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case UserAppDomainMismatch:
         case UserDisabled:
         case UserNotFound:
+        case UserpassTokenInvalid:
         case ValueAlreadyExists:
         case ValueDuplicateName:
         case ValueNotFound:
@@ -369,6 +370,7 @@ static const MapElem string_to_error_code[] = {
     {"UserAppDomainMismatch", ErrorCodes::UserAppDomainMismatch},
     {"UserDisabled", ErrorCodes::UserDisabled},
     {"UserNotFound", ErrorCodes::UserNotFound},
+    {"UserpassTokenInvalid", ErrorCodes::UserpassTokenInvalid},
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
