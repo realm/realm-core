@@ -696,7 +696,7 @@ tasks:
       working_dir: realm-core/build/test/fuzzy_object_store/
       shell: bash
       script: |-
-        ./realm-core/build/test/fuzzy_object_store/realm_libfuzz
+        ./realm_libfuzz
 
 task_groups:
 - name: compile_test_and_package
