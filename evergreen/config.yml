@@ -696,7 +696,7 @@ tasks:
       working_dir: realm-core/build/test/realm-fuzzer/
       shell: bash
       script: |-
-        ./test/realm-fuzzer/realm-libfuzz
+        ./test/realm-fuzzer/${cmake_build_type|Debug}/realm-libfuzz
 
 task_groups:
 - name: compile_test_and_package
