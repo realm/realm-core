@@ -30,6 +30,7 @@
 * Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 * Add c_api error category for resolve errors instead of reporting unknown category, part 2. ([PR #6186](https://github.com/realm/realm-core/pull/6186))
 * Remove `File::is_removed` ([#6222](https://github.com/realm/realm-core/pull/6222))
+* Improve performance of committting write transactions in debug builds. Small writes are potentially upwards of twice as fast. Release builds are uneffected ([PR #6226](https://github.com/realm/realm-core/pull/6226)).
 
 ----------------------------------------------
 

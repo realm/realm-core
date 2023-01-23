@@ -340,9 +340,9 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 #define ALLOC_DBG_COUT(args)
 #endif
 
-#ifdef REALM_DEBUG
 void GroupWriter::map_reachable()
 {
+#if REALM_ALLOC_DEBUG
     class Collector : public Array::MemUsageHandler {
     public:
         Collector(std::vector<Reachable>& reachable)
@@ -370,7 +370,6 @@ void GroupWriter::map_reachable()
                   });
     }
 
-#if REALM_ALLOC_DEBUG
     std::cout << "  Reachable: ";
     // this really should be inverted, showing all versions pr entry instead of all entries pr version
     for (auto& [version, info] : m_top_ref_map) {
@@ -380,9 +379,8 @@ void GroupWriter::map_reachable()
         }
     }
     std::cout << std::endl << "  Backdating:";
-#endif
+#endif // REALM_ALLOC_DEBUG
 }
-#endif
 
 void GroupWriter::backdate()
 {
@@ -557,9 +555,7 @@ void GroupWriter::backdate()
     };
 
 
-#ifdef REALM_DEBUG
     map_reachable();
-#endif
     for (auto&& entry : m_not_free_in_file) {
         backdate_single_entry(entry);
     }
