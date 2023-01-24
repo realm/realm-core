@@ -232,10 +232,11 @@ functions:
   "upload fuzzer results":
   - command: shell.exec
     params:
+      working_dir: realm-core
       shell: bash
       script: |-
         cpack=$(pwd)/${cmake_bindir}/cpack
-        cd realm-core/build/test/realm-fuzzer
+        cd build/test/realm-fuzzer
         if [ -f crash-* ]; then
           $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-fuzzer-crash-report" ${package_flags|}
           rm crash-*
