@@ -62,9 +62,8 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(std::string path)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string path, VersionID before_version, bool did_recover)>
-        notify_after_client_reset;
+    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.
