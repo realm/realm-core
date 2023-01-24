@@ -232,16 +232,22 @@ functions:
   "upload fuzzer results":
   - command: shell.exec
     params:
-      working_dir: realm-core
+      working_dir: realm-core/build/test/realm-fuzzer
       script: |-
-        cd build/test/realm-fuzzer
+        echo $(pwd)
+        ls $(pwd)
+        echo " ---- "
+        ls $(pwd)/${cmake_build_type|Debug}
+        echo " ---- "
         if [ -f "crash-*" ]; then
+          echo "Found crash file"
           mv crash-* realm-fuzzer-crash.txt
           rm crash-*
         fi
     
   - command: s3.put
     params:
+      working_dir: realm-core/build/test/realm-fuzzer
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash.txt'
