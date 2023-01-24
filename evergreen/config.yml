@@ -680,29 +680,29 @@ tasks:
     params:
       working_dir: realm-core
       script: |-
-        set -o errexit
-        cpack=$(pwd)/${cmake_bindir}/cpack
+        
         cd build/test/realm-fuzzer
-        if [[ -f "crash-*" ]]; then
-          $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-fuzzer-crash-report" ${package_flags|}
+        if [ -f "crash-*" ]; then
+          mv crash-* realm-fuzzer-crash.txt
           rm crash-*
         fi
   - command: s3.put
     params:
+      working_dir: realm-core
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash-report.tar.gz'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash-report.tar.gz'
+      local_file: 'build/test/realm-fuzzer/realm-fuzzer-crash.txt'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
       bucket: mciuploads
       permissions: public-read
-      content_type: '${content_type|application/x-gzip}'
+      content_type: text/text
       display_name: Fuzzer crash report
       optional: true
   - command: shell.exec
     params:
       working_dir: realm-core/build/test/realm-fuzzer
       script: |-
-        rm realm-fuzzer-crash-report.tar.gz
+        rm realm-fuzzer-crash.txt
 
 task_groups:
 - name: compile_test_and_package
