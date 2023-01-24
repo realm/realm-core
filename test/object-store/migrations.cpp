@@ -2117,6 +2117,9 @@ TEST_CASE("migration: SoftResetFile") {
         REQUIRE(util::File::get_unique_id(config.path, id));
         return id;
     };
+// To verify that the file has actually be deleted and recreated, on
+// non-Windows we need to hold an open file handle to the old file to force
+// using a new inode, but on Windows we *can't*
 #ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
 #endif
