@@ -234,12 +234,7 @@ functions:
     params:
       working_dir: realm-core/build/test/realm-fuzzer
       script: |-
-        echo $(pwd)
-        ls $(pwd)
-        echo " ---- "
-        ls $(pwd)/${cmake_build_type|Debug}
-        echo " ---- "
-        if [ -f "crash-*" ]; then
+        if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
           mv crash-* realm-fuzzer-crash.txt
           rm crash-*
