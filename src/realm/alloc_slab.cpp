@@ -1183,10 +1183,15 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
             if (section_size == (1 << section_shift)) {
                 new_mappings.push_back(
                     {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
+                if (db)
+                    db->inject_encryption_marker_observer(
+                        new_mappings.back().primary_mapping.get_encrypted_mapping());
             }
             else {
                 new_mappings.push_back({util::File::Map<char>()});
                 auto& mapping = new_mappings.back().primary_mapping;
+                if (db)
+                    db->inject_encryption_marker_observer(mapping.get_encrypted_mapping());
                 bool reserved =
                     mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
                 if (reserved) {

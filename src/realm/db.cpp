@@ -79,7 +79,8 @@ namespace {
 // 12      Change `number_of_versions` to an atomic rather than guarding it
 //         with a lock.
 // 13      New impl of VersionList and added mutex for it (former RingBuffer)
-const uint_fast16_t g_shared_info_version = 13;
+// 14      Added field for tracking ongoing encrypted writes
+const uint_fast16_t g_shared_info_version = 14;
 
 
 struct VersionList {
@@ -462,6 +463,8 @@ struct alignas(8) DB::SharedInfo {
     InterprocessCondVar::SharedPart pick_next_writer;
     std::atomic<uint32_t> next_ticket;
     std::atomic<uint32_t> next_served = 0;
+    std::atomic<uint64_t> writing_page;
+    std::atomic<uint64_t> write_counter;
 
     // IMPORTANT: The VersionList MUST be the last field in SharedInfo - see above.
     VersionList readers;
@@ -760,6 +763,29 @@ private:
         }
     }
 
+    void mark_page_for_writing(uint64_t page_number)
+    {
+        m_info->writing_page = page_number + 1;
+        m_info->write_counter++;
+    }
+    void clear_writing_marker()
+    {
+        m_info->writing_page = 0;
+    }
+    // returns false if no page is marked.
+    // if a page is marked, returns true and optionally the number of the page marked for writing
+    // in all cases returns optionally the write counter
+    bool observe_writer(uint64_t* page_number, uint64_t* write_counter)
+    {
+        if (write_counter) {
+            *write_counter = m_info->write_counter;
+        }
+        uint64_t marked = m_info->writing_page;
+        if (marked && page_number) {
+            *page_number = marked - 1;
+        }
+        return marked != 0;
+    }
     std::mutex m_local_mutex;
     std::vector<VersionList::ReadCount> m_local_readers;
 
@@ -768,6 +794,42 @@ private:
     File& m_file;
     File::Map<DB::SharedInfo> m_reader_map;
     util::InterprocessMutex& m_mutex;
+
+    friend class DB::EncryptionMarkerObserver;
+};
+
+// adapter class for marking/observing encrypted writes
+class DB::EncryptionMarkerObserver : public util::WriteMarker, public util::WriteObserver {
+public:
+    EncryptionMarkerObserver(DB::VersionManager& vm)
+        : vm(vm)
+    {
+    }
+    bool observe(uint64_t* pos, uint64_t* write_count) override
+    {
+        return vm.observe_writer(pos, write_count);
+    }
+    void mark(uint64_t pos) override
+    {
+        vm.mark_page_for_writing(pos);
+    }
+    void unmark() override
+    {
+        vm.clear_writing_marker();
+    }
+
+private:
+    DB::VersionManager& vm;
+};
+
+void DB::inject_encryption_marker_observer(util::EncryptedFileMapping* mapping) const
+{
+    util::WriteMarker* marker = m_marker_observer.get();
+    util::WriteObserver* observer = m_marker_observer.get();
+    if (mapping) {
+        mapping->set_marker(marker);
+        mapping->set_observer(observer);
+    }
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -1360,6 +1422,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             // Keep the mappings and file open:
             m_version_manager = std::move(version_manager);
+            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*m_version_manager);
             alloc_detach_guard.release();
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
