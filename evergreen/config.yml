@@ -679,8 +679,8 @@ tasks:
   - command: shell.exec
     params:
       working_dir: realm-core
+      shell: /bin/bash
       script: |-
-        
         cd build/test/realm-fuzzer
         if [ -f "crash-*" ]; then
           mv crash-* realm-fuzzer-crash.txt
@@ -701,6 +701,7 @@ tasks:
   - command: shell.exec
     params:
       working_dir: realm-core/build/test/realm-fuzzer
+      shell: /bin/bash
       script: |-
         rm realm-fuzzer-crash.txt
 
