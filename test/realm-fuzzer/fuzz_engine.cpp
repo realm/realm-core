@@ -177,10 +177,10 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
                 fuzzer.check_null(group, log, state);
             }
             else if (instr == ASYNC_WRITE && group.size() > 0) {
-                fuzzer.async_write(shared_realm, log);
+                // TODO: add support for async transactions
             }
             else if (instr == ASYNC_CANCEL) {
-                fuzzer.async_cancel(shared_realm, group, log, state);
+                // TODO: add support for async transactions
             }
         }
         catch (const std::exception& e) {

@@ -23,7 +23,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size)
 {
     if (Size == 0)
         return 0;
-    throw std::runtime_error({"test..."});
     std::string input{(const char*)Data, Size};
     FuzzEngine fuzz_engine;
     return fuzz_engine.run_fuzzer(input, "realm_libfuzz", false,

@@ -415,34 +415,6 @@ void FuzzObject::check_null(Group& group, FuzzLog& log, State& s)
     }
 }
 
-void FuzzObject::async_write(SharedRealm shared_realm, FuzzLog& log)
-{
-    log << "FuzzObject::async_write\n";
-    if (!shared_realm->is_in_async_transaction() && !shared_realm->is_in_transaction()) {
-        shared_realm->async_begin_transaction([&]() {
-            shared_realm->async_commit_transaction([](std::exception_ptr) {});
-        });
-    }
-}
-
-void FuzzObject::async_cancel(SharedRealm shared_realm, Group& group, FuzzLog& log, State& s)
-{
-    log << "FuzzObject::async_cancel\n";
-    if (!shared_realm->is_in_async_transaction() && !shared_realm->is_in_transaction()) {
-        auto token = shared_realm->async_begin_transaction([&]() {
-            TableKey table_key = group.get_table_keys()[get_next_token(s) % group.size()];
-            size_t num_rows = get_next_token(s);
-            if (group.get_table(table_key)->size() + num_rows < max_rows) {
-                log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
-                    << num_rows % add_empty_row_max << ", keys); }\n";
-                std::vector<ObjKey> keys;
-                group.get_table(table_key)->create_objects(num_rows % add_empty_row_max, keys);
-            }
-        });
-        shared_realm->async_cancel_transaction(token);
-    }
-}
-
 DataType FuzzObject::get_type(unsigned char c) const
 {
     DataType types[] = {type_Int, type_Bool, type_Float, type_Double, type_String, type_Binary, type_Timestamp};

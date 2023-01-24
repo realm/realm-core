@@ -51,8 +51,6 @@ public:
     void close_and_reopen(realm::SharedRealm& shared_realm, FuzzLog& log, const realm::Realm::Config& config);
     void create_table_view(realm::Group& group, FuzzLog& log, State& s, std::vector<realm::TableView>& table_views);
     void check_null(realm::Group& group, FuzzLog& log, State& s);
-    void async_write(realm::SharedRealm shared_realm, FuzzLog& log);
-    void async_cancel(realm::SharedRealm shared_realm, realm::Group& group, FuzzLog& log, State& s);
 
     const char* get_encryption_key() const;
     std::string get_current_time_stamp() const;
