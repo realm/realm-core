@@ -18,7 +18,6 @@
 #include "fuzz_configurator.hpp"
 #include "fuzz_object.hpp"
 #include "../util/test_path.hpp"
-#include <iostream>
 
 FuzzConfigurator::FuzzConfigurator(FuzzObject& fuzzer, const std::string& input, bool use_input_file,
                                    const std::string& name)

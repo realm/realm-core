@@ -237,7 +237,6 @@ functions:
         if ls crash-*> /dev/null 2>&1; then
           echo "Found crash file"
           mv crash-* realm-fuzzer-crash.txt
-          rm crash-*
         fi
     
   - command: s3.put
@@ -694,7 +693,7 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: ["for_pull_requests" ]
+  tags: [ "test_suite"]
   commands:
   - command: shell.exec
     timeout_secs: 3600
@@ -937,8 +936,8 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    #cron: "@daily"
-    #patchable: false
+    cron: "@daily"
+    patchable: false
 
 
 - name: rhel70
