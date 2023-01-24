@@ -233,15 +233,15 @@ functions:
   - command: shell.exec
     params:
       working_dir: realm-core
-      shell: bash
       script: |-
+        set -o errexit
         cpack=$(pwd)/${cmake_bindir}/cpack
         cd build/test/realm-fuzzer
-        if [ -f crash-* ]; then
+        if [[ -f "crash-*" ]]; then
           $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-fuzzer-crash-report" ${package_flags|}
           rm crash-*
         fi
-
+        
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
@@ -253,7 +253,13 @@ functions:
       content_type: '${content_type|application/x-gzip}'
       display_name: Fuzzer crash report
       optional: true
-  
+
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      script: |-
+        rm realm-fuzzer-crash-report.tar.gz
+
   "run hang analyzer":
   - command: shell.exec
     params:
