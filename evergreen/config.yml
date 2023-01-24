@@ -229,6 +229,35 @@ functions:
       display_name: install baas output
       optional: true
   
+  "upload fuzzer results":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        cd build/test/realm-fuzzer
+        if [ -f "crash-*" ]; then
+          mv crash-* realm-fuzzer-crash.txt
+          rm crash-*
+        fi
+    
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash.txt'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: Fuzzer crash report
+      optional: true
+
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      script: |-
+        rm realm-fuzzer-crash.txt
+
   "run hang analyzer":
   - command: shell.exec
     params:
@@ -674,37 +703,6 @@ tasks:
       script: |-
         ${cmake_build_type|Debug}/realm-libfuzz
 
-- name: fuzzer-results
-  commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: /bin/bash
-      script: |-
-        cd build/test/realm-fuzzer
-        if [ -f "crash-*" ]; then
-          mv crash-* realm-fuzzer-crash.txt
-          rm crash-*
-        fi
-  - command: s3.put
-    params:
-      working_dir: realm-core
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      local_file: 'build/test/realm-fuzzer/realm-fuzzer-crash.txt'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/text
-      display_name: Fuzzer crash report
-      optional: true
-  - command: shell.exec
-    params:
-      working_dir: realm-core/build/test/realm-fuzzer
-      shell: /bin/bash
-      script: |-
-        rm realm-fuzzer-crash.txt
-
 task_groups:
 - name: compile_test_and_package
   max_hosts: 1
@@ -784,9 +782,10 @@ task_groups:
   - func: "compile"
     vars:
       target_to_build: realm-libfuzz
+  teardown_task:
+  - func: "upload fuzzer results"
   tasks:
   - fuzzer
-  - fuzzer-results
   
 buildvariants:
 - name: ubuntu2004
