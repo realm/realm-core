@@ -130,7 +130,10 @@ bool RunLoopScheduler::can_invoke() const noexcept
 
 class MainRunLoopScheduler : public RunLoopScheduler {
 public:
-    MainRunLoopScheduler() : RunLoopScheduler(CFRunLoopGetMain()) {}
+    MainRunLoopScheduler()
+        : RunLoopScheduler(CFRunLoopGetMain())
+    {
+    }
 
     bool is_on_thread() const noexcept override
     {
