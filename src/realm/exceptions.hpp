@@ -35,6 +35,7 @@ public:
     const Status& to_status() const;
     std::string_view reason() const noexcept;
     ErrorCodes::Error code() const noexcept;
+    ErrorCategory category() const noexcept;
     std::string_view code_string() const noexcept;
 
 private:

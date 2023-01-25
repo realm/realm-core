@@ -44,6 +44,11 @@ ErrorCodes::Error Exception::code() const noexcept
     return m_status.code();
 }
 
+ErrorCategory Exception::category() const noexcept
+{
+    return ErrorCodes::error_categories(code());
+}
+
 std::string_view Exception::code_string() const noexcept
 {
     return m_status.code_string();
