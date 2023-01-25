@@ -4304,6 +4304,7 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(checked(realm_dictionary_get_keys(ints.get(), &size, &keys)));
                     CHECK(keys);
                     CHECK((*keys).size() == size);
+                    realm_release(keys);
                 }
 
                 SECTION("realm_dictionary_contains_key") {
