@@ -39,7 +39,8 @@ using namespace realm::metrics;
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
-    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size);
+    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size,
+              util::WriteMarker* write_marker = nullptr);
     ~MapWindow();
 
     // translate a ref to a pointer
@@ -124,12 +125,15 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size)
+GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size,
+                                  util::WriteMarker* write_marker)
     : m_alignment(alignment)
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+    if (auto p = m_map.get_encrypted_mapping())
+        p->set_marker(write_marker);
 }
 
 GroupWriter::MapWindow::~MapWindow()
@@ -165,13 +169,14 @@ void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t s
 }
 
 
-GroupWriter::GroupWriter(Group& group, Durability dura)
+GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_free_positions(m_alloc)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
     , m_durability(dura)
+    , m_write_marker(write_marker)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_PLATFORM_APPLE && REALM_MOBILE
@@ -325,7 +330,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
-    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
+    auto new_window =
+        std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size, m_write_marker);
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }
