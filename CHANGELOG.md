@@ -18,6 +18,7 @@
 * Changesets from the server sent during FLX bootstrapping that are larger than 16MB can cause the sync client to crash with a LogicError (PR [#6218](https://github.com/realm/realm-core/pull/6218), since v12.0.0)
 * Online compaction may cause a single commit to take a long time ([#6245](https://github.com/realm/realm-core/pull/6245), since v13.0.0)
 * Expose `collection_was_cleared` in the C API ([#6200](https://github.com/realm/realm-core/issues/6200), since v.10.4.0)
+* `Set<Mixed>::sort()` used a different sort order from sorting any other collection, including a filtered `Set<Mixed>` ([PR #6238](https://github.com/realm/realm-core/pull/6238), since v13.0.0).
 
 ### Breaking changes
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
