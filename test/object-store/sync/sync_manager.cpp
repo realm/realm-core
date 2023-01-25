@@ -499,7 +499,23 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, local_uuid_3, realm_url, partition);
     const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, local_uuid_4, realm_url, partition);
 
+    //
+#ifdef _WIN32
+    SECTION("Action::DeleteRealm - fails if locked") {
+        SharedRealm locked_realm;
+        create_dummy_realm(realm_path_1, &locked_realm);
+
+        REQUIRE(locked_realm);
+
+        TestSyncManager tsm(config);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
+
+        REQUIRE_FALSE(tsm.app()->sync_manager()->immediately_run_file_actions(realm_path_1));
+    }
+#endif
+
     SECTION("Action::DeleteRealm") {
+
         // Create some file actions
         manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
         manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);
