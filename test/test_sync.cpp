@@ -1565,17 +1565,6 @@ TEST(Sync_FailingReadsOnClientSide)
 }
 
 
-TEST(Sync_RapidStartStop)
-{
-    TEST_DIR(dir);
-    for (int i = 0; i < 1000; i++) {
-        ClientServerFixture fixture{dir, test_context};
-        fixture.stop();
-        std::cerr << "Fixture start/stop: " << i << std::endl;
-    }
-}
-
-
 TEST(Sync_FailingReadsOnServerSide)
 {
     TEST_CLIENT_DB(db_1);

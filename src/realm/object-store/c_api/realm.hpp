@@ -20,7 +20,10 @@
 
 #include <realm/object-store/c_api/util.hpp>
 #include <realm/object-store/binding_context.hpp>
+
+#if REALM_ENABLE_SYNC
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#endif // REALM_ENABLE_SYNC
 
 namespace realm::c_api {
 
@@ -64,6 +67,8 @@ private:
     CallbackRegistry<const Schema&> m_schema_changed_callbacks;
 };
 
+#if REALM_ENABLE_SYNC
+
 class CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
 public:
     using ThreadCallback = util::UniqueFunction<void()>;
@@ -106,5 +111,7 @@ private:
     ThreadCallback m_destroy_callback;
     ErrorCallback m_error_callback;
 };
+
+#endif // REALM_ENABLE_SYNC
 
 } // namespace realm::c_api
