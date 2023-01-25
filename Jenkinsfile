@@ -282,7 +282,7 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
             environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
-            environment << "UNITTEST_LOG_LEVEL=1"
+            environment << "UNITTEST_LOG_LEVEL=debug"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
