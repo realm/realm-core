@@ -409,29 +409,6 @@ private:
     patterns m_include, m_exclude;
 };
 
-
-class IntraTestLogger : public Logger {
-public:
-    // Logger with a local log level used for the different test threads
-    // A new log level threshold atomic will be used for this logger, but
-    // it will write to the base_logger_ptr when do_log() is called
-    IntraTestLogger(const std::shared_ptr<Logger>& base_logger_ptr, Level threshold)
-        : Logger(threshold)
-        , m_chained_logger{base_logger_ptr}
-    {
-        REALM_ASSERT(m_chained_logger);
-    }
-
-    void do_log(Logger::Level level, std::string const& message) override final
-    {
-        Logger::do_log(*m_chained_logger, level, message); // Throws
-    }
-
-protected:
-    std::shared_ptr<Logger> m_chained_logger;
-};
-
-
 } // anonymous namespace
 
 
@@ -489,7 +466,7 @@ public:
     ThreadContextImpl(SharedContextImpl& sc, int ti, const std::shared_ptr<util::Logger>& attached_logger)
         : ThreadContext(sc, ti, attached_logger ? attached_logger : sc.report_logger_ptr)
         , intra_test_logger(
-              std::make_shared<IntraTestLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
+              std::make_shared<LocalThresholdLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
         , shared_context(sc)
     {
     }
