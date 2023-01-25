@@ -153,8 +153,7 @@ struct results {
     long num_lines;
     long num_fields;
     results(long num_lines, long num_fields)
-        : first_line(first_line)
-        , num_lines(num_lines)
+        : num_lines(num_lines)
         , num_fields(num_fields)
     {
         values = new long[num_lines * num_fields];
@@ -166,7 +165,7 @@ struct results {
     void finalize(long _first_line, long limit)
     {
         first_line = _first_line;
-        num_lines = limit - first_line;
+        num_lines = limit - _first_line;
     };
 };
 
@@ -267,7 +266,7 @@ int main(int argc, char* argv[])
     assert(file_start != (void*)-1);
     long step_size = 1000000;
     concurrent_queue<results*> to_reader;
-    for (int i = 0; i < 1; ++i)
+    for (int i = 0; i < 100; ++i)
         to_reader.put(new results(step_size, max_fields));
     concurrent_queue<results*> to_writer;
 
@@ -312,6 +311,7 @@ int main(int argc, char* argv[])
             });
             db.release(std::move(s3));
         }
+        std::cout << "Committing data...." << std::endl;
         while (1) {
 
             results* res;
@@ -323,6 +323,7 @@ int main(int argc, char* argv[])
                 break;
             }
 
+            start = std::chrono::high_resolution_clock::now();
             const Snapshot& s3 = db.open_snapshot();
             db.release(std::move(s3));
             Snapshot& s2 = db.create_changes(); // create_changes();
@@ -330,28 +331,22 @@ int main(int argc, char* argv[])
             auto num_value = 0;
             auto val_ptr = res->values;
             auto limit = res->first_line + res->num_lines;
+            std::cout << "Writing " << num_line << " to " << limit << " width " << res->num_fields << std::endl;
             while (num_line < limit) {
-                Object o;
-                if (num_value == 0) {
-                    auto row = row_order[num_line];
-                    // if (!s2.exists(t, row)) {
-                    //     std::cout << "Weird - " << num_line << " with key " << row.key << " is missing"
-                    //               << std::endl;
-                    // }
-                    o = s2.get(t, row);
+                auto row = row_order[num_line];
+                Object o = s2.get(t, row);
+                num_value = 0;
+                while (num_value < res->num_fields) {
+                    auto val = *val_ptr++;
+                    o.set(f_i[num_value++], val);
                 }
-                auto val = *val_ptr++;
-                o.set(f_i[num_value++], val);
-                if (num_value == res->num_fields) {
-                    num_value = 0;
-                    num_line++;
-                }
+                num_line++;
             }
             to_reader.put(res);
             end = std::chrono::high_resolution_clock::now();
             std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << "   ...transaction built in " << ms.count() << " millisecs" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
+            start = end;
             db.commit(std::move(s2));
             end = std::chrono::high_resolution_clock::now();
             ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -377,7 +372,7 @@ int main(int argc, char* argv[])
                 if ((num_line % 100000) == 0)
                     std::cout << num_line << " " << std::flush;
                 // std::cout << "Index " << num_line << " - key " << row.key << std::endl;
-                long* line_results = res->values + (num_line - res->first_line) * max_fields;
+                long* line_results = res->values + (num_line - first_line) * max_fields;
                 ++num_line;
                 while (num_value < max_fields) {
                     const char* read_ptr2 = read_ptr;
