@@ -282,6 +282,7 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
             environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
+            environment << "UNITTEST_LOG_LEVEL=1"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
@@ -375,6 +376,7 @@ def doCheckSanity(Map options = [:]) {
               'CXX=clang++',
               'UNITTEST_XML=unit-test-report.xml',
               "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
+              "UNITTEST_LOG_LEVEL=debug"
             ]
             buildDockerEnv('testing.Dockerfile').inside(privileged) {
                 withEnv(environment) {
