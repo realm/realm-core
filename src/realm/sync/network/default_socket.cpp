@@ -466,7 +466,8 @@ void DefaultSocketProvider::event_loop()
     lock.lock();
     if (m_state != State::Started) {
         // Stop has already been requested - exit early
-        return;
+        lock.unlock(); // make sure the mutex is unloaded before exiting
+        return;        // early return
     }
     do_state_update(State::Running);
     lock.unlock();
