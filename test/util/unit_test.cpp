@@ -413,29 +413,23 @@ private:
 class IntraTestLogger : public Logger {
 public:
     // Logger with a local log level used for the different test threads
+    // A new log level threshold atomic will be used for this logger, but
+    // it will write to the base_logger_ptr when do_log() is called
     IntraTestLogger(const std::shared_ptr<Logger>& base_logger_ptr, Level threshold)
-        : Logger(base_logger_ptr)
-        , m_local_log_level(threshold)
+        : Logger(threshold)
+        , m_chained_logger{base_logger_ptr}
     {
-    }
-
-    Level get_level_threshold() const noexcept override
-    {
-        return m_local_log_level;
-    }
-
-    void set_level_threshold(Level level) noexcept override
-    {
-        m_local_log_level = level;
+        REALM_ASSERT(m_chained_logger);
     }
 
     void do_log(Logger::Level level, std::string const& message) override final
     {
-        Logger::do_log(*m_base_logger_ptr, level, message); // Throws
+        Logger::do_log(*m_chained_logger, level, message); // Throws
     }
 
 protected:
     Level m_local_log_level;
+    std::shared_ptr<Logger> m_chained_logger;
 };
 
 
