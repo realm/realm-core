@@ -345,7 +345,7 @@ private:
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+    void handle_fresh_realm_downloaded(DBRef db, Status status,
                                        sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);

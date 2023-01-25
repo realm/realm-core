@@ -33,8 +33,6 @@ class system_category : public std::error_category {
     std::string message(int) const override;
 };
 
-system_category g_system_category;
-
 const char* system_category::name() const noexcept
 {
     return "realm.basic_system";
@@ -93,14 +91,15 @@ std::string system_category::message(int value) const
 
 } // anonymous namespace
 
-const std::error_category& realm::util::basic_system_error_category() noexcept
-{
-    return g_system_category;
-}
-
 namespace realm::util::error {
 std::error_code make_error_code(basic_system_errors err) noexcept
 {
-    return std::error_code(err, g_system_category);
+    return std::error_code(err, basic_system_error_category());
+}
+
+const std::error_category& basic_system_error_category()
+{
+    static system_category system_category;
+    return system_category;
 }
 } // namespace realm::util::error

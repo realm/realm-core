@@ -754,7 +754,18 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     bool new_batch = false;
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    try {
+        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    }
+    catch (const LogicError& ex) {
+        if (ex.code() == ErrorCodes::LimitExceeded) {
+            IntegrationException ex(ClientError::bad_changeset_size,
+                                    "bootstrap changeset too large to store in pending bootstrap store");
+            on_integration_failure(ex);
+            return true;
+        }
+        throw;
+    }
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
