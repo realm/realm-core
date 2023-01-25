@@ -428,7 +428,6 @@ public:
     }
 
 protected:
-    Level m_local_log_level;
     std::shared_ptr<Logger> m_chained_logger;
 };
 
