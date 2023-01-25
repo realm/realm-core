@@ -19,6 +19,7 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
+#include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
 
 #include <realm/util/optional.hpp>
@@ -503,7 +504,7 @@ private:
 
     TransactionRef m_transaction;
 
-    uint64_t m_schema_version;
+    uint64_t m_schema_version = ObjectStore::NotVersioned;
     Schema m_schema;
     util::Optional<Schema> m_new_schema;
     uint64_t m_schema_transaction_version = -1;

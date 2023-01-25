@@ -27,7 +27,6 @@
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
-#include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
