@@ -589,12 +589,13 @@ private:
         Query query_for_added_object = table->where().equal(id_col, pk);
         mut_subs.insert_or_assign(query_for_added_object);
         auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (create_object) {
             realm->begin_transaction();
             table->create_object_with_primary_key(pk, {{str_col, "initial value"}});
             realm->commit_transaction();
         }
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_upload(*realm);
     }
 
     void load_initial_data(SharedRealm realm)
