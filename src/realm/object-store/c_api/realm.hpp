@@ -96,19 +96,19 @@ public:
 
     void did_create_thread() override
     {
-        if (m_create_callback && m_user_data)
+        if (m_create_callback)
             m_create_callback(m_user_data.get());
     }
 
     void will_destroy_thread() override
     {
-        if (m_destroy_callback && m_user_data)
+        if (m_destroy_callback)
             m_destroy_callback(m_user_data.get());
     }
 
     void handle_error(std::exception const& e) override
     {
-        if (m_error_callback && m_user_data)
+        if (m_error_callback)
             m_error_callback(m_user_data.get(), e.what());
     }
 
