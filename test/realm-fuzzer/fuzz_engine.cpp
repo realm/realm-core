@@ -52,7 +52,6 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
             return cnf;
         }
         catch (const EndOfFile& e) {
-            std::cout << "Error, cnf is invalid" << std::endl;
             throw std::runtime_error{"Realm cnf is invalid"};
         }
     };
@@ -63,7 +62,6 @@ int FuzzEngine::run_fuzzer(const std::string& input, const std::string& name, bo
         do_fuzz(cnf);
     }
     catch (const EndOfFile&) {
-        std::cout << "End of input ... " << std::endl;
     }
     return 0;
 }
