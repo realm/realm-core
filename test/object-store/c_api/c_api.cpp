@@ -4918,15 +4918,6 @@ struct BCTOState {
     bool thread_destroy_called = false;
     std::string thread_on_error_message;
     std::string id = "BTCO-STATE";
-
-    static BCTOState* check_bcto_userdata(realm_userdata_t userdata)
-    {
-        REALM_ASSERT(userdata);
-        REALM_ASSERT(BCTOState::bcto_deleted == false);
-        auto user_data = static_cast<BCTOState*>(userdata);
-        REALM_ASSERT(user_data && user_data->id == "BTCO-STATE");
-        return user_data;
-    }
 };
 
 bool BCTOState::bcto_deleted = false;
@@ -4936,44 +4927,56 @@ TEST_CASE("C API - binding callback thread observer") {
     BCTOState::bcto_deleted = false;
 
     auto bcto_free_userdata = [](realm_userdata_t userdata) {
-        auto user_data = BCTOState::check_bcto_userdata(userdata);
+        REQUIRE(userdata);
+        REQUIRE(BCTOState::bcto_deleted == false);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
         user_data->id.clear();
         delete user_data;
         BCTOState::bcto_deleted = true;
     };
 
     auto bcto_on_thread_create = [](realm_userdata_t userdata) {
-        auto user_data = BCTOState::check_bcto_userdata(userdata);
+        REQUIRE(userdata);
+        REQUIRE(BCTOState::bcto_deleted == false);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
         user_data->thread_create_called = true;
     };
 
     auto bcto_on_thread_destroy = [](realm_userdata_t userdata) {
-        auto user_data = BCTOState::check_bcto_userdata(userdata);
+        REQUIRE(userdata);
+        REQUIRE(BCTOState::bcto_deleted == false);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
         user_data->thread_destroy_called = true;
     };
 
     auto bcto_on_thread_error = [](realm_userdata_t userdata, const char* err_message) {
-        auto user_data = BCTOState::check_bcto_userdata(userdata);
+        REQUIRE(userdata);
         REALM_ASSERT(err_message);
+        REQUIRE(BCTOState::bcto_deleted == false);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
         user_data->thread_on_error_message = err_message;
     };
 
     auto bcto_token = realm_set_binding_callback_thread_observer(
         bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
         static_cast<realm_userdata_t>(bcto_user_data), bcto_free_userdata);
-    REALM_ASSERT(bcto_token);
-    REALM_ASSERT(g_binding_callback_thread_observer);
+    REQUIRE(bcto_token);
+    REQUIRE(g_binding_callback_thread_observer);
     g_binding_callback_thread_observer->did_create_thread();
-    REALM_ASSERT(bcto_user_data->thread_create_called);
+    REQUIRE(bcto_user_data->thread_create_called);
     g_binding_callback_thread_observer->handle_error(MultipleSyncAgents());
-    REALM_ASSERT(bcto_user_data->thread_on_error_message.find(
+    REQUIRE(bcto_user_data->thread_on_error_message.find(
                      "Multiple sync agents attempted to join the same session") != std::string::npos);
     g_binding_callback_thread_observer->will_destroy_thread();
-    REALM_ASSERT(bcto_user_data->thread_destroy_called);
+    REQUIRE(bcto_user_data->thread_destroy_called);
 
     realm_release(static_cast<void*>(bcto_token));
-    REALM_ASSERT(BCTOState::bcto_deleted == true);
-    REALM_ASSERT(g_binding_callback_thread_observer == nullptr);
+    REQUIRE(BCTOState::bcto_deleted == true);
+    REQUIRE(g_binding_callback_thread_observer == nullptr);
 }
 #endif
 
