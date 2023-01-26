@@ -2275,6 +2275,34 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, 
 RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool* out_erased);
 
 /**
+ * Return the list of keys stored in the dictionary
+ *
+ * @param out_size number of keys
+ * @param out_keys the list of keys in the dictionary, the memory has to be released once it is no longer used.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_get_keys(realm_dictionary_t*, size_t* out_size, realm_results_t** out_keys);
+
+/**
+ * Check if the dictionary contains a certain key
+ *
+ * @param key to search in the dictionary
+ * @param found True if the such key exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t*, realm_value_t key, bool* found);
+
+/**
+ * Check if the dictionary contains a certain value
+ *
+ * @param value to search in the dictionary
+ * @param index the index of the value in the dictionry if such value exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t*, realm_value_t value, size_t* index);
+
+
+/**
  * Clear a dictionary.
  *
  * @return True if no exception occurred.

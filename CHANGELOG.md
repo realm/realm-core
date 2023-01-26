@@ -4,6 +4,7 @@
 * `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 * Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
+* Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
