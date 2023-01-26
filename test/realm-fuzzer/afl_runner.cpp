@@ -22,7 +22,7 @@ int main(int argc, const char* argv[])
 {
     FuzzEngine fuzz_engine;
     bool enable_logging = false;
-    std::string path = "real-afl.txt";
+    std::string path = "realm-afl.txt";
     size_t input_index = 0;
     for (size_t i = 0; i < (size_t)argc; ++i) {
         if (strcmp(argv[i], "--log") == 0) {
