@@ -1842,16 +1842,6 @@ RLM_API bool realm_list_clear(realm_list_t*);
 RLM_API bool realm_list_remove_all(realm_list_t*);
 
 /**
- * Replace the contents of a list with values.
- *
- * This is equivalent to calling `realm_list_clear()`, and then
- * `realm_list_insert()` repeatedly.
- *
- * @return True if no exception occurred.
- */
-RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -2116,18 +2106,6 @@ RLM_API bool realm_set_clear(realm_set_t*);
 RLM_API bool realm_set_remove_all(realm_set_t*);
 
 /**
- * Replace the contents of a set with values.
- *
- * The provided values may contain duplicates, in which case the size of the set
- * after calling this function will be less than @a num_values.
- *
- * @param values The list of values to insert.
- * @param num_values The number of elements.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -2308,20 +2286,6 @@ RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t*, realm_va
  * @return True if no exception occurred.
  */
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
-
-/**
- * Replace the contents of a dictionary with key/value pairs.
- *
- * The provided keys may contain duplicates, in which case the size of the
- * dictionary after calling this function will be less than @a num_pairs.
- *
- * @param keys An array of keys of length @a num_pairs.
- * @param values An array of values of length @a num_pairs.
- * @param num_pairs The number of key-value pairs to assign.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, const realm_value_t* keys,
-                                     const realm_value_t* values);
 
 /**
  * Subscribe to notifications for this object.
