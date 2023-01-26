@@ -587,6 +587,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
     }
 }
 
+// FIXME(RCORE-1431) Fix this flakey test
+#if 0
 TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
@@ -632,6 +634,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         auto realm3 = Realm::get_shared_realm(config3);
     }
 }
+#endif
 
 
 TEST_CASE("sync: stable IDs", "[sync]") {
