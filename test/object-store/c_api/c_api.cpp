@@ -4969,8 +4969,8 @@ TEST_CASE("C API - binding callback thread observer") {
     g_binding_callback_thread_observer->did_create_thread();
     REQUIRE(bcto_user_data->thread_create_called);
     g_binding_callback_thread_observer->handle_error(MultipleSyncAgents());
-    REQUIRE(bcto_user_data->thread_on_error_message.find(
-                     "Multiple sync agents attempted to join the same session") != std::string::npos);
+    REQUIRE(bcto_user_data->thread_on_error_message.find("Multiple sync agents attempted to join the same session") !=
+            std::string::npos);
     g_binding_callback_thread_observer->will_destroy_thread();
     REQUIRE(bcto_user_data->thread_destroy_called);
 
