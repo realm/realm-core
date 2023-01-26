@@ -422,11 +422,6 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
-struct realm_thread_observer_token : realm::c_api::WrapC {
-    explicit realm_thread_observer_token() = default;
-    ~realm_thread_observer_token();
-};
-
 struct realm_callback_token : realm::c_api::WrapC {
 protected:
     realm_callback_token(realm_t* realm, uint64_t token)
@@ -786,6 +781,11 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
         }
         return false;
     }
+};
+
+struct realm_thread_observer_token : realm::c_api::WrapC {
+    explicit realm_thread_observer_token() = default;
+    ~realm_thread_observer_token();
 };
 
 #endif // REALM_ENABLE_SYNC
