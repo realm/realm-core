@@ -4458,7 +4458,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = ec == make_error_code(ErrorCodes::ReadError);
+        bool valid_error = ec == sync::websocket::make_error_code(ErrorCodes::ReadError);
         CHECK(valid_error);
         bowl.add_stone();
     };

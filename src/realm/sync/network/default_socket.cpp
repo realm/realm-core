@@ -92,7 +92,7 @@ private:
             error = ErrorCodes::WebSocket_MovedPermanently;
         }
         else if (ec == websocket::Error::bad_response_3xx_redirection) {
-            error = ErrorCodes::Retry;
+            error = ErrorCodes::WebSocket_Retry_Error;
             was_clean = false;
         }
         else if (ec == websocket::Error::bad_response_401_unauthorized) {
@@ -110,7 +110,7 @@ private:
             was_clean = false;
         }
         else {
-            error = ErrorCodes::Fatal;
+            error = ErrorCodes::WebSocket_Fatal_Error;
             was_clean = false;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";

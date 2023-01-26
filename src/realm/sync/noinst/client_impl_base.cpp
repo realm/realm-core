@@ -400,7 +400,7 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
 
 void Connection::websocket_error_handler()
 {
-    m_error_received = true;
+    m_websocket_error_received = true;
 }
 
 
@@ -413,7 +413,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
     }
 
     auto&& status_code = status.code();
-    std::error_code error_code{static_cast<int>(status_code), close_status_category()};
+    std::error_code error_code{static_cast<int>(status_code), websocket::websocket_close_status_category()};
 
     // TODO: Use a switch statement once websocket errors have their own category in exception unification.
     if (status_code == ErrorCodes::ResolveFailed || status_code == ErrorCodes::ConnectionFailed) {
@@ -468,7 +468,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::Fatal || status_code == ErrorCodes::WebSocket_Forbidden) {
+    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
@@ -476,7 +476,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
     else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
              status_code == ErrorCodes::WebSocket_MovedPermanently ||
              status_code == ErrorCodes::WebSocket_InternalServerError ||
-             status_code == ErrorCodes::WebSocket_AbnormalClosure || status_code == ErrorCodes::Retry) {
+             status_code == ErrorCodes::WebSocket_AbnormalClosure ||
+             status_code == ErrorCodes::WebSocket_Retry_Error) {
         constexpr bool is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
@@ -697,7 +698,7 @@ void Connection::initiate_reconnect()
         }
     }
 
-    m_error_received = false;
+    m_websocket_error_received = false;
     m_websocket = m_client.m_socket_provider->connect(
         this, WebSocketEndpoint{
                   m_address,
@@ -888,8 +889,8 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    // Stop sending messages if an error was received.
-    if (m_error_received)
+    // Stop sending messages if an websocket error was received.
+    if (m_websocket_error_received)
         return;
 
     m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {

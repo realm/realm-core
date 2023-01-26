@@ -550,7 +550,7 @@ private:
     // At least one PING message was sent since connection was established
     bool m_ping_sent = false;
 
-    bool m_error_received = false;
+    bool m_websocket_error_received = false;
 
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.
