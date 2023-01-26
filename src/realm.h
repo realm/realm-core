@@ -2279,7 +2279,7 @@ RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool
  * Return the list of keys stored in the dictionary
  *
  * @param out_size number of keys
- * @param out_keys the list of keys in the dictionary
+ * @param out_keys the list of keys in the dictionary, the memory has to be released once it is no longer used.
  * @return True if no exception occurred.
  */
 RLM_API bool realm_dictionary_get_keys(realm_dictionary_t*, size_t* out_size, realm_results_t** out_keys);
