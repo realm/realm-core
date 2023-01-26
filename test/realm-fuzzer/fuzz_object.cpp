@@ -28,6 +28,7 @@
 #include <realm/index_string.hpp>
 
 #include <utility>
+#include <random>
 
 using namespace realm;
 using namespace realm::util;
@@ -455,10 +456,15 @@ int32_t FuzzObject::get_int32(State& s) const
 std::string FuzzObject::create_string(size_t length) const
 {
     REALM_ASSERT_3(length, <, 256);
-    char buf[256] = {0};
-    for (size_t i = 0; i < length; i++)
-        buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, length};
+    static auto& chrs = "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while (length--)
+        s += chrs[pick(rg)];
+    return s;
 }
 
 std::pair<int64_t, int32_t> FuzzObject::get_timestamp_values(State& s) const

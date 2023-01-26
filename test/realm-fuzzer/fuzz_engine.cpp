@@ -102,85 +102,79 @@ void FuzzEngine::do_fuzz(FuzzConfigurator& cnf)
     int iteration = 0;
 
     for (;;) {
-        char instr = fuzzer.get_next_token(state) % COUNT;
+        char instr = fuzzer.get_next_token(state) % Count;
         iteration++;
         log << "Iteration: " << iteration << ". fuzz with command: " << std::to_string(instr) << "\n";
 
         try {
             Group& group = begin_write(shared_realm);
-            if (instr == ADD_TABLE && group.size() < max_tables) {
+            if (instr == Add_Table && group.size() < max_tables) {
                 fuzzer.create_table(group, log);
             }
-            else if (instr == REMOVE_TABLE && group.size() > 0) {
+            else if (instr == Remove_Table && group.size() > 0) {
                 fuzzer.remove_table(group, log, state);
             }
-            else if (instr == CLEAR_TABLE && group.size() > 0) {
+            else if (instr == Clear_Table && group.size() > 0) {
                 fuzzer.clear_table(group, log, state);
             }
-            else if (instr == CREATE_OBJECT && group.size() > 0) {
+            else if (instr == Create_Object && group.size() > 0) {
                 fuzzer.create_object(group, log, state);
             }
-            else if (instr == ADD_COLUMN && group.size() > 0) {
+            else if (instr == Add_Column && group.size() > 0) {
                 fuzzer.add_column(group, log, state);
             }
-            else if (instr == REMOVE_COLUMN && group.size() > 0) {
+            else if (instr == Remove_Column && group.size() > 0) {
                 fuzzer.remove_column(group, log, state);
             }
-            else if (instr == GET_ALL_COLUMN_NAMES && group.size() > 0) {
+            else if (instr == Get_All_Column_Names && group.size() > 0) {
                 fuzzer.get_all_column_names(group, log);
             }
-            else if (instr == RENAME_COLUMN && group.size() > 0) {
+            else if (instr == Rename_Column && group.size() > 0) {
                 fuzzer.rename_column(group, log, state);
             }
-            else if (instr == ADD_SEARCH_INDEX && group.size() > 0) {
+            else if (instr == Add_Search_Index && group.size() > 0) {
                 fuzzer.add_search_index(group, log, state);
             }
-            else if (instr == REMOVE_SEARCH_INDEX && group.size() > 0) {
+            else if (instr == Remove_Search_Index && group.size() > 0) {
                 fuzzer.remove_search_index(group, log, state);
             }
-            else if (instr == ADD_COLUMN_LINK && group.size() >= 1) {
+            else if (instr == Add_Column_Link && group.size() >= 1) {
                 fuzzer.add_column_link(group, log, state);
             }
-            else if (instr == ADD_COLUMN_LINK_LIST && group.size() >= 2) {
+            else if (instr == Add_Column_Link_List && group.size() >= 2) {
                 fuzzer.add_column_link_list(group, log, state);
             }
-            else if (instr == SET && group.size() > 0) {
+            else if (instr == Instruction::Set && group.size() > 0) {
                 fuzzer.set_obj(group, log, state);
             }
-            else if (instr == REMOVE_OBJECT && group.size() > 0) {
+            else if (instr == Remove_Object && group.size() > 0) {
                 fuzzer.remove_obj(group, log, state);
             }
-            else if (instr == REMOVE_RECURSIVE && group.size() > 0) {
+            else if (instr == Remove_Recursive && group.size() > 0) {
                 fuzzer.remove_recursive(group, log, state);
             }
-            else if (instr == ENUMERATE_COLUMN && group.size() > 0) {
+            else if (instr == Enumerate_Column && group.size() > 0) {
                 fuzzer.enumerate_column(group, log, state);
             }
-            else if (instr == COMMIT) {
+            else if (instr == Commit) {
                 fuzzer.commit(shared_realm, log);
             }
-            else if (instr == ROLLBACK) {
+            else if (instr == Rollback) {
                 fuzzer.rollback(shared_realm, group, log);
             }
-            else if (instr == ADVANCE) {
+            else if (instr == Advance) {
                 fuzzer.advance(shared_realm, log);
             }
-            else if (instr == CLOSE_AND_REOPEN) {
+            else if (instr == Close_And_Reopen) {
                 fuzzer.close_and_reopen(shared_realm, log, cnf.get_config());
             }
-            else if (instr == CREATE_TABLE_VIEW && group.size() > 0) {
+            else if (instr == Create_Table_View && group.size() > 0) {
                 fuzzer.create_table_view(group, log, state, table_views);
             }
-            else if (instr == COMPACT) {
+            else if (instr == Compact) {
             }
-            else if (instr == IS_NULL && group.size() > 0) {
+            else if (instr == Is_Null && group.size() > 0) {
                 fuzzer.check_null(group, log, state);
-            }
-            else if (instr == ASYNC_WRITE && group.size() > 0) {
-                // TODO: add support for async transactions
-            }
-            else if (instr == ASYNC_CANCEL) {
-                // TODO: add support for async transactions
             }
         }
         catch (const std::exception& e) {

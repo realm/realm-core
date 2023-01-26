@@ -1,11 +1,5 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
-
-#include <ctime>
-#include <cstdio>
-#include <fstream>
-#include <iostream>
-
 #include "../fuzz_group.hpp"
 #include "../util/test_path.hpp"
 
