@@ -2,7 +2,7 @@
 
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR="build.object.store.lib.fuzzer"
+BUILD_DIR="build.realm.fuzzer.libfuzz"
 
 build_mode="Debug"
 corpus=""
