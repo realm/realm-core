@@ -370,7 +370,6 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
-typedef struct realm_thread_observer_token realm_thread_observer_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
@@ -1843,16 +1842,6 @@ RLM_API bool realm_list_clear(realm_list_t*);
 RLM_API bool realm_list_remove_all(realm_list_t*);
 
 /**
- * Replace the contents of a list with values.
- *
- * This is equivalent to calling `realm_list_clear()`, and then
- * `realm_list_insert()` repeatedly.
- *
- * @return True if no exception occurred.
- */
-RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -2117,18 +2106,6 @@ RLM_API bool realm_set_clear(realm_set_t*);
 RLM_API bool realm_set_remove_all(realm_set_t*);
 
 /**
- * Replace the contents of a set with values.
- *
- * The provided values may contain duplicates, in which case the size of the set
- * after calling this function will be less than @a num_values.
- *
- * @param values The list of values to insert.
- * @param num_values The number of elements.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -2276,25 +2253,39 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, 
 RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool* out_erased);
 
 /**
+ * Return the list of keys stored in the dictionary
+ *
+ * @param out_size number of keys
+ * @param out_keys the list of keys in the dictionary, the memory has to be released once it is no longer used.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_get_keys(realm_dictionary_t*, size_t* out_size, realm_results_t** out_keys);
+
+/**
+ * Check if the dictionary contains a certain key
+ *
+ * @param key to search in the dictionary
+ * @param found True if the such key exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t*, realm_value_t key, bool* found);
+
+/**
+ * Check if the dictionary contains a certain value
+ *
+ * @param value to search in the dictionary
+ * @param index the index of the value in the dictionry if such value exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t*, realm_value_t value, size_t* index);
+
+
+/**
  * Clear a dictionary.
  *
  * @return True if no exception occurred.
  */
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
-
-/**
- * Replace the contents of a dictionary with key/value pairs.
- *
- * The provided keys may contain duplicates, in which case the size of the
- * dictionary after calling this function will be less than @a num_pairs.
- *
- * @param keys An array of keys of length @a num_pairs.
- * @param values An array of values of length @a num_pairs.
- * @param num_pairs The number of key-value pairs to assign.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, const realm_value_t* keys,
-                                     const realm_value_t* values);
 
 /**
  * Subscribe to notifications for this object.
@@ -3562,6 +3553,15 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
 } realm_sync_error_action_e;
 
+typedef enum realm_sync_error_resolve {
+    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND = 1,
+    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN = 2,
+    RLM_SYNC_ERROR_RESOLVE_NO_DATA = 3,
+    RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY = 4,
+    RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND = 5,
+    RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED = 6,
+} realm_sync_error_resolve_e;
+
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
 
@@ -4063,6 +4063,10 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 
+#if REALM_ENABLE_SYNC
+
+typedef struct realm_thread_observer_token realm_thread_observer_token_t;
+
 /**
  * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
  * runs.
@@ -4076,6 +4080,8 @@ realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback
                                            realm_on_object_store_thread_callback_t on_thread_destroy,
                                            realm_on_object_store_error_callback_t on_error, realm_userdata_t,
                                            realm_free_userdata_func_t free_userdata);
+
+#endif // REALM_ENABLE_SYNC
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 

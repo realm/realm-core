@@ -142,8 +142,7 @@ public:
 
     /// Temporary functions added to support the default socket provider until
     /// it is fully integrated. Will be removed in future PRs.
-    virtual void run() {}
-    virtual void stop() {}
+    virtual void stop(bool = false) {}
 };
 
 /// Struct that defines the endpoint to create a new websocket connection.
@@ -248,17 +247,6 @@ struct WebSocketObserver {
     ///         is returned, the WebSocket object will be destroyed at some point
     ///         in the future.
     virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
-
-    //@{
-    /// DEPRECATED - Will be removed in a future release
-    /// These functions are deprecated and should not be called by custom socket provider implementations
-    virtual void websocket_connect_error_handler(std::error_code) = 0;
-    virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
-    virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code, const std::string_view* body) = 0;
-    virtual void websocket_protocol_error_handler(std::error_code) = 0;
-    virtual bool websocket_close_message_received(std::error_code error_code, StringData message) = 0;
-    //@}
 };
 
 } // namespace realm::sync

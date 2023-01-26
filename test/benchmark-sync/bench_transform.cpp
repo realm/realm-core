@@ -92,13 +92,11 @@ void transform_transactions(TestContext& test_context)
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
-        fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
-        fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
     }
@@ -172,13 +170,11 @@ void transform_instructions(TestContext& test_context)
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
-        fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
-        fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
     }
@@ -250,13 +246,11 @@ void connected_objects(TestContext& test_context)
 
         // Start server and upload changes of second client.
         fixture.start_server(0);
-        fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
-        fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
     }
