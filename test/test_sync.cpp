@@ -4458,12 +4458,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        using syserr = util::error::basic_system_errors;
-        bool valid_error = (util::MiscExtErrors::end_of_input == ec) ||
-                           (util::MiscExtErrors::premature_end_of_input == ec) ||
-                           // FIXME: this is the error on Windows. is it correct?
-                           (util::make_basic_system_error_code(syserr::connection_reset) == ec) ||
-                           (util::make_basic_system_error_code(syserr::connection_aborted) == ec);
+        bool valid_error = ec == sync::websocket::make_error_code(ErrorCodes::ReadError);
         CHECK(valid_error);
         bowl.add_stone();
     };

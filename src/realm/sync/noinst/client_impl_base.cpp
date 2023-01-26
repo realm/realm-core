@@ -384,65 +384,6 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 }
 
 
-void Connection::websocket_read_or_write_error_handler(std::error_code ec)
-{
-    read_or_write_error(ec); // Throws
-}
-
-
-void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
-{
-    bool is_fatal;
-    if (ec == websocket::Error::bad_response_3xx_redirection ||
-        ec == websocket::Error::bad_response_301_moved_permanently ||
-        ec == websocket::Error::bad_response_401_unauthorized ||
-        ec == websocket::Error::bad_response_5xx_server_error ||
-        ec == websocket::Error::bad_response_500_internal_server_error ||
-        ec == websocket::Error::bad_response_502_bad_gateway ||
-        ec == websocket::Error::bad_response_503_service_unavailable ||
-        ec == websocket::Error::bad_response_504_gateway_timeout) {
-        is_fatal = false;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-    }
-    else {
-        is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        if (body) {
-            std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-            auto i = body->find(identifier);
-            if (i != std::string_view::npos) {
-                std::string_view rest = body->substr(i + identifier.size());
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](std::string_view string, std::string_view prefix) {
-                    return (string.size() >= prefix.size() &&
-                            std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                };
-                if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                    ec = ClientError::client_too_old_for_server;
-                }
-                else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                    ec = ClientError::client_too_new_for_server;
-                }
-                else {
-                    // Other more complicated forms of mismatch
-                    ec = ClientError::protocol_mismatch;
-                }
-            }
-        }
-    }
-
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
-}
-
-
-void Connection::websocket_protocol_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                                       // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
-}
-
-
 bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
     std::error_code ec;
@@ -457,30 +398,89 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
 }
 
 
-bool Connection::websocket_close_message_received(std::error_code error_code, StringData message)
+void Connection::websocket_error_handler()
 {
-    if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
-        error_code.value() != 1000) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+    m_websocket_error_received = true;
+}
 
+
+bool Connection::websocket_closed_handler(bool was_clean, Status status)
+{
+    logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
+    // Return early.
+    if (status.is_ok()) {
+        return bool(m_websocket);
+    }
+
+    auto&& status_code = status.code();
+    std::error_code error_code{static_cast<int>(status_code), websocket::websocket_close_status_category()};
+
+    // TODO: Use a switch statement once websocket errors have their own category in exception unification.
+    if (status_code == ErrorCodes::ResolveFailed || status_code == ErrorCodes::ConnectionFailed) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
         constexpr bool try_again = true;
-        SessionErrorInfo error_info{error_code, message, try_again};
-
-        // If the server sends a websocket close message with code 1009, then it's because we've sent an
-        // UPLOAD message that is too large for the server to process. Simply disconnecting/reconnecting will not
-        // be sufficient because when we re-connect we'll just try to send the same bad upload message.
-        //
-        // Since the handling of this error happens at a layer below the standard `ERROR` message handling
-        // we need to synthesize an `ERROR` message-like error info here to client reset when this error
-        // is received.
-        if (error_code.value() == 1009) {
-            error_info.error_code = make_error_code(ProtocolError::limits_exceeded);
-            error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-            error_info.message = util::format(
-                "Sync websocket closed because the server received a message that was too large: %1", message);
-        }
-
+        involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+    }
+    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
+        read_or_write_error(error_code);
+    }
+    else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
+             status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
+             status_code == ErrorCodes::WebSocket_InvalidPayloadData ||
+             status_code == ErrorCodes::WebSocket_PolicyViolation ||
+             status_code == ErrorCodes::WebSocket_InavalidExtension) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+        constexpr bool try_again = true;
+        SessionErrorInfo error_info{error_code, status.reason(), try_again};
         involuntary_disconnect(std::move(error_info));
+    }
+    else if (status_code == ErrorCodes::WebSocket_MessageTooBig) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+        constexpr bool try_again = true;
+        auto ec = make_error_code(ProtocolError::limits_exceeded);
+        auto message = util::format(
+            "Sync websocket closed because the server received a message that was too large: %1", status.reason());
+        SessionErrorInfo error_info(ec, message, try_again);
+        error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
+        involuntary_disconnect(std::move(error_info));
+    }
+    else if (status_code == ErrorCodes::WebSocket_TLSHandshakeFailed) {
+        error_code = ClientError::ssl_server_cert_rejected;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
+        error_code = ClientError::client_too_old_for_server;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
+        error_code = ClientError::client_too_new_for_server;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
+        error_code = ClientError::protocol_mismatch;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
+             status_code == ErrorCodes::WebSocket_MovedPermanently ||
+             status_code == ErrorCodes::WebSocket_InternalServerError ||
+             status_code == ErrorCodes::WebSocket_AbnormalClosure ||
+             status_code == ErrorCodes::WebSocket_Retry_Error) {
+        constexpr bool is_fatal = false;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
 
     return bool(m_websocket);
@@ -698,6 +698,7 @@ void Connection::initiate_reconnect()
         }
     }
 
+    m_websocket_error_received = false;
     m_websocket = m_client.m_socket_provider->connect(
         this, WebSocketEndpoint{
                   m_address,
@@ -888,6 +889,10 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
+    // Stop sending messages if an websocket error was received.
+    if (m_websocket_error_received)
+        return;
+
     m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
@@ -1041,36 +1046,6 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::websocket_connect_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
-}
-
-void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
-{
-    logger.error("SSL handshake failed: %1", ec.message()); // Throws
-    // FIXME: Some error codes (those from OpenSSL) most likely indicate a
-    // fatal error (SSL protocol violation), but other errors codes
-    // (read/write error from underlying socket) most likely indicate a
-    // nonfatal error.
-    bool is_fatal = false;
-    std::error_code ec2;
-    if (ec == network::ssl::Errors::certificate_rejected) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        ec2 = ClientError::ssl_server_cert_rejected;
-        is_fatal = true;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-        ec2 = ec;
-        is_fatal = false;
-    }
-    close_due_to_client_side_error(ec2, std::nullopt, is_fatal); // Throws
-}
-
-
 void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
@@ -1084,15 +1059,6 @@ void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<s
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
     bool is_fatal = true;                              // A sync protocol violation is a fatal error
     close_due_to_client_side_error(ec, msg, is_fatal); // Throws
-}
-
-
-void Connection::close_due_to_missing_protocol_feature()
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
-    std::error_code ec = ClientError::missing_protocol_feature;
-    bool is_fatal = true;                                       // A missing protocol feature is a fatal error
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
