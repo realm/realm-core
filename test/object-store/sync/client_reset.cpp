@@ -162,7 +162,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
         realm->sync_session()->pause();
     }
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
     {
         SyncTestFile realm_config(app->current_user(), partition.value, schema);
         auto second_realm = Realm::get_shared_realm(realm_config);
