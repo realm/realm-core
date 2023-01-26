@@ -136,11 +136,8 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    // @{
-    /// These call stop() and run() on the socket provider respectively.
+    /// This calls stop() on the socket provider respectively.
     void stop() noexcept;
-    void run();
-    // @}
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -179,7 +176,6 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    // This will be updated to the SyncSocketProvider interface once the integration is complete
     std::shared_ptr<SyncSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
@@ -219,8 +215,6 @@ private:
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
     bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
-
-    std::atomic<bool> m_running{false}; // Debugging facility
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -1163,7 +1157,6 @@ inline bool ClientImpl::is_dry_run() const noexcept
 {
     return m_dry_run;
 }
-
 
 inline std::mt19937_64& ClientImpl::get_random() noexcept
 {

@@ -370,7 +370,6 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
-typedef struct realm_thread_observer_token realm_thread_observer_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
@@ -4072,6 +4071,10 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 
+#if REALM_ENABLE_SYNC
+
+typedef struct realm_thread_observer_token realm_thread_observer_token_t;
+
 /**
  * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
  * runs.
@@ -4085,6 +4088,8 @@ realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback
                                            realm_on_object_store_thread_callback_t on_thread_destroy,
                                            realm_on_object_store_error_callback_t on_error, realm_userdata_t,
                                            realm_free_userdata_func_t free_userdata);
+
+#endif // REALM_ENABLE_SYNC
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
