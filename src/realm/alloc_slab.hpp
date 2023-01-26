@@ -45,7 +45,7 @@ class GroupWriter;
 namespace util {
 class EncryptedFileMapping;
 struct SharedFileInfo;
-}
+} // namespace util
 
 /// Thrown by Group and DB constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
@@ -120,8 +120,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -152,7 +151,7 @@ public:
     ///
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry
-    ref_type attach_file(const std::string& file_path, Config& cfg);
+    ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
 
     /// If the attached file is in streaming form, convert it to normal form.
     ///
@@ -637,6 +636,7 @@ private:
     using Chunks = std::map<ref_type, size_t>;
     Slabs m_slabs;
     Chunks m_free_read_only;
+    util::WriteObserver* m_write_observer = nullptr;
     size_t m_commit_size = 0;
 
     bool m_debug_out = false;

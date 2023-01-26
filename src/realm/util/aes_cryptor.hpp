@@ -48,12 +48,14 @@ class EncryptedFileMapping;
 class WriteObserver {
 public:
     virtual bool observe(uint64_t* page_offset, uint64_t* write_counter) = 0;
+    virtual ~WriteObserver(){};
 };
 
 class WriteMarker {
 public:
     virtual void mark(uint64_t page_offset) = 0;
     virtual void unmark() = 0;
+    virtual ~WriteMarker(){};
 };
 
 class AESCryptor {

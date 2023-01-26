@@ -426,8 +426,6 @@ public:
     /// To be used only when already holding the lock.
     bool other_writers_waiting_for_lock() const;
 
-    void inject_encryption_marker_observer(util::EncryptedFileMapping* mapping) const;
-
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 

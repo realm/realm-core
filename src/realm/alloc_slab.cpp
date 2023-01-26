@@ -686,9 +686,10 @@ std::string SlabAlloc::get_file_path_for_assertions() const
     return m_file.get_path();
 }
 
-ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
+ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer)
 {
     m_cfg = cfg;
+    m_write_observer = write_observer;
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
@@ -758,6 +759,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_start(this);
         // we'll read header and (potentially) footer
         File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
+        if (auto enc = map_header.get_encrypted_mapping()) {
+            enc->set_observer(m_write_observer);
+        }
         realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
         auto header = reinterpret_cast<const Header*>(map_header.get_addr());
 
@@ -769,6 +773,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             size_t footer_offset = footer_ref - footer_page_base;
             map_footer = File::Map<char>(m_file, footer_page_base, File::access_ReadOnly,
                                          sizeof(StreamingFooter) + footer_offset, 0);
+            if (auto enc = map_footer.get_encrypted_mapping()) {
+                enc->set_observer(m_write_observer);
+            }
             realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
             footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         }
@@ -803,6 +810,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             size_t top_offset = top_ref - top_page_base;
             size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
             File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0);
+            if (auto enc = map_top.get_encrypted_mapping()) {
+                enc->set_observer(m_write_observer);
+            }
             realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
             auto top_header = map_top.get_addr() + top_offset;
             auto top_data = NodeHeader::get_data_from_header(top_header);
@@ -1183,15 +1193,16 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
             if (section_size == (1 << section_shift)) {
                 new_mappings.push_back(
                     {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
-                if (db)
-                    db->inject_encryption_marker_observer(
-                        new_mappings.back().primary_mapping.get_encrypted_mapping());
+                auto enc_mapping = new_mappings.back().primary_mapping.get_encrypted_mapping();
+                if (enc_mapping)
+                    enc_mapping->set_observer(m_write_observer);
             }
             else {
                 new_mappings.push_back({util::File::Map<char>()});
                 auto& mapping = new_mappings.back().primary_mapping;
-                if (db)
-                    db->inject_encryption_marker_observer(mapping.get_encrypted_mapping());
+                auto enc_mapping = mapping.get_encrypted_mapping();
+                if (enc_mapping)
+                    enc_mapping->set_observer(m_write_observer);
                 bool reserved =
                     mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
                 if (reserved) {
@@ -1880,6 +1891,9 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
         auto mapping_file_offset = file_offset & ~(_page_size - 1);
         auto minimal_mapping_size = end_offset - mapping_file_offset;
         util::File::Map<char> mapping(m_file, mapping_file_offset, File::access_ReadOnly, minimal_mapping_size);
+        if (auto enc = mapping.get_encrypted_mapping()) {
+            enc->set_observer(m_write_observer);
+        }
         map_entry->xover_mapping = std::move(mapping);
     }
     txl.xover_mapping_base = offset & ~(_page_size - 1);

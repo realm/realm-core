@@ -303,7 +303,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
             else
                 num_no_writes_sampled++;
         }
-        if (elapsed > max_retry_period || (observer && (num_no_writes_sampled > 5))) {
+        if (elapsed > max_retry_period || !observer || (observer && (num_no_writes_sampled > 5))) {
             auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);

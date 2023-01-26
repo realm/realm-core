@@ -807,7 +807,15 @@ public:
     }
     bool observe(uint64_t* pos, uint64_t* write_count) override
     {
-        return vm.observe_writer(pos, write_count);
+        uint64_t tmp_write_count;
+        auto page_may_have_been_written = vm.observe_writer(pos, &tmp_write_count);
+        if (called_once && tmp_write_count != last_seen_count) {
+            page_may_have_been_written = true;
+        }
+        last_seen_count = tmp_write_count;
+        called_once = true;
+        if (write_count) *write_count = tmp_write_count;
+        return page_may_have_been_written;
     }
     void mark(uint64_t pos) override
     {
@@ -820,16 +828,8 @@ public:
 
 private:
     DB::VersionManager& vm;
-};
-
-void DB::inject_encryption_marker_observer(util::EncryptedFileMapping* mapping) const
-{
-    util::WriteMarker* marker = m_marker_observer.get();
-    util::WriteObserver* observer = m_marker_observer.get();
-    if (mapping) {
-        mapping->set_marker(marker);
-        mapping->set_observer(observer);
-    }
+    bool called_once = false;
+    uint64_t last_seen_count = 0;
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -1182,6 +1182,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
+            m_version_manager = std::move(version_manager);
+            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*m_version_manager);
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
             }
@@ -1356,7 +1358,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     top.init_from_ref(top_ref);
                     file_size = Group::get_logical_file_size(top);
                 }
-                version_manager->init_versioning(top_ref, file_size, version);
+                m_version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
                 // Durability setting must be consistent across a session. An
@@ -1421,8 +1423,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             ++info->num_participants;
 
             // Keep the mappings and file open:
-            m_version_manager = std::move(version_manager);
-            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*m_version_manager);
             alloc_detach_guard.release();
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
@@ -1634,7 +1634,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.clear_file = false;
         cfg.encryption_key = write_key;
         ref_type top_ref;
-        top_ref = m_alloc.attach_file(m_db_path, cfg);
+        top_ref = m_alloc.attach_file(m_db_path, cfg, m_marker_observer.get());
         m_alloc.convert_from_streaming_form(top_ref);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
@@ -2493,7 +2493,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     transaction.update_num_objects();
 #endif // REALM_METRICS
 
-    GroupWriter out(transaction, Durability(info->durability)); // Throws
+    GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
 
     if (auto limit = out.get_evacuation_limit()) {
