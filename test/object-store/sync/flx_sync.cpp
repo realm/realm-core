@@ -2982,6 +2982,393 @@ TEST_CASE("flx: really big bootstraps", "[sync][flx][app]") {
     REQUIRE(err.error_code == sync::ClientError::bad_changeset_size);
 }
 
+TEST_CASE("flx: relationships tree", "[sync][flx][app]") {
+    Schema schema{
+        {"tableA",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_B", PropertyType::Object | PropertyType::Nullable, "tableB"},
+             {"array_links_B", PropertyType::Array | PropertyType::Object, "tableB"},
+         }},
+        {"tableB",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_C", PropertyType::Object | PropertyType::Nullable, "tableC"},
+         }},
+        {"tableC",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_D", PropertyType::Object | PropertyType::Nullable, "tableD"},
+         }},
+        {"tableD",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("flx_relationships_tree", {schema, {"queryable_str_field"}});
+
+    std::condition_variable cv, cv2;
+    std::mutex mutex;
+    bool create_objects = false;
+
+    // Upload data.
+
+    create_user_and_log_in(harness.app());
+    auto user1 = harness.app()->current_user();
+    SyncTestFile config1(user1, harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    // Simulate user commits.
+    auto thread = std::thread([&] {
+        // Initial data.
+        auto realm = Realm::get_shared_realm(config1);
+        auto table_A = realm->read_group().get_table("class_tableA");
+        auto table_B = realm->read_group().get_table("class_tableB");
+        auto table_C = realm->read_group().get_table("class_tableC");
+        auto table_D = realm->read_group().get_table("class_tableD");
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(table_A));
+        mut_subs.insert_or_assign(Query(table_B));
+        mut_subs.insert_or_assign(Query(table_C));
+        mut_subs.insert_or_assign(Query(table_D));
+        mut_subs.commit();
+
+        CppContext c(realm);
+        auto create = [&](std::any&& value, const std::string& table_name) {
+            auto obj = Object::create(c, realm, table_name, value);
+            return obj;
+        };
+
+        for (int i = 0; i < 10000; ++i) {
+            realm->begin_transaction();
+            auto objD = create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}}, "tableD");
+            auto objC =
+                create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_D", objD}}, "tableC");
+            auto objB =
+                create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_C", objC}}, "tableB");
+            create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_B", objB}}, "tableA");
+            realm->commit_transaction();
+        }
+        wait_for_upload(*realm);
+        cv.notify_one();
+
+        int pk = 10000;
+        for (int it = 0; it < 100; ++it) {
+            {
+                std::unique_lock<std::mutex> lk(mutex);
+                cv.wait(lk, [&] {
+                    return create_objects;
+                });
+                create_objects = false;
+            }
+            realm->begin_transaction();
+            for (int i = 0; i < 100; ++i) {
+                auto objD = create(AnyDict{{"_id", int64_t(pk)}, {"queryable_str_field", "string"s}}, "tableD");
+                auto objC = create(
+                    AnyDict{{"_id", int64_t(pk)}, {"queryable_str_field", "string"s}, {"link_D", objD}}, "tableC");
+                auto objB = create(
+                    AnyDict{{"_id", int64_t(pk)}, {"queryable_str_field", "string"s}, {"link_C", objC}}, "tableB");
+                create(AnyDict{{"_id", int64_t(pk)}, {"queryable_str_field", "string"s}, {"link_B", objB}}, "tableA");
+                ++pk;
+            }
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+    });
+
+    // Download data.
+    create_user_and_log_in(harness.app());
+    auto user2 = harness.app()->current_user();
+    SyncTestFile config2(user2, harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto make_relationship_sub = [](TableRef table, int obj_count) -> Query {
+        std::vector<Mixed> pks(obj_count);
+        std::iota(std::begin(pks), std::end(pks), 0);
+
+        return table->query("_id in $0", {{{pks}}});
+    };
+
+    config2.sync_config->on_sync_client_event_hook = [&make_relationship_sub, &create_objects, &cv, &cv2,
+                                                      &mutex](std::weak_ptr<SyncSession> weak_sess,
+                                                              const SyncClientHookData& data) {
+        auto sess = weak_sess.lock();
+        if (!sess ||
+            (data.event != SyncClientHookEvent::BootstrapProcessed &&
+             data.event != SyncClientHookEvent::DownloadMessageIntegrated) ||
+            data.query_version == 0) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
+            data.batch_state != sync::DownloadBatchState::SteadyState) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        if (data.num_changesets == 0) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        // Update relationship subscription.
+
+        auto db = SyncSession::OnlyForTesting::get_db(*sess);
+        auto read_tr = db->start_read();
+        auto table_A = read_tr->get_table("class_tableA");
+        auto table_B = read_tr->get_table("class_tableB");
+        auto table_C = read_tr->get_table("class_tableC");
+        auto table_D = read_tr->get_table("class_tableD");
+
+        if (table_D->size() == 10000 + 100 * 100) {
+            cv2.notify_one();
+            return SyncClientHookAction::NoAction;
+        }
+
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            if ((table_A->size() == table_B->size()) && (table_B->size() == table_C->size()) &&
+                (table_C->size() == table_D->size())) {
+                create_objects = true;
+                cv.notify_one();
+                return SyncClientHookAction::NoAction;
+            }
+        }
+
+        auto latest_subs = sess->get_flx_subscription_store()->get_latest().make_mutable_copy();
+
+        latest_subs.clear();
+        latest_subs.insert_or_assign(Query(table_A));
+        if (table_A->size() > table_B->size()) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_B, static_cast<int>(table_A->size())));
+        }
+        else if (table_A->size() == table_B->size() && table_B->size() > 0) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_B, static_cast<int>(table_B->size())));
+        }
+        if (table_B->size() > table_C->size()) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_C, static_cast<int>(table_B->size())));
+        }
+        else if (table_B->size() == table_C->size() && table_C->size() > 0) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_C, static_cast<int>(table_C->size())));
+        }
+        if (table_C->size() > table_D->size()) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_D, static_cast<int>(table_C->size())));
+        }
+        else if (table_C->size() == table_D->size() && table_D->size() > 0) {
+            latest_subs.insert_or_assign(make_relationship_sub(table_D, static_cast<int>(table_D->size())));
+        }
+
+        latest_subs.commit();
+
+        return SyncClientHookAction::NoAction;
+    };
+
+    {
+        std::unique_lock<std::mutex> lk(mutex);
+        cv.wait(lk);
+    }
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto realm2 = Realm::get_shared_realm(config2);
+    auto table_A = realm2->read_group().get_table("class_tableA");
+    auto mut_subs = realm2->get_latest_subscription_set().make_mutable_copy();
+    mut_subs.insert_or_assign(Query(table_A));
+    mut_subs.commit();
+
+    {
+        std::unique_lock<std::mutex> lk(mutex);
+        cv2.wait(lk, [&] {
+            realm2->begin_transaction();
+            auto tableD = realm2->read_group().get_table("class_tableD");
+            realm2->cancel_transaction();
+            return tableD->size() == 10000 + 100 * 100;
+        });
+    }
+
+    auto duration = std::chrono::steady_clock::now() - start_time;
+    util::StderrLogger logger;
+    logger.info("Downloading 10000 + 100 * 100 objects took %1 ms.",
+                std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+
+    thread.join();
+}
+
+TEST_CASE("flx: relationships tree - bootstrap only", "[sync][flx][app]") {
+    Schema schema{
+        {"tableA",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_B", PropertyType::Object | PropertyType::Nullable, "tableB"},
+             {"array_links_B", PropertyType::Array | PropertyType::Object, "tableB"},
+         }},
+        {"tableB",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_C", PropertyType::Object | PropertyType::Nullable, "tableC"},
+         }},
+        {"tableC",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"link_D", PropertyType::Object | PropertyType::Nullable, "tableD"},
+         }},
+        {"tableD",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("flx_relationships_tree", {schema, {"queryable_str_field"}});
+
+    std::condition_variable cv, cv2;
+    std::mutex mutex;
+
+    // Upload data.
+
+    create_user_and_log_in(harness.app());
+    auto user1 = harness.app()->current_user();
+    SyncTestFile config1(user1, harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    // Simulate user commits.
+    auto thread = std::thread([&] {
+        // Initial data.
+        auto realm = Realm::get_shared_realm(config1);
+        auto table_A = realm->read_group().get_table("class_tableA");
+        auto table_B = realm->read_group().get_table("class_tableB");
+        auto table_C = realm->read_group().get_table("class_tableC");
+        auto table_D = realm->read_group().get_table("class_tableD");
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(table_A));
+        mut_subs.insert_or_assign(Query(table_B));
+        mut_subs.insert_or_assign(Query(table_C));
+        mut_subs.insert_or_assign(Query(table_D));
+        mut_subs.commit();
+
+        CppContext c(realm);
+        auto create = [&](std::any&& value, const std::string& table_name) {
+            auto obj = Object::create(c, realm, table_name, value);
+            return obj;
+        };
+
+        for (int i = 0; i < 10000; ++i) {
+            realm->begin_transaction();
+            auto objD = create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}}, "tableD");
+            auto objC =
+                create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_D", objD}}, "tableC");
+            auto objB =
+                create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_C", objC}}, "tableB");
+            create(AnyDict{{"_id", int64_t(i)}, {"queryable_str_field", "string"s}, {"link_B", objB}}, "tableA");
+            realm->commit_transaction();
+        }
+        wait_for_upload(*realm);
+        cv.notify_one();
+    });
+
+    // Download data.
+    create_user_and_log_in(harness.app());
+    auto user2 = harness.app()->current_user();
+    SyncTestFile config2(user2, harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto make_relationship_sub = [](TableRef table, int obj_count) -> Query {
+        std::vector<Mixed> pks(obj_count);
+        std::iota(std::begin(pks), std::end(pks), 0);
+
+        return table->query("_id in $0", {{{pks}}});
+    };
+
+    config2.sync_config->on_sync_client_event_hook =
+        [&make_relationship_sub, &cv2](std::weak_ptr<SyncSession> weak_sess, const SyncClientHookData& data) {
+            auto sess = weak_sess.lock();
+            if (!sess ||
+                (data.event != SyncClientHookEvent::BootstrapProcessed &&
+                 data.event != SyncClientHookEvent::DownloadMessageIntegrated) ||
+                data.query_version == 0) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
+                data.batch_state != sync::DownloadBatchState::SteadyState) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (data.num_changesets == 0) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            // Update relationship subscription.
+
+            auto db = SyncSession::OnlyForTesting::get_db(*sess);
+            auto read_tr = db->start_read();
+            auto table_A = read_tr->get_table("class_tableA");
+            auto table_B = read_tr->get_table("class_tableB");
+            auto table_C = read_tr->get_table("class_tableC");
+            auto table_D = read_tr->get_table("class_tableD");
+
+            if (table_D->size() == 10000) {
+                cv2.notify_one();
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto latest_subs = sess->get_flx_subscription_store()->get_latest().make_mutable_copy();
+
+            latest_subs.clear();
+            latest_subs.insert_or_assign(Query(table_A));
+            if (table_A->size() > table_B->size()) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_B, static_cast<int>(table_A->size())));
+            }
+            else if (table_A->size() == table_B->size() && table_B->size() > 0) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_B, static_cast<int>(table_B->size())));
+            }
+            if (table_B->size() > table_C->size()) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_C, static_cast<int>(table_B->size())));
+            }
+            else if (table_B->size() == table_C->size() && table_C->size() > 0) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_C, static_cast<int>(table_C->size())));
+            }
+            if (table_C->size() > table_D->size()) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_D, static_cast<int>(table_C->size())));
+            }
+            else if (table_C->size() == table_D->size() && table_D->size() > 0) {
+                latest_subs.insert_or_assign(make_relationship_sub(table_D, static_cast<int>(table_D->size())));
+            }
+
+            latest_subs.commit();
+
+            return SyncClientHookAction::NoAction;
+        };
+
+    {
+        std::unique_lock<std::mutex> lk(mutex);
+        cv.wait(lk);
+    }
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto realm2 = Realm::get_shared_realm(config2);
+    auto table_A = realm2->read_group().get_table("class_tableA");
+    auto mut_subs = realm2->get_latest_subscription_set().make_mutable_copy();
+    mut_subs.insert_or_assign(Query(table_A));
+    mut_subs.commit();
+
+    {
+        std::unique_lock<std::mutex> lk(mutex);
+        cv2.wait(lk, [&] {
+            realm2->begin_transaction();
+            auto tableD = realm2->read_group().get_table("class_tableD");
+            realm2->cancel_transaction();
+            return tableD->size() == 10000;
+        });
+    }
+    auto duration = std::chrono::steady_clock::now() - start_time;
+    util::StderrLogger logger;
+    logger.info("Downloading 10000 objects took %1 ms.",
+                std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+    thread.join();
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
