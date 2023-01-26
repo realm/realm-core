@@ -41,10 +41,10 @@ StringData ErrorCodes::error_string(Error code)
             return "ResolveFailed";
         case ErrorCodes::ConnectionFailed:
             return "ConnectionFailed";
-        case ErrorCodes::Retry:
-            return "Retry";
-        case ErrorCodes::Fatal:
-            return "Fatal";
+        case ErrorCodes::WebSocket_Retry_Error:
+            return "WebSocket: Retry Error";
+        case ErrorCodes::WebSocket_Fatal_Error:
+            return "WebSocket: Fatal Error";
 
         /// WebSocket error codes
         case ErrorCodes::WebSocket_GoingAway:
@@ -91,37 +91,6 @@ StringData ErrorCodes::error_string(Error code)
         default:
             return "UnknownError";
     }
-}
-
-namespace {
-
-class StatusErrorCategory : public std::error_category {
-    const char* name() const noexcept final
-    {
-        return "realm::sync::websocket::CloseStatus";
-    }
-    std::string message(int error_code) const final
-    {
-        // Converts an error_code to one of the pre-defined status codes in
-        // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        if (error_code == 1000 || error_code == 0) {
-            return ErrorCodes::error_string(ErrorCodes::OK);
-        }
-        return ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code));
-    }
-};
-
-} // unnamed namespace
-
-const std::error_category& close_status_category() noexcept
-{
-    static const StatusErrorCategory category = {};
-    return category;
-}
-
-std::error_code make_error_code(ErrorCodes::Error error) noexcept
-{
-    return std::error_code{error, close_status_category()};
 }
 
 } // namespace realm
