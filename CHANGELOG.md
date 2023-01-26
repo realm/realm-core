@@ -34,6 +34,7 @@
 * Remove `File::is_removed` ([#6222](https://github.com/realm/realm-core/pull/6222))
 * Client reset recovery froze Realms for the callbacks in an invalid way. It is unclear if this resulted in any actual problems.
 * Fix default enabled debug output during realm-sync-tests ([#6233](https://github.com/realm/realm-core/issues/6233))
+* Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
 
 ----------------------------------------------
 
@@ -76,7 +77,6 @@
 * Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
 * Improve detection of Windows target architecture when downloading prebuild dependencies. ([#6135](https://github.com/realm/realm-core/issues/6135))
 * App services request ID now logged at info level when sync client connects ([#6143](https://github.com/realm/realm-core/pull/6143]))
-* Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
 * Add c_api error category for resolve errors instead of reporting unknown category. ([PR #6157](https://github.com/realm/realm-core/pull/6157))
 * Add permanent redirect (308) as a supported redirect response from the server. ([#6162](https://github.com/realm/realm-core/issues/6162))
 * Integrate DefaultSocketProvider as SyncSocketProvider in sync client. ([PR #6171](https://github.com/realm/realm-core/pull/6171))
