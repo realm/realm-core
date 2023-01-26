@@ -213,6 +213,10 @@ enum class Error {
     bad_message
 };
 
+const std::error_category& websocket_close_status_category() noexcept;
+
+std::error_code make_error_code(ErrorCodes::Error error) noexcept;
+
 const std::error_category& error_category() noexcept;
 
 std::error_code make_error_code(Error) noexcept;
