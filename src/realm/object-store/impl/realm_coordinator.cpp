@@ -238,6 +238,7 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
+    REALM_ASSERT(!version || *version != VersionID());
     if (!config.scheduler)
         config.scheduler = version ? util::Scheduler::make_frozen(*version) : util::Scheduler::make_default();
     // realm must be declared before lock so that the mutex is released before

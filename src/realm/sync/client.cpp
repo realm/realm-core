@@ -393,11 +393,12 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = m_running;
-    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
-
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
+
+    // Event Loop TODO: Until the event loop can be free-running, wait for the
+    // thread to exit before tearing down the client.
+    m_socket_provider->stop(true);
 
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
@@ -490,19 +491,15 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
-    util::LockGuard lock{m_mutex};
-    if (m_stopped)
-        return;
-    m_stopped = true;
-    m_wait_or_client_stopped_cond.notify_all();
+    {
+        util::LockGuard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+        m_wait_or_client_stopped_cond.notify_all();
+    }
+    // TODO: in the future we will need to block here until all the sessions have been torn down
     m_socket_provider->stop();
-}
-
-
-void ClientImpl::run()
-{
-    auto ta = util::make_temp_assign(m_running, true);
-    m_socket_provider->run();
 }
 
 
@@ -754,7 +751,18 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     bool new_batch = false;
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    try {
+        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    }
+    catch (const LogicError& ex) {
+        if (ex.kind() == LogicError::binary_too_big) {
+            IntegrationException ex(ClientError::bad_changeset_size,
+                                    "bootstrap changeset too large to store in pending bootstrap store");
+            on_integration_failure(ex);
+            return true;
+        }
+        throw;
+    }
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
@@ -1828,15 +1836,15 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
-void Client::run()
-{
-    m_impl->run(); // Throws
-}
-
-
 void Client::stop() noexcept
 {
     m_impl->stop();
+}
+
+
+void Client::post_for_testing(SyncSocketProvider::FunctionHandler&& handler)
+{
+    m_impl->post(std::move(handler));
 }
 
 

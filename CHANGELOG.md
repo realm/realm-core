@@ -3,6 +3,8 @@
 ### Enhancements
 * `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
+* Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
+* Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -12,6 +14,8 @@
 * Fixed diverging history in flexible sync if writes occur during bootstrap to objects that just came into view ([#5804](https://github.com/realm/realm-core/issues/5804), since v11.7.0)
 * Fix several data races when opening cached frozen Realms. New frozen Realms were added to the cache and the lock released before they were fully initialized, resulting in races if they were immediately read from the cache on another thread ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v6.0.0).
 * Properties and types not present in the requested schema would be missing from the reported schema in several scenarios, such as if the Realm was being opened with a different schema version than the persisted one, and if the new tables or columns were added while the Realm instance did not have an active read transaction ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v13.2.0).
+* If a client reset w/recovery or discard local is interrupted while the "fresh" realm is being downloaded, the sync client may crash with a MultpleSyncAgents exception ([#6217](https://github.com/realm/realm-core/issues/6217), since v11.13.0)
+* Changesets from the server sent during FLX bootstrapping that are larger than 16MB can cause the sync client to crash with a LogicError (PR [#6218](https://github.com/realm/realm-core/pull/6218), since v12.0.0)
 
 ### Breaking changes
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
@@ -27,6 +31,9 @@
 * Fix failures in Metrics_TransactionTimings core test ([#6164](https://github.com/realm/realm-core/issues/6164))
 * Make log level threshold atomic and shared ([#6009](https://github.com/realm/realm-core/issues/6009))
 * Add c_api error category for resolve errors instead of reporting unknown category, part 2. ([PR #6186](https://github.com/realm/realm-core/pull/6186))
+* Remove `File::is_removed` ([#6222](https://github.com/realm/realm-core/pull/6222))
+* Client reset recovery froze Realms for the callbacks in an invalid way. It is unclear if this resulted in any actual problems.
+* Fix default enabled debug output during realm-sync-tests ([#6233](https://github.com/realm/realm-core/issues/6233))
 * Update ClientImpl::Connection and DefaultWebSocketImpl to use the new WebSocketObserver callbacks ([PR #6219](https://github.com/realm/realm-core/pull/6219))
 
 ----------------------------------------------
@@ -65,7 +72,7 @@
 
 ### Internals
 * Updates for upcoming Platform Networking feature, including new SyncSocketProvider class. ([PR #6096](https://github.com/realm/realm-core/pull/6096))
-* Updated namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
+* Update namespaces for files moved to realm/sync/network ([PR #6109](https://github.com/realm/realm-core/pull/6109))
 * Replace util::network::Trigger with a Sync client custom trigger. ([PR #6121](https://github.com/realm/realm-core/pull/6121))
 * Create DefaultSyncSocket class ([PR #6116](https://github.com/realm/realm-core/pull/6116))
 * Improve detection of Windows target architecture when downloading prebuild dependencies. ([#6135](https://github.com/realm/realm-core/issues/6135))
@@ -73,6 +80,8 @@
 * Add c_api error category for resolve errors instead of reporting unknown category. ([PR #6157](https://github.com/realm/realm-core/pull/6157))
 * Add permanent redirect (308) as a supported redirect response from the server. ([#6162](https://github.com/realm/realm-core/issues/6162))
 * Integrate DefaultSocketProvider as SyncSocketProvider in sync client. ([PR #6171](https://github.com/realm/realm-core/pull/6171))
+* Migrate service and event loop into DefaultSyncSocket ([PR #6151](https://github.com/realm/realm-core/pull/6151))
+* Move BindingCallbackThreadObserver from object-store to sync ([PR #6151](https://github.com/realm/realm-core/pull/6151))
 
 ----------------------------------------------
 

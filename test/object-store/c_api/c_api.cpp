@@ -4280,6 +4280,56 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(insertion_range.to == 2);
                 }
             }
+
+            SECTION("realm_dictionary_content_checks") {
+                auto ints = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["int_dict"]));
+                CHECK(ints);
+                CHECK(!realm_is_frozen(ints.get()));
+                realm_value_t key1 = rlm_str_val("k");
+                realm_value_t key2 = rlm_str_val("k2");
+                realm_value_t integer1 = rlm_int_val(987);
+                realm_value_t integer2 = rlm_int_val(988);
+
+                write([&]() {
+                    bool inserted = false;
+                    CHECK(checked(realm_dictionary_insert(ints.get(), key1, integer1, nullptr, &inserted)));
+                    CHECK(inserted);
+                    CHECK(checked(realm_dictionary_insert(ints.get(), key2, integer2, nullptr, &inserted)));
+                    CHECK(inserted);
+                });
+
+                SECTION("realm_dictionary_get_keys") {
+                    size_t size = 0;
+                    realm_results_t* keys = nullptr;
+                    CHECK(checked(realm_dictionary_get_keys(ints.get(), &size, &keys)));
+                    CHECK(keys);
+                    CHECK((*keys).size() == size);
+                    realm_release(keys);
+                }
+
+                SECTION("realm_dictionary_contains_key") {
+                    bool found = false;
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key1, &found)));
+                    CHECK(found);
+                    found = false;
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key2, &found)));
+                    CHECK(found);
+                    realm_value_t key_no_present = rlm_str_val("kkkk");
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key_no_present, &found)));
+                    CHECK(!found);
+                }
+
+                SECTION("realm_dictionary_contains_value") {
+                    size_t index = -1;
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer1, &index)));
+                    CHECK(index == 0);
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer2, &index)));
+                    CHECK(index == 1);
+                    realm_value_t integer_no_present = rlm_int_val(678);
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer_no_present, &index)));
+                    CHECK(index == realm::npos);
+                }
+            }
         }
 
         SECTION("notifications") {

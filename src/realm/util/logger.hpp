@@ -249,6 +249,28 @@ private:
 };
 
 
+// Logger with a local log level that is independent of the parent log level threshold
+// The LocalThresholdLogger will define its own atomic log level threshold and
+// will be unaffected by changes to the log level threshold of the parent.
+// In addition, any changes to the log level threshold of this class or any
+// subsequent linked loggers will not change the log level threshold of the
+// parent. The parent will only be used for outputting log messages.
+class LocalThresholdLogger : public Logger {
+public:
+    // A shared_ptr parent must be provided for this class for log output
+    // Local log level is initialized with the current value from the provided logger
+    LocalThresholdLogger(const std::shared_ptr<Logger>&);
+
+    // A shared_ptr parent must be provided for this class for log output
+    LocalThresholdLogger(const std::shared_ptr<Logger>&, Level);
+
+    void do_log(Logger::Level level, std::string const& message) override;
+
+protected:
+    std::shared_ptr<Logger> m_chained_logger;
+};
+
+
 /// A logger that essentially performs a noop when logging functions are called
 /// The log level threshold for this logger is always Logger::Level::off and
 /// cannot be changed.
@@ -486,6 +508,22 @@ inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logg
     , m_prefix{std::move(prefix)}
     , m_chained_logger{*base_logger} // do_log() writes to the chained logger
 {
+}
+
+// Construct a LocalThresholdLogger using the current log level value from the parent
+inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>& base_logger)
+    : Logger(base_logger->get_level_threshold())
+    , m_chained_logger{base_logger}
+{
+}
+
+// Construct a LocalThresholdLogger using the provided log level threshold value
+inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>& base_logger, Level threshold)
+    : Logger(threshold)
+    , m_chained_logger{base_logger}
+{
+    // Verify the passed in shared ptr is not null
+    REALM_ASSERT(m_chained_logger);
 }
 
 } // namespace realm::util
