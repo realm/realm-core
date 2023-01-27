@@ -732,6 +732,7 @@ AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
             return AdminAPIEndpoint(util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
                                     m_access_token);
     }
+    REALM_UNREACHABLE();
 }
 
 AppCreateConfig default_app_config(const std::string& base_url)
