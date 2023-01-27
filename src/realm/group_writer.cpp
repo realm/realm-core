@@ -679,10 +679,8 @@ ref_type GroupWriter::write_group()
     // bigger databases the space required for free lists will be relatively less.
     max_free_list_size += 10;
 
-    // If current size is less than 128 MB, the database need not expand above 2 GB
-    // which means that the positions and sizes can still be in 32 bit.
-    int size_per_entry = (m_logical_size < 0x8000000 ? 8 : 16) + 8;
-    size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
+    size_t max_free_space_needed =
+        Array::get_max_byte_size(top.size()) + size_per_free_list_entry() * max_free_list_size;
 
     ALLOC_DBG_COUT("  Allocating file space for freelists:" << std::endl);
     // Reserve space for remaining arrays. We ask for some extra bytes beyond the
