@@ -1173,6 +1173,19 @@ const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscriptio
     return m_flx_subscription_store;
 }
 
+sync::SaltedFileIdent SyncSession::get_file_ident() const
+{
+    auto repl = m_db->get_replication();
+    REALM_ASSERT(repl);
+    REALM_ASSERT(dynamic_cast<sync::ClientReplication*>(repl));
+
+    sync::SaltedFileIdent ret;
+    sync::version_type unused_version;
+    sync::SyncProgress unused_progress;
+    static_cast<sync::ClientReplication*>(repl)->get_history().get_status(unused_version, ret, unused_progress);
+    return ret;
+}
+
 void SyncSession::update_configuration(SyncConfig new_config)
 {
     while (true) {
