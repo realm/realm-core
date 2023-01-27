@@ -2968,7 +2968,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 
     Client::Config config;
     config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
-    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, {});
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
     config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
     Client client(config);
