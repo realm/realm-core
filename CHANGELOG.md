@@ -16,6 +16,7 @@
 * Properties and types not present in the requested schema would be missing from the reported schema in several scenarios, such as if the Realm was being opened with a different schema version than the persisted one, and if the new tables or columns were added while the Realm instance did not have an active read transaction ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v13.2.0).
 * If a client reset w/recovery or discard local is interrupted while the "fresh" realm is being downloaded, the sync client may crash with a MultpleSyncAgents exception ([#6217](https://github.com/realm/realm-core/issues/6217), since v11.13.0)
 * Changesets from the server sent during FLX bootstrapping that are larger than 16MB can cause the sync client to crash with a LogicError (PR [#6218](https://github.com/realm/realm-core/pull/6218), since v12.0.0)
+* Online compaction may cause a single commit to take a long time ([#6245](https://github.com/realm/realm-core/pull/6245), since v13.0.0)
 
 ### Breaking changes
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
