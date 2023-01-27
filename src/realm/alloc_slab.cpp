@@ -1200,9 +1200,6 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
             else {
                 new_mappings.push_back({util::File::Map<char>()});
                 auto& mapping = new_mappings.back().primary_mapping;
-                auto enc_mapping = mapping.get_encrypted_mapping();
-                if (enc_mapping)
-                    enc_mapping->set_observer(m_write_observer);
                 bool reserved =
                     mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
                 if (reserved) {
@@ -1214,6 +1211,11 @@ void SlabAlloc::update_reader_view(size_t file_size, DB* db, VersionID version) 
                     new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
                                                             section_start_offset);
                 }
+                // must only refer to any encrypted mapping AFTER it has been set,
+                // which happens in either map() or try_extend_to()
+                auto enc_mapping = mapping.get_encrypted_mapping();
+                if (enc_mapping)
+                    enc_mapping->set_observer(m_write_observer);
             }
         }
     }

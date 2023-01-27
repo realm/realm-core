@@ -292,22 +292,19 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
     std::pair<iv_table, size_t> last_iv_and_data_hash;
     auto retry_start_time = std::chrono::steady_clock::now();
     size_t num_identical_reads = 1;
-    int num_no_writes_sampled = 0;
     auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
         constexpr auto max_retry_period = std::chrono::seconds(5);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
+        bool we_are_alone = true;
+        // not having an observer set means that we're alone. (or should mean it)
         if (observer) {
-            bool a_page_is_marked_for_writing = observer->observe(nullptr, nullptr);
-            if (a_page_is_marked_for_writing)
-                num_no_writes_sampled = 0;
-            else
-                num_no_writes_sampled++;
+            we_are_alone = observer->no_concurrent_writer_seen();
         }
-        if (elapsed > max_retry_period || !observer || (observer && (num_no_writes_sampled > 5))) {
+        if (elapsed > max_retry_period || we_are_alone) {
             auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);
-            std::cerr << std::endl << "*Timeout: " << str << std::endl;
+            // std::cerr << std::endl << "*Timeout: " << str << std::endl;
             throw DecryptionFailed(str);
         }
         else {
@@ -327,6 +324,13 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
     };
 
     auto should_retry = [&]() -> bool {
+        // if we don't have an observer object, we're guaranteed to be alone in the world,
+        // and retrying will not help us, since the file is not being changed.
+        if (!observer)
+            return false;
+        // if no-one is mutating the file, retrying will also not help:
+        if (observer && observer->no_concurrent_writer_seen())
+            return false;
         // if we do not observe identical data or iv within several sequential reads then
         // this is a multiprocess reader starvation scenario so keep trying until we get a match
         return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);

@@ -770,6 +770,7 @@ private:
     }
     void clear_writing_marker()
     {
+        m_info->write_counter++;
         m_info->writing_page = 0;
     }
     // returns false if no page is marked.
@@ -805,17 +806,20 @@ public:
         : vm(vm)
     {
     }
-    bool observe(uint64_t* pos, uint64_t* write_count) override
+    bool no_concurrent_writer_seen() override
     {
         uint64_t tmp_write_count;
-        auto page_may_have_been_written = vm.observe_writer(pos, &tmp_write_count);
-        if (called_once && tmp_write_count != last_seen_count) {
+        auto page_may_have_been_written = vm.observe_writer(nullptr, &tmp_write_count);
+        if (tmp_write_count != last_seen_count) {
             page_may_have_been_written = true;
+            last_seen_count = tmp_write_count;
         }
-        last_seen_count = tmp_write_count;
-        called_once = true;
-        if (write_count) *write_count = tmp_write_count;
-        return page_may_have_been_written;
+        if (page_may_have_been_written) {
+            calls_since_last_writer_observed = 0;
+            return false;
+        }
+        ++calls_since_last_writer_observed;
+        return (calls_since_last_writer_observed >= 5);
     }
     void mark(uint64_t pos) override
     {
@@ -828,8 +832,8 @@ public:
 
 private:
     DB::VersionManager& vm;
-    bool called_once = false;
     uint64_t last_seen_count = 0;
+    int calls_since_last_writer_observed = 0;
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -846,6 +850,8 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
+        REALM_ASSERT(m_db.m_marker_observer.get());
+        REALM_ASSERT(m_db.m_alloc.m_write_observer);
         start();
     }
     ~PageRefresher()
@@ -857,6 +863,8 @@ public:
         auto& alloc = m_db.m_alloc;
         std::optional<uint64_t> change_from;
         while (m_should_run) {
+            REALM_ASSERT(m_db.m_marker_observer.get());
+            REALM_ASSERT(m_db.m_alloc.m_write_observer);
             // wait for change
             bool changed = true;
             if (change_from) {
@@ -1185,7 +1193,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             m_version_manager = std::move(version_manager);
             m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*m_version_manager);
             try {
-                top_ref = alloc.attach_file(path, cfg); // Throws
+                top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
             catch (const SlabAlloc::Retry&) {
                 // On a SlabAlloc::Retry file mappings are already unmapped, no
