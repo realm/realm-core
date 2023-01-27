@@ -567,9 +567,7 @@ public:
     {
         unit_test::TestContext& test_context = m_test_context;
         stop();
-        for (int i = 0; i < m_num_clients; ++i) {
-            m_client_socket_providers[i]->stop(true);
-        }
+        m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
                 CHECK(!m_server_threads[i].join());
