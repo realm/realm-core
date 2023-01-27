@@ -578,7 +578,6 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
         // Updating state to Stopping will free a start() if it is waiting for the thread to
         // start and may cause the thread to exit early before calling service.run()
         m_service.stop(); // Unblocks m_service.run()
-        state_wait_for(lock, State::Stopping);
     }
 
     // Wait until the thread is stopped (exited) if requested
