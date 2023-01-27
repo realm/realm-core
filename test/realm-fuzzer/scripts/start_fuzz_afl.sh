@@ -52,7 +52,7 @@ mkdir -p "${BUILD_DIR}"
     
 cd "${BUILD_DIR}" || exit
 if [ -z ${REALM_MAX_BPNODE_SIZE} ]; then
-    REALM_MAX_BPNODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
+    REALM_MAX_BPNODE_SIZE=$(python -c "import random; print ((random.randint(4,999), 1000)[bool(random.randint(0,1))])")
 fi
 
 cmake -D CMAKE_BUILD_TYPE=${build_mode} \
