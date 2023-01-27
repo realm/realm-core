@@ -1892,10 +1892,11 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  * @param out_num_insertions The number of insertions. May be NULL.
  * @param out_num_modifications The number of modifications. May be NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
+ * @param out_collection_was_cleared a flag to signal if the collection has been cleared. May be NULL
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
 
 /**
  * Get the number of various types of changes in a collection notification,
