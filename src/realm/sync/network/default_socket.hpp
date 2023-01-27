@@ -106,6 +106,7 @@ private:
     const std::string m_user_agent;
     SyncTimer m_keep_running_timer;
     std::mutex m_mutex;
+    uint64_t m_event_loop_generation = 0;
     State m_state;                      // protected by m_mutex
     std::condition_variable m_state_cv; // uses m_mutex
     std::thread m_thread;               // protected by m_mutex

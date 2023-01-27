@@ -535,14 +535,21 @@ void DefaultSocketProvider::event_loop()
 
     // We update the state to Running from inside the event loop so that start() is blocked until
     // the event loop is actually ready to receive work.
-    m_service.post([this](Status status) {
-        std::unique_lock<std::mutex> lock(m_mutex);
+    m_service.post([this, my_generation = ++m_event_loop_generation](Status status) {
         if (status == ErrorCodes::OperationAborted) {
-            REALM_ASSERT(m_state == State::Stopping || m_state == State::Stopped);
             return;
         }
 
         REALM_ASSERT(status.is_ok());
+
+        std::unique_lock<std::mutex> lock(m_mutex);
+        // This is a callback from a previous generation
+        if (m_event_loop_generation != my_generation) {
+            return;
+        }
+        if (m_state == State::Stopping) {
+            return;
+        }
         m_logger_ptr->trace("Default event loop: service run");
         REALM_ASSERT(m_state == State::Starting);
         do_state_update(lock, State::Running);
