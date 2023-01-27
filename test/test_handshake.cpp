@@ -1,4 +1,5 @@
 #include <realm/sync/client.hpp>
+#include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/websocket.hpp>
@@ -285,7 +286,7 @@ void run_client_surprise_server(unit_test::TestContext& test_context, const std:
 
     util::Logger& logger = test_context.logger;
     util::PrefixLogger server_logger("Server: ", logger);
-    util::PrefixLogger client_logger("Client: ", logger);
+    auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
 
     SurpriseServer server{server_logger};
     server.start();
@@ -294,8 +295,9 @@ void run_client_surprise_server(unit_test::TestContext& test_context, const std:
         server.run();
     });
 
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_logger, "");
     Client::Config client_config;
-    client_config.logger = &client_logger;
+    client_config.logger = client_logger;
     client_config.one_connection_per_session = true;
     client_config.tcp_no_delay = true;
     Client client(client_config);
@@ -476,9 +478,11 @@ TEST_IF(Handshake_ExternalServer, false)
 
     SHARED_GROUP_TEST_PATH(path);
     util::Logger& logger = test_context.logger;
-    util::PrefixLogger client_logger("Client: ", logger);
+    auto client_logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
 
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_logger, "");
     Client::Config client_config;
+    client_config.socket_provider = socket_provider;
     client_config.logger = &client_logger;
     client_config.one_connection_per_session = true;
     client_config.tcp_no_delay = true;

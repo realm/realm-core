@@ -10,6 +10,7 @@
 #include <realm/sync/network/network.hpp>
 #include <realm/util/future.hpp>
 #include <realm/util/random.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 namespace realm::sync::network {
 class Service;
@@ -44,12 +45,19 @@ public:
         network::DeadlineTimer m_timer;
     };
 
-    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent);
+    struct AutoStartTag {};
+
+    using AutoStart = util::TaggedBool<AutoStartTag>;
+    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                          AutoStart auto_start = AutoStart{true});
 
     // Don't allow move or copy constructor
     DefaultSocketProvider(DefaultSocketProvider&&) = delete;
 
     ~DefaultSocketProvider();
+
+    // Start the event loop if it is not started already. Otherwise, do nothing.
+    void start();
 
     /// Temporary workaround until client shutdown has been updated in a separate PR - these functions
     /// will be handled internally when this happens.
@@ -74,13 +82,10 @@ public:
 private:
     enum class State { Starting, Started, Running, Stopping, Stopped };
 
-    // Start the event loop
-    void start();
-
     /// Block until the state reaches the expected or later state - return true if state matches expected state
-    void state_wait_for(State expected_state);
+    void state_wait_for(std::unique_lock<std::mutex>& lock, State expected_state);
     /// Internal function for updating the state and signaling the wait_for_state condvar
-    void do_state_update(State new_state);
+    void do_state_update(std::unique_lock<std::mutex>&, State new_state);
     /// The execution code for the event loop thread
     void event_loop();
 

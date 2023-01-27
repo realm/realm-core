@@ -38,9 +38,6 @@ public:
     Client(Client&&) noexcept;
     ~Client() noexcept;
 
-    /// Used by testing to post a function handler onto the event loop
-    void post_for_testing(SyncSocketProvider::FunctionHandler&& handler);
-
     /// Run the internal event-loop of the client. At most one thread may
     /// execute run() at any given time. The call will not return until somebody
     /// calls stop().

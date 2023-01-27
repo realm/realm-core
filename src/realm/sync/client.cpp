@@ -1842,12 +1842,6 @@ void Client::stop() noexcept
 }
 
 
-void Client::post_for_testing(SyncSocketProvider::FunctionHandler&& handler)
-{
-    m_impl->post(std::move(handler));
-}
-
-
 void Client::cancel_reconnect_delay()
 {
     m_impl->cancel_reconnect_delay();
