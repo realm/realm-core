@@ -158,6 +158,55 @@ TEST(Set_Mixed)
     CHECK(ref_values == actuals);
 }
 
+TEST(Set_Mixed_SortStringAndBinary)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column_set(type_Mixed, "set");
+    auto obj = table->create_object();
+    auto set = obj.get_set<Mixed>(col);
+
+    std::vector<size_t> indices = {1};
+
+    // Empty set
+    set.sort(indices);
+    CHECK(indices.empty());
+
+    // Strings only
+    set.insert("c");
+    set.insert("e");
+    set.insert("a");
+    set.sort(indices, true);
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 2}));
+    set.sort(indices, false);
+    CHECK_EQUAL(indices, (std::vector<size_t>{2, 1, 0}));
+
+    // Non-strings surrounding the strings
+    set.insert(0);
+    set.insert(UUID());
+    set.sort(indices, true);
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 2, 3, 4}));
+    set.sort(indices, false);
+    CHECK_EQUAL(indices, (std::vector<size_t>{4, 3, 2, 1, 0}));
+
+    // Binary values which should be interleaved with the strings
+    set.insert(BinaryData("b", 1));
+    set.insert(BinaryData("d", 1));
+    set.sort(indices, true);
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 4, 2, 5, 3, 6}));
+    set.sort(indices, false);
+    CHECK_EQUAL(indices, (std::vector<size_t>{6, 3, 5, 2, 4, 1, 0}));
+
+    // Non-empty but no strings
+    set.clear();
+    set.insert(1);
+    set.insert(2);
+    set.sort(indices, true);
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1}));
+    set.sort(indices, false);
+    CHECK_EQUAL(indices, (std::vector<size_t>{1, 0}));
+}
+
 TEST(Set_LinksRemoveBacklinks)
 {
     SHARED_GROUP_TEST_PATH(path);
