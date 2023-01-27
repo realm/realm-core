@@ -1813,7 +1813,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset]") {
 
     realm_config.sync_config->notify_after_client_reset =
         [&schema, promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
-            std::shared_ptr<Realm> realm, ThreadSafeReference after, bool did_recover) mutable {
+            std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
             CHECK(realm->schema_version() == ObjectStore::NotVersioned);
             promise.get_promise().emplace_value();
         };
