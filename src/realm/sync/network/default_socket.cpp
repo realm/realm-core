@@ -478,13 +478,12 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 
 DefaultSocketProvider::~DefaultSocketProvider()
 {
-    // Wait for the thread to stop
-    stop(true);
+    m_logger_ptr->trace("Default event loop teardown");
     if (m_keep_running_timer)
         m_keep_running_timer->cancel();
-    if (m_thread.joinable()) {
-        m_thread.join();
-    }
+
+    // Wait for the thread to stop
+    stop(true);
     // Shutting down - no need to lock mutex before check
     REALM_ASSERT(m_state == State::Stopped);
 }
@@ -493,16 +492,12 @@ void DefaultSocketProvider::start()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
     // Has the thread already been started or is running
-    if (m_state == State::Starting || m_state == State::Started || m_state == State::Running)
+    if (m_state == State::Starting || m_state == State::Running)
         return; // early return
 
     // If the thread has been previously run, make sure it has been joined first
-    if (m_state == State::Stopping || m_state == State::Stopped) {
-        if (m_thread.joinable()) {
-            lock.unlock();
-            m_thread.join();
-            lock.lock();
-        }
+    if (m_state == State::Stopping) {
+        state_wait_for(lock, State::Stopped);
     }
 
     m_logger_ptr->trace("Default event loop: start()");
@@ -510,20 +505,12 @@ void DefaultSocketProvider::start()
     do_state_update(lock, State::Starting);
     m_thread = std::thread{&DefaultSocketProvider::event_loop, this};
     // Wait for the thread to start before continuing
-    state_wait_for(lock, State::Started);
+    state_wait_for(lock, State::Running);
 }
 
 void DefaultSocketProvider::event_loop()
 {
     m_logger_ptr->trace("Default event loop: thread running");
-    {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        // The thread has started - don't return early due to stop() until after did_create_thread()
-        if (m_state == State::Starting) {
-            do_state_update(lock, State::Started);
-        }
-    }
-
     auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
         m_logger_ptr->trace("Default event loop: thread exiting");
         if (g_binding_callback_thread_observer)
@@ -542,15 +529,25 @@ void DefaultSocketProvider::event_loop()
         g_binding_callback_thread_observer->did_create_thread();
 
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        if (m_state != State::Started) {
-            // Stop has already been requested - exit early
-            return; // early return
-        }
-        do_state_update(lock, State::Running);
+        std::lock_guard<std::mutex> lock(m_mutex);
+        REALM_ASSERT(m_state == State::Starting);
     }
 
-    m_logger_ptr->trace("Default event loop: service run");
+    // We update the state to Running from inside the event loop so that start() is blocked until
+    // the event loop is actually ready to receive work.
+    m_service.post([this](Status status) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (status == ErrorCodes::OperationAborted) {
+            REALM_ASSERT(m_state == State::Stopping || m_state == State::Stopped);
+            return;
+        }
+
+        REALM_ASSERT(status.is_ok());
+        m_logger_ptr->trace("Default event loop: service run");
+        REALM_ASSERT(m_state == State::Starting);
+        do_state_update(lock, State::Running);
+    });
+
     try {
         m_service.run(); // Throws
     }
@@ -572,7 +569,7 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
     std::unique_lock<std::mutex> lock(m_mutex);
 
     // Do nothing if the thread is not started or running or stop has already been called
-    if (m_state == State::Starting || m_state == State::Started || m_state == State::Running) {
+    if (m_state == State::Starting || m_state == State::Running) {
         m_logger_ptr->trace("Default event loop: stop()");
         do_state_update(lock, State::Stopping);
         // Updating state to Stopping will free a start() if it is waiting for the thread to
@@ -581,21 +578,20 @@ void DefaultSocketProvider::stop(bool wait_for_stop)
     }
 
     // Wait until the thread is stopped (exited) if requested
-    if (wait_for_stop && m_state == State::Stopping) {
+    if (wait_for_stop) {
         m_logger_ptr->trace("Default event loop: wait for stop");
         state_wait_for(lock, State::Stopped);
-    }
-
-    if (m_state == State::Stopped && m_thread.joinable()) {
-        m_thread.join();
+        if (m_thread.joinable()) {
+            m_thread.join();
+        }
     }
 }
 
-//                    +--------------------------------------------------+
-//                   \/                                                  |
-// State Machine: Stopped -> Starting -> Started -> Running -> Stopping -+
-//                              |           |                     ^
-//                              +-----------+---------------------+
+//                    +---------------------------------------+
+//                   \/                                       |
+// State Machine: Stopped -> Starting -> Running -> Stopping -+
+//                              |           |          ^
+//                              +----------------------+
 
 void DefaultSocketProvider::do_state_update(std::unique_lock<std::mutex>&, State new_state)
 {

@@ -81,7 +81,7 @@ public:
     }
 
 private:
-    enum class State { Starting, Started, Running, Stopping, Stopped };
+    enum class State { Starting, Running, Stopping, Stopped };
 
     /// Block until the state reaches the expected or later state - return true if state matches expected state
     void state_wait_for(std::unique_lock<std::mutex>& lock, State expected_state);

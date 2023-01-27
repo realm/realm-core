@@ -2997,6 +2997,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
+    socket_provider->stop(true);
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3155,7 +3156,7 @@ TEST(Sync_UploadDownloadProgress_1)
         });
 
         client.stop();
-
+        socket_provider->stop(true);
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3496,6 +3497,7 @@ TEST(Sync_UploadDownloadProgress_3)
     client.stop();
 
     server_thread.join();
+    socket_provider->stop(true);
 }
 
 
@@ -3695,9 +3697,8 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, db, nullptr, std::move(session_config)}};
-
     std::mutex mutex;
+    auto session = std::make_unique<Session>(client, db, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -3721,6 +3722,7 @@ TEST(Sync_UploadDownloadProgress_6)
 
     client.stop();
     server.stop();
+    socket_provider->stop(true);
     server_thread.join();
 
     // The check is that we reach this point without deadlocking.
