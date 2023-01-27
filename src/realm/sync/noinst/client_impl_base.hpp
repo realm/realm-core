@@ -392,21 +392,8 @@ public:
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
     void websocket_connected_handler(const std::string& protocol) override;
     bool websocket_binary_message_received(util::Span<const char> data) override;
-    // Will be implemented when the functions below are removed
-    void websocket_error_handler() override {}
-    bool websocket_closed_handler(bool, Status) override
-    {
-        return false;
-    }
-
-    /// DEPRECATED - Will be removed in a future release
-    // Methods from WebsocketObserver that will be going away soon
-    void websocket_connect_error_handler(std::error_code) override;
-    void websocket_ssl_handshake_error_handler(std::error_code) override;
-    void websocket_read_or_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code, const std::string_view*) override;
-    void websocket_protocol_error_handler(std::error_code) override;
-    bool websocket_close_message_received(std::error_code error_code, StringData message) override;
+    void websocket_error_handler() override;
+    bool websocket_closed_handler(bool, Status) override;
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -476,7 +463,6 @@ private:
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
-    void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
@@ -563,6 +549,8 @@ private:
 
     // At least one PING message was sent since connection was established
     bool m_ping_sent = false;
+
+    bool m_websocket_error_received = false;
 
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.

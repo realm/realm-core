@@ -29,6 +29,7 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -161,7 +162,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
         realm->sync_session()->pause();
     }
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
     {
         SyncTestFile realm_config(app->current_user(), partition.value, schema);
         auto second_realm = Realm::get_shared_realm(realm_config);
@@ -226,7 +227,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.error_code == sync::websocket::make_error_code(ErrorCodes::ReadError)) {
             return;
         }
 
@@ -248,16 +249,14 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             std::any(AnyDict{{"_id", obj_id}, {"value", int64_t(5)}, {partition.property_name, partition.value}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
-        reset_utils::wait_for_object_to_persist_to_atlas(app->current_user(), test_app_session.app_session(),
-                                                         "object", {{"_id", obj_id}, {"value", 5}});
     }
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 }

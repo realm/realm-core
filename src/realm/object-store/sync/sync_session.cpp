@@ -662,7 +662,10 @@ void SyncSession::handle_error(SyncError error)
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        if (error_code == sync::websocket::make_error_code(sync::websocket::Error::bad_response_401_unauthorized)) {
+        if (error_code.category() == sync::websocket::websocket_close_status_category() &&
+            (error_code.value() == ErrorCodes::WebSocket_Unauthorized ||
+             error_code.value() == ErrorCodes::WebSocket_AbnormalClosure ||
+             error_code.value() == ErrorCodes::WebSocket_MovedPermanently)) {
             if (auto u = user()) {
                 u->refresh_custom_data(handle_refresh(shared_from_this()));
                 return;
@@ -1168,6 +1171,19 @@ std::string const& SyncSession::path() const
 const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
 {
     return m_flx_subscription_store;
+}
+
+sync::SaltedFileIdent SyncSession::get_file_ident() const
+{
+    auto repl = m_db->get_replication();
+    REALM_ASSERT(repl);
+    REALM_ASSERT(dynamic_cast<sync::ClientReplication*>(repl));
+
+    sync::SaltedFileIdent ret;
+    sync::version_type unused_version;
+    sync::SyncProgress unused_progress;
+    static_cast<sync::ClientReplication*>(repl)->get_history().get_status(unused_version, ret, unused_progress);
+    return ret;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
