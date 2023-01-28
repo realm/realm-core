@@ -62,8 +62,6 @@
 * Migrate service and event loop into DefaultSyncSocket ([PR #6151](https://github.com/realm/realm-core/pull/6151))
 * Move BindingCallbackThreadObserver from object-store to sync ([PR #6151](https://github.com/realm/realm-core/pull/6151))
 * Update ClientImpl::Connection and DefaultWebSocketImpl to use the new WebSocketObserver callbacks ([PR #6219](https://github.com/realm/realm-core/pull/6219))
-* Migrate service and event loop into DefaultSyncSocket ([PR #6151](https://github.com/realm/realm-core/pull/6151))
-* Move BindingCallbackThreadObserver from object-store to sync ([PR #6151](https://github.com/realm/realm-core/pull/6151))
 * Switched client reset tests to using private `force_client_reset` server API ([PR #6216](https://github.com/realm/realm-core/pull/6216))
 
 ----------------------------------------------
