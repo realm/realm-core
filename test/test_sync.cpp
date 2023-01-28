@@ -3797,6 +3797,8 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
         TEST_CLIENT_DB(db);
         Client::Config config;
         config.logger = test_context.logger;
+        auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
+        config.socket_provider = socket_provider;
         config.reconnect_mode = ReconnectMode::testing;
         Client client{config};
         Session session_1{client, db, nullptr};
@@ -3807,6 +3809,9 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
         CHECK(callback_observer->wait_for_error(10s));
         CHECK_STRING_CONTAINS(callback_observer->get_error(),
                               "Multiple sync agents attempted to join the same session");
+        // Need to stop the event loop thread before resetting g_binding_callback_thread_observer
+        client.stop();
+        socket_provider->stop(true);
     }
     CHECK(callback_observer->create_thread_called);
     CHECK(callback_observer->destroy_thread_called);
