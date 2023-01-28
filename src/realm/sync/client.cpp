@@ -396,7 +396,6 @@ ClientImpl::~ClientImpl()
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
 
-    // Event Loop TODO: Until the event loop can be free-running, wait for the
     // thread to exit before tearing down the client.
     m_socket_provider->stop(true);
 
@@ -1839,12 +1838,6 @@ Client::~Client() noexcept {}
 void Client::stop() noexcept
 {
     m_impl->stop();
-}
-
-
-void Client::post_for_testing(SyncSocketProvider::FunctionHandler&& handler)
-{
-    m_impl->post(std::move(handler));
 }
 
 

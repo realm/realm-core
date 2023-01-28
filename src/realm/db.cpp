@@ -2225,8 +2225,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     if (auto limit = out.get_evacuation_limit()) {
         // Get a work limit based on the size of the transaction we're about to commit
-        // Assume at least 4K on top of that for the top arrays
-        size_t work_limit = 4 * 1024 + m_alloc.get_commit_size() / 2;
+        // Add 4k to ensure progress on small commits
+        size_t work_limit = m_alloc.get_commit_size() / 2 + out.get_free_list_size() + 0x1000;
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 

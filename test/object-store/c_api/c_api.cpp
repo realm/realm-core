@@ -3304,11 +3304,13 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(num_moves == 0);
 
                     size_t num_deletions, num_insertions, num_modifications;
+                    bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves);
+                                                             &num_modifications, &num_moves, &collection_cleared);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 1);
+                    CHECK(collection_cleared == false);
 
                     realm_index_range_t deletions, insertions, modifications, modifications_after;
                     realm_collection_move_t moves;
@@ -3345,6 +3347,14 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(modifications_v[1] == size_t(-1));
                     CHECK(modifications_after_v[0] == 2);
                     CHECK(modifications_after_v[1] == size_t(-1));
+
+                    write([&]() {
+                        checked(realm_list_clear(strings.get()));
+                    });
+
+                    realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
+                                                             &num_modifications, &num_moves, &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
         }
@@ -3763,6 +3773,16 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(deletion_range.to == 1);
                     CHECK(insertion_range.from == 0);
                     CHECK(insertion_range.to == 2);
+
+                    write([&]() {
+                        checked(realm_set_clear(strings.get()));
+                    });
+
+                    size_t num_deletions, num_insertions, num_modifications;
+                    bool collection_cleared = false;
+                    realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
+                                                             &num_modifications, &num_moves, &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
         }

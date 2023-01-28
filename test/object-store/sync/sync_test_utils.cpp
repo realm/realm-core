@@ -361,32 +361,11 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
-void trigger_client_reset(const AppSession& app_session)
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)
 {
-    // cause a client reset by restarting the sync service
-    // this causes the server's sync history to be resynthesized
-    auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
-    auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
-
-    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-    app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-    timed_sleeping_wait_for([&] {
-        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
-    });
-    app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-    if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
-        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
-    }
-
-    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
-    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
-    // our remote changes.
-    if (!app_session.config.flx_sync_config) {
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
-    }
+    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());
+    REQUIRE(file_ident.ident != 0);
+    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -442,9 +421,6 @@ struct BaasClientReset : public TestClientReset {
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            wait_for_object_to_persist_to_atlas(m_local_config.sync_config->user, app_session, object_schema_name,
-                                                {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
-
             session->pause();
 
             realm->begin_transaction();
@@ -455,7 +431,7 @@ struct BaasClientReset : public TestClientReset {
             realm->commit_transaction();
         }
 
-        trigger_client_reset(app_session);
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -547,16 +523,13 @@ struct BaasFLXClientReset : public TestClientReset {
             return ret;
         }();
 
-        wait_for_object_to_persist_to_atlas(m_local_config.sync_config->user, app_session,
-                                            std::string(c_object_schema_name),
-                                            {{std::string(c_id_col_name), pk_of_added_object}});
         session->pause();
 
         if (m_make_local_changes) {
             m_make_local_changes(realm);
         }
 
-        trigger_client_reset(app_session);
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -616,12 +589,13 @@ private:
         Query query_for_added_object = table->where().equal(id_col, pk);
         mut_subs.insert_or_assign(query_for_added_object);
         auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (create_object) {
             realm->begin_transaction();
             table->create_object_with_primary_key(pk, {{str_col, "initial value"}});
             realm->commit_transaction();
         }
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_upload(*realm);
     }
 
     void load_initial_data(SharedRealm realm)
