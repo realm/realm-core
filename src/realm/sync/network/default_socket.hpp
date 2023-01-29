@@ -4,6 +4,7 @@
 #include <system_error>
 #include <map>
 
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/network/http.hpp>
@@ -50,6 +51,7 @@ public:
 
     using AutoStart = util::TaggedBool<AutoStartTag>;
     DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                          const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr,
                           AutoStart auto_start = AutoStart{true});
 
     // Don't allow move or copy constructor
@@ -101,6 +103,7 @@ private:
     }
 
     std::shared_ptr<util::Logger> m_logger_ptr;
+    std::shared_ptr<BindingCallbackThreadObserver> m_observer_ptr;
     network::Service m_service;
     std::mt19937_64 m_random;
     const std::string m_user_agent;

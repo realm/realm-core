@@ -458,8 +458,11 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 ///
 
 DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger,
-                                             const std::string user_agent, AutoStart auto_start)
+                                             const std::string user_agent,
+                                             const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr,
+                                             AutoStart auto_start)
     : m_logger_ptr{logger}
+    , m_observer_ptr{observer_ptr}
     , m_service{}
     , m_random{}
     , m_user_agent{user_agent}
@@ -502,6 +505,10 @@ void DefaultSocketProvider::start()
 
     m_logger_ptr->trace("Default event loop: start()");
     REALM_ASSERT(m_state == State::Stopped);
+
+    // Reset the service so it can be run() again
+    m_service.reset();
+
     do_state_update(lock, State::Starting);
     m_thread = std::thread{&DefaultSocketProvider::event_loop, this};
     // Wait for the thread to start before continuing
@@ -511,11 +518,10 @@ void DefaultSocketProvider::start()
 void DefaultSocketProvider::event_loop()
 {
     m_logger_ptr->trace("Default event loop: thread running");
+    // Calls will_destroy_thread() when destroyed
+    auto thread_guard = BindingCallbackThreadObserver::ThreadGuard(m_observer_ptr);
     auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
         m_logger_ptr->trace("Default event loop: thread exiting");
-        if (g_binding_callback_thread_observer)
-            g_binding_callback_thread_observer->will_destroy_thread();
-
         std::unique_lock<std::mutex> lock(m_mutex);
         // Did we get here due to an unhandled exception?
         if (m_state != State::Stopping) {
@@ -525,8 +531,7 @@ void DefaultSocketProvider::event_loop()
         std::notify_all_at_thread_exit(m_state_cv, std::move(lock));
     });
 
-    if (g_binding_callback_thread_observer)
-        g_binding_callback_thread_observer->did_create_thread();
+    BindingCallbackThreadObserver::call_did_create_thread(m_observer_ptr);
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -564,9 +569,7 @@ void DefaultSocketProvider::event_loop()
         do_state_update(lock, State::Stopping);
         lock.unlock();
         m_logger_ptr->error("Default event loop exception: ", e.what());
-        if (g_binding_callback_thread_observer)
-            g_binding_callback_thread_observer->handle_error(e);
-        else
+        if (!BindingCallbackThreadObserver::call_handle_error(e, m_observer_ptr))
             throw;
     }
 }

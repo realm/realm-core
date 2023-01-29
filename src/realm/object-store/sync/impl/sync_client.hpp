@@ -41,6 +41,7 @@ struct SyncClient {
             sync::Client::Config c;
             c.logger = logger;
             c.socket_provider = config.socket_provider;
+            c.default_socket_provider_thread_observer = config.default_socket_provider_thread_observer;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
             /// DEPRECATED - Will be removed in a future release

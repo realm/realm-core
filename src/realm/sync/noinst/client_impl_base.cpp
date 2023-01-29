@@ -146,7 +146,8 @@ ClientImpl::ClientImpl(ClientConfig config)
         if (config.socket_provider)
             return config.socket_provider;
 
-        return std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string());
+        return std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string(),
+                                                                  config.default_socket_provider_thread_observer);
     }()}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}

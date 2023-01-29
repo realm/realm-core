@@ -3739,83 +3739,70 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
-    struct TestThreadObserver : public BindingCallbackThreadObserver {
-        // This method is called just before the thread is started
-        void did_create_thread() final
-        {
-            create_thread_called = true;
-        }
+    using namespace std::literals::chrono_literals;
 
-        // This method is called just before the thread is being destroyed
-        void will_destroy_thread() final
-        {
-            destroy_thread_called = true;
-        }
+    std::mutex thread_mutex;
+    bool create_thread_called = false;
+    bool destroy_thread_called = false;
+    std::string error_message;
+    std::condition_variable error_cv;
 
-        // This method is called with any exception thrown by client.run().
-        void handle_error(std::exception const& e) final
-        {
-            std::lock_guard<std::mutex> lock(m_error_mutex);
-            error_message = e.what(); // save a copy of the exception
-            error_cv.notify_all();
-        }
-
-        // Wait up to timeout seconds for the exception passed to handle_error to be
-        // thrown by this function. Returns false if exception was not thrown before timeout.
-        bool wait_for_error(std::chrono::seconds timeout)
-        {
-            std::unique_lock<std::mutex> lock(m_error_mutex);
-            // Skip the wait if the exception has already been processed
-            if (error_message.empty()) {
-                if (!error_cv.wait_for(lock, timeout, [this]() {
-                        return !error_message.empty();
-                    })) {
-                    return false; // wait timed out - exception did not occur
-                }
-            }
-            return true;
-        }
-
-        // Return the captured exception or an empty std::exception if none captured
-        const std::string& get_error()
-        {
-            std::lock_guard<std::mutex> lock(m_error_mutex);
-            return error_message;
-        }
-
-        bool create_thread_called = false;
-        bool destroy_thread_called = false;
-        std::string error_message;
-        std::mutex m_error_mutex;
-        std::condition_variable error_cv;
+    auto&& create_thread = [&thread_mutex, &create_thread_called]() {
+        std::lock_guard<std::mutex> lock(thread_mutex);
+        create_thread_called = true;
     };
 
-    auto callback_observer = std::make_unique<TestThreadObserver>();
-    g_binding_callback_thread_observer = callback_observer.get();
+    auto&& destroy_thread = [&thread_mutex, &destroy_thread_called]() {
+        std::lock_guard<std::mutex> lock(thread_mutex);
+        destroy_thread_called = true;
+    };
+
+    auto&& handle_error = [&thread_mutex, &error_cv, &error_message](const std::exception& e) {
+        std::unique_lock<std::mutex> lock(thread_mutex);
+        error_message = e.what();
+        error_cv.notify_all();
+    };
+
+    // Since the event loop thread has been moved into the DefaultSocketProvider, use the
+    // client local BindingCallbackThreadObserver to receive the error message
+    auto observer_ptr = std::make_shared<BindingCallbackThreadObserver>(
+        std::move(create_thread), std::move(destroy_thread), std::move(handle_error));
+
+    TEST_CLIENT_DB(db);
+    Client::Config config;
+    config.logger = test_context.logger;
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(
+        config.logger, "", observer_ptr, websocket::DefaultSocketProvider::AutoStart{false});
+    config.socket_provider = socket_provider;
+    config.reconnect_mode = ReconnectMode::testing;
+    Client client{config};
+    Session session_1{client, db, nullptr};
+    Session session_2{client, db, nullptr};
+    session_1.bind("realm://foo/bar", "blablabla");
+    session_2.bind("realm://foo/bar", "blablabla");
+    socket_provider->start();
+
     {
-        using namespace std::literals::chrono_literals;
-        TEST_CLIENT_DB(db);
-        Client::Config config;
-        config.logger = test_context.logger;
-        auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
-        config.socket_provider = socket_provider;
-        config.reconnect_mode = ReconnectMode::testing;
-        Client client{config};
-        Session session_1{client, db, nullptr};
-        Session session_2{client, db, nullptr};
-        session_1.bind("realm://foo/bar", "blablabla");
-        session_2.bind("realm://foo/bar", "blablabla");
+        std::unique_lock<std::mutex> lock(thread_mutex);
         // Wait up to 10 seconds for the exception to be thrown by event loop
-        CHECK(callback_observer->wait_for_error(10s));
-        CHECK_STRING_CONTAINS(callback_observer->get_error(),
-                              "Multiple sync agents attempted to join the same session");
-        // Need to stop the event loop thread before resetting g_binding_callback_thread_observer
-        client.stop();
-        socket_provider->stop(true);
+        // Skip the wait if the exception has already been processed
+        if (error_message.empty()) {
+            CHECK(error_cv.wait_for(lock, 10s, [&error_message]() {
+                return !error_message.empty();
+            }));
+            CHECK_STRING_CONTAINS(error_message, "Multiple sync agents attempted to join the same session");
+        }
     }
-    CHECK(callback_observer->create_thread_called);
-    CHECK(callback_observer->destroy_thread_called);
-    g_binding_callback_thread_observer = nullptr;
+
+    // Now stop the event loop thread
+    client.stop();
+    socket_provider->stop(true);
+
+    {
+        std::unique_lock<std::mutex> lock(thread_mutex);
+        CHECK(create_thread_called);
+        CHECK(destroy_thread_called);
+    }
 }
 
 TEST(Sync_CancelReconnectDelay)

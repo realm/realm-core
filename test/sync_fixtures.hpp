@@ -537,7 +537,7 @@ public:
             Client::Config config_2;
 
             m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
-                m_client_loggers[i], "", websocket::DefaultSocketProvider::AutoStart{false}));
+                m_client_loggers[i], "", nullptr, websocket::DefaultSocketProvider::AutoStart{false}));
             config_2.socket_provider = m_client_socket_providers.back();
             config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
             config_2.logger = m_client_loggers[i];

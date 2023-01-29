@@ -2,6 +2,7 @@
 #define REALM_SYNC_CLIENT_BASE_HPP
 
 #include <realm/transaction.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/socket_provider.hpp>
@@ -184,6 +185,10 @@ struct ClientConfig {
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
     std::shared_ptr<sync::SyncSocketProvider> socket_provider;
+
+    // Optional thread observer for event loop thread events in the default SyncSocketProvider
+    // implementation. It is not used for custom SyncSocketProvider implementations.
+    std::shared_ptr<BindingCallbackThreadObserver> default_socket_provider_thread_observer;
 
     /// Use ports 80 and 443 by default instead of 7800 and 7801
     /// respectively. Ideally, these default ports should have been made
