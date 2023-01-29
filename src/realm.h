@@ -4096,7 +4096,7 @@ realm_set_global_binding_thread_observer(realm_on_object_store_thread_callback_t
  * @param user_data pointer to user defined data that is provided to each of the callback functions
  * @param free_userdata callback invoked when the user_data is to be freed
  */
-RLM_API void realm_sync_client_config_set_binding_callback_thread_observer(
+RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
     realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
     realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
     realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);

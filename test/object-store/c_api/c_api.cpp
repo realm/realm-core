@@ -5011,7 +5011,7 @@ TEST_CASE("C API - binding callback thread observer") {
     c_api::CBindingThreadObserver observer(bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
                                            nullptr, nullptr);
     auto config = cptr(realm_sync_client_config_new());
-    realm_sync_client_config_set_binding_callback_thread_observer(
+    realm_sync_client_config_set_default_binding_thread_observer(
         config.get(), bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error, nullptr, nullptr);
     auto observer_ptr =
         static_cast<c_api::CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
