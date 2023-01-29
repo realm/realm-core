@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
 
 ### Breaking changes
 * None.
