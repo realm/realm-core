@@ -463,7 +463,7 @@ struct alignas(8) DB::SharedInfo {
     InterprocessCondVar::SharedPart pick_next_writer;
     std::atomic<uint32_t> next_ticket;
     std::atomic<uint32_t> next_served = 0;
-    std::atomic<uint64_t> writing_page;
+    std::atomic<uint64_t> writing_page_offset;
     std::atomic<uint64_t> write_counter;
 
     // IMPORTANT: The VersionList MUST be the last field in SharedInfo - see above.
