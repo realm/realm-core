@@ -7,6 +7,9 @@
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/scope_exit.hpp>
 
+// TODO: Remove before committing
+#include <iostream>
+
 namespace realm::sync::websocket {
 
 namespace {
@@ -14,11 +17,13 @@ namespace {
 ///
 /// DefaultWebSocketImpl - websocket implementation for the default socket provider
 ///
-class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
+class DefaultWebSocketImpl final : public WebSocketInterface,
+                                   public Config,
+                                   public std::enable_shared_from_this<DefaultWebSocketImpl> {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
-                         std::mt19937_64& random, const std::string user_agent, WebSocketObserver& observer,
-                         WebSocketEndpoint&& endpoint)
+                         std::mt19937_64& random, const std::string user_agent,
+                         const std::shared_ptr<WebSocketObserver>& observer, WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
         , m_random{random}
@@ -31,11 +36,20 @@ public:
         initiate_resolve();
     }
 
+    ~DefaultWebSocketImpl() = default;
+
     void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
     {
-        m_websocket.async_write_binary(data.data(), data.size(), [handler = std::move(handler)]() {
-            handler(Status::OK());
-        });
+        m_websocket.async_write_binary(data.data(), data.size(),
+                                       [self = weak_from_this(), handler = std::move(handler)]() {
+                                           auto socket_provider = self.lock();
+                                           if (socket_provider) {
+                                               handler(Status::OK());
+                                           }
+                                           else {
+                                               handler(Status(ErrorCodes::OperationAborted, "Operation aborted"));
+                                           }
+                                       });
     }
 
     std::string_view get_appservices_request_id() const noexcept override
@@ -62,12 +76,16 @@ private:
 
     void websocket_handshake_completion_handler(const HTTPHeaders& headers) override
     {
+        auto observer = m_observer.lock();
+        if (!observer)
+            return; // early return
+
         const std::string empty;
         if (auto it = headers.find("X-Appservices-Request-Id"); it != headers.end()) {
             m_app_services_coid = it->second;
         }
         auto it = headers.find("Sec-WebSocket-Protocol");
-        m_observer.websocket_connected_handler(it == headers.end() ? empty : it->second);
+        observer->websocket_connected_handler(it == headers.end() ? empty : it->second);
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
@@ -157,14 +175,22 @@ private:
     }
     bool websocket_error_and_close_handler(bool was_clean, Status status)
     {
+        auto observer = m_observer.lock();
+        if (!observer)
+            return true; // early return
+
         if (!was_clean) {
-            m_observer.websocket_error_handler();
+            observer->websocket_error_handler();
         }
-        return m_observer.websocket_closed_handler(was_clean, status);
+        return observer->websocket_closed_handler(was_clean, status);
     }
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
-        return m_observer.websocket_binary_message_received(util::Span<const char>(ptr, size));
+        auto observer = m_observer.lock();
+        if (!observer)
+            return true; // early return
+
+        return observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
     }
 
     void initiate_resolve();
@@ -191,7 +217,8 @@ private:
     const std::string m_user_agent;
     std::string m_app_services_coid;
 
-    WebSocketObserver& m_observer;
+    // Keep a weak ptr in case the Observer is destroyed before the callback is called
+    std::weak_ptr<WebSocketObserver> m_observer;
 
     const WebSocketEndpoint m_endpoint;
     util::Optional<network::Resolver> m_resolver;
@@ -207,11 +234,22 @@ private:
 void DefaultWebSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
+    auto&& completion = [self = weak_from_this(), handler = std::move(handler)](std::error_code ec,
+                                                                                size_t num_bytes_transferred) {
+        auto websocket = self.lock();
+        if (websocket) {
+            handler(ec, num_bytes_transferred);
+        }
+        else {
+            std::cout << "Callback: async_read - default websocket is null" << std::endl;
+        }
+    };
+
     if (m_ssl_stream) {
-        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
+        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, std::move(completion)); // Throws
     }
     else {
-        m_socket->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
+        m_socket->async_read(buffer, size, m_read_ahead_buffer, std::move(completion)); // Throws
     }
 }
 
@@ -219,11 +257,22 @@ void DefaultWebSocketImpl::async_read(char* buffer, std::size_t size, ReadComple
 void DefaultWebSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
+    auto&& completion = [self = weak_from_this(), handler = std::move(handler)](std::error_code ec,
+                                                                                size_t num_bytes_transferred) {
+        auto websocket = self.lock();
+        if (websocket) {
+            handler(ec, num_bytes_transferred);
+        }
+        else {
+            std::cout << "Callback: async_read_until - default websocket is null" << std::endl;
+        }
+    };
+
     if (m_ssl_stream) {
-        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
+        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(completion)); // Throws
     }
     else {
-        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
+        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(completion)); // Throws
     }
 }
 
@@ -231,11 +280,22 @@ void DefaultWebSocketImpl::async_read_until(char* buffer, std::size_t size, char
 void DefaultWebSocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
+    auto&& completion = [self = weak_from_this(), handler = std::move(handler)](std::error_code ec,
+                                                                                size_t num_bytes_transferred) {
+        auto websocket = self.lock();
+        if (websocket) {
+            handler(ec, num_bytes_transferred);
+        }
+        else {
+            std::cout << "Callback: async_write - default websocket is null" << std::endl;
+        }
+    };
+
     if (m_ssl_stream) {
-        m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
+        m_ssl_stream->async_write(data, size, std::move(completion)); // Throws
     }
     else {
-        m_socket->async_write(data, size, std::move(handler)); // Throws
+        m_socket->async_write(data, size, std::move(completion)); // Throws
     }
 }
 
@@ -252,6 +312,7 @@ void DefaultWebSocketImpl::initiate_resolve()
     m_logger.detail("Resolving '%1:%2'", address, port); // Throws
 
     network::Resolver::Query query(address, util::to_string(port)); // Throws
+    // Can't use weak_from_this() here since it is called from the constructor
     auto handler = [this](std::error_code ec, network::Endpoint::List endpoints) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
@@ -283,12 +344,19 @@ void DefaultWebSocketImpl::initiate_tcp_connect(network::Endpoint::List endpoint
     network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
     m_socket.emplace(m_service); // Throws
-    m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_tcp_connect(ec, std::move(endpoints), i); // Throws
-    });
+    m_socket->async_connect(
+        ep, [self = weak_from_this(), endpoints = std::move(endpoints), i](std::error_code ec) mutable {
+            auto websocket = self.lock();
+            if (!websocket) {
+                std::cout << "Callback: initiate_tcp_connect - default websocket is null" << std::endl;
+                return;
+            }
+
+            // If the operation is aborted, the connection object may have been
+            // destroyed.
+            if (ec != util::error::operation_aborted)
+                websocket->handle_tcp_connect(ec, std::move(endpoints), i); // Throws
+        });
     m_logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
@@ -344,24 +412,31 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
     // TODO handle proxy authorization
 
     m_proxy_client.emplace(*this, m_logger_ptr);
-    auto handler = [this](HTTPResponse response, std::error_code ec) {
+    auto handler = [self = weak_from_this()](HTTPResponse response, std::error_code ec) {
+        auto websocket = self.lock();
+        if (!websocket) {
+            std::cout << "Callback: initiate_http_tunnel - default websocket is null" << std::endl;
+            return;
+        }
+
         if (ec && ec != util::error::operation_aborted) {
-            m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
+            websocket->m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             constexpr bool was_clean = false;
-            websocket_error_and_close_handler(was_clean,
-                                              Status{ErrorCodes::ConnectionFailed, ec.message()}); // Throws
+            websocket->websocket_error_and_close_handler(
+                was_clean, Status{ErrorCodes::ConnectionFailed, ec.message()}); // Throws
             return;
         }
 
         if (response.status != HTTPStatus::Ok) {
-            m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
+            websocket->m_logger.error("Proxy server returned response '%1 %2'", response.status,
+                                      response.reason); // Throws
             constexpr bool was_clean = false;
-            websocket_error_and_close_handler(was_clean,
-                                              Status{ErrorCodes::ConnectionFailed, response.reason}); // Throws
+            websocket->websocket_error_and_close_handler(
+                was_clean, Status{ErrorCodes::ConnectionFailed, response.reason}); // Throws
             return;
         }
 
-        initiate_websocket_or_ssl_handshake(); // Throws
+        websocket->initiate_websocket_or_ssl_handshake(); // Throws
     };
 
     m_proxy_client->async_request(req, std::move(handler)); // Throws
@@ -403,11 +478,17 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
         }
     }
 
-    auto handler = [this](std::error_code ec) {
+    auto handler = [self = weak_from_this()](std::error_code ec) {
+        auto websocket = self.lock();
+        if (!websocket) {
+            std::cout << "Callback: initiate_ssl_handshake - default websocket is null" << std::endl;
+            return;
+        }
+
         // If the operation is aborted, the connection object may have been
         // destroyed.
         if (ec != util::error::operation_aborted)
-            handle_ssl_handshake(ec); // Throws
+            websocket->handle_ssl_handshake(ec); // Throws
     };
     m_ssl_stream->async_handshake(std::move(handler)); // Throws
 
@@ -621,10 +702,10 @@ void DefaultSocketProvider::state_wait_for(std::unique_lock<std::mutex>& lock, S
     });
 }
 
-std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(WebSocketObserver* observer,
+std::shared_ptr<WebSocketInterface> DefaultSocketProvider::connect(const std::shared_ptr<WebSocketObserver>& observer,
                                                                    WebSocketEndpoint&& endpoint)
 {
-    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, m_service, m_random, m_user_agent, *observer,
+    return std::make_shared<DefaultWebSocketImpl>(m_logger_ptr, m_service, m_random, m_user_agent, observer,
                                                   std::move(endpoint));
 }
 

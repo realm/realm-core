@@ -98,7 +98,9 @@ public:
                               port_type& port, std::string& path) const;
 
 private:
-    std::unique_ptr<ClientImpl> m_impl;
+    std::shared_ptr<util::Logger> m_logger_ptr;
+    std::shared_ptr<SyncSocketProvider> m_socket_provider;
+    std::shared_ptr<ClientImpl> m_impl;
     friend class Session;
 };
 

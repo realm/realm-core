@@ -97,7 +97,7 @@ public:
     /// websocket will call directly to the handlers provided by the observer.
     /// The WebSocketObserver guarantees that the WebSocket object will be
     /// closed/destroyed before the observer is terminated/destroyed.
-    virtual std::unique_ptr<WebSocketInterface> connect(WebSocketObserver* observer,
+    virtual std::shared_ptr<WebSocketInterface> connect(const std::shared_ptr<WebSocketObserver>& observer,
                                                         WebSocketEndpoint&& endpoint) = 0;
 
     /// Submit a handler function to be executed by the event loop (thread).

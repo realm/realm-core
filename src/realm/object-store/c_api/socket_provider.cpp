@@ -96,7 +96,7 @@ private:
 
 struct CAPIWebSocketObserver : sync::WebSocketObserver {
 public:
-    CAPIWebSocketObserver(sync::WebSocketObserver& observer)
+    CAPIWebSocketObserver(const std::shared_ptr<sync::WebSocketObserver>& observer)
         : m_observer(observer)
     {
     }
@@ -105,26 +105,35 @@ public:
 
     void websocket_connected_handler(const std::string& protocol) final
     {
-        m_observer.websocket_connected_handler(protocol);
+        if (auto observer = m_observer.lock())
+            observer->websocket_connected_handler(protocol);
     }
 
     void websocket_error_handler() final
     {
-        m_observer.websocket_error_handler();
+        if (auto observer = m_observer.lock())
+            observer->websocket_error_handler();
     }
 
     bool websocket_binary_message_received(util::Span<const char> data) final
     {
-        return m_observer.websocket_binary_message_received(data);
+        if (auto observer = m_observer.lock())
+            return observer->websocket_binary_message_received(data);
+        else
+            return true;
     }
 
     bool websocket_closed_handler(bool was_clean, Status status) final
     {
-        return m_observer.websocket_closed_handler(was_clean, status);
+        if (auto observer = m_observer.lock())
+            return observer->websocket_closed_handler(was_clean, status);
+        else
+            return true;
     }
 
 private:
-    sync::WebSocketObserver& m_observer;
+    // Keep a weak ptr in case the Observer is destroyed before the callback is called
+    std::weak_ptr<sync::WebSocketObserver> m_observer;
 };
 
 struct CAPISyncSocketProvider : sync::SyncSocketProvider {
@@ -165,11 +174,11 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         m_free(m_userdata);
     }
 
-    std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+    std::shared_ptr<sync::WebSocketInterface> connect(const std::shared_ptr<sync::WebSocketObserver>& observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
-        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(*observer);
-        return std::make_unique<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
+        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(observer);
+        return std::make_shared<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
                                                m_websocket_free, new realm_websocket_observer_t(capi_observer),
                                                std::move(endpoint));
     }

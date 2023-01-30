@@ -67,7 +67,7 @@ struct ErrorTryAgainBackoffInfo {
     util::Optional<sync::ProtocolError> triggering_error;
 };
 
-class ClientImpl {
+class ClientImpl : public std::enable_shared_from_this<ClientImpl> {
 public:
     enum class ConnectionTerminationReason;
     class Connection;
@@ -131,7 +131,8 @@ public:
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
-    ClientImpl(ClientConfig);
+    ClientImpl(ClientConfig config, const std::shared_ptr<util::Logger>& logger_p,
+               SyncSocketProvider* socket_provider);
     ~ClientImpl();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
@@ -152,6 +153,9 @@ public:
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
     std::mt19937_64& get_random() noexcept;
+
+    static std::string make_user_agent_string(ClientConfig&);
+    bool shutting_down();
 
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
@@ -176,7 +180,7 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
-    std::shared_ptr<SyncSocketProvider> m_socket_provider;
+    SyncSocketProvider* m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
     const bool m_one_connection_per_session;
@@ -197,11 +201,11 @@ private:
     // to the client.
     struct ServerSlot {
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
-        std::unique_ptr<ClientImpl::Connection> connection;
+        std::shared_ptr<ClientImpl::Connection> connection;
 
         // Used instead of `connection` when `m_one_connection_per_session` is
         // true.
-        std::map<connection_ident_type, std::unique_ptr<ClientImpl::Connection>> alt_connections;
+        std::map<connection_ident_type, std::shared_ptr<ClientImpl::Connection>> alt_connections;
     };
 
     // Must be accessed only by event loop thread
@@ -231,6 +235,9 @@ private:
 
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
+
+    // Lazy create the m_actualize_and_finalize trigger (outside of the constructor)
+    Trigger<SyncSocketProvider>& get_actualize_and_finalize_trigger();
 
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
@@ -267,8 +274,6 @@ private:
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
-
-    static std::string make_user_agent_string(ClientConfig&);
 
     session_ident_type get_next_session_ident() noexcept;
 
@@ -316,7 +321,8 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 
 // TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
-class ClientImpl::Connection final : public WebSocketObserver {
+class ClientImpl::Connection final : public WebSocketObserver,
+                                     public std::enable_shared_from_this<ClientImpl::Connection> {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -438,6 +444,9 @@ private:
     /// associated client object.
     void on_idle();
 
+    // Lazy create the m_on_idle trigger (outside of the constructor)
+    Trigger<SyncSocketProvider>& get_on_idle_trigger();
+
     std::string get_http_request_path() const;
 
     void initiate_reconnect_wait();
@@ -499,7 +508,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<WebSocketInterface> m_websocket;
+    std::shared_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -1222,12 +1231,13 @@ inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInf
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept
 {
-    REALM_ASSERT(m_on_idle);
+    logger.debug("Connection disconnected: %1:%2%3", m_address, m_port, get_http_request_path());
+
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
-        m_on_idle->trigger();
+        get_on_idle_trigger().trigger();
 
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     if (m_disconnect_delay_in_progress) {

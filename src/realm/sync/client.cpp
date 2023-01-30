@@ -2,6 +2,7 @@
 #include <memory>
 #include <tuple>
 #include <atomic>
+#include <iostream>
 
 #include "realm/sync/client_base.hpp"
 #include "realm/sync/protocol.hpp"
@@ -396,9 +397,6 @@ ClientImpl::~ClientImpl()
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
 
-    // thread to exit before tearing down the client.
-    m_socket_provider->stop(true);
-
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
     REALM_ASSERT(m_unactualized_session_wrappers.empty());
@@ -408,15 +406,20 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    post([this](Status status) {
+    post([self = weak_from_this()](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        for (auto& p : m_server_slots) {
+        auto client_impl = self.lock();
+        if (!client_impl) {
+            std::cerr << "ClientImpl::cancel_reconnect_delay - clientimpl is null" << std::endl;
+            return;
+        }
+        for (auto& p : client_impl->m_server_slots) {
             ServerSlot& slot = p.second;
-            if (m_one_connection_per_session) {
+            if (client_impl->m_one_connection_per_session) {
                 REALM_ASSERT(!slot.connection);
                 for (const auto& p : slot.alt_connections) {
                     ClientImpl::Connection& conn = *p.second;
@@ -466,15 +469,22 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    post([this](Status status) mutable {
+    post([self = weak_from_this()](Status status) mutable {
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        util::LockGuard lock{m_mutex};
-        m_sessions_terminated = true;
-        m_wait_or_client_stopped_cond.notify_all();
+        auto client_impl = self.lock();
+        if (!client_impl) {
+            std::cerr << "ClientImpl::wait_for_session_terminations_or_client_stopped - clientimpl is null"
+                      << std::endl;
+            return;
+        }
+
+        util::LockGuard lock{client_impl->m_mutex};
+        client_impl->m_sessions_terminated = true;
+        client_impl->m_wait_or_client_stopped_cond.notify_all();
     }); // Throws
 
     bool completion_condition_was_satisfied;
@@ -497,19 +507,16 @@ void ClientImpl::stop() noexcept
         m_stopped = true;
         m_wait_or_client_stopped_cond.notify_all();
     }
-    // TODO: in the future we will need to block here until all the sessions have been torn down
-    m_socket_provider->stop();
 }
 
 
 void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, ServerEndpoint endpoint)
 {
     // Thread safety required.
-
     util::LockGuard lock{m_mutex};
-    REALM_ASSERT(m_actualize_and_finalize);
+
     m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
-    bool retrigger = !m_actualize_and_finalize_needed;
+    bool retrigger = !m_actualize_and_finalize_needed && !m_stopped;
     m_actualize_and_finalize_needed = true;
     // The conditional triggering needs to happen before releasing the mutex,
     // because if two threads call register_unactualized_session_wrapper()
@@ -521,16 +528,14 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
     if (retrigger)
-        m_actualize_and_finalize->trigger();
+        get_actualize_and_finalize_trigger().trigger();
 }
 
 
 void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
     // Thread safety required.
-
     util::LockGuard lock{m_mutex};
-    REALM_ASSERT(m_actualize_and_finalize);
 
     // If the session wrapper has not yet been actualized (on the event loop
     // thread), it can be immediately finalized. This ensures that we will
@@ -543,13 +548,13 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
         return;
     }
     m_abandoned_session_wrappers.push(std::move(wrapper));
-    bool retrigger = !m_actualize_and_finalize_needed;
+    bool retrigger = !m_actualize_and_finalize_needed && !m_stopped;
     m_actualize_and_finalize_needed = true;
     // The conditional triggering needs to happen before releasing the
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
     if (retrigger)
-        m_actualize_and_finalize->trigger();
+        get_actualize_and_finalize_trigger().trigger();
 }
 
 
@@ -597,7 +602,7 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
     // Create a new connection
     REALM_ASSERT(!server_slot.connection);
     connection_ident_type ident = m_prev_connection_ident + 1;
-    std::unique_ptr<ClientImpl::Connection> conn_2 = std::make_unique<ClientImpl::Connection>(
+    std::shared_ptr<ClientImpl::Connection> conn_2 = std::make_shared<ClientImpl::Connection>(
         *this, ident, std::move(endpoint), authorization_header_name, custom_http_headers,
         verify_servers_ssl_certificate, std::move(ssl_trust_certificate_path), std::move(ssl_verify_callback),
         std::move(proxy_config), server_slot.reconnect_info,
@@ -619,7 +624,12 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 {
     const ServerEndpoint& endpoint = conn.get_server_endpoint();
     auto i = m_server_slots.find(endpoint);
-    REALM_ASSERT(i != m_server_slots.end()); // Must be found
+
+    // Must be found unless shutting down
+    if (REALM_UNLIKELY(i == m_server_slots.end() && shutting_down()))
+        return;
+
+    REALM_ASSERT(i != m_server_slots.end());
     ServerSlot& server_slot = i->second;
     if (!m_one_connection_per_session) {
         REALM_ASSERT(server_slot.alt_connections.empty());
@@ -1735,19 +1745,32 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_authorization_header_name{authorization_header_name} // DEPRECATED
     , m_custom_http_headers{custom_http_headers}             // DEPRECATED
 {
-    m_on_idle = m_client.create_trigger([this](Status status) {
-        if (status == ErrorCodes::OperationAborted)
-            return;
-        else if (!status.is_ok())
-            throw ExceptionForStatus(status);
-
-        REALM_ASSERT(m_activated);
-        if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    });
 }
+
+
+Trigger<SyncSocketProvider>& ClientImpl::Connection::get_on_idle_trigger()
+{
+    if (!m_on_idle) {
+        m_on_idle = m_client.create_trigger([self = weak_from_this()](Status status) {
+            if (status == ErrorCodes::OperationAborted)
+                return;
+            else if (!status.is_ok())
+                throw ExceptionForStatus(status);
+
+            auto conn = self.lock();
+            if (!conn)
+                return; // reaturn early
+
+            REALM_ASSERT(conn->m_activated);
+            if (conn->m_state == ConnectionState::disconnected && conn->m_num_active_sessions == 0) {
+                conn->on_idle(); // Throws
+                // Connection object may be destroyed now.
+            }
+        });
+    }
+    return *m_on_idle;
+}
+
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
 {
@@ -1821,7 +1844,15 @@ void ClientImpl::Connection::report_connection_state_change(ConnectionState stat
 
 
 Client::Client(Config config)
-    : m_impl{new ClientImpl{std::move(config)}} // Throws
+    : m_logger_ptr{config.logger ? config.logger : std::make_shared<util::StderrLogger>()}
+    , m_socket_provider{[&]() -> std::shared_ptr<SyncSocketProvider> {
+        if (config.socket_provider)
+            return config.socket_provider;
+
+        return std::make_shared<websocket::DefaultSocketProvider>(m_logger_ptr,
+                                                                  ClientImpl::make_user_agent_string(config));
+    }()}
+    , m_impl{new ClientImpl{std::move(config), m_logger_ptr, m_socket_provider.get()}} // Throws
 {
 }
 

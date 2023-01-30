@@ -1404,30 +1404,33 @@ public:
 
     on_time_progressed : {
         clock::time_point now = clock::now();
-        if (process_timers(now))
-            goto on_operations_completed;
+        {
+            LockGuard lock{m_mutex};
+            if (process_timers(now))
+                goto on_operations_completed;
 
-        bool no_incomplete_operations =
-            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
-        if (no_incomplete_operations) {
-            // We can only get to this point when there are no completion
-            // handlers ready to execute. It happens either because of a
-            // fall-through from on_operations_completed, or because of a
-            // jump to on_time_progressed, but that only happens if no
-            // completions handlers became ready during
-            // wait_and_process_io().
-            //
-            // We can also only get to this point when there are no
-            // asynchronous operations in progress (due to the preceeding
-            // if-condition.
-            //
-            // It is possible that an other thread has added new post
-            // operations since we checked, but there is really no point in
-            // rechecking that, as it is always possible, even after a
-            // recheck, that new post handlers get added after we decide to
-            // return, but before we actually do return. Also, if would
-            // offer no additional guarantees to the application.
-            return; // Out of work
+            bool no_incomplete_operations =
+                (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
+            if (no_incomplete_operations) {
+                // We can only get to this point when there are no completion
+                // handlers ready to execute. It happens either because of a
+                // fall-through from on_operations_completed, or because of a
+                // jump to on_time_progressed, but that only happens if no
+                // completions handlers became ready during
+                // wait_and_process_io().
+                //
+                // We can also only get to this point when there are no
+                // asynchronous operations in progress (due to the preceeding
+                // if-condition.
+                //
+                // It is possible that an other thread has added new post
+                // operations since we checked, but there is really no point in
+                // rechecking that, as it is always possible, even after a
+                // recheck, that new post handlers get added after we decide to
+                // return, but before we actually do return. Also, if would
+                // offer no additional guarantees to the application.
+                return; // Out of work
+            }
         }
 
         // Blocking wait for I/O
@@ -1477,6 +1480,7 @@ public:
 
     void add_wait_oper(LendersWaitOperPtr op)
     {
+        LockGuard lock{m_mutex};
         m_wait_operations.push(std::move(op)); // Throws
     }
 
@@ -1557,6 +1561,7 @@ public:
 
     void cancel_incomplete_wait_oper(WaitOperBase& op) noexcept
     {
+        LockGuard lock{m_mutex};
         auto p = std::equal_range(m_wait_operations.begin(), m_wait_operations.end(), op.m_expiration_time,
                                   WaitOperCompare{});
         auto pred = [&op](const LendersWaitOperPtr& op_2) {
@@ -1608,6 +1613,7 @@ private:
 
     bool process_timers(clock::time_point now)
     {
+        // Mutex is locked before entering this function
         bool any_operations_completed = false;
         for (;;) {
             if (m_wait_operations.empty())
@@ -1625,8 +1631,12 @@ private:
     bool wait_and_process_io(clock::time_point now, bool& interrupted)
     {
         clock::time_point timeout;
-        if (!m_wait_operations.empty())
-            timeout = m_wait_operations.top()->m_expiration_time;
+
+        {
+            LockGuard lock{m_mutex};
+            if (!m_wait_operations.empty())
+                timeout = m_wait_operations.top()->m_expiration_time;
+        }
         bool operations_completed = io_reactor.wait_and_advance(timeout, now, interrupted,
                                                                 m_completed_operations); // Throws
         return operations_completed;
