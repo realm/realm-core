@@ -763,27 +763,27 @@ private:
         }
     }
 
-    void mark_page_for_writing(uint64_t page_number)
+    void mark_page_for_writing(uint64_t page_offset)
     {
-        m_info->writing_page = page_number + 1;
+        m_info->writing_page_offset = page_offset + 1;
         m_info->write_counter++;
     }
     void clear_writing_marker()
     {
         m_info->write_counter++;
-        m_info->writing_page = 0;
+        m_info->writing_page_offset = 0;
     }
     // returns false if no page is marked.
-    // if a page is marked, returns true and optionally the number of the page marked for writing
+    // if a page is marked, returns true and optionally the offset of the page marked for writing
     // in all cases returns optionally the write counter
-    bool observe_writer(uint64_t* page_number, uint64_t* write_counter)
+    bool observe_writer(uint64_t* page_offset, uint64_t* write_counter)
     {
         if (write_counter) {
             *write_counter = m_info->write_counter;
         }
-        uint64_t marked = m_info->writing_page;
-        if (marked && page_number) {
-            *page_number = marked - 1;
+        uint64_t marked = m_info->writing_page_offset;
+        if (marked && page_offset) {
+            *page_offset = marked - 1;
         }
         return marked != 0;
     }
