@@ -61,6 +61,7 @@ struct BindingCallbackThreadObserver {
     // Returns true if the global binding callback thread observer is set, otherwise false
     static bool has_global_thread_observer()
     {
+        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
         return bool(BindingCallbackThreadObserver::m_instance);
     }
 
@@ -95,17 +96,20 @@ struct BindingCallbackThreadObserver {
     };
 
     // This method is called just before the thread is started
-    // This takes an optional reference to an observer_ptr and decides whether to use the passed in or global observer
+    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
+    // global thread observer will be used.
     static void call_did_create_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
 
     // This method is called just before the thread is being destroyed
-    // This takes an optional reference to an observer_ptr and decides whether to use the passed in or global observer
+    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
+    // global thread observer will be used.
     static void
     call_will_destroy_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
 
     // This method is called with any exception thrown by client.run().
-    // This takes an optional reference to an observer_ptr and decides whether to use the passed in or global observer
-    // Returns true if the exception was passed along otherwise false.
+    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
+    // global thread observer will be used.
+    // Return true if the exception was handled by this function, otherwise false
     static bool call_handle_error(const std::exception& e,
                                   const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
 

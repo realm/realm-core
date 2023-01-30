@@ -85,12 +85,13 @@ public:
     virtual ~CBindingThreadObserver() = default;
 
     // For testing: compare two CBindingThreadObserver instances to see if they have
-    // the same callback functions
+    // the same callback functions and userdata ptr values.
+    // This needed to be added since there are no implicit or default equality operators (until C++20)
     bool operator==(const CBindingThreadObserver& other) const
     {
         return m_create_callback_func == other.m_create_callback_func &&
                m_destroy_callback_func == other.m_destroy_callback_func &&
-               m_error_callback_func == other.m_error_callback_func;
+               m_error_callback_func == other.m_error_callback_func && m_user_data == other.m_user_data;
     }
 
 protected:

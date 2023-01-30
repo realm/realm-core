@@ -5003,16 +5003,26 @@ TEST_CASE("C API - binding callback thread observer") {
             std::string::npos);
     REQUIRE(bcto_user_data->thread_destroy_called);
 
-    realm_release(static_cast<void*>(bcto_token));
+    realm_release(bcto_token);
     REQUIRE(BCTOState::bcto_deleted == true);
     REQUIRE(!BindingCallbackThreadObserver::has_global_thread_observer());
 
     // Check setting the thread observer in SyncClientConfig
+
+    // Some random value - not used, except to verify the raw pointer value
+    realm_userdata_t dummy_userdata = reinterpret_cast<realm_userdata_t>(0x999123);
+
+    // Don't actually delete anything
+    auto dummy_user_data_free = [](realm_userdata_t userdata) {
+        REQUIRE(userdata == reinterpret_cast<realm_userdata_t>(0x999123));
+    };
+
     c_api::CBindingThreadObserver observer(bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
-                                           nullptr, nullptr);
+                                           dummy_userdata, dummy_user_data_free);
     auto config = cptr(realm_sync_client_config_new());
-    realm_sync_client_config_set_default_binding_thread_observer(
-        config.get(), bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error, nullptr, nullptr);
+    realm_sync_client_config_set_default_binding_thread_observer(config.get(), bcto_on_thread_create,
+                                                                 bcto_on_thread_destroy, bcto_on_thread_error,
+                                                                 dummy_userdata, dummy_user_data_free);
     auto observer_ptr =
         static_cast<c_api::CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
     REQUIRE(observer == *observer_ptr);
