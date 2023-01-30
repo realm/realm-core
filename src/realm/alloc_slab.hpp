@@ -120,7 +120,8 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {};
+    struct Retry {
+    };
 
     /// \brief Attach this allocator to the specified file.
     ///
