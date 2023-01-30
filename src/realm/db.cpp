@@ -787,7 +787,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         File::CloseGuard fcg(m_file);
         m_file.set_fifo_path(coordination_dir, "lock.fifo");
 
-        if (m_file.try_lock_exclusive()) { // Throws
+        if (m_file.try_rw_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
 
             // We're alone in the world, and it is Ok to initialize the
@@ -819,12 +819,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
         // if the lock is already open in shared mode, so we work around it by
         // busy waiting. This should occur only briefly during session initialization.
-        while (!m_file.try_lock_shared()) {
+        while (!m_file.try_rw_lock_shared()) {
             sched_yield();
         }
 #else
-        m_file.lock_shared(); // Throws
+        m_file.rw_lock_shared(); // Throws
 #endif
+        File::UnlockGuard ulg(m_file);
+
         // The coordination/management dir is created as a side effect of the lock
         // operation above if needed for lock emulation. But it may also be needed
         // for other purposes, so make sure it exists.
@@ -1234,6 +1236,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
         }
+        ulg.release(); // Do not release shared lock
         break;
     }
 
@@ -1594,7 +1597,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // interleave which is not permitted on Windows. It is permitted on *nix.
         m_file_map.unmap();
         m_version_manager.reset();
-        m_file.unlock();
+        m_file.rw_unlock();
         // info->~SharedInfo(); // DO NOT Call destructor
         m_file.close();
     }
@@ -2315,7 +2318,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock&& callba
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
     lockfile.set_fifo_path(realm_path + ".management", "lock.fifo");
-    if (lockfile.try_lock_exclusive()) { // Throws
+    if (lockfile.try_rw_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
     }
