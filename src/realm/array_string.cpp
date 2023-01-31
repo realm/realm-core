@@ -478,3 +478,50 @@ void ArrayString::verify() const
     }
 #endif
 }
+
+bool ArrayString::verify_cluster(util::Logger& logger, std::vector<unsigned>& path, ref_type ref, Allocator& alloc)
+{
+    bool err = false;
+    Array top(alloc);
+    top.init_from_ref(ref);
+
+    if (top.has_refs()) {
+        path.push_back(0);
+        for (unsigned i = 0; i < top.size(); i++) {
+            path.back() = i;
+            auto val = top.get(i);
+            if (val & 7) {
+                logger.debug("Path %1: Not a ref %2", path, val);
+                err = true;
+            }
+        }
+        path.pop_back();
+        if (!top.get_context_flag() && !err) {
+            if (top.size() != 3) {
+                logger.debug("Path %1: Medium string top array has size %2 ", path, top.size());
+                err = true;
+            }
+            else {
+                Array offs(alloc);
+                Array values(alloc);
+                Array nulls(alloc);
+                offs.init_from_ref(top.get_as_ref(0));
+                values.init_from_ref(top.get_as_ref(1));
+                nulls.init_from_ref(top.get_as_ref(2));
+                if (offs.size() != nulls.size()) {
+                    logger.debug("Path %1: Medium string size mismatch %2 and %3", path, offs.size(), nulls.size());
+                    err = true;
+                }
+                auto sz = offs.size();
+                auto end = (sz > 0) ? size_t(offs.get(sz - 1)) : 0;
+                if (end != values.size()) {
+                    logger.debug("Path %1: Medium string offset/values size mismatch: %2 and %3", path, end,
+                                 values.size());
+                    err = true;
+                }
+            }
+        }
+    }
+
+    return !err;
+}

@@ -23,6 +23,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <realm/util/optional.hpp>
 

@@ -516,6 +516,7 @@ public:
     /// return the file format version.
     static int read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path);
     void verify() const;
+    void verify_cluster(util::Logger& logger) const;
     void validate_primary_columns();
 #ifdef REALM_DEBUG
     void print() const;

@@ -119,6 +119,7 @@ public:
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
+    void verify_cluster(util::Logger&, std::vector<unsigned>&) const override;
 
 private:
     static constexpr size_t s_key_ref_index = 0;
@@ -647,6 +648,65 @@ void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
             ->dump_objects(key_value, lead + "   ");
     }
 }
+
+void ClusterNodeInner::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const
+{
+    size_t sz = node_size();
+    if (m_keys.is_attached()) {
+        if (Node::get_wtype_from_header(get_header_from_data(m_keys.m_data)) != Node::wtype_Bits) {
+            logger.debug("Path %1: Keys array has wrong width type", path);
+        }
+        else {
+            int64_t prev = -1;
+            for (size_t i = 0; i < sz; i++) {
+                auto key = m_keys.get(i);
+                if (int64_t(key) <= prev) {
+                    logger.debug("Path %1: key %2 not bigger than %3", path, key, prev);
+                }
+                prev = key;
+            }
+            // We should have as many nodes below as we have keys
+            if (sz != m_keys.size()) {
+                logger.debug("Path %1: keys size: %2, children: %3", path, m_keys.size(), sz);
+            }
+        }
+    }
+    auto depth = Array::get(s_sub_tree_depth_index);
+    if (!(depth & 1)) {
+        logger.debug("Path %1: tree depth not a value %2", path, depth);
+    }
+    else {
+        depth >>= 1;
+        path.push_back(0);
+        for (unsigned i = 0; i < sz; i++) {
+            path.back() = i + s_first_node_index;
+            auto val = Array::get(path.back());
+            if (val & 7) {
+                logger.debug("Path %1: Not a ref %2", path, val);
+            }
+            else {
+                char* child_header = m_alloc.translate(to_ref(val));
+                bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+                MemRef mem(child_header, to_ref(val), m_alloc);
+                if (child_is_leaf ^ (depth == 1)) {
+                    logger.debug("Path %1: Unbalanced tree", path, val);
+                }
+                if (child_is_leaf) {
+                    Cluster child(0, m_alloc, m_tree_top);
+                    child.init(mem);
+                    child.verify_cluster(logger, path);
+                }
+                else {
+                    ClusterNodeInner child(m_alloc, m_tree_top);
+                    child.init(mem);
+                    child.verify_cluster(logger, path);
+                }
+            }
+        }
+        path.pop_back();
+    }
+}
+
 // LCOV_EXCL_STOP
 void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 {
@@ -1109,6 +1169,11 @@ void ClusterTree::verify() const
         return IteratorControl::AdvanceToNext;
     });
 #endif
+}
+
+void ClusterTree::verify_cluster(util::Logger& logger, std::vector<unsigned>& path) const
+{
+    m_root->verify_cluster(logger, path);
 }
 
 void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
