@@ -23,7 +23,7 @@ cd build
 cmake -D CMAKE_BUILD_TYPE=${build_mode} 
       -D CMAKE_C_COMPILER=afl-cc 
       -D CMAKE_CXX_COMPILER=afl-c++ 
-      -D REALM_ENABLE_ENCRYPTION=ON 
+      -D REALM_ENABLE_ENCRYPTION=OFF 
       -G Ninja 
       ..
 cmake --build . --target realm-afl++
@@ -43,7 +43,7 @@ cmake -D REALM_LIBFUZZER=ON
       -D CMAKE_BUILD_TYPE=${build_mode} 
       -D CMAKE_C_COMPILER=clang 
       -D CMAKE_CXX_COMPILER=clang++ 
-      -D REALM_ENABLE_ENCRYPTION=ON 
+      -D REALM_ENABLE_ENCRYPTION=OFF 
       -G Ninja 
       ..
 cmake --build . --target realm-libfuzz

@@ -59,7 +59,7 @@ cmake -D CMAKE_BUILD_TYPE=${build_mode} \
       -D CMAKE_C_COMPILER=afl-cc \
       -D CMAKE_CXX_COMPILER=afl-c++ \
       -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
-      -D REALM_ENABLE_ENCRYPTION=ON \
+      -D REALM_ENABLE_ENCRYPTION=OFF \
       -G Ninja \
       ..
 

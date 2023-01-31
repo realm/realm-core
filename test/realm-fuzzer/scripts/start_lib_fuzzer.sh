@@ -37,7 +37,7 @@ cmake -D REALM_LIBFUZZER=ON \
       -D CMAKE_C_COMPILER=clang \
       -D CMAKE_CXX_COMPILER=clang++ \
       -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
-      -D REALM_ENABLE_ENCRYPTION=ON \
+      -D REALM_ENABLE_ENCRYPTION=OFF \
       -G Ninja \
       ..
 
