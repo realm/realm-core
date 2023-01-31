@@ -771,6 +771,9 @@ util::Future<void> Connection::do_message_read_loop()
                 return Status{ErrorCodes::RuntimeError, "Invalid message type"};
             }
             handle_message_received(msg.message_data);
+            if (sentinel->destroyed) {
+                return Status::OK();
+            }
             return do_message_read_loop();
         });
 }
