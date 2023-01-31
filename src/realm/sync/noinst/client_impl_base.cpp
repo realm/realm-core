@@ -384,8 +384,9 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 }
 
 
-bool Connection::websocket_binary_message_received(util::Span<const char> data)
+bool Connection::websocket_binary_message_received(util::Span<const char>)
 {
+    /*
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
@@ -395,6 +396,8 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
 
     handle_message_received(data);
     return bool(m_websocket);
+    */
+    return true;
 }
 
 
@@ -666,6 +669,10 @@ void Connection::initiate_reconnect()
 
     m_state = ConnectionState::connecting;
     report_connection_state_change(ConnectionState::connecting); // Throws
+    if (m_websocket_lifecycle_sentinel) {
+        m_websocket_lifecycle_sentinel->destroyed = true;
+        m_websocket_lifecycle_sentinel.reset();
+    }
     m_websocket.reset();
 
     // In most cases, the reconnect delay will be counting from the point in
@@ -698,6 +705,7 @@ void Connection::initiate_reconnect()
         }
     }
 
+    m_websocket_lifecycle_sentinel = util::make_bind<LifetimeSentinel>();
     m_websocket_error_received = false;
     m_websocket = m_client.m_socket_provider->connect(
         this, WebSocketEndpoint{
@@ -747,6 +755,25 @@ void Connection::handle_connect_wait(Status status)
     involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again}); // Throws
 }
 
+util::Future<void> Connection::do_message_read_loop()
+{
+    return m_websocket->async_read_message().then(
+        [this,
+         sentinel = m_websocket_lifecycle_sentinel](StatusWith<WebSocketInterface::Message> sw_msg) -> Future<void> {
+            if (sentinel->destroyed) {
+                return Status::OK();
+            }
+            if (!sw_msg.is_ok()) {
+                return sw_msg.get_status();
+            }
+            auto& msg = sw_msg.get_value();
+            if (msg.op_code != WebSocketInterface::Message::Opcode::binary) {
+                return Status{ErrorCodes::RuntimeError, "Invalid message type"};
+            }
+            handle_message_received(msg.message_data);
+            return do_message_read_loop();
+        });
+}
 
 void Connection::handle_connection_established()
 {
@@ -777,6 +804,19 @@ void Connection::handle_connection_established()
     }
 
     report_connection_state_change(ConnectionState::connected); // Throws
+    do_message_read_loop().get_async([this](Status status) {
+        if (status == ErrorCodes::OperationAborted || status == ErrorCodes::BrokenPromise) {
+            return;
+        }
+        logger.info("Read loop terminated. %1", status);
+        if (!status.is_ok()) {
+            bool was_clean = true;
+            if (status == ErrorCodes::ReadError || status == ErrorCodes::WriteError) {
+                was_clean = false;
+            }
+            websocket_closed_handler(was_clean, status);
+        }
+    });
 }
 
 
@@ -1143,6 +1183,10 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_heartbeat_timer.reset();
     m_previous_ping_rtt = 0;
 
+    if (m_websocket_lifecycle_sentinel) {
+        m_websocket_lifecycle_sentinel->destroyed = true;
+        m_websocket_lifecycle_sentinel.reset();
+    }
     m_websocket.reset();
     m_input_body_buffer.reset();
     m_sending_session = nullptr;

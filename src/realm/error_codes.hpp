@@ -42,6 +42,7 @@ public:
         ConnectionFailed = 10,
         WebSocket_Retry_Error = 11,
         WebSocket_Fatal_Error = 12,
+        ConnectionClosed = 13,
 
         /// WebSocket Errors
         // WebSocket_OK = 1000 is not used, just use OK instead

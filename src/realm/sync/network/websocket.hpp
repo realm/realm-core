@@ -2,7 +2,9 @@
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/span.hpp>
 
 #include <random>
 #include <system_error>
@@ -39,6 +41,9 @@ public:
     virtual void async_read(char* buffer, size_t size, ReadCompletionHandler handler) = 0;
     virtual void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler) = 0;
     //@}
+
+    virtual util::Future<size_t> async_read(util::Span<char> output);
+    virtual util::Future<size_t> async_write(util::Span<const char> input);
 
     /// websocket_handshake_completion_handler() is called when the websocket is connected, .i.e.
     /// after the handshake is done. It is not allowed to send messages on the socket before the
@@ -159,6 +164,14 @@ public:
     void async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler);
     void async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler);
     //@}
+
+    util::Future<void> async_write_binary(util::Span<const char> data);
+
+    struct Message {
+        Opcode op_code;
+        util::Span<const char> message_data;
+    };
+    util::Future<Message> async_read_message();
 
     /// stop() stops the socket. The socket will stop processing incoming data,
     /// sending data, and calling callbacks.  It is an error to attempt to send

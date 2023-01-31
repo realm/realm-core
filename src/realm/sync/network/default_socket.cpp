@@ -38,6 +38,18 @@ public:
         });
     }
 
+    util::Future<void> async_write_binary(util::Span<const char> data) override
+    {
+        return m_websocket.async_write_binary(data);
+    }
+
+    util::Future<Message> async_read_message() override
+    {
+        return m_websocket.async_read_message().then([](websocket::Socket::Message msg) {
+            return Message{static_cast<Message::Opcode>(msg.op_code), msg.message_data};
+        });
+    }
+
     std::string_view get_appservices_request_id() const noexcept override
     {
         return m_app_services_coid;

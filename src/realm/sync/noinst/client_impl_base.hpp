@@ -414,6 +414,9 @@ public:
 
 private:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+    struct LifetimeSentinel : public util::AtomicRefCountBase {
+        bool destroyed = false;
+    };
 
     template <class H>
     void for_each_active_session(H handler);
@@ -459,6 +462,7 @@ private:
     void initiate_write_ping(const OutputBuffer&);
     void handle_write_ping();
     void handle_message_received(util::Span<const char> data);
+    util::Future<void> do_message_read_loop();
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code);
@@ -499,6 +503,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
+    util::bind_ptr<LifetimeSentinel> m_websocket_lifecycle_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;

@@ -27,6 +27,7 @@
 #include <realm/sync/config.hpp>
 
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/span.hpp>
 
@@ -199,6 +200,19 @@ struct WebSocketInterface {
     ///                than OPEN, the handler function should be called with a
     ///                Status of ErrorCodes::RuntimeError.
     virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) = 0;
+    virtual util::Future<void> async_write_binary(util::Span<const char>)
+    {
+        return Status{ErrorCodes::LogicError, "not implemented"};
+    }
+
+    struct Message {
+        enum class Opcode { text = 1, binary = 2, close = 8, ping = 9, pong = 10 } op_code;
+        util::Span<const char> message_data;
+    };
+    virtual util::Future<Message> async_read_message()
+    {
+        return Status{ErrorCodes::LogicError, "not implemented"};
+    }
 };
 
 

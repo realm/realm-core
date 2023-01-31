@@ -300,6 +300,11 @@ public:
         m_stage = Stage::init;
     }
 
+    util::Span<char> read_into() const noexcept
+    {
+        return util::Span<char>(read_buffer, read_size);
+    }
+
     // next() parses the new information and moves
     // one stage forward.
     void next()
@@ -706,12 +711,68 @@ public:
         m_config.async_write(m_write_buffer.data(), message_size, handler);
     }
 
-    void handle_write_message()
+    util::Future<void> async_write_binary(util::Span<const char> data)
+    {
+        REALM_ASSERT(!m_stopped);
+
+        bool mask = m_is_client;
+
+        // 14 is the maximum header length of a Websocket frame.
+        size_t required_size = data.size() + 14;
+        if (m_write_buffer.size() < required_size)
+            m_write_buffer.resize(required_size);
+        size_t message_size = make_frame(true, static_cast<int>(websocket::Opcode::binary), mask, data.data(),
+                                         data.size(), m_write_buffer.data(), m_config.websocket_get_random());
+
+        util::Span<const char> frame_data(m_write_buffer.data(), message_size);
+        return m_config.async_write(frame_data)
+            .then([this](size_t) {
+                shrink_write_buffer();
+                return Status::OK();
+            })
+            .on_error([this](Status status) {
+                if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
+                    stop();
+                }
+                return status;
+            });
+    }
+
+    util::Future<websocket::Socket::Message> async_read_binary()
+    {
+        return do_next_frame_reader_future().then([this](size_t) -> util::Future<websocket::Socket::Message> {
+            websocket::Socket::Message ret;
+            switch (m_frame_reader.delivery_opcode) {
+                case websocket::Opcode::text:
+                case websocket::Opcode::binary:
+                case websocket::Opcode::ping:
+                case websocket::Opcode::pong:
+                    ret.op_code = m_frame_reader.delivery_opcode;
+                    ret.message_data =
+                        util::Span<const char>(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    return ret;
+                case websocket::Opcode::close: {
+                    auto [error_code, error_message] =
+                        parse_close_message(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    return Status{static_cast<ErrorCodes::Error>(error_code.value()), error_message};
+                }
+                default:
+                    REALM_UNREACHABLE();
+            }
+            REALM_UNREACHABLE();
+        });
+    }
+
+    void shrink_write_buffer()
     {
         if (m_write_buffer.size() > s_write_buffer_stable_size) {
             m_write_buffer.resize(s_write_buffer_stable_size);
             m_write_buffer.shrink_to_fit();
         }
+    }
+    void handle_write_message()
+    {
+        shrink_write_buffer();
 
         auto handler = std::move(m_write_completion_handler);
         m_write_completion_handler = nullptr;
@@ -866,11 +927,6 @@ private:
         }
 
         m_config.websocket_handshake_completion_handler(response.headers);
-
-        if (m_stopped)
-            return;
-
-        frame_reader_loop();
     }
 
     void handle_http_request_received(HTTPRequest request)
@@ -949,6 +1005,34 @@ private:
 
         std::error_code error_code_with_category{error_code, websocket::websocket_close_status_category()};
         return std::make_pair(error_code_with_category, error_message);
+    }
+
+    util::Future<size_t> do_next_frame_reader_future()
+    {
+        m_frame_reader.next();
+        if (m_frame_reader.protocol_error) {
+            return Status{ErrorCodes::WebSocket_ProtocolError, "Error decoding websocket frame"};
+        }
+
+        if (m_frame_reader.delivery_ready) {
+            return 0; // end the future loop
+        }
+
+        // otherwise read again
+        return m_config.async_read(m_frame_reader.read_into())
+            .then([this](size_t) {
+                return do_next_frame_reader_future();
+            })
+            .on_completion([this](StatusWith<size_t> result) -> StatusWith<size_t> {
+                if (result.is_ok()) {
+                    return result;
+                }
+                const auto& status = result.get_status();
+                if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
+                    stop();
+                }
+                return status;
+            });
     }
 
     // frame_reader_loop() uses the frame_reader to read and process the incoming
@@ -1118,6 +1202,53 @@ class CloseStatusErrorCategory : public std::error_category {
 
 } // unnamed namespace
 
+util::Future<size_t> websocket::Config::async_read(util::Span<char> output)
+{
+    auto&& [promise, future] = util::make_promise_future<size_t>();
+    async_read(output.data(), output.size(), [promise = std::move(promise)](std::error_code ec, size_t n) mutable {
+        if (ec) {
+            auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
+                                         ec == util::error::make_error_code(util::error::broken_pipe) ||
+                                         ec == util::make_error_code(util::MiscExtErrors::end_of_input));
+            if (is_socket_closed_err) {
+                promise.set_error({ErrorCodes::ConnectionClosed, ec.message()});
+            }
+            else if (ec == util::error::operation_aborted) {
+                promise.set_error({ErrorCodes::OperationAborted, ec.message()});
+            }
+            else {
+                promise.set_error({ErrorCodes::ReadError, ec.message()});
+            }
+            return;
+        }
+        promise.emplace_value(n);
+    });
+    return std::move(future);
+}
+
+util::Future<size_t> websocket::Config::async_write(util::Span<const char> input)
+{
+    auto&& [promise, future] = util::make_promise_future<size_t>();
+    async_write(input.data(), input.size(), [promise = std::move(promise)](std::error_code ec, size_t n) mutable {
+        if (ec) {
+            auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
+                                         ec == util::error::make_error_code(util::error::broken_pipe) ||
+                                         ec == util::make_error_code(util::MiscExtErrors::end_of_input));
+            if (is_socket_closed_err) {
+                promise.set_error({ErrorCodes::ConnectionClosed, ec.message()});
+            }
+            else if (ec == util::error::operation_aborted) {
+                promise.set_error({ErrorCodes::OperationAborted, ec.message()});
+            }
+            else {
+                promise.set_error({ErrorCodes::WriteError, ec.message()});
+            }
+            return;
+        }
+        promise.emplace_value(n);
+    });
+    return std::move(future);
+}
 
 bool websocket::Config::websocket_text_message_received(const char*, size_t)
 {
@@ -1210,6 +1341,16 @@ void websocket::Socket::async_write_ping(const char* data, size_t size, util::Un
 void websocket::Socket::async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
     async_write_frame(true, Opcode::pong, data, size, std::move(handler));
+}
+
+util::Future<void> websocket::Socket::async_write_binary(util::Span<const char> data)
+{
+    return m_impl->async_write_binary(data);
+}
+
+util::Future<websocket::Socket::Message> websocket::Socket::async_read_message()
+{
+    return m_impl->async_read_binary();
 }
 
 void websocket::Socket::stop() noexcept
