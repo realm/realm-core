@@ -43,10 +43,10 @@ struct CollectionNotificationsCallback {
     }
 };
 
-KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
+std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
-    KeyPathArray ret;
     if (key_path_array) {
+        KeyPathArray ret;
         for (size_t i = 0; i < key_path_array->nb_elements; i++) {
             realm_key_path_t* key_path = key_path_array->paths + i;
             ret.emplace_back();
@@ -56,8 +56,9 @@ KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
                 kp.emplace_back(TableKey(path_elem->object), ColKey(path_elem->property));
             }
         }
+        return ret;
     }
-    return ret;
+    return std::nullopt;
 }
 
 } // namespace
@@ -180,7 +181,8 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
 
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t* changes,
                                                       size_t* out_num_deletions, size_t* out_num_insertions,
-                                                      size_t* out_num_modifications, size_t* out_num_moves)
+                                                      size_t* out_num_modifications, size_t* out_num_moves,
+                                                      bool* out_collection_was_cleared)
 {
     // FIXME: This has O(n) performance, which seems ridiculous.
 
@@ -192,6 +194,8 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
         *out_num_modifications = changes->modifications.count();
     if (out_num_moves)
         *out_num_moves = changes->moves.size();
+    if (out_collection_was_cleared)
+        *out_collection_was_cleared = changes->collection_was_cleared;
 }
 
 static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)

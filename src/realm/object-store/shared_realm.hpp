@@ -104,6 +104,7 @@ struct RealmConfig {
 
     bool in_memory = false;
     SchemaMode schema_mode = SchemaMode::Automatic;
+    SchemaSubsetMode schema_subset_mode = SchemaSubsetMode::Strict;
 
     // Optional schema for the file.
     // If the schema and schema version are supplied, update_schema() is
@@ -242,7 +243,6 @@ public:
     {
         return m_schema_version;
     }
-
 
     void begin_transaction();
     void commit_transaction();
@@ -475,6 +475,11 @@ public:
             realm.run_writes();
         }
 
+        static void copy_schema(Realm& target_realm, const Realm& source_realm)
+        {
+            target_realm.copy_schema_from(source_realm);
+        }
+
         // CollectionNotifier needs to be able to access the owning
         // coordinator to wake up the worker thread when a callback is
         // added, and coordinators need to be able to get themselves from a Realm
@@ -554,6 +559,7 @@ private:
     void cache_new_schema();
     void translate_schema_error();
     void notify_schema_changed();
+    void copy_schema_from(const Realm&);
 
     Transaction& transaction();
     Transaction& transaction() const;

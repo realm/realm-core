@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -29,7 +30,19 @@
 #include "types.hpp"
 #include "util.hpp"
 
+
+realm_async_open_task_progress_notification_token::~realm_async_open_task_progress_notification_token()
+{
+    task->unregister_download_progress_notifier(token);
+}
+
+realm_sync_session_connection_state_notification_token::~realm_sync_session_connection_state_notification_token()
+{
+    session->unregister_connection_change_callback(token);
+}
+
 namespace realm::c_api {
+
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::Encryption) ==
@@ -59,6 +72,7 @@ static_assert(realm_sync_session_state_e(SyncSession::State::Dying) == RLM_SYNC_
 static_assert(realm_sync_session_state_e(SyncSession::State::Inactive) == RLM_SYNC_SESSION_STATE_INACTIVE);
 static_assert(realm_sync_session_state_e(SyncSession::State::WaitingForAccessToken) ==
               RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN);
+static_assert(realm_sync_session_state_e(SyncSession::State::Paused) == RLM_SYNC_SESSION_STATE_PAUSED);
 
 static_assert(realm_sync_connection_state_e(SyncSession::ConnectionState::Disconnected) ==
               RLM_SYNC_CONNECTION_STATE_DISCONNECTED);
@@ -227,20 +241,22 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found) ==
+              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found_try_again) ==
+              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_data) == RLM_SYNC_ERROR_RESOLVE_NO_DATA);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_recovery) == RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::service_not_found) ==
+              RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND);
+static_assert(realm_sync_error_resolve_e(network::ResolveErrors::socket_type_not_supported) ==
+              RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+
 } // namespace
 
-static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
+realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
-
-    // HACK: there isn't a good way to get a hold of "our" system category
-    // so we have to make one of "our" error codes to access it
-    const std::error_category* realm_basic_system_category;
-    {
-        using namespace realm::util::error;
-        std::error_code dummy = make_error_code(basic_system_errors::invalid_argument);
-        realm_basic_system_category = &dummy.category();
-    }
 
     const std::error_category& category = error_code.category();
     if (category == realm::sync::client_error_category()) {
@@ -254,8 +270,11 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
             ret.category = RLM_SYNC_ERROR_CATEGORY_CONNECTION;
         }
     }
-    else if (category == std::system_category() || category == *realm_basic_system_category) {
+    else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
+    }
+    else if (category == realm::sync::network::resolve_error_category()) {
+        ret.category = RLM_SYNC_ERROR_CATEGORY_RESOLVE;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
@@ -269,25 +288,26 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     return ret;
 }
 
-static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
+void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, std::error_code* error_code_out)
 {
-    auto error = std::error_code();
-    const realm_sync_error_category_e category = sync_error_code.category;
-    if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
-        error.assign(sync_error_code.value, realm::sync::client_error_category());
+    if (error_code_out) {
+        const realm_sync_error_category_e category = sync_error_code.category;
+        if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
+            error_code_out->assign(sync_error_code.value, realm::sync::client_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
+            error_code_out->assign(sync_error_code.value, realm::sync::protocol_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
+            error_code_out->assign(sync_error_code.value, std::system_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
+            error_code_out->assign(sync_error_code.value, realm::sync::network::resolve_error_category());
+        }
+        else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
+            error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
+        }
     }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
-        error.assign(sync_error_code.value, realm::sync::protocol_error_category());
-    }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
-        error.assign(sync_error_code.value, std::system_category());
-    }
-    else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
-        using namespace realm::util::error;
-        std::error_code dummy = make_error_code(basic_system_errors::invalid_argument);
-        error.assign(sync_error_code.value, dummy.category());
-    }
-    return error;
 }
 
 static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
@@ -435,6 +455,15 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.user_info_map = c_user_info.data();
         c_error.user_info_length = c_user_info.size();
 
+        std::vector<realm_sync_error_compensating_write_info_t> c_compensating_writes;
+        for (const auto& compensating_write : error.compensating_writes_info) {
+            c_compensating_writes.push_back({compensating_write.reason.c_str(),
+                                             compensating_write.object_name.c_str(),
+                                             to_capi(compensating_write.primary_key)});
+        }
+        c_error.compensating_writes = c_compensating_writes.data();
+        c_error.compensating_writes_length = c_compensating_writes.size();
+
         realm_sync_session_t c_session(session);
         handler(userdata.get(), &c_session, std::move(c_error));
     };
@@ -495,41 +524,41 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
 RLM_API realm_object_id_t realm_sync_subscription_id(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->id());
+    return to_capi(subscription->id);
 }
 
 RLM_API realm_string_t realm_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->name());
+    return to_capi(subscription->name);
 }
 
 RLM_API realm_string_t
 realm_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->object_class_name());
+    return to_capi(subscription->object_class_name);
 }
 
 RLM_API realm_string_t
 realm_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->query_string());
+    return to_capi(subscription->query_string);
 }
 
 RLM_API realm_timestamp_t
 realm_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->created_at());
+    return to_capi(subscription->created_at);
 }
 
 RLM_API realm_timestamp_t
 realm_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->updated_at());
+    return to_capi(subscription->updated_at);
 }
 
 RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t* config,
@@ -642,10 +671,10 @@ realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t* su
                                      const char* name) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(name);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(name);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t(*it);
+    return new realm_flx_sync_subscription_t(*ptr);
 }
 
 RLM_API realm_flx_sync_subscription_t*
@@ -654,10 +683,10 @@ realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*
 {
     REALM_ASSERT(subscription_set != nullptr);
     auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
-    auto it = subscription_set->find(realm_query);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(realm_query);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t{*it};
+    return new realm_flx_sync_subscription_t{*ptr};
 }
 
 RLM_API realm_flx_sync_subscription_t*
@@ -678,10 +707,10 @@ realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t* s
 {
     REALM_ASSERT(subscription_set != nullptr);
     auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
-    auto it = subscription_set->find(realm_query);
-    if (it == subscription_set->end())
+    auto ptr = subscription_set->find(realm_query);
+    if (!ptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t(*it);
+    return new realm_flx_sync_subscription_t(*ptr);
 }
 
 RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t* subscription_set)
@@ -750,7 +779,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
     *erased = false;
     return wrap_err([&] {
         auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
-            return from_capi(*id) == sub.id();
+            return from_capi(*id) == sub.id;
         });
         if (it != subscription_set->end()) {
             subscription_set->erase(it);
@@ -766,10 +795,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_su
     REALM_ASSERT(subscription_set != nullptr && name != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(name); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(name);
         return true;
     });
 }
@@ -781,10 +807,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
     *erased = false;
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
-        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(realm_query);
         return true;
     });
 }
@@ -796,10 +819,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     *erased = false;
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
-        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase(realm_query);
         return true;
     });
 }
@@ -842,21 +862,18 @@ RLM_API void realm_async_open_task_cancel(realm_async_open_task_t* task) noexcep
     (*task)->cancel();
 }
 
-RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
-    realm_async_open_task_t* task, realm_sync_progress_func_t notifier, realm_userdata_t userdata,
-    realm_free_userdata_func_t userdata_free) noexcept
+RLM_API realm_async_open_task_progress_notification_token_t*
+realm_async_open_task_register_download_progress_notifier(realm_async_open_task_t* task,
+                                                          realm_sync_progress_func_t notifier,
+                                                          realm_userdata_t userdata,
+                                                          realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
                                                                                            uint64_t transferrable) {
         notifier(userdata.get(), transferred, transferrable);
     };
-    return (*task)->register_download_progress_notifier(std::move(cb));
-}
-
-RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t* task,
-                                                                         uint64_t token) noexcept
-{
-    (*task)->unregister_download_progress_notifier(token);
+    auto token = (*task)->register_download_progress_notifier(std::move(cb));
+    return new realm_async_open_task_progress_notification_token_t{(*task), token};
 }
 
 RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t* realm) noexcept
@@ -896,57 +913,50 @@ RLM_API const char* realm_sync_session_get_file_path(const realm_sync_session_t*
 
 RLM_API void realm_sync_session_pause(realm_sync_session_t* session) noexcept
 {
-    (*session)->log_out();
+    (*session)->pause();
 }
 
 RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 {
-    (*session)->revive_if_needed();
+    (*session)->resume();
 }
 
-RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char* sync_path) noexcept
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path,
+                                                     bool* did_run) noexcept
 {
     return wrap_err([&]() {
-        return (*app)->sync_manager()->immediately_run_file_actions(sync_path);
+        *did_run = (*realm_app)->sync_manager()->immediately_run_file_actions(sync_path);
+        return true;
     });
 }
 
-RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
-    realm_sync_session_t* session, realm_sync_connection_state_changed_func_t callback, realm_userdata_t userdata,
-    realm_free_userdata_func_t userdata_free) noexcept
+RLM_API realm_sync_session_connection_state_notification_token_t*
+realm_sync_session_register_connection_state_change_callback(realm_sync_session_t* session,
+                                                             realm_sync_connection_state_changed_func_t callback,
+                                                             realm_userdata_t userdata,
+                                                             realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ConnectionStateChangeCallback> cb =
         [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](auto old_state, auto new_state) {
             callback(userdata.get(), realm_sync_connection_state_e(old_state),
                      realm_sync_connection_state_e(new_state));
         };
-    return (*session)->register_connection_change_callback(std::move(cb));
+    auto token = (*session)->register_connection_change_callback(std::move(cb));
+    return new realm_sync_session_connection_state_notification_token_t{(*session), token};
 }
 
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
-                                                                            uint64_t token) noexcept
-{
-    (*session)->unregister_connection_change_callback(token);
-}
-
-RLM_API uint64_t realm_sync_session_register_progress_notifier(realm_sync_session_t* session,
-                                                               realm_sync_progress_func_t notifier,
-                                                               realm_sync_progress_direction_e direction,
-                                                               bool is_streaming, realm_userdata_t userdata,
-                                                               realm_free_userdata_func_t userdata_free) noexcept
+RLM_API realm_sync_session_connection_state_notification_token_t* realm_sync_session_register_progress_notifier(
+    realm_sync_session_t* session, realm_sync_progress_func_t notifier, realm_sync_progress_direction_e direction,
+    bool is_streaming, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
         [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
                                                                                      uint64_t transferrable) {
             notifier(userdata.get(), transferred, transferrable);
         };
-    return (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
-                                                  is_streaming);
-}
-
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session, uint64_t token) noexcept
-{
-    (*session)->unregister_progress_notifier(token);
+    auto token = (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),
+                                                        is_streaming);
+    return new realm_sync_session_connection_state_notification_token_t{(*session), token};
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
@@ -993,7 +1003,8 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     REALM_ASSERT(session);
     realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
                                        error_message};
-    auto err = sync_error_to_error_code(sync_error);
+    std::error_code err;
+    sync_error_to_error_code(sync_error, &err);
     SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
 }
 

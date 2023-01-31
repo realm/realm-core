@@ -517,9 +517,6 @@ public:
     bool is_same_file(const File&) const;
     static bool is_same_file_static(FileDesc f1, FileDesc f2);
 
-    // FIXME: Get rid of this method
-    bool is_removed() const;
-
     /// Resolve the specified path against the specified base directory.
     ///
     /// If \a path is absolute, or if \a base_dir is empty, \p path is returned
@@ -553,6 +550,8 @@ public:
 
     static std::string load_file(const std::string& path);
     static std::string load_file_and_chomp(const std::string& path);
+    /// Same effect as std::filesystem::path::parent_path().
+    static std::string parent_dir(const std::string& path);
 
     using ForEachHandler = util::FunctionRef<bool(const std::string& file, const std::string& dir)>;
 

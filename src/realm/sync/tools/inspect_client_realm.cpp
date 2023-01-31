@@ -27,8 +27,8 @@ void print_tables(const Group& group)
                 StringData target_name = target_table->get_name();
                 std::cout << ", " << target_name;
             }
-            bool has_search_index = table->has_search_index(col_key);
-            std::cout << ", " << (has_search_index ? "search_index" : "no_search_index") << "\n";
+            auto search_index_type = table->search_index_type(col_key);
+            std::cout << ", " << search_index_type << "\n";
         }
         std::cout << "\n";
     }

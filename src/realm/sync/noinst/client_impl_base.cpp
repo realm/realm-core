@@ -10,10 +10,10 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/sync/network/http.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -21,7 +21,7 @@
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove
+#include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
@@ -43,13 +43,36 @@ using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
+void ErrorTryAgainBackoffInfo::update(const ProtocolErrorInfo& info)
+{
+    if (triggering_error && static_cast<ProtocolError>(info.raw_error_code) == *triggering_error) {
+        return;
+    }
 
-namespace {
+    delay_info = info.resumption_delay_interval.value_or(ResumptionDelayInfo{});
+    cur_delay_interval = util::none;
+    triggering_error = static_cast<ProtocolError>(info.raw_error_code);
+}
 
-util::StderrLogger g_fallback_logger;
+void ErrorTryAgainBackoffInfo::reset()
+{
+    triggering_error = util::none;
+    cur_delay_interval = util::none;
+    delay_info = ResumptionDelayInfo{};
+}
 
-} // unnamed namespace
-
+std::chrono::milliseconds ErrorTryAgainBackoffInfo::delay_interval()
+{
+    if (!cur_delay_interval) {
+        cur_delay_interval = delay_info.resumption_delay_interval;
+        return *cur_delay_interval;
+    }
+    if (*cur_delay_interval >= delay_info.max_resumption_delay_interval) {
+        return delay_info.max_resumption_delay_interval;
+    }
+    *cur_delay_interval *= delay_info.resumption_delay_backoff_multiplier;
+    return *cur_delay_interval;
+}
 
 bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                       port_type& port, std::string& path) const
@@ -104,7 +127,8 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger{config.logger ? *config.logger : g_fallback_logger}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
     , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
@@ -118,16 +142,15 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
-    , m_service{}                                         // Throws
-    , m_socket_factory(util::websocket::EZConfig{
-          logger,
-          m_random,
-          m_service,
-          get_user_agent_string(),
-      })
+    , m_socket_provider{[&]() -> std::shared_ptr<SyncSocketProvider> {
+        if (config.socket_provider)
+            return config.socket_provider;
+
+        return std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string());
+    }()}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
-    , m_keep_running_timer{get_service()} // Throws
+    , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
@@ -188,12 +211,13 @@ ClientImpl::ClientImpl(ClientConfig config)
                     "never do this in production");
     }
 
-    auto handler = [this] {
+    m_actualize_and_finalize = create_trigger([this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
         actualize_and_finalize_session_wrappers(); // Throws
-    };
-    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
-
-    start_keep_running_timer(); // Throws
+    });
 }
 
 
@@ -210,11 +234,33 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 }
 
 
+void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    m_socket_provider->post(std::move(handler));
+}
+
+
+SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds delay,
+                                                       SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    return m_socket_provider->create_timer(delay, std::move(handler));
+}
+
+ClientImpl::SyncTrigger ClientImpl::create_trigger(SyncSocketProvider::FunctionHandler&& handler)
+{
+    REALM_ASSERT(m_socket_provider);
+    return std::make_unique<Trigger<SyncSocketProvider>>(m_socket_provider.get(), std::move(handler));
+}
+
+
 void Connection::activate()
 {
+    REALM_ASSERT(m_on_idle);
     m_activated = true;
     if (m_num_active_sessions == 0)
-        m_on_idle.trigger();
+        m_on_idle->trigger();
     // We cannot in general connect immediately, because a prior failure to
     // connect may require a delay before reconnecting (see `m_reconnect_info`).
     initiate_reconnect_wait(); // Throws
@@ -243,7 +289,7 @@ void Connection::initiate_session_deactivation(Session* sess)
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
-            m_on_idle.trigger();
+            m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
@@ -267,7 +313,7 @@ void Connection::cancel_reconnect_delay()
         // operation might have to be initiated before the previous one
         // completes (its completion handler starts to execute), so the new wait
         // operation must be done on a new timer object.
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_reconnect_delay_in_progress = false;
         m_reconnect_info.reset();
         initiate_reconnect_wait(); // Throws
@@ -300,7 +346,7 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-void Connection::websocket_handshake_completion_handler(const std::string& protocol)
+void Connection::websocket_connected_handler(const std::string& protocol)
 {
     if (!protocol.empty()) {
         std::string_view expected_prefix =
@@ -338,66 +384,7 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
 }
 
 
-void Connection::websocket_read_or_write_error_handler(std::error_code ec)
-{
-    read_or_write_error(ec); // Throws
-}
-
-
-void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
-{
-    bool is_fatal;
-    if (ec == util::websocket::Error::bad_response_3xx_redirection ||
-        ec == util::websocket::Error::bad_response_301_moved_permanently ||
-        ec == util::websocket::Error::bad_response_401_unauthorized ||
-        ec == util::websocket::Error::bad_response_5xx_server_error ||
-        ec == util::websocket::Error::bad_response_500_internal_server_error ||
-        ec == util::websocket::Error::bad_response_502_bad_gateway ||
-        ec == util::websocket::Error::bad_response_503_service_unavailable ||
-        ec == util::websocket::Error::bad_response_504_gateway_timeout) {
-        is_fatal = false;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-    }
-    else {
-        is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        if (body) {
-            std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-            auto i = body->find(identifier);
-            if (i != std::string_view::npos) {
-                std::string_view rest = body->substr(i + identifier.size());
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](std::string_view string, std::string_view prefix) {
-                    return (string.size() >= prefix.size() &&
-                            std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                };
-                if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                    ec = ClientError::client_too_old_for_server;
-                }
-                else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                    ec = ClientError::client_too_new_for_server;
-                }
-                else {
-                    // Other more complicated forms of mismatch
-                    ec = ClientError::protocol_mismatch;
-                }
-            }
-        }
-    }
-
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
-}
-
-
-void Connection::websocket_protocol_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                                       // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
-}
-
-
-bool Connection::websocket_binary_message_received(const char* data, std::size_t size)
+bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
     std::error_code ec;
     using sf = SimulatedFailure;
@@ -406,35 +393,94 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
         return bool(m_websocket);
     }
 
-    handle_message_received(data, size);
+    handle_message_received(data);
     return bool(m_websocket);
 }
 
 
-bool Connection::websocket_close_message_received(std::error_code error_code, StringData message)
+void Connection::websocket_error_handler()
 {
-    if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
-        error_code.value() != 1000) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+    m_websocket_error_received = true;
+}
 
+
+bool Connection::websocket_closed_handler(bool was_clean, Status status)
+{
+    logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
+    // Return early.
+    if (status.is_ok()) {
+        return bool(m_websocket);
+    }
+
+    auto&& status_code = status.code();
+    std::error_code error_code{static_cast<int>(status_code), websocket::websocket_close_status_category()};
+
+    // TODO: Use a switch statement once websocket errors have their own category in exception unification.
+    if (status_code == ErrorCodes::ResolveFailed || status_code == ErrorCodes::ConnectionFailed) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
         constexpr bool try_again = true;
-        SessionErrorInfo error_info{error_code, message, try_again};
-
-        // If the server sends a websocket close message with code 1009, then it's because we've sent an
-        // UPLOAD message that is too large for the server to process. Simply disconnecting/reconnecting will not
-        // be sufficient because when we re-connect we'll just try to send the same bad upload message.
-        //
-        // Since the handling of this error happens at a layer below the standard `ERROR` message handling
-        // we need to synthesize an `ERROR` message-like error info here to client reset when this error
-        // is received.
-        if (error_code.value() == 1009) {
-            error_info.error_code = make_error_code(ProtocolError::limits_exceeded);
-            error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-            error_info.message = util::format(
-                "Sync websocket closed because the server received a message that was too large: %1", message);
-        }
-
+        involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+    }
+    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
+        read_or_write_error(error_code);
+    }
+    else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
+             status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
+             status_code == ErrorCodes::WebSocket_InvalidPayloadData ||
+             status_code == ErrorCodes::WebSocket_PolicyViolation ||
+             status_code == ErrorCodes::WebSocket_InavalidExtension) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+        constexpr bool try_again = true;
+        SessionErrorInfo error_info{error_code, status.reason(), try_again};
         involuntary_disconnect(std::move(error_info));
+    }
+    else if (status_code == ErrorCodes::WebSocket_MessageTooBig) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+        constexpr bool try_again = true;
+        auto ec = make_error_code(ProtocolError::limits_exceeded);
+        auto message = util::format(
+            "Sync websocket closed because the server received a message that was too large: %1", status.reason());
+        SessionErrorInfo error_info(ec, message, try_again);
+        error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
+        involuntary_disconnect(std::move(error_info));
+    }
+    else if (status_code == ErrorCodes::WebSocket_TLSHandshakeFailed) {
+        error_code = ClientError::ssl_server_cert_rejected;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
+        error_code = ClientError::client_too_old_for_server;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
+        error_code = ClientError::client_too_new_for_server;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
+        error_code = ClientError::protocol_mismatch;
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
+        constexpr bool is_fatal = true;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    }
+    else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
+             status_code == ErrorCodes::WebSocket_MovedPermanently ||
+             status_code == ErrorCodes::WebSocket_InternalServerError ||
+             status_code == ErrorCodes::WebSocket_AbnormalClosure ||
+             status_code == ErrorCodes::WebSocket_Retry_Error) {
+        constexpr bool is_fatal = false;
+        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
+        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
 
     return bool(m_websocket);
@@ -475,7 +521,6 @@ void Connection::initiate_reconnect_wait()
     }
     else {
         // Compute a new reconnect delay
-
         bool zero_delay = false;
         switch (m_client.get_reconnect_mode()) {
             case ReconnectMode::normal:
@@ -519,8 +564,8 @@ void Connection::initiate_reconnect_wait()
                         delay = max_delay;
                     break;
                 case ConnectionTerminationReason::server_said_try_again_later:
-                    delay = max_delay;
                     record_delay_as_zero = true;
+                    delay = m_reconnect_info.m_try_again_delay_info.delay_interval().count();
                     break;
                 case ConnectionTerminationReason::ssl_certificate_rejected:
                 case ConnectionTerminationReason::ssl_protocol_violation:
@@ -589,26 +634,23 @@ void Connection::initiate_reconnect_wait()
                       remaining_delay); // Throws
     }
 
-    if (!m_reconnect_disconnect_timer)
-        m_reconnect_disconnect_timer.emplace(m_client.get_service()); // Throws
-    auto handler = [this](std::error_code ec) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_reconnect_wait(ec); // Throws
-    };
-    m_reconnect_disconnect_timer->async_wait(std::chrono::milliseconds(remaining_delay),
-                                             std::move(handler)); // Throws
+    m_reconnect_disconnect_timer =
+        m_client.create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
+            // If the operation is aborted, the connection object may have been
+            // destroyed.
+            if (status != ErrorCodes::OperationAborted)
+                handle_reconnect_wait(status); // Throws
+        });                                    // Throws
     m_reconnect_delay_in_progress = true;
     m_nonzero_reconnect_delay = (remaining_delay > 0);
 }
 
 
-void Connection::handle_reconnect_wait(std::error_code ec)
+void Connection::handle_reconnect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (!status.is_ok()) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw ExceptionForStatus(status);
     }
 
     m_reconnect_delay_in_progress = false;
@@ -642,11 +684,8 @@ void Connection::initiate_reconnect()
     // change it if the outcome ends up being success or failure.
     m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
 
-    std::string sec_websocket_protocol;
+    std::vector<std::string> sec_websocket_protocol;
     {
-        std::ostringstream out;
-        out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-        out.imbue(std::locale::classic());
         auto protocol_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
         int min = get_oldest_supported_protocol_version();
@@ -654,30 +693,26 @@ void Connection::initiate_reconnect()
         REALM_ASSERT(min <= max);
         // List protocol version in descending order to ensure that the server
         // selects the highest possible version.
-        int version = max;
-        for (;;) {
-            out << protocol_prefix << version; // Throws
-            if (version == min)
-                break;
-            out << ", "; // Throws
-            --version;
+        for (int version = max; version >= min; --version) {
+            sec_websocket_protocol.push_back(util::format("%1%2", protocol_prefix, version)); // Throws
         }
-        sec_websocket_protocol = std::move(out).str();
     }
 
-    m_websocket =
-        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
-                                                    m_address,
-                                                    m_port,
-                                                    get_http_request_path(),
-                                                    std::move(sec_websocket_protocol),
-                                                    is_ssl(m_protocol_envelope),
-                                                    {m_custom_http_headers.begin(), m_custom_http_headers.end()},
-                                                    m_verify_servers_ssl_certificate,
-                                                    m_ssl_trust_certificate_path,
-                                                    m_ssl_verify_callback,
-                                                    m_proxy_config,
-                                                });
+    m_websocket_error_received = false;
+    m_websocket = m_client.m_socket_provider->connect(
+        this, WebSocketEndpoint{
+                  m_address,
+                  m_port,
+                  get_http_request_path(),
+                  std::move(sec_websocket_protocol),
+                  is_ssl(m_protocol_envelope),
+                  /// DEPRECATED - The following will be removed in a future release
+                  {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                  m_verify_servers_ssl_certificate,
+                  m_ssl_trust_certificate_path,
+                  m_ssl_verify_callback,
+                  m_proxy_config,
+              });
 }
 
 
@@ -687,25 +722,22 @@ void Connection::initiate_connect_wait()
     // fully establish the connection (including SSL and WebSocket
     // handshakes). Without such a watchdog, connect operations could take very
     // long, or even indefinite time.
-    m_connect_timer.emplace(m_client.get_service()); // Throws
-
     milliseconds_type time = m_client.m_connect_timeout;
 
-    auto handler = [this](std::error_code ec) {
+    m_connect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_connect_wait(ec); // Throws
-    };
-    m_connect_timer->async_wait(std::chrono::milliseconds(time), std::move(handler)); // Throws
+        if (status != ErrorCodes::OperationAborted)
+            handle_connect_wait(status); // Throws
+    });                                  // Throws
 }
 
 
-void Connection::handle_connect_wait(std::error_code ec)
+void Connection::handle_connect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (!status.is_ok()) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw ExceptionForStatus(status);
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
@@ -719,9 +751,14 @@ void Connection::handle_connect_wait(std::error_code ec)
 void Connection::handle_connection_established()
 {
     // Cancel connect timeout watchdog
-    m_connect_timer = util::none;
+    m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
+
+    // TODO(RCORE-1380) get this information in-band rather than from the websocket.
+    if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
+        logger.info("Connected to app services with request id: \"%1\"", coid);
+    }
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -747,7 +784,7 @@ void Connection::schedule_urgent_ping()
 {
     REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_ping_delay_in_progress) {
-        m_heartbeat_timer = util::none;
+        m_heartbeat_timer.reset();
         m_ping_delay_in_progress = false;
         m_minimize_next_ping_delay = true;
         milliseconds_type now = monotonic_clock_now();
@@ -795,13 +832,15 @@ void Connection::initiate_ping_delay(milliseconds_type now)
 
     m_ping_delay_in_progress = true;
 
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
-            handle_ping_delay(); // Throws
-    };
-    m_heartbeat_timer.emplace(m_client.get_service());                                   // Throws
-    m_heartbeat_timer->async_wait(std::chrono::milliseconds(delay), std::move(handler)); // Throws
-    logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
+        handle_ping_delay();                                    // Throws
+    });                                                         // Throws
+    logger.debug("Will emit a ping in %1 milliseconds", delay); // Throws
 }
 
 
@@ -828,11 +867,14 @@ void Connection::initiate_pong_timeout()
     m_pong_wait_started_at = monotonic_clock_now();
 
     milliseconds_type time = m_client.m_pong_keepalive_timeout;
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
-            handle_pong_timeout(); // Throws
-    };
-    m_heartbeat_timer->async_wait(std::chrono::milliseconds(time), std::move(handler)); // Throws
+    m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
+        handle_pong_timeout(); // Throws
+    });                        // Throws
 }
 
 
@@ -847,10 +889,18 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    auto handler = [this] {
+    // Stop sending messages if an websocket error was received.
+    if (m_websocket_error_received)
+        return;
+
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         handle_write_message(); // Throws
-    };
-    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    });                         // Throws
     m_sending_session = sess;
     m_sending = true;
 }
@@ -882,7 +932,7 @@ void Connection::send_next_message()
     while (!m_sessions_enlisted_to_send.empty()) {
         // The state of being connected is not supposed to be able to change
         // across this loop thanks to the "no callback reentrance" guarantee
-        // provided by util::Websocket::async_write_text(), and friends.
+        // provided by Websocket::async_write_text(), and friends.
         REALM_ASSERT(m_state == ConnectionState::connected);
 
         Session& sess = *m_sessions_enlisted_to_send.front();
@@ -927,10 +977,14 @@ void Connection::send_ping()
 
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
-    auto handler = [this] {
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
+
         handle_write_ping(); // Throws
-    };
-    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    });                      // Throws
     m_sending = true;
 }
 
@@ -944,11 +998,11 @@ void Connection::handle_write_ping()
 }
 
 
-void Connection::handle_message_received(const char* data, std::size_t size)
+void Connection::handle_message_received(util::Span<const char> data)
 {
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
-    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
+    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data.data(), data.size()));
 }
 
 
@@ -957,31 +1011,27 @@ void Connection::initiate_disconnect_wait()
     REALM_ASSERT(!m_reconnect_delay_in_progress);
 
     if (m_disconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer = util::none;
+        m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
     }
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
-    if (!m_reconnect_disconnect_timer)
-        m_reconnect_disconnect_timer.emplace(m_client.get_service()); // Throws
-    auto handler = [this](std::error_code ec) {
+    m_reconnect_disconnect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_disconnect_wait(ec); // Throws
-    };
-    m_reconnect_disconnect_timer->async_wait(std::chrono::milliseconds(time),
-                                             std::move(handler)); // Throws
+        if (status != ErrorCodes::OperationAborted)
+            handle_disconnect_wait(status); // Throws
+    });                                     // Throws
     m_disconnect_delay_in_progress = true;
 }
 
 
-void Connection::handle_disconnect_wait(std::error_code ec)
+void Connection::handle_disconnect_wait(Status status)
 {
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        throw std::system_error(ec);
+    if (!status.is_ok()) {
+        REALM_ASSERT(status != ErrorCodes::OperationAborted);
+        throw ExceptionForStatus(status);
     }
 
     m_disconnect_delay_in_progress = false;
@@ -993,36 +1043,6 @@ void Connection::handle_disconnect_wait(std::error_code ec)
         voluntary_disconnect();                   // Throws
         logger.info("Disconnected");              // Throws
     }
-}
-
-
-void Connection::websocket_connect_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
-}
-
-void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
-{
-    logger.error("SSL handshake failed: %1", ec.message()); // Throws
-    // FIXME: Some error codes (those from OpenSSL) most likely indicate a
-    // fatal error (SSL protocol violation), but other errors codes
-    // (read/write error from underlying socket) most likely indicate a
-    // nonfatal error.
-    bool is_fatal = false;
-    std::error_code ec2;
-    if (ec == network::ssl::Errors::certificate_rejected) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        ec2 = ClientError::ssl_server_cert_rejected;
-        is_fatal = true;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-        ec2 = ec;
-        is_fatal = false;
-    }
-    close_due_to_client_side_error(ec2, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -1039,15 +1059,6 @@ void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<s
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
     bool is_fatal = true;                              // A sync protocol violation is a fatal error
     close_due_to_client_side_error(ec, msg, is_fatal); // Throws
-}
-
-
-void Connection::close_due_to_missing_protocol_feature()
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
-    std::error_code ec = ClientError::missing_protocol_feature;
-    bool is_fatal = true;                                       // A missing protocol feature is a fatal error
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -1077,6 +1088,8 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
         m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
     }
 
+    m_reconnect_info.m_try_again_delay_info.update(info);
+
     // When the server asks us to reconnect later, it is important to make the
     // reconnect delay start at the time of the reception of the ERROR message,
     // rather than at the initiation of the connection, as is usually the
@@ -1097,7 +1110,7 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
 void Connection::disconnect(const SessionErrorInfo& info)
 {
     // Cancel connect timeout watchdog
-    m_connect_timer = util::none;
+    m_connect_timer.reset();
 
     if (m_state == ConnectionState::connected) {
         m_disconnect_time = monotonic_clock_now();
@@ -1127,7 +1140,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_minimize_next_ping_delay = false;
     m_ping_after_scheduled_reset_of_reconnect_info = false;
     m_ping_sent = false;
-    m_heartbeat_timer = util::none;
+    m_heartbeat_timer.reset();
     m_previous_ping_rtt = 0;
 
     m_websocket.reset();
@@ -1178,7 +1191,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
         m_reconnect_info.m_scheduled_reset = false;
     }
 
-    m_heartbeat_timer = util::none;
+    m_heartbeat_timer.reset();
     m_waiting_for_pong = false;
 
     initiate_ping_delay(now); // Throws
@@ -1414,6 +1427,32 @@ void Session::cancel_resumption_delay()
 }
 
 
+void Session::gather_pending_compensating_writes(util::Span<Changeset> changesets,
+                                                 std::vector<ProtocolErrorInfo>* out)
+{
+    if (m_pending_compensating_write_errors.empty() || changesets.empty()) {
+        return;
+    }
+
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(
+        std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
+                       [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
+                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                       }));
+#endif
+
+    while (!m_pending_compensating_write_errors.empty() &&
+           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+               changesets.back().version) {
+        auto& cur_error = m_pending_compensating_write_errors.front();
+        REALM_ASSERT(cur_error.compensating_write_server_version >= changesets.front().version);
+        out->push_back(std::move(cur_error));
+        m_pending_compensating_write_errors.pop_front();
+    }
+}
+
+
 void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
@@ -1428,8 +1467,15 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
-    history.integrate_server_changesets(progress, &downloadable_bytes, received_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+
+    std::vector<ProtocolErrorInfo> pending_compensating_write_errors;
+    auto transact = get_db()->start_read();
+    history.integrate_server_changesets(
+        progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
+        [&](const TransactionRef&, util::Span<Changeset> changesets) {
+            gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
+        },
+        get_transact_reporter()); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1437,6 +1483,20 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
                      version_info.sync_version.version, received_changesets.size()); // Throws
+    }
+
+    for (const auto& pending_error : pending_compensating_write_errors) {
+        logger.info("Reporting compensating write for client version %1 in server version %2: %3",
+                    pending_error.compensating_write_rejected_client_version,
+                    pending_error.compensating_write_server_version, pending_error.message);
+        try {
+            ProtocolError error_code = ProtocolError(pending_error.raw_error_code);
+            on_connection_state_changed(m_conn.get_state(),
+                                        SessionErrorInfo{pending_error, make_error_code(error_code)});
+        }
+        catch (...) {
+            logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
+        }
     }
 }
 
@@ -1508,6 +1568,7 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
+    bool has_pending_client_reset = false;
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         // The reason we need a mutable reference from get_client_reset_config() is because we
         // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
@@ -1538,8 +1599,9 @@ void Session::activate()
         }
 
         if (!m_client_reset_operation) {
-            const ClientReplication& repl = access_realm();                                           // Throws
-            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+            const ClientReplication& repl = access_realm(); // Throws
+            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress,
+                                          &has_pending_client_reset); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1568,6 +1630,10 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         on_suspended(SessionErrorInfo{error.code(), false});
         m_conn.one_less_active_unsuspended_session(); // Throws
+    }
+
+    if (has_pending_client_reset) {
+        handle_pending_client_reset_acknowledgement();
     }
 }
 
@@ -1849,8 +1915,7 @@ void Session::send_upload_message()
                  uploadable_changesets.size()); // Throws
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
-    ClientProtocol::UploadMessageBuilder upload_message_builder =
-        protocol.make_upload_message_builder(logger); // Throws
+    ClientProtocol::UploadMessageBuilder upload_message_builder = protocol.make_upload_message_builder(); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
         logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
@@ -2102,7 +2167,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+        bool has_pending_client_reset = false;
+        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress,
+                                      &has_pending_client_reset); // Throws
         REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
                         client_file_ident.ident);
         REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
@@ -2123,6 +2190,10 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
+
+        if (has_pending_client_reset) {
+            handle_pending_client_reset_acknowledgement();
+        }
         return true;
     };
     // if a client reset happens, it will take care of setting the file ident
@@ -2224,6 +2295,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
@@ -2235,6 +2309,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
+        return;
+    }
     REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
@@ -2317,6 +2394,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
+    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+    if (debug_action == SyncClientHookAction::EarlyReturn) {
+        return {};
+    }
+
     // Ignore the error because the connection is going to be closed.
     if (m_connection_to_close)
         return std::error_code{}; // Success
@@ -2338,9 +2420,11 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    if (!session_level_error_requires_suspend(error_code)) {
-        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
-        return {}; // Success
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
+    if (error_code == ProtocolError::compensating_write) {
+        m_pending_compensating_write_errors.push_back(info);
+        return {};
     }
 
     REALM_ASSERT(!m_suspended);
@@ -2403,31 +2487,23 @@ std::error_code Session::receive_test_command_response(request_ident_type ident,
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
-    m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
-    if (error_info.resumption_delay_interval) {
-        m_try_again_delay_info = *error_info.resumption_delay_interval;
-    }
-    if (!m_current_try_again_delay_interval ||
-        (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.raw_error_code))) {
-        m_current_try_again_delay_interval = m_try_again_delay_info.resumption_delay_interval;
-    }
-    else if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
+
+    m_try_again_delay_info.update(error_info);
+    auto try_again_interval = m_try_again_delay_info.delay_interval();
+    if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
         // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
         // backoff behavior would result in waiting up to 5 minutes in between each query change which is
         // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
-        m_current_try_again_delay_interval = std::chrono::milliseconds{1000};
+        try_again_interval = std::chrono::milliseconds{1000};
     }
-    m_try_again_error_code = ProtocolError(error_info.raw_error_code);
-    logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
-    m_try_again_activation_timer->async_wait(*m_current_try_again_delay_interval, [this](std::error_code ec) {
-        if (ec == util::error::operation_aborted) {
+    logger.debug("Will attempt to resume session after %1 milliseconds", try_again_interval.count());
+    m_try_again_activation_timer = get_client().create_timer(try_again_interval, [this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
             return;
-        }
+        else if (!status.is_ok())
+            throw ExceptionForStatus(status);
 
         m_try_again_activation_timer.reset();
-        if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {
-            *m_current_try_again_delay_interval *= m_try_again_delay_info.resumption_delay_backoff_multiplier;
-        }
         cancel_resumption_delay();
     });
 }
@@ -2436,7 +2512,7 @@ void Session::clear_resumption_delay_state()
 {
     if (m_try_again_activation_timer) {
         logger.debug("Clearing resumption delay state after successful download");
-        m_current_try_again_delay_interval = util::none;
+        m_try_again_delay_info.reset();
     }
 }
 

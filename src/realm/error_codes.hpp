@@ -35,6 +35,36 @@ public:
         RuntimeError = 2,
         LogicError = 3,
         BrokenPromise = 4,
+        OperationAborted = 5,
+        ReadError = 7,
+        WriteError = 8,
+        ResolveFailed = 9,
+        ConnectionFailed = 10,
+        WebSocket_Retry_Error = 11,
+        WebSocket_Fatal_Error = 12,
+
+        /// WebSocket Errors
+        // WebSocket_OK = 1000 is not used, just use OK instead
+        WebSocket_GoingAway = 1001,
+        WebSocket_ProtocolError = 1002,
+        WebSocket_UnsupportedData = 1003,
+        WebSocket_Reserved = 1004,
+        WebSocket_NoStatusReceived = 1005,
+        WebSocket_AbnormalClosure = 1006,
+        WebSocket_InvalidPayloadData = 1007,
+        WebSocket_PolicyViolation = 1008,
+        WebSocket_MessageTooBig = 1009,
+        WebSocket_InavalidExtension = 1010,
+        WebSocket_InternalServerError = 1011,
+        WebSocket_TLSHandshakeFailed = 1015, // Used by default WebSocket
+
+        /// WebSocket Errors - reported by server
+        WebSocket_Unauthorized = 4001,
+        WebSocket_Forbidden = 4002,
+        WebSocket_MovedPermanently = 4003,
+        WebSocket_Client_Too_Old = 4004,
+        WebSocket_Client_Too_New = 4005,
+        WebSocket_Protocol_Mismatch = 4006,
     };
 
     static StringData error_string(Error code);

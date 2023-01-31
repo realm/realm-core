@@ -305,7 +305,10 @@ std::vector<SyncUserIdentity> SyncUser::identities() const
 void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
 {
     util::CheckedLockGuard lock(m_mutex);
-    REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
+    if (m_state != SyncUser::State::LoggedIn) {
+        return;
+    }
+
     m_user_identities = identities;
 
     m_sync_manager->perform_metadata_update([&](const auto& manager) {
@@ -352,7 +355,7 @@ void SyncUser::log_out()
         // logged back in, they will automatically be reactivated.
         for (auto& [path, weak_session] : m_sessions) {
             if (auto ptr = weak_session.lock()) {
-                ptr->log_out();
+                ptr->force_close();
                 m_waiting_sessions[path] = std::move(ptr);
             }
         }
@@ -436,7 +439,9 @@ util::Optional<bson::BsonDocument> SyncUser::custom_data() const
 void SyncUser::update_user_profile(const SyncUserProfile& profile)
 {
     util::CheckedLockGuard lock(m_mutex);
-    REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
+    if (m_state != SyncUser::State::LoggedIn) {
+        return;
+    }
 
     m_user_profile = profile;
 

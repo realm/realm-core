@@ -108,19 +108,6 @@ void on_change_but_no_notify(realm::Realm& realm);
 #endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
 
 
-struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
-    void do_log(realm::util::Logger::Level, std::string const&) override {}
-    Level get() const noexcept override
-    {
-        return Level::off;
-    }
-    TestLogger()
-        : Logger::LevelThreshold()
-        , Logger(static_cast<Logger::LevelThreshold&>(*this))
-    {
-    }
-};
-
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
@@ -155,7 +142,7 @@ private:
     friend class TestSyncManager;
     SyncServer(const Config& config);
     std::string m_local_root_dir;
-    std::unique_ptr<realm::util::Logger> m_logger;
+    std::shared_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
     std::thread m_thread;
     std::string m_url;
@@ -192,7 +179,7 @@ class TestAppSession {
 public:
     TestAppSession();
     TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true);
+                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal);
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept
@@ -286,6 +273,9 @@ inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
 
 std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+
+void set_app_config_defaults(realm::app::App::Config& app_config,
+                             const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
 
 #endif // REALM_ENABLE_SYNC
 

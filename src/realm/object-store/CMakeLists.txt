@@ -1,7 +1,6 @@
 add_subdirectory(c_api)
 
 set(SOURCES
-    binding_callback_thread_observer.cpp
     collection.cpp
     collection_notifications.cpp
     dictionary.cpp
@@ -38,7 +37,6 @@ set(SOURCES
 set(HEADERS
     audit.hpp
     audit_serializer.hpp
-    binding_callback_thread_observer.hpp
     binding_context.hpp
     collection.hpp
     collection_notifications.hpp

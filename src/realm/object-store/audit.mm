@@ -744,7 +744,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
                     wait_for_upload(sync_session);
                 }
                 else {
-                    sync_session->log_out();
+                    sync_session->force_close();
                     m_open_paths.erase(m_current_realm->config().path);
                 }
             }
@@ -1006,7 +1006,7 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     }
 
     if (!m_logger)
-        m_logger = audit_user->sync_manager()->make_logger();
+        m_logger = audit_user->sync_manager()->get_logger();
     if (!m_serializer)
         m_serializer = std::make_shared<AuditObjectSerializer>();
 

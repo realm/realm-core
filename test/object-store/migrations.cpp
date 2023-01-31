@@ -156,6 +156,12 @@ Schema set_indexed(Schema schema, StringData object_name, StringData property_na
     return schema;
 }
 
+Schema set_fulltext_indexed(Schema schema, StringData object_name, StringData property_name, bool value)
+{
+    schema.find(object_name)->property_for_name(property_name)->is_fulltext_indexed = value;
+    return schema;
+}
+
 Schema set_optional(Schema schema, StringData object_name, StringData property_name, bool value)
 {
     auto& prop = *schema.find(object_name)->property_for_name(property_name);
@@ -1060,6 +1066,7 @@ TEST_CASE("migration: Automatic") {
                  {"pk", PropertyType::Int, Property::IsPrimary{true}},
                  {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  {"optional", PropertyType::Int | PropertyType::Nullable},
+                 {"text", PropertyType::String},
              }},
             {"link origin",
              {
@@ -1149,6 +1156,9 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("add index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "optional", true));
+        }
+        SECTION("add fulltext index") {
+            VERIFY_SCHEMA_IN_MIGRATION(set_fulltext_indexed(schema, "object", "text", true));
         }
         SECTION("remove index") {
             VERIFY_SCHEMA_IN_MIGRATION(set_indexed(schema, "object", "value", false));
@@ -2389,7 +2399,7 @@ TEST_CASE("migration: Additive") {
         }));
     }
 
-    SECTION("add new columns from different SG") {
+    SECTION("new columns added externally are ignored") {
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
         realm2->begin_transaction();
@@ -2402,6 +2412,11 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema() == schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+
+        auto frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
     }
 
     SECTION("opening new Realms uses the correct schema after an external change") {
@@ -2432,6 +2447,45 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema() == schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+    }
+
+    SECTION("obtaining a frozen Realm from before an external schema change") {
+        auto realm2 = Realm::get_shared_realm(config);
+        realm->read_group();
+        realm2->read_group();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        auto col_keys = table->get_column_keys();
+
+        {
+            auto write_realm = Realm::get_shared_realm(config);
+            write_realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(write_realm->read_group(), "object");
+            table->add_column(type_Double, "newcol");
+            write_realm->commit_transaction();
+        }
+
+        // Before refreshing when we haven't seen the new version at all
+        auto frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+
+        // Refresh the other instance so that the schema cache is updated, and
+        // then repeat
+        realm2->refresh();
+
+        frozen = realm->freeze();
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
+        frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+        REQUIRE(frozen->schema() == schema);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[0].column_key == col_keys[0]);
+        REQUIRE(frozen->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
     }
 
     SECTION("can have different subsets of columns in different Realm instances") {

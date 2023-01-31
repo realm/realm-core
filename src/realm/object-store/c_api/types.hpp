@@ -474,7 +474,6 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
-
 struct realm_callback_token : realm::c_api::WrapC {
 protected:
     realm_callback_token(realm_t* realm, uint64_t token)
@@ -583,6 +582,29 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 };
 
 #if REALM_ENABLE_SYNC
+struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
+    realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
+        : task(task)
+        , token(token)
+    {
+    }
+    ~realm_async_open_task_progress_notification_token();
+    std::shared_ptr<realm::AsyncOpenTask> task;
+    uint64_t token;
+};
+
+struct realm_sync_session_connection_state_notification_token : realm::c_api::WrapC {
+    realm_sync_session_connection_state_notification_token(std::shared_ptr<realm::SyncSession> session,
+                                                           uint64_t token)
+        : session(session)
+        , token(token)
+    {
+    }
+    ~realm_sync_session_connection_state_notification_token();
+    std::shared_ptr<realm::SyncSession> session;
+    uint64_t token;
+};
+
 struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
     realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
         : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))
@@ -750,6 +772,72 @@ struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollecti
         : realm::app::MongoCollection(std::move(collection))
     {
     }
+};
+
+struct realm_sync_socket : realm::c_api::WrapC, std::shared_ptr<realm::sync::SyncSocketProvider> {
+    explicit realm_sync_socket(std::shared_ptr<realm::sync::SyncSocketProvider> ptr)
+        : std::shared_ptr<realm::sync::SyncSocketProvider>(std::move(ptr))
+    {
+    }
+
+    realm_sync_socket* clone() const override
+    {
+        return new realm_sync_socket{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_socket*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_websocket_observer : realm::c_api::WrapC, std::shared_ptr<realm::sync::WebSocketObserver> {
+    explicit realm_websocket_observer(std::shared_ptr<realm::sync::WebSocketObserver> ptr)
+        : std::shared_ptr<realm::sync::WebSocketObserver>(std::move(ptr))
+    {
+    }
+
+    realm_websocket_observer* clone() const override
+    {
+        return new realm_websocket_observer{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_websocket_observer*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_sync_socket_callback : realm::c_api::WrapC,
+                                    std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> {
+    explicit realm_sync_socket_callback(std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> ptr)
+        : std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler>(std::move(ptr))
+    {
+    }
+
+    realm_sync_socket_callback* clone() const override
+    {
+        return new realm_sync_socket_callback{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_socket_callback*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_thread_observer_token : realm::c_api::WrapC {
+    explicit realm_thread_observer_token() = default;
+    ~realm_thread_observer_token();
 };
 
 #endif // REALM_ENABLE_SYNC

@@ -22,6 +22,13 @@ set_target_properties(RealmTrawler PROPERTIES
 )
 target_link_libraries(RealmTrawler Storage)
 
+add_executable(RealmEnumerate EXCLUDE_FROM_ALL realm_enumerate.cpp )
+set_target_properties(RealmEnumerate PROPERTIES
+    OUTPUT_NAME "realm-enumerate"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(RealmEnumerate ObjectStore)
+
 add_executable(RealmDecrypt EXCLUDE_FROM_ALL realm_decrypt.cpp )
 set_target_properties(RealmDecrypt PROPERTIES
     OUTPUT_NAME "realm-decrypt"
@@ -43,13 +50,15 @@ set_target_properties(RealmBrowser PROPERTIES
 )
 target_link_libraries(RealmBrowser Storage)
 
+if(REALM_ENABLE_SYNC)
 add_executable(Realm2JSON realm2json.cpp )
 set_target_properties(Realm2JSON PROPERTIES
-    OUTPUT_NAME "realm2json-10"
+    OUTPUT_NAME "realm2json"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
-target_link_libraries(Realm2JSON Storage QueryParser)
+target_link_libraries(Realm2JSON Storage QueryParser Sync)
 list(APPEND ExecTargetsToInstall Realm2JSON)
+endif()
 
 add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
 set_target_properties(RealmDump PROPERTIES

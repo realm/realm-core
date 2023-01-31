@@ -16,8 +16,7 @@
  *
  **************************************************************************/
 
-#ifndef REALM_UTIL_HTTP_HPP
-#define REALM_UTIL_HTTP_HPP
+#pragma once
 
 #include <cstdint>
 #include <type_traits>
@@ -31,8 +30,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/string_data.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::sync {
 enum class HTTPParserError {
     None = 0,
     ContentTooLong,
@@ -42,17 +40,15 @@ enum class HTTPParserError {
     BadRequest,
 };
 std::error_code make_error_code(HTTPParserError);
-} // namespace util
-} // namespace realm
+} // namespace realm::sync
 
 namespace std {
 template <>
-struct is_error_code_enum<realm::util::HTTPParserError> : std::true_type {
+struct is_error_code_enum<realm::sync::HTTPParserError> : std::true_type {
 };
 } // namespace std
 
-namespace realm {
-namespace util {
+namespace realm::sync {
 
 /// See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
 ///
@@ -171,7 +167,7 @@ struct HTTPRequest {
     /// set to a string representation of the number of bytes in the body.
     /// FIXME: Relax this restriction, and also support Transfer-Encoding
     /// and other HTTP/1.1 features.
-    Optional<std::string> body;
+    util::Optional<std::string> body;
 };
 
 struct HTTPResponse {
@@ -183,7 +179,7 @@ struct HTTPResponse {
     // Content-Length header.
     // FIXME: Support other transfer methods, including Transfer-Encoding and
     // HTTP/1.1 features.
-    Optional<std::string> body;
+    util::Optional<std::string> body;
 };
 
 
@@ -198,6 +194,7 @@ std::ostream& operator<<(std::ostream&, HTTPStatus);
 
 
 struct HTTPParserBase {
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     // FIXME: Generally useful?
@@ -208,8 +205,9 @@ struct HTTPParserBase {
         }
     };
 
-    HTTPParserBase(util::Logger& logger_2)
-        : logger{logger_2}
+    HTTPParserBase(const std::shared_ptr<util::Logger>& logger_ptr)
+        : logger_ptr{logger_ptr}
+        , logger{*logger_ptr}
     {
         // Allocating read buffer with calloc to avoid accidentally spilling
         // data from other sessions in case of a buffer overflow exploit.
@@ -219,7 +217,7 @@ struct HTTPParserBase {
 
     std::string m_write_buffer;
     std::unique_ptr<char[], CallocDeleter> m_read_buffer;
-    Optional<size_t> m_found_content_length;
+    util::Optional<size_t> m_found_content_length;
     static const size_t read_buffer_size = 8192;
     static const size_t max_header_line_length = read_buffer_size;
 
@@ -237,7 +235,7 @@ struct HTTPParserBase {
 
     /// If the input matches a known HTTP method string, return the appropriate
     /// HTTPMethod enum value. Otherwise, returns none.
-    static Optional<HTTPMethod> parse_method_string(StringData method);
+    static util::Optional<HTTPMethod> parse_method_string(StringData method);
 
     /// Interpret line as the first line of an HTTP request. If the return value
     /// is true, out_method and out_uri have been assigned the appropriate
@@ -257,8 +255,8 @@ struct HTTPParserBase {
 
 template <class Socket>
 struct HTTPParser : protected HTTPParserBase {
-    explicit HTTPParser(Socket& socket, util::Logger& logger)
-        : HTTPParserBase(logger)
+    explicit HTTPParser(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParserBase(logger_ptr)
         , m_socket(socket)
     {
     }
@@ -266,7 +264,7 @@ struct HTTPParser : protected HTTPParserBase {
     void read_first_line()
     {
         auto handler = [this](std::error_code ec, size_t n) {
-            if (ec == error::operation_aborted) {
+            if (ec == util::error::operation_aborted) {
                 return;
             }
             if (ec) {
@@ -286,7 +284,7 @@ struct HTTPParser : protected HTTPParserBase {
     void read_headers()
     {
         auto handler = [this](std::error_code ec, size_t n) {
-            if (ec == error::operation_aborted) {
+            if (ec == util::error::operation_aborted) {
                 return;
             }
             if (ec) {
@@ -319,7 +317,7 @@ struct HTTPParser : protected HTTPParserBase {
             }
 
             auto handler = [this](std::error_code ec, size_t n) {
-                if (ec == error::operation_aborted) {
+                if (ec == util::error::operation_aborted) {
                     return;
                 }
                 if (!ec) {
@@ -348,8 +346,8 @@ template <class Socket>
 struct HTTPClient : protected HTTPParser<Socket> {
     using Handler = void(HTTPResponse, std::error_code);
 
-    explicit HTTPClient(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPClient(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
@@ -378,7 +376,7 @@ struct HTTPClient : protected HTTPParser<Socket> {
         m_handler = std::move(handler);
         this->write_buffer([this](std::error_code ec, size_t bytes_written) {
             static_cast<void>(bytes_written);
-            if (ec == error::operation_aborted) {
+            if (ec == util::error::operation_aborted) {
                 return;
             }
             if (ec) {
@@ -431,8 +429,8 @@ struct HTTPServer : protected HTTPParser<Socket> {
     using RequestHandler = void(HTTPRequest, std::error_code);
     using RespondHandler = void(std::error_code);
 
-    explicit HTTPServer(Socket& socket, util::Logger& logger)
-        : HTTPParser<Socket>(socket, logger)
+    explicit HTTPServer(Socket& socket, const std::shared_ptr<util::Logger>& logger_ptr)
+        : HTTPParser<Socket>(socket, logger_ptr)
     {
     }
 
@@ -485,7 +483,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
         m_respond_handler = std::move(handler);
         this->set_write_buffer(response);
         this->write_buffer([this](std::error_code ec, size_t) {
-            if (ec == error::operation_aborted) {
+            if (ec == util::error::operation_aborted) {
                 return;
             }
             m_request_handler = nullptr;
@@ -532,8 +530,4 @@ private:
     }
 };
 
-} // namespace util
-} // namespace realm
-
-
-#endif // REALM_UTIL_HTTP_HPP
+} // namespace realm::sync

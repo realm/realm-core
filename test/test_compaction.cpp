@@ -59,11 +59,11 @@ TEST(Compaction_WhileGrowing)
     for (int i = 0; i < 5000; ++i) {
         w[i] = '0' + (i % 64);
     }
-    int num = (REALM_MAX_BPNODE_SIZE == 1000) ? 1490 : 1400;
+    int num = (REALM_MAX_BPNODE_SIZE == 1000) ? 1400 : 1300;
     tr->promote_to_write();
     CHECK(db->get_evacuation_stage() == DB::EvacStage::idle);
     for (int j = 0; j < num; ++j) {
-        table1->create_object().set(col_bin1, BinaryData(w, 400));
+        table1->create_object().set(col_bin1, BinaryData(w, 450));
         table2->create_object().set(col_bin2, BinaryData(w, 200));
         if (j % 10 == 0) {
             tr->commit_and_continue_as_read();

@@ -25,25 +25,24 @@ using namespace realm::_impl;
 
 ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key, ObjKey obj_key)
     : CollectionNotifier(std::move(realm))
-    , m_table_key(table_key)
+    , m_table(transaction().get_table(table_key))
     , m_obj_key(obj_key)
 {
 }
 
-void ObjectNotifier::do_attach_to(Transaction& sg)
+void ObjectNotifier::reattach()
 {
-    REALM_ASSERT(m_table_key);
-    m_table = sg.get_table(m_table_key);
+    REALM_ASSERT(m_table);
+    m_table = transaction().get_table(m_table->get_key());
 }
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    if (!m_table_key)
+    if (!m_table)
         return false;
-    REALM_ASSERT(m_table);
 
     m_info = &info;
-    info.tables[m_table_key];
+    info.tables[m_table->get_key()];
 
     // When adding or removing a callback the related tables can change due to the way we calculate related tables
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
@@ -57,17 +56,15 @@ bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ObjectNotifier::run()
 {
-    if (!m_table_key)
+    if (!m_table)
         return;
-    REALM_ASSERT(m_table);
 
-    auto it = m_info->tables.find(m_table_key);
+    auto it = m_info->tables.find(m_table->get_key());
     if (it != m_info->tables.end() && it->second.deletions_contains(m_obj_key)) {
         // The object was deleted in this set of changes, so report that and
         // release all of our resources so that we don't do anything further.
         m_change.deletions.add(0);
         m_table = {};
-        m_table_key = {};
         m_obj_key = {};
         return;
     }

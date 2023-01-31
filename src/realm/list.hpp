@@ -277,6 +277,20 @@ protected:
             }
         }
     }
+
+private:
+    template <class U>
+    static U unresolved_to_null(U value) noexcept
+    {
+        return value;
+    }
+
+    static Mixed unresolved_to_null(Mixed value) noexcept
+    {
+        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
+            return Mixed{};
+        return value;
+    }
 };
 
 // Specialization of Lst<ObjKey>:
@@ -668,13 +682,7 @@ inline T Lst<T>::get(size_t ndx) const
         throw std::out_of_range("Index out of range");
     }
 
-    auto value = m_tree->get(ndx);
-    if constexpr (std::is_same_v<T, Mixed>) {
-        // return a null for mixed unresolved link
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-    }
-    return value;
+    return unresolved_to_null(m_tree->get(ndx));
 }
 
 template <class T>
@@ -877,9 +885,17 @@ T Lst<T>::set(size_t ndx, T value)
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_set(*this, ndx, value);
     }
-    if (old != value) {
-        do_set(ndx, value);
-        bump_content_version();
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (!(old.is_same_type(value) && old == value)) {
+            do_set(ndx, value);
+            bump_content_version();
+        }
+    }
+    else {
+        if (old != value) {
+            do_set(ndx, value);
+            bump_content_version();
+        }
     }
     return old;
 }

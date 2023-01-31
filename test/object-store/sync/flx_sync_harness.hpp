@@ -61,6 +61,25 @@ public:
         return create_app(server_app_config);
     }
 
+    struct Config {
+        Config(std::string test_name, ServerSchema server_schema)
+            : test_name(std::move(test_name))
+            , server_schema(std::move(server_schema))
+        {
+        }
+
+        std::string test_name;
+        ServerSchema server_schema;
+        std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>;
+        ReconnectMode reconnect_mode = ReconnectMode::testing;
+    };
+
+    explicit FLXSyncTestHarness(Config&& config)
+        : m_test_session(make_app_from_server_schema(config.test_name, config.server_schema), config.transport, true,
+                         config.reconnect_mode)
+        , m_schema(std::move(config.server_schema.schema))
+    {
+    }
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
                        std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>)
         : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport))

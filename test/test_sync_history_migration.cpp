@@ -202,7 +202,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(sync::make_client_replication(), client_path_2);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, test_context.logger);
+        return compare_groups(rt_1, rt_2, *(test_context.logger));
     };
 
     auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
@@ -212,7 +212,7 @@ TEST(Sync_HistoryMigration)
         DBRef sg_2 = DB::create(history_2, server_path);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
-        return compare_groups(rt_1, rt_2, test_context.logger);
+        return compare_groups(rt_1, rt_2, *(test_context.logger));
     };
 
     std::string resources_dir = get_test_resource_path();
@@ -445,7 +445,7 @@ TEST(Sync_HistoryCompression)
 
     {
         WriteTransaction wt(db);
-        auto table = wt.add_table("class_table");
+        auto table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "id");
         table->add_column(type_Binary, "data");
         wt.commit();
     }
@@ -454,7 +454,7 @@ TEST(Sync_HistoryCompression)
         WriteTransaction wt(db);
         auto table = wt.get_table("class_table");
         auto data = std::make_unique<char[]>(100'000);
-        table->create_object().set("data", BinaryData{data.get(), 100'000});
+        table->create_object_with_primary_key(1).set("data", BinaryData{data.get(), 100'000});
         wt.commit();
     }
 

@@ -96,12 +96,9 @@ set(UTIL_SOURCES
     util/thread.cpp
     util/to_string.cpp
     util/demangle.cpp
-    util/duplicating_logger.cpp
     util/enum.cpp
-    util/http.cpp
     util/json_parser.cpp
     util/misc_ext_errors.cpp
-    util/parent_dir.cpp
     util/random.cpp
     util/resource_limits.cpp
     util/substitute.cpp
@@ -238,7 +235,6 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
-    util/http.hpp
     util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
@@ -248,7 +244,6 @@ set(REALM_INSTALL_HEADERS
     util/misc_errors.hpp
     util/misc_ext_errors.hpp
     util/miscellaneous.hpp
-    util/network.hpp
     util/optional.hpp
     util/overload.hpp
     util/priority_queue.hpp
@@ -280,13 +275,12 @@ set(REALM_NOINST_HEADERS
     util/circular_buffer.hpp
     util/cli_args.hpp
     util/demangle.hpp
-    util/duplicating_logger.hpp
     util/enum.hpp
-    util/ez_websocket.hpp
     util/from_chars.hpp
     util/json_parser.hpp
-    util/network_ssl.hpp
-    util/parent_dir.hpp
+    # util/network_ssl.hpp
+    # util/parent_dir.hpp
+    # util/load_file.hpp
     util/platform_info.hpp
     util/quote.hpp
     util/random.hpp
@@ -321,11 +315,14 @@ add_library(Storage STATIC
 )
 add_library(Realm::Storage ALIAS Storage)
 
-set_target_properties(Storage PROPERTIES 
+set_target_properties(Storage PROPERTIES
     OUTPUT_NAME "realm"
 )
 
 target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+if(REALM_USE_FAST_LINKER)
+    target_link_options(Storage PUBLIC ${REALM_USE_FAST_LINKER})
+endif()
 
 target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>

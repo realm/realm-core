@@ -44,6 +44,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/group.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -810,8 +811,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
         if (top_ref) {
             // Get the expected file size by looking up logical file size stored in top array
-            constexpr size_t file_size_ndx = 2; // This MUST match definition of s_file_size_ndx in Group
-            constexpr size_t max_top_size = (file_size_ndx + 1) * 8 + sizeof(Header);
+            constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
             size_t top_page_base = top_ref & ~(page_size() - 1);
             size_t top_offset = top_ref - top_page_base;
             size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
@@ -820,13 +820,13 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             auto top_header = map_top.get_addr() + top_offset;
             auto top_data = NodeHeader::get_data_from_header(top_header);
             auto w = NodeHeader::get_width_from_header(top_header);
-            auto logical_size = size_t(get_direct(top_data, w, file_size_ndx)) >> 1;
+            auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
             expected_size = round_up_to_page_size(logical_size);
         }
     }
-    catch (const DecryptionFailed&) {
+    catch (const DecryptionFailed& e) {
         note_reader_end(this);
-        throw InvalidDatabase("Realm file decryption failed", path);
+        throw InvalidDatabase(util::format("Realm file decryption failed (%1)", e.message()), path);
     }
     catch (const std::exception& e) {
         note_reader_end(this);

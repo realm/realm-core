@@ -25,6 +25,10 @@ static inline realm_string_t to_capi(StringData data)
     return realm_string_t{data.data(), data.size()};
 }
 
+// Because this is often used as `return to_capi(...);` it is dangerous to pass a temporary string here. If you really
+// need to and know it is correct (eg passing to a C callback), you can explicitly create the StringData wrapper.
+realm_string_t to_capi(const std::string&& str) = delete; // temporary std::string would dangle.
+
 static inline realm_string_t to_capi(const std::string& str)
 {
     return to_capi(StringData{str});
@@ -362,6 +366,7 @@ static inline Property from_capi(const realm_property_info_t& p) noexcept
     prop.link_origin_property_name = p.link_origin_property_name;
     prop.is_primary = Property::IsPrimary{bool(p.flags & RLM_PROPERTY_PRIMARY_KEY)};
     prop.is_indexed = Property::IsIndexed{bool(p.flags & RLM_PROPERTY_INDEXED)};
+    prop.is_fulltext_indexed = Property::IsFulltextIndexed{bool(p.flags & RLM_PROPERTY_FULLTEXT_INDEXED)};
 
     if (bool(p.flags & RLM_PROPERTY_NULLABLE)) {
         prop.type |= PropertyType::Nullable;
@@ -397,6 +402,8 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
     p.flags = RLM_PROPERTY_NORMAL;
     if (prop.is_indexed)
         p.flags |= RLM_PROPERTY_INDEXED;
+    if (prop.is_fulltext_indexed)
+        p.flags |= RLM_PROPERTY_FULLTEXT_INDEXED;
     if (prop.is_primary)
         p.flags |= RLM_PROPERTY_PRIMARY_KEY;
     if (bool(prop.type & PropertyType::Nullable))
@@ -449,6 +456,9 @@ static inline realm_version_id_t to_capi(const VersionID& v)
     version_id.index = v.index;
     return version_id;
 }
+
+realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message);
+void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, std::error_code* error_code_out);
 
 } // namespace realm::c_api
 

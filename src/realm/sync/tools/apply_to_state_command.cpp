@@ -241,13 +241,8 @@ int main(int argc, const char** argv)
     CliFlag flx_sync_arg(arg_parser, "flx-sync", 'f');
     auto arg_results = arg_parser.parse(argc, argv);
 
-    std::unique_ptr<RootLogger> logger = std::make_unique<StderrLogger>(); // Throws
-    if (verbose_arg) {
-        logger->set_level_threshold(Logger::Level::all);
-    }
-    else {
-        logger->set_level_threshold(Logger::Level::error);
-    }
+    std::unique_ptr<Logger> logger =
+        std::make_unique<StderrLogger>(verbose_arg ? Logger::Level::all : Logger::Level::error);
 
     if (help_arg) {
         print_usage(arg_results.program_name);
@@ -291,10 +286,11 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
+                             auto transact = bool(flx_sync_arg) ? local_db->start_write() : local_db->start_read();
                              history.integrate_server_changesets(download_message.progress,
                                                                  &download_message.downloadable_bytes,
                                                                  download_message.changesets, version_info,
-                                                                 download_message.batch_state, *logger, nullptr);
+                                                                 download_message.batch_state, *logger, transact);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {

@@ -51,6 +51,11 @@ Schema::Schema(std::initializer_list<ObjectSchema> types)
 Schema::Schema(base types) noexcept
     : base(std::move(types))
 {
+    sort_schema();
+}
+
+void Schema::sort_schema()
+{
     std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
         return lft.name < rgt.name;
     });
@@ -261,9 +266,16 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
         }
         if (target_prop->requires_index()) {
             if (!current_prop.is_indexed)
-                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop});
+                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop, IndexType::General});
         }
         else if (current_prop.requires_index()) {
+            changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
+        }
+        if (target_prop->requires_fulltext_index()) {
+            if (!current_prop.is_fulltext_indexed)
+                changes.emplace_back(schema_change::AddIndex{&existing_schema, &current_prop, IndexType::Fulltext});
+        }
+        else if (current_prop.requires_fulltext_index()) {
             changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
         }
     }
@@ -280,7 +292,7 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
 }
 
 template <typename T, typename U, typename Func>
-void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
+void Schema::zip_matching(T&& a, U&& b, Func&& func)
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
@@ -348,20 +360,32 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
     return changes;
 }
 
-void Schema::copy_keys_from(realm::Schema const& other) noexcept
+void Schema::copy_keys_from(realm::Schema const& other, SchemaSubsetMode subset_mode)
 {
+    std::vector<const ObjectSchema*> other_classes;
     zip_matching(*this, other, [&](ObjectSchema* existing, const ObjectSchema* other) {
+        if (subset_mode.include_types && !existing && other)
+            other_classes.push_back(other);
         if (!existing || !other)
             return;
 
         existing->table_key = other->table_key;
         for (auto& current_prop : other->persisted_properties) {
-            auto target_prop = existing->property_for_name(current_prop.name);
-            if (target_prop) {
+            if (auto target_prop = existing->property_for_name(current_prop.name)) {
                 target_prop->column_key = current_prop.column_key;
+            }
+            else if (subset_mode.include_properties) {
+                existing->persisted_properties.push_back(current_prop);
             }
         }
     });
+
+    if (!other_classes.empty()) {
+        reserve(size() + other_classes.size());
+        for (auto other : other_classes)
+            push_back(*other);
+        sort_schema();
+    }
 }
 
 namespace realm {
@@ -383,7 +407,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         return cmp(value.type) == cmp(rgt);                                                                          \
     }
 
-        REALM_SC_COMPARE(AddIndex, v.object, v.property)
+        REALM_SC_COMPARE(AddIndex, v.object, v.property, v.type)
         REALM_SC_COMPARE(AddProperty, v.object, v.property)
         REALM_SC_COMPARE(AddInitialProperties, v.object)
         REALM_SC_COMPARE(AddTable, v.object)

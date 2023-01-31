@@ -57,15 +57,28 @@ class App : public std::enable_shared_from_this<App>,
             public Subscribable<App> {
 public:
     struct Config {
+        // Information about the device where the app is running
+        struct DeviceInfo {
+            std::string platform;          // json: platform
+            std::string platform_version;  // json: platformVersion
+            std::string sdk_version;       // json: sdkVersion
+            std::string sdk;               // json: sdk
+            std::string cpu_arch;          // json: cpuArch
+            std::string device_name;       // json: deviceName
+            std::string device_version;    // json: deviceVersion
+            std::string framework_name;    // json: frameworkName
+            std::string framework_version; // json: frameworkVersion
+            // Other parameters provided to server no included here:
+            // * CoreVersion - populated by Sync when the device info is sent
+        };
+
         std::string app_id;
         std::shared_ptr<GenericNetworkTransport> transport;
         util::Optional<std::string> base_url;
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
-        std::string platform;
-        std::string platform_version;
-        std::string sdk_version;
+        DeviceInfo device_info;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
@@ -374,11 +387,19 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
-    std::unique_ptr<util::Logger> m_logger;
+    std::shared_ptr<util::Logger> m_logger_ptr;
 
+    /// m_Logger_ptr is not set until the first call to one of these functions.
+    /// If configure() not been called, a logger will not be available yet.
+    /// @returns true if the logger was set, otherwise false.
+    bool init_logger();
+    /// These helpers prevent all the checks for if(m_logger_ptr) throughout the
+    /// code.
+    bool would_log(util::Logger::Level level);
     template <class... Params>
-    void log(const char* message, Params&&... params);
-    bool would_log();
+    void log_debug(const char* message, Params&&... params);
+    template <class... Params>
+    void log_error(const char* message, Params&&... params);
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.

@@ -4,8 +4,12 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
+#include <realm/sync/trigger.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
+#include <realm/sync/network/http.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
@@ -19,12 +23,9 @@
 #include <realm/util/circular_buffer.hpp>
 #include <realm/util/compression.hpp>
 #include <realm/util/file.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/json_parser.hpp>
 #include <realm/util/memory_stream.hpp>
-#include <realm/util/network_ssl.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/parent_dir.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -33,7 +34,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/thread_exec_guard.hpp>
 #include <realm/util/value_reset_guard.hpp>
-#include <realm/util/websocket.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>
@@ -90,7 +90,7 @@ using UploadChangeset = ServerProtocol::UploadChangeset;
 
 using UploadChangesets = std::vector<UploadChangeset>;
 
-using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
+using EventLoopMetricsHandler = network::Service::EventLoopMetricsHandler;
 
 
 static_assert(std::numeric_limits<session_ident_type>::digits >= 63, "Bad session identifier type");
@@ -103,8 +103,6 @@ namespace {
 
 enum class SchedStatus { done = 0, pending, in_progress };
 
-
-util::StderrLogger g_fallback_logger;
 
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 {
@@ -752,14 +750,15 @@ public:
 
     util::Mutex last_client_accesses_mutex;
 
+    const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
-    util::network::Service& get_service() noexcept
+    network::Service& get_service() noexcept
     {
         return m_service;
     }
 
-    const util::network::Service& get_service() const noexcept
+    const network::Service& get_service() const noexcept
     {
         return m_service;
     }
@@ -784,7 +783,7 @@ public:
         return m_root_dir;
     }
 
-    util::network::ssl::Context& get_ssl_context() noexcept
+    network::ssl::Context& get_ssl_context() noexcept
     {
         return *m_ssl_context;
     }
@@ -849,7 +848,7 @@ public:
         start(); // Throws
     }
 
-    util::network::Endpoint listen_endpoint() const
+    network::Endpoint listen_endpoint() const
     {
         return m_acceptor.local_endpoint();
     }
@@ -893,8 +892,8 @@ public:
             _impl::parse_virtual_path(m_root_dir, virt_path); // Throws
         REALM_ASSERT(virt_path_components.is_valid);
 
-        _impl::make_dirs(m_root_dir, virt_path);  // Throws
-        m_realm_names.insert(virt_path);          // Throws
+        _impl::make_dirs(m_root_dir, virt_path); // Throws
+        m_realm_names.insert(virt_path);         // Throws
         {
             bool disable_sync_to_disk = m_config.disable_sync_to_disk;
             file.reset(new ServerFile(*this, m_file_access_cache, virt_path, virt_path_components.real_realm_path,
@@ -975,7 +974,7 @@ public:
 
 private:
     Server::Config m_config;
-    util::network::Service m_service;
+    network::Service m_service;
     std::mt19937_64 m_random;
     const std::size_t m_max_upload_backlog;
     const std::string m_root_dir;
@@ -995,14 +994,14 @@ private:
     // file-system level intervention.
     std::set<std::string> m_realm_names;
 
-    std::unique_ptr<util::network::ssl::Context> m_ssl_context;
+    std::unique_ptr<network::ssl::Context> m_ssl_context;
     ServerFileAccessCache m_file_access_cache;
     Worker m_worker;
     std::map<std::string, util::bind_ptr<ServerFile>> m_files; // Key is virtual path
-    util::network::Acceptor m_acceptor;
+    network::Acceptor m_acceptor;
     std::int_fast64_t m_next_conn_id = 0;
     std::unique_ptr<HTTPConnection> m_next_http_conn;
-    util::network::Endpoint m_next_http_conn_endpoint;
+    network::Endpoint m_next_http_conn_endpoint;
     std::map<std::int_fast64_t, std::unique_ptr<HTTPConnection>> m_http_connections;
     std::map<std::int_fast64_t, std::unique_ptr<SyncConnection>> m_sync_connections;
     ServerProtocol m_server_protocol;
@@ -1011,7 +1010,7 @@ private:
     std::unique_ptr<Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
     int_fast64_t m_current_server_session_ident;
-    Optional<util::network::DeadlineTimer> m_connection_reaper_timer;
+    Optional<network::DeadlineTimer> m_connection_reaper_timer;
     bool m_allow_load_balancing = false;
 
     util::Mutex m_mutex;
@@ -1068,15 +1067,17 @@ private:
 
 // ============================ SyncConnection ============================
 
-class SyncConnection : public util::websocket::Config {
+class SyncConnection : public websocket::Config {
 public:
-    util::PrefixLogger logger;
+    const std::shared_ptr<util::Logger> logger_ptr;
+    util::Logger& logger;
 
-    SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<util::network::Socket>&& socket,
-                   std::unique_ptr<util::network::ssl::Stream>&& ssl_stream,
-                   std::unique_ptr<util::network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
+    SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
+                   std::unique_ptr<network::ssl::Stream>&& ssl_stream,
+                   std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint)
-        : logger{make_logger_prefix(id), serv.logger} // Throws
+        : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
         , m_socket{std::move(socket)}
@@ -1091,12 +1092,14 @@ public:
         // expand the buffer
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
-        util::network::Service& service = m_server.get_service();
-        auto handler = [this] {
+        network::Service& service = m_server.get_service();
+        auto handler = [this](Status status) {
+            if (!status.is_ok())
+                return;
             if (!m_is_sending)
                 send_next_message(); // Throws
         };
-        m_send_trigger = util::network::Trigger{service, std::move(handler)}; // Throws
+        m_send_trigger = std::make_unique<Trigger<network::Service>>(&service, std::move(handler)); // Throws
     }
 
     ~SyncConnection() noexcept;
@@ -1126,9 +1129,9 @@ public:
         return m_remote_endpoint;
     }
 
-    util::Logger& websocket_get_logger() noexcept final override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept final
     {
-        return logger;
+        return logger_ptr;
     }
 
     std::mt19937_64& websocket_get_random() noexcept final override
@@ -1165,7 +1168,7 @@ public:
         return true;
     }
 
-    void async_write(const char* data, size_t size, util::websocket::WriteCompletionHandler handler) final override
+    void async_write(const char* data, size_t size, websocket::WriteCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
@@ -1175,7 +1178,7 @@ public:
         }
     }
 
-    void async_read(char* buffer, size_t size, util::websocket::ReadCompletionHandler handler) final override
+    void async_read(char* buffer, size_t size, websocket::ReadCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read(buffer, size, *m_read_ahead_buffer, std::move(handler)); // Throws
@@ -1186,7 +1189,7 @@ public:
     }
 
     void async_read_until(char* buffer, size_t size, char delim,
-                          util::websocket::ReadCompletionHandler handler) final override
+                          websocket::ReadCompletionHandler handler) final override
     {
         if (m_ssl_stream) {
             m_ssl_stream->async_read_until(buffer, size, delim, *m_read_ahead_buffer,
@@ -1232,7 +1235,7 @@ public:
         return m_id;
     }
 
-    util::network::Socket& get_socket() noexcept
+    network::Socket& get_socket() noexcept
     {
         return *m_socket;
     }
@@ -1296,11 +1299,11 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
-    std::unique_ptr<util::network::Socket> m_socket;
-    std::unique_ptr<util::network::ssl::Stream> m_ssl_stream;
-    std::unique_ptr<util::network::ReadAheadBuffer> m_read_ahead_buffer;
+    std::unique_ptr<network::Socket> m_socket;
+    std::unique_ptr<network::ssl::Stream> m_ssl_stream;
+    std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
 
-    util::websocket::Socket m_websocket;
+    websocket::Socket m_websocket;
     std::unique_ptr<char[]> m_input_body_buffer;
     OutputBuffer m_output_buffer;
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
@@ -1335,7 +1338,7 @@ private:
     bool m_send_pong = false;
     bool m_sending_pong = false;
 
-    util::network::Trigger m_send_trigger;
+    std::unique_ptr<Trigger<network::Service>> m_send_trigger;
 
     milliseconds_type m_last_ping_timestamp = 0;
 
@@ -1434,22 +1437,24 @@ std::string g_user_agent = "User-Agent";
 
 class HTTPConnection {
 public:
-    util::PrefixLogger logger;
+    const std::shared_ptr<Logger> logger_ptr;
+    util::Logger& logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : logger{make_logger_prefix(id), serv.logger} // Throws
+        : logger_ptr{std::make_shared<PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
-        , m_socket{new util::network::Socket{serv.get_service()}} // Throws
-        , m_read_ahead_buffer{new util::network::ReadAheadBuffer} // Throws
-        , m_http_server{*this, logger}
+        , m_socket{new network::Socket{serv.get_service()}} // Throws
+        , m_read_ahead_buffer{new network::ReadAheadBuffer} // Throws
+        , m_http_server{*this, logger_ptr}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
         // expand the buffer
         m_output_buffer.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
         if (is_ssl) {
-            using namespace util::network::ssl;
+            using namespace network::ssl;
             Context& ssl_context = serv.get_ssl_context();
             m_ssl_stream = std::make_unique<Stream>(*m_socket, ssl_context,
                                                     Stream::server); // Throws
@@ -1466,7 +1471,7 @@ public:
         return m_id;
     }
 
-    util::network::Socket& get_socket() noexcept
+    network::Socket& get_socket() noexcept
     {
         return *m_socket;
     }
@@ -1572,9 +1577,9 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
-    std::unique_ptr<util::network::Socket> m_socket;
-    std::unique_ptr<util::network::ssl::Stream> m_ssl_stream;
-    std::unique_ptr<util::network::ReadAheadBuffer> m_read_ahead_buffer;
+    std::unique_ptr<network::Socket> m_socket;
+    std::unique_ptr<network::ssl::Stream> m_ssl_stream;
+    std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
     HTTPServer<HTTPConnection> m_http_server;
     OutputBuffer m_output_buffer;
     bool m_is_sending = false;
@@ -2046,7 +2051,7 @@ public:
     util::PrefixLogger logger;
 
     Session(SyncConnection& conn, session_ident_type session_ident)
-        : logger{make_logger_prefix(session_ident), conn.logger} // Throws
+        : logger{make_logger_prefix(session_ident), conn.logger_ptr} // Throws
         , m_connection{conn}
         , m_session_ident{session_ident}
     {
@@ -3154,7 +3159,7 @@ void SessionQueue::clear() noexcept
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
                        std::string real_path, bool disable_sync_to_disk)
-    : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
+    : logger{"ServerFile[" + virt_path + "]: ", server.logger_ptr}           // Throws
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
@@ -3375,15 +3380,14 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     m_server.m_par_time.fetch_add(parallel_time, std::memory_order_relaxed);
 
     // Pass control back to the network event loop thread
-    auto handler = [this] {
+    network::Service& service = m_server.get_service();
+    service.post([this](Status) {
         // FIXME: The safety of capturing `this` here, relies on the fact
         // that ServerFile objects currently are not destroyed until the
         // server object is destroyed.
         group_postprocess_stage_1(); // Throws
         // Suicide may have happened at this point
-    };
-    util::network::Service& service = m_server.get_service();
-    service.post(std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -3625,7 +3629,7 @@ void ServerFile::finalize_work_stage_1()
         if (i != m_identified_sessions.end()) {
             Session& sess = *i->second;
             SyncConnection& conn = sess.get_connection();
-            conn.protocol_error(error_2, &sess);           // Throws
+            conn.protocol_error(error_2, &sess); // Throws
         }
         const IntegratableChangesetList& list = m_changesets_from_downstream[client_file_ident];
         std::size_t num_changesets = list.changesets.size();
@@ -3691,7 +3695,7 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : logger{"Worker: ", server.logger} // Throws
+    : logger{"Worker: ", server.logger_ptr} // Throws
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
@@ -3759,7 +3763,8 @@ void Worker::stop() noexcept
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger{config.logger ? *config.logger : g_fallback_logger}
+    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
     , m_root_dir{root_dir} // Throws
@@ -3772,7 +3777,7 @@ ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> p
     , m_compress_memory_arena{} // Throws
 {
     if (m_config.ssl) {
-        m_ssl_context = std::make_unique<util::network::ssl::Context>();          // Throws
+        m_ssl_context = std::make_unique<network::ssl::Context>();                // Throws
         m_ssl_context->use_certificate_chain_file(m_config.ssl_certificate_path); // Throws
         m_ssl_context->use_private_key_file(m_config.ssl_certificate_key_path);   // Throws
     }
@@ -3822,7 +3827,7 @@ void ServerImpl::start()
             logger.info("%1: No", lead_text); // Throws
         }
     }
-    logger.info("Log level: %1", logger.level_threshold.get()); // Throws
+    logger.info("Log level: %1", logger.get_level_threshold()); // Throws
     {
         const char* lead_text = "Disable sync to disk";
         if (m_config.disable_sync_to_disk) {
@@ -3847,7 +3852,7 @@ void ServerImpl::start()
     logger.info("Connection reaper timeout: %1 ms", m_config.connection_reaper_timeout);   // Throws
     logger.info("Connection reaper interval: %1 ms", m_config.connection_reaper_interval); // Throws
     logger.info("Connection soft close timeout: %1 ms", m_config.soft_close_timeout);      // Throws
-    logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
+    logger.debug("Authorization header name: %1", m_config.authorization_header_name);     // Throws
 
     m_transformer = make_transformer(); // Throws
 
@@ -3935,11 +3940,10 @@ util::Buffer<char>& ServerImpl::get_transform_buffer() noexcept
 
 void ServerImpl::listen()
 {
-    util::network::Resolver resolver{get_service()};
-    util::network::Resolver::Query query(m_config.listen_address, m_config.listen_port,
-                                         util::network::Resolver::Query::passive |
-                                             util::network::Resolver::Query::address_configured);
-    util::network::Endpoint::List endpoints = resolver.resolve(query); // Throws
+    network::Resolver resolver{get_service()};
+    network::Resolver::Query query(m_config.listen_address, m_config.listen_port,
+                                   network::Resolver::Query::passive | network::Resolver::Query::address_configured);
+    network::Endpoint::List endpoints = resolver.resolve(query); // Throws
 
     auto i = endpoints.begin();
     auto end = endpoints.end();
@@ -3947,7 +3951,7 @@ void ServerImpl::listen()
         std::error_code ec;
         m_acceptor.open(i->protocol(), ec);
         if (!ec) {
-            using SocketBase = util::network::SocketBase;
+            using SocketBase = network::SocketBase;
             m_acceptor.set_option(SocketBase::reuse_address(m_config.reuse_address), ec);
             if (!ec) {
                 m_acceptor.bind(*i, ec);
@@ -3971,7 +3975,7 @@ void ServerImpl::listen()
 
     m_acceptor.listen(m_config.listen_backlog);
 
-    util::network::Endpoint local_endpoint = m_acceptor.local_endpoint();
+    network::Endpoint local_endpoint = m_acceptor.local_endpoint();
     const char* ssl_mode = (m_ssl_context ? "TLS" : "non-TLS");
     logger.info("Listening on %1:%2 (max backlog is %3, %4)", local_endpoint.address(), local_endpoint.port(),
                 m_config.listen_backlog, ssl_mode); // Throws
@@ -3987,7 +3991,7 @@ void ServerImpl::initiate_accept()
             handle_accept(ec);
     };
     bool is_ssl = bool(m_ssl_context);
-    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                 // Throws
+    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                            // Throws
     m_acceptor.async_accept(m_next_http_conn->get_socket(), m_next_http_conn_endpoint, std::move(handler)); // Throws
 }
 
@@ -4020,7 +4024,7 @@ void ServerImpl::handle_accept(std::error_code ec)
     else {
         HTTPConnection& conn = *m_next_http_conn;
         if (m_config.tcp_no_delay)
-            conn.get_socket().set_option(util::network::SocketBase::no_delay(true)); // Throws
+            conn.get_socket().set_option(network::SocketBase::no_delay(true));       // Throws
         m_http_connections.emplace(conn.get_id(), std::move(m_next_http_conn));      // Throws
         Formatter& formatter = m_misc_buffers.formatter;
         formatter.reset();
@@ -4052,19 +4056,17 @@ void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 
 void ServerImpl::set_connection_reaper_timeout(milliseconds_type timeout)
 {
-    auto handler = [this, timeout] {
+    get_service().post([this, timeout](Status) {
         m_config.connection_reaper_timeout = timeout;
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::close_connections()
 {
-    auto handler = [this] {
+    get_service().post([this](Status) {
         do_close_connections(); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
@@ -4077,10 +4079,9 @@ bool ServerImpl::map_virtual_to_real_path(const std::string& virt_path, std::str
 void ServerImpl::recognize_external_change(const std::string& virt_path)
 {
     std::string virt_path_2 = virt_path; // Throws (copy)
-    auto handler = [this, virt_path = std::move(virt_path_2)] {
+    get_service().post([this, virt_path = std::move(virt_path_2)](Status) {
         do_recognize_external_change(virt_path); // Throws
-    };
-    get_service().post(std::move(handler)); // Throws
+    });                                          // Throws
 }
 
 
@@ -4091,25 +4092,22 @@ void ServerImpl::stop_sync_and_wait_for_backup_completion(
                 "timeout = %1",
                 timeout); // Throws
 
-    auto handler = [this, completion_handler = std::move(completion_handler), timeout]() mutable {
+    get_service().post([this, completion_handler = std::move(completion_handler), timeout](Status) mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
                                                     timeout); // Throws
-    };
-    get_service().post(std::move(handler));
+    });
 }
 
 
 void ServerImpl::initiate_connection_reaper_timer(milliseconds_type timeout)
 {
-    auto handler = [this, timeout](std::error_code ec) {
-        if (ec != util::error::operation_aborted) {
+    m_connection_reaper_timer.emplace(get_service());
+    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), [this, timeout](Status status) {
+        if (status != ErrorCodes::OperationAborted) {
             reap_connections();                        // Throws
             initiate_connection_reaper_timer(timeout); // Throws
         }
-    };
-
-    m_connection_reaper_timer.emplace(get_service());
-    m_connection_reaper_timer->async_wait(std::chrono::milliseconds(timeout), std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -4225,10 +4223,11 @@ void SyncConnection::terminate_if_dead(SteadyTimePoint now)
 
 void SyncConnection::enlist_to_send(Session* sess) noexcept
 {
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     REALM_ASSERT(!sess->is_enlisted_to_send());
     m_sessions_enlisted_to_send.push_back(sess);
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 
@@ -4438,8 +4437,9 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
 
 void SyncConnection::bad_session_ident(const char* message_type, session_ident_type session_ident)
 {
-    logger.error("Bad session identifier in %1 message, session_ident = %2", message_type, session_ident); // Throws
-    protocol_error(ProtocolError::bad_session_ident);                                                      // Throws
+    logger.error("Bad session identifier in %1 message, session_ident = %2", message_type,
+                 session_ident);                      // Throws
+    protocol_error(ProtocolError::bad_session_ident); // Throws
 }
 
 
@@ -4599,7 +4599,7 @@ void SyncConnection::handle_write_error()
     REALM_ASSERT(m_is_closing);
     if (!m_ssl_stream) {
         std::error_code ec;
-        m_socket->shutdown(util::network::Socket::shutdown_send, ec);
+        m_socket->shutdown(network::Socket::shutdown_send, ec);
         if (ec && ec != make_basic_system_error_code(ENOTCONN))
             throw std::system_error(ec);
     }
@@ -4650,6 +4650,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
     REALM_ASSERT(is_session_level_error(error_code) == (session_ident != 0));
     REALM_ASSERT(!is_session_level_error(error_code));
 
+    REALM_ASSERT(m_send_trigger);
     REALM_ASSERT(!m_is_closing);
     m_is_closing = true;
 
@@ -4664,7 +4665,7 @@ void SyncConnection::do_initiate_soft_close(ProtocolError error_code, session_id
 
     terminate_sessions(); // Throws
 
-    m_send_trigger.trigger();
+    m_send_trigger->trigger();
 }
 
 
@@ -4751,7 +4752,7 @@ void Server::start(const std::string& listen_address, const std::string& listen_
 }
 
 
-util::network::Endpoint Server::listen_endpoint() const
+network::Endpoint Server::listen_endpoint() const
 {
     return m_impl->listen_endpoint(); // Throws
 }

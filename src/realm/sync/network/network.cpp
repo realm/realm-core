@@ -22,7 +22,7 @@
 #include <realm/util/misc_errors.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
-#include <realm/util/network.hpp>
+#include <realm/sync/network/network.hpp>
 
 #if defined _GNU_SOURCE && !REALM_ANDROID
 #define HAVE_LINUX_PIPE2 1
@@ -69,7 +69,7 @@
 #endif
 
 using namespace realm::util;
-using namespace realm::util::network;
+using namespace realm::sync::network;
 
 
 namespace {
@@ -1352,24 +1352,23 @@ public:
     {
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         m_event_loop_metrics_timer.emplace(service);
-        auto handler_2 = [this, handler = std::move(handler)](std::error_code ec) {
-            REALM_ASSERT(!ec);
-            clock::time_point now = clock::now();
-            clock::duration elapsed_time = now - m_event_loop_metrics_start_time;
-            clock::duration sleep_time = io_reactor.get_and_reset_sleep_time();
-            clock::duration nonsleep_time = elapsed_time - sleep_time;
-            double saturation = double(nonsleep_time.count()) / double(elapsed_time.count());
-            clock::duration internal_exec_time = nonsleep_time - m_handler_exec_time;
-            internal_exec_time += now - m_handler_exec_start_time;
-            double inefficiency = double(internal_exec_time.count()) / double(elapsed_time.count());
-            m_event_loop_metrics_start_time = now;
-            m_handler_exec_start_time = now;
-            m_handler_exec_time = clock::duration::zero();
-            handler(saturation, inefficiency);             // Throws
-            report_event_loop_metrics(std::move(handler)); // Throws
-        };
-        m_event_loop_metrics_timer->async_wait(std::chrono::seconds{30},
-                                               std::move(handler_2)); // Throws
+        m_event_loop_metrics_timer->async_wait(
+            std::chrono::seconds{30}, [this, handler = std::move(handler)](Status status) {
+                REALM_ASSERT(status.is_ok());
+                clock::time_point now = clock::now();
+                clock::duration elapsed_time = now - m_event_loop_metrics_start_time;
+                clock::duration sleep_time = io_reactor.get_and_reset_sleep_time();
+                clock::duration nonsleep_time = elapsed_time - sleep_time;
+                double saturation = double(nonsleep_time.count()) / double(elapsed_time.count());
+                clock::duration internal_exec_time = nonsleep_time - m_handler_exec_time;
+                internal_exec_time += now - m_handler_exec_start_time;
+                double inefficiency = double(internal_exec_time.count()) / double(elapsed_time.count());
+                m_event_loop_metrics_start_time = now;
+                m_handler_exec_start_time = now;
+                m_handler_exec_time = clock::duration::zero();
+                handler(saturation, inefficiency);             // Throws
+                report_event_loop_metrics(std::move(handler)); // Throws
+            });                                                // Throws
 #else
         static_cast<void>(handler);
 #endif
@@ -2507,9 +2506,7 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
 }
 
 
-namespace realm {
-namespace util {
-namespace network {
+namespace realm::sync::network {
 
 std::string host_name()
 {
@@ -2579,36 +2576,43 @@ Address make_address(const char* c_str, std::error_code& ec) noexcept
     */
 }
 
-
-ResolveErrorCategory resolve_error_category;
-
-
-const char* ResolveErrorCategory::name() const noexcept
-{
-    return "realm.util.network.resolve";
-}
-
-
-std::string ResolveErrorCategory::message(int value) const
-{
-    switch (ResolveErrors(value)) {
-        case ResolveErrors::host_not_found:
-            return "Host not found (authoritative)";
-        case ResolveErrors::host_not_found_try_again:
-            return "Host not found (non-authoritative)";
-        case ResolveErrors::no_data:
-            return "The query is valid but does not have associated address data";
-        case ResolveErrors::no_recovery:
-            return "A non-recoverable error occurred";
-        case ResolveErrors::service_not_found:
-            return "The service is not supported for the given socket type";
-        case ResolveErrors::socket_type_not_supported:
-            return "The socket type is not supported";
+class ResolveErrorCategory : public std::error_category {
+public:
+    const char* name() const noexcept final
+    {
+        return "realm.sync.network.resolve";
     }
-    REALM_ASSERT(false);
-    return {};
+
+    std::string message(int value) const final
+    {
+        switch (ResolveErrors(value)) {
+            case ResolveErrors::host_not_found:
+                return "Host not found (authoritative)";
+            case ResolveErrors::host_not_found_try_again:
+                return "Host not found (non-authoritative)";
+            case ResolveErrors::no_data:
+                return "The query is valid but does not have associated address data";
+            case ResolveErrors::no_recovery:
+                return "A non-recoverable error occurred";
+            case ResolveErrors::service_not_found:
+                return "The service is not supported for the given socket type";
+            case ResolveErrors::socket_type_not_supported:
+                return "The socket type is not supported";
+        }
+        REALM_ASSERT(false);
+        return {};
+    }
+};
+
+const std::error_category& resolve_error_category() noexcept
+{
+    static const ResolveErrorCategory resolve_error_category;
+    return resolve_error_category;
 }
 
-} // namespace network
-} // namespace util
-} // namespace realm
+std::error_code make_error_code(ResolveErrors err)
+{
+    return std::error_code(int(err), resolve_error_category());
+}
+
+} // namespace realm::sync::network

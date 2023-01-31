@@ -60,7 +60,7 @@ public:
 
     // Live transactions state changes, often taking an observer functor:
     VersionID commit_and_continue_as_read(bool commit_to_disk = true) REQUIRES(!m_async_mutex);
-    void commit_and_continue_writing();
+    VersionID commit_and_continue_writing();
     template <class O>
     void rollback_and_continue_as_read(O* observer) REQUIRES(!m_async_mutex);
     void rollback_and_continue_as_read() REQUIRES(!m_async_mutex)
@@ -188,7 +188,7 @@ private:
     void complete_async_commit();
     void acquire_write_lock() REQUIRES(!m_async_mutex);
 
-    void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit);
+    void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t work_limit);
     void close_read_with_lock() REQUIRES(!m_async_mutex, db->m_mutex);
 
     DBRef db;

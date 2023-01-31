@@ -10,6 +10,7 @@ set(SYNC_SOURCES
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
+    binding_callback_thread_observer.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -22,10 +23,11 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
-    ../util/network_ssl.cpp
-    ../util/network.cpp
-    ../util/websocket.cpp
-    ../util/ez_websocket.cpp
+    network/default_socket.cpp
+    network/http.cpp
+    network/network.cpp
+    network/network_ssl.cpp
+    network/websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS
@@ -34,12 +36,14 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    binding_callback_thread_observer.hpp
     config.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
     changeset.hpp
     client.hpp
     client_base.hpp
+    socket_provider.hpp
     history.hpp
     instruction_applier.hpp
     instruction_replication.hpp
@@ -48,11 +52,16 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+
+    network/http.hpp
 )
 
 set(NOINST_HEADERS
-    ../util/http.hpp
-    ../util/websocket.hpp
+    trigger.hpp
+    network/default_socket.hpp
+    network/network.hpp
+    network/network_ssl.hpp
+    network/websocket.hpp
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
@@ -82,7 +91,7 @@ target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
-else()
+elseif(NOT EMSCRIPTEN)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 

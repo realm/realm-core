@@ -735,10 +735,8 @@ ref_type GroupWriter::write_group()
     // bigger databases the space required for free lists will be relatively less.
     max_free_list_size += 10;
 
-    // If current size is less than 128 MB, the database need not expand above 2 GB
-    // which means that the positions and sizes can still be in 32 bit.
-    int size_per_entry = (m_logical_size < 0x8000000 ? 8 : 16) + 8;
-    size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
+    size_t max_free_space_needed =
+        Array::get_max_byte_size(top.size()) + size_per_free_list_entry() * max_free_list_size;
 
     ALLOC_DBG_COUT("  Allocating file space for freelists:" << std::endl);
     // Reserve space for remaining arrays. We ask for some extra bytes beyond the
@@ -822,6 +820,34 @@ ref_type GroupWriter::write_group()
     top.set(Group::s_free_version_ndx, from_ref(free_versions_ref));            // Throws
     top.set(Group::s_version_ndx, RefOrTagged::make_tagged(m_current_version)); // Throws
 
+    // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
+    static constexpr size_t minimal_compaction_size = 0x100000;
+    if (m_logical_size >= minimal_compaction_size && m_evacuation_limit == 0 && m_backoff == 0) {
+        // We might have allocated a bigger chunk than needed for the free lists, so if we
+        // add what we have reserved and subtract what was requested, we get a better measure
+        // for what will be free eventually. Also subtract the locked space as this is not
+        // actually free.
+        size_t free_space = m_free_space_size + reserve_size - max_free_space_needed - m_locked_space_size;
+        REALM_ASSERT(m_logical_size > free_space);
+        size_t used_space = m_logical_size - free_space;
+        if (free_space > 2 * used_space) {
+            // Clean up potential
+            auto limit = util::round_up_to_page_size(used_space + used_space / 2);
+
+            // If we make the file too small, there is a big chance it will grow immediately afterwards
+            static constexpr size_t minimal_evac_limit = 0x10000;
+            m_evacuation_limit = std::max(minimal_evac_limit, limit);
+
+            // From now on, we will only allocate below this limit
+            // Save the limit in the file
+            while (top.size() <= Group::s_evacuation_point_ndx) {
+                top.add(0);
+            }
+            top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
+            // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
+        }
+    }
+
     // Get final sizes
     const size_t top_byte_size = top.get_byte_size();
     const ref_type end_ref = top_ref + top_byte_size;
@@ -845,26 +871,6 @@ ref_type GroupWriter::write_group()
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
     m_free_space_size += rest;
-
-    if (m_evacuation_limit == 0 && m_backoff == 0) {
-        size_t used_space = m_logical_size - m_free_space_size;
-        // Compacting files smaller than 1 Mb is not worth the effort. Arbitrary chosen value.
-        static constexpr size_t minimal_compaction_size = 0x100000;
-        // If we make the file too small, there is a big chance it will grow immediately afterwards
-        static constexpr size_t minimal_evac_limit = 0x10000;
-        if (m_logical_size >= minimal_compaction_size && m_free_space_size - m_locked_space_size > 2 * used_space) {
-            // Clean up potential
-            auto limit = util::round_up_to_page_size(used_space + used_space / 2 + m_locked_space_size);
-            m_evacuation_limit = std::max(minimal_evac_limit, limit);
-            // From now on, we will only allocate below this limit
-            // Save the limit in the file
-            while (top.size() <= Group::s_evacuation_point_ndx) {
-                top.add(0);
-            }
-            top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
-            // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
-        }
-    }
 
 #if REALM_ALLOC_DEBUG
     std::cout << "  Final Freelist:" << std::endl;

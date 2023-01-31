@@ -45,7 +45,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include <chrono>
 #include <condition_variable>
@@ -659,7 +659,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     TestAppSession session;
     auto app = session.app();
 
-    SECTION("link_user intergration") {
+    SECTION("link_user integration") {
         AutoVerifiedEmailCredentials creds;
         bool processed = false;
         std::shared_ptr<SyncUser> sync_user;
@@ -2011,26 +2011,8 @@ constexpr size_t minus_25_percent(size_t val)
     return val * .75 - 10;
 }
 
-static void set_app_config_defaults(app::App::Config& app_config,
-                                    const std::shared_ptr<app::GenericNetworkTransport>& transport)
-{
-    if (!app_config.transport)
-        app_config.transport = transport;
-    if (app_config.platform.empty())
-        app_config.platform = "Object Store Test Platform";
-    if (app_config.platform_version.empty())
-        app_config.platform_version = "Object Store Test Platform Version";
-    if (app_config.sdk_version.empty())
-        app_config.sdk_version = "SDK Version";
-    if (app_config.app_id.empty())
-        app_config.app_id = "app_id";
-    if (!app_config.local_app_version)
-        app_config.local_app_version.emplace("A Local App Version");
-}
-
 TEST_CASE("app: sync integration", "[sync][app]") {
-    auto logger = std::make_unique<util::StderrLogger>();
-    logger->set_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    auto logger = std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
 
@@ -2241,7 +2223,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
                     redir_transport->simulated_response = {
-                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                        308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 3) {
@@ -2293,7 +2275,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
                 redir_transport->simulated_response = {
-                    301,
+                    request_count % 2 == 1 ? 308 : 301,
                     0,
                     {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
                     "Some body data"};
@@ -2712,7 +2694,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex mutex;
         bool done = false;
         auto r = Realm::get_shared_realm(config);
-        r->sync_session()->close();
+        r->sync_session()->pause();
 
         // Create 26 MB worth of dogs in 26 transactions, which should work but
         // will result in an error from the server if the changesets are batched
@@ -2732,7 +2714,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!ec);
             done = true;
         });
-        r->sync_session()->revive_if_needed();
+        r->sync_session()->resume();
 
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
@@ -2773,6 +2755,33 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                  "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
+    }
+
+    SECTION("freezing realm does not resume session") {
+        SyncTestFile config(app, partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+
+        auto state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Active);
+
+        realm->sync_session()->pause();
+        state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Paused);
+
+        realm->read_group();
+
+        {
+            auto frozen = realm->freeze();
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
+
+        {
+            auto frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
     }
 
     SECTION("validation") {
@@ -3245,7 +3254,13 @@ private:
                                 {"appVersion", "A Local App Version"},
                                 {"platform", "Object Store Test Platform"},
                                 {"platformVersion", "Object Store Test Platform Version"},
+                                {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
+                                {"cpuArch", "CPU Arch"},
+                                {"deviceName", "Device Name"},
+                                {"deviceVersion", "Device Version"},
+                                {"frameworkName", "Framework Name"},
+                                {"frameworkVersion", "Framework Version"},
                                 {"coreVersion", REALM_VERSION_STRING}}}}));
 
         CHECK(request.timeout_ms == 60000);
@@ -4432,6 +4447,23 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         CHECK(cur_user);
 
         SyncTestFile config(app->current_user(), bson::Bson("foo"));
+        // Ignore websocket errors, since sometimes a websocket connection gets started during the test
+        config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
+            // Ignore websocket errors, since there's not really an app out there...
+            if (error.message.find("Bad WebSocket") != std::string::npos) {
+                util::format(std::cerr,
+                             "An expected possible WebSocket error was caught during test: 'app destroyed during "
+                             "token refresh': '%1' for '%2'",
+                             error.message, session->path());
+            }
+            else {
+                util::format(std::cerr,
+                             "An unexpected sync error was caught during test: 'app destroyed during token refresh': "
+                             "'%1' for '%2'",
+                             error.message, session->path());
+                abort();
+            }
+        };
         auto r = Realm::get_shared_realm(config);
         auto session = r->sync_session();
         mock_transport_worker.add_work_item([session] {
@@ -4706,3 +4738,100 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     mock_transport_worker.mark_complete();
 }
 #endif
+
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, profile };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    struct transport : public GenericNetworkTransport {
+        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state,
+                  std::shared_ptr<SyncUser>& logged_in_user)
+            : mock_transport_worker(worker)
+            , state(state)
+            , logged_in_user(logged_in_user)
+        {
+        }
+
+        void send_request_to_server(const Request& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion) override
+        {
+            if (request.url.find("/login") != std::string::npos) {
+                state.advance_to(TestState::login);
+                mock_transport_worker.add_work_item(
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                logged_in_user->log_out();
+                state.advance_to(TestState::profile);
+                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                    std::move(completion));
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                state.advance_to(TestState::location);
+                mock_transport_worker.add_work_item(
+                    Response{200,
+                             0,
+                             {},
+                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    std::move(completion));
+            }
+        }
+
+        AsyncMockNetworkTransport& mock_transport_worker;
+        TestStateBundle& state;
+        std::shared_ptr<SyncUser>& logged_in_user;
+    };
+
+    std::shared_ptr<SyncUser> logged_in_user;
+    auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
+
+    TestSyncManager sync_manager(get_config(transporter));
+    auto app = sync_manager.app();
+
+    logged_in_user = app->sync_manager()->get_user(UnitTestTransport::user_id, good_access_token, good_access_token,
+                                                   "anon-user", dummy_device_id);
+    auto custom_credentials = AppCredentials::facebook("a_token");
+    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
+
+    app->link_user(logged_in_user, custom_credentials,
+                   [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                           util::Optional<AppError> error) mutable {
+                       REQUIRE_FALSE(error);
+                       promise.emplace_value(std::move(user));
+                   });
+
+    auto cur_user = std::move(cur_user_future).get();
+    CHECK(state.get() == TestState::profile);
+    CHECK(cur_user);
+    CHECK(cur_user == logged_in_user);
+
+    mock_transport_worker.mark_complete();
+}

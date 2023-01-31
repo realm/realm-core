@@ -308,7 +308,7 @@ echo "Starting mongodb"
 
 echo "Initializing replica set"
 retries=0
-until "./mongodb-binaries/bin/$MONGOSH"  --port 26000 --eval 'try { rs.initiate(); } catch (e) { if (e.codeName != "AlreadyInitialized") { throw e; } }' > /dev/null
+until "./mongodb-binaries/bin/$MONGOSH" mongodb://localhost:26000/auth --eval 'try { rs.initiate(); } catch (e) { if (e.codeName != "AlreadyInitialized") { throw e; } }' > /dev/null
 do
     if (( retries++ < 5 )); then
         sleep 1
@@ -336,6 +336,17 @@ go build -o "$WORK_PATH/baas_server" cmd/server/main.go
     --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json > "$WORK_PATH/baas_server.log" 2>&1 &
 echo $! > "$WORK_PATH/baas_server.pid"
 "$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
+
+echo "Adding roles to admin user"
+$CURL 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --silent \
+  --fail \
+  --output /dev/null \
+  --data-raw '{"username":"unique_user@domain.com","password":"password"}'
+
+"../mongodb-binaries/bin/$MONGOSH"  --quiet mongodb://localhost:26000/auth "$BASE_PATH/add_admin_roles.js"
 
 touch "$WORK_PATH/baas_ready"
 

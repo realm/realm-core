@@ -67,13 +67,15 @@ public:
     static AdminAPISession login(const std::string& base_url, const std::string& username,
                                  const std::string& password);
 
-    AdminAPIEndpoint apps() const;
+    enum class APIFamily { Admin, Private };
+    AdminAPIEndpoint apps(APIFamily family = APIFamily::Admin) const;
     void revoke_user_sessions(const std::string& user_id, const std::string& app_id) const;
     void disable_user_sessions(const std::string& user_id, const std::string& app_id) const;
     void enable_user_sessions(const std::string& user_id, const std::string& app_id) const;
     bool verify_access_token(const std::string& access_token, const std::string& app_id) const;
     void set_development_mode_to(const std::string& app_id, bool enable) const;
     void delete_app(const std::string& app_id) const;
+    void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
 
     struct Service {
         std::string id;
@@ -238,9 +240,8 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
             util::none,
             util::Optional<std::string>("A Local App Version"),
             util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
+            {"Object Store Platform Tests", "Object Store Platform Version Blah", "An sdk version", "An sdk name",
+             "A cpu arch", "A device name", "A device version", "A framework name", "A framework version"}};
 }
 
 } // namespace realm

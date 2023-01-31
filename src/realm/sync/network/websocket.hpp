@@ -1,16 +1,14 @@
+#pragma once
 
-#ifndef REALM_UTIL_WEBSOCKET_HPP
-#define REALM_UTIL_WEBSOCKET_HPP
-
+#include <realm/sync/network/http.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/http.hpp>
 #include <realm/util/logger.hpp>
 
 #include <random>
 #include <system_error>
 #include <map>
 
-namespace realm::util::websocket {
+namespace realm::sync::websocket {
 
 using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
@@ -20,7 +18,7 @@ public:
     virtual ~Config() {}
 
     /// The Socket uses the caller supplied logger for logging.
-    virtual util::Logger& websocket_get_logger() noexcept = 0;
+    virtual const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept = 0;
 
     /// The Socket needs random numbers to satisfy the Websocket protocol.
     /// The caller must supply a random number generator.
@@ -199,6 +197,7 @@ enum class Error {
     bad_response_200_ok,
     bad_response_3xx_redirection,
     bad_response_301_moved_permanently,
+    bad_response_308_permanent_redirect,
     bad_response_4xx_client_errors,
     bad_response_401_unauthorized,
     bad_response_403_forbidden,
@@ -216,19 +215,19 @@ enum class Error {
 
 const std::error_category& websocket_close_status_category() noexcept;
 
+std::error_code make_error_code(ErrorCodes::Error error) noexcept;
+
 const std::error_category& error_category() noexcept;
 
 std::error_code make_error_code(Error) noexcept;
 
-} // namespace realm::util::websocket
+} // namespace realm::sync::websocket
 
 namespace std {
 
 template <>
-struct is_error_code_enum<realm::util::websocket::Error> {
+struct is_error_code_enum<realm::sync::websocket::Error> {
     static const bool value = true;
 };
 
 } // namespace std
-
-#endif // REALM_UTIL_WEBSOCKET_HPP

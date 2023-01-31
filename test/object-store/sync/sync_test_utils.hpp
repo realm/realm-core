@@ -148,9 +148,13 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId>
 
 struct TestClientReset {
     using Callback = util::UniqueFunction<void(const SharedRealm&)>;
+    using InitialObjectCallback = util::UniqueFunction<ObjectId(const SharedRealm&)>;
     TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config);
     virtual ~TestClientReset();
     TestClientReset* setup(Callback&& on_setup);
+
+    // Only used in FLX sync client reset tests.
+    TestClientReset* populate_initial_object(InitialObjectCallback&& callback);
     TestClientReset* make_local_changes(Callback&& changes_local);
     TestClientReset* make_remote_changes(Callback&& changes_remote);
     TestClientReset* on_post_local_changes(Callback&& post_local);
@@ -166,6 +170,7 @@ protected:
     realm::Realm::Config m_remote_config;
 
     Callback m_on_setup;
+    InitialObjectCallback m_populate_initial_object;
     Callback m_make_local_changes;
     Callback m_make_remote_changes;
     Callback m_on_post_local;
@@ -185,6 +190,11 @@ std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& loc
 std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
                                                             const Realm::Config& remote_config,
                                                             const TestAppSession& test_app_session);
+
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                         const std::string& schema_name, const bson::BsonDocument& filter_bson);
+
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

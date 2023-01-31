@@ -183,9 +183,7 @@ public:
 
     class UploadMessageBuilder {
     public:
-        util::Logger& logger;
-
-        UploadMessageBuilder(util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
+        UploadMessageBuilder(OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
                              util::compression::CompressMemoryArena& compress_memory_arena);
 
         void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,
@@ -202,7 +200,7 @@ public:
         util::compression::CompressMemoryArena& m_compress_memory_arena;
     };
 
-    UploadMessageBuilder make_upload_message_builder(util::Logger& logger);
+    UploadMessageBuilder make_upload_message_builder();
 
     void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
 
@@ -310,6 +308,11 @@ public:
                             cwei.primary_key = sync::parse_base64_encoded_primary_key(pk);
                             info.compensating_writes.push_back(std::move(cwei));
                         }
+
+                        info.compensating_write_server_version =
+                            json.at("compensatingWriteServerVersion").get<int64_t>();
+                        info.compensating_write_rejected_client_version =
+                            json.at("rejectedClientVersion").get<int64_t>();
                     }
                 }
                 catch (const nlohmann::json::exception& e) {
@@ -600,7 +603,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        util::Logger& logger = connection.logger;
+        auto& logger = connection.logger;
 
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);

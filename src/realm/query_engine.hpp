@@ -224,6 +224,10 @@ public:
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column);
 
+    virtual std::string validate()
+    {
+        return m_child ? m_child->validate() : "";
+    }
 
     ParentNode(const ParentNode& from);
 
@@ -535,7 +539,8 @@ public:
 
     bool has_search_index() const override
     {
-        return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+        return this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) ==
+               IndexType::General;
     }
 
     const std::vector<ObjKey>& index_based_keys() override
@@ -1240,7 +1245,7 @@ public:
 
     bool has_search_index() const override
     {
-        return this->m_table->has_search_index(BaseType::m_condition_column_key);
+        return this->m_table->search_index_type(BaseType::m_condition_column_key) == IndexType::General;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1445,7 +1450,7 @@ public:
 
     void table_changed() override
     {
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
 
     bool has_search_index() const override
@@ -1838,8 +1843,7 @@ public:
     void table_changed() override
     {
         StringNodeBase::table_changed();
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key) ||
-                             m_table.unchecked_ptr()->get_primary_key_column() == m_condition_column_key;
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
 
     void _search_index_init() override;
@@ -1932,7 +1936,7 @@ public:
     void table_changed() override
     {
         StringNodeBase::table_changed();
-        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
+        m_has_search_index = m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
     }
     void _search_index_init() override;
 
@@ -2140,6 +2144,25 @@ public:
         }
 
         return index;
+    }
+
+    std::string validate() override
+    {
+        if (m_conditions.size() == 0)
+            return "Missing both arguments of OR";
+        if (m_conditions.size() == 1)
+            return "Missing argument of OR";
+        std::string s;
+        if (m_child != 0)
+            s = m_child->validate();
+        if (s != "")
+            return s;
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            s = m_conditions[i]->validate();
+            if (s != "")
+                return s;
+        }
+        return "";
     }
 
     std::unique_ptr<ParentNode> clone() const override

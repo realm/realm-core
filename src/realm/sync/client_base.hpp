@@ -4,6 +4,7 @@
 #include <realm/transaction.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -61,9 +62,8 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(std::string path)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string path, VersionID before_version, bool did_recover)>
-        notify_after_client_reset;
+    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.
@@ -133,6 +133,9 @@ static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1
 using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
 struct ClientConfig {
+    ///
+    /// DEPRECATED - Will be removed in a future release
+    ///
     /// An optional custom platform description to be sent to server as part
     /// of a user agent description (HTTP `User-Agent` header).
     ///
@@ -140,6 +143,9 @@ struct ClientConfig {
     /// by util::get_platform_info().
     std::string user_agent_platform_info;
 
+    ///
+    /// DEPRECATED - Will be removed in a future release
+    ///
     /// Optional information about the application to be added to the user
     /// agent description as sent to the server. The intention is that the
     /// application describes itself using the following (rough) syntax:
@@ -173,7 +179,11 @@ struct ClientConfig {
     /// client does not require a thread-safe logger, and it guarantees that
     /// all logging happens either on behalf of the constructor or on behalf
     /// of the invocation of run().
-    util::Logger* logger = nullptr;
+    std::shared_ptr<util::Logger> logger;
+
+    // The SyncSocket instance used by the Sync Client for event synchronization
+    // and creating WebSockets. If not provided the default implementation will be used.
+    std::shared_ptr<sync::SyncSocketProvider> socket_provider;
 
     /// Use ports 80 and 443 by default instead of 7800 and 7801
     /// respectively. Ideally, these default ports should have been made

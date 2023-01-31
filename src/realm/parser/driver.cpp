@@ -20,13 +20,17 @@
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 #include "realm/sort_descriptor.hpp"
-#include <realm/decimal128.hpp>
-#include <realm/uuid.hpp>
+#include "realm/decimal128.hpp"
+#include "realm/uuid.hpp"
 #include "realm/util/base64.hpp"
+#include "realm/util/overload.hpp"
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
 #include "realm/parser/generated/query_flex.hpp"
+
+#include <external/mpark/variant.hpp>
+#include <stdexcept>
 
 using namespace realm;
 using namespace std::string_literals;
@@ -174,105 +178,115 @@ inline T string_to(const std::string& s)
 
 class MixedArguments : public query_parser::Arguments {
 public:
+    using Arg = mpark::variant<Mixed, std::vector<Mixed>>;
+
     MixedArguments(const std::vector<Mixed>& args)
         : Arguments(args.size())
-        , m_args([](const std::vector<Mixed>& list) -> std::vector<std::vector<Mixed>> {
-            std::vector<std::vector<Mixed>> ret;
-            for (const Mixed& m : list) {
-                ret.push_back({m});
+        , m_args([](const std::vector<Mixed>& args) -> std::vector<Arg> {
+            std::vector<Arg> ret;
+            ret.reserve(args.size());
+            for (const Mixed& m : args) {
+                ret.push_back(m);
             }
             return ret;
         }(args))
     {
     }
-    MixedArguments(const std::vector<std::vector<Mixed>>& args)
+    MixedArguments(const std::vector<Arg>& args)
         : Arguments(args.size())
         , m_args(args)
     {
     }
     bool bool_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<bool>();
+        return mixed_for_argument(n).get<bool>();
     }
     long long long_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<int64_t>();
+        return mixed_for_argument(n).get<int64_t>();
     }
     float float_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<float>();
+        return mixed_for_argument(n).get<float>();
     }
     double double_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<double>();
+        return mixed_for_argument(n).get<double>();
     }
     StringData string_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<StringData>();
+        return mixed_for_argument(n).get<StringData>();
     }
     BinaryData binary_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<BinaryData>();
+        return mixed_for_argument(n).get<BinaryData>();
     }
     Timestamp timestamp_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<Timestamp>();
+        return mixed_for_argument(n).get<Timestamp>();
     }
     ObjectId objectid_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjectId>();
+        return mixed_for_argument(n).get<ObjectId>();
     }
     UUID uuid_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<UUID>();
+        return mixed_for_argument(n).get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<Decimal128>();
+        return mixed_for_argument(n).get<Decimal128>();
     }
     ObjKey object_index_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjKey>();
+        return mixed_for_argument(n).get<ObjKey>();
     }
     ObjLink objlink_for_argument(size_t n) final
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get<ObjLink>();
+        return mixed_for_argument(n).get<ObjLink>();
     }
     std::vector<Mixed> list_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n);
+        return mpark::get<std::vector<Mixed>>(m_args[n]);
     }
     bool is_argument_null(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).size() == 0 || m_args.at(n)[0].is_null();
+        return visit(util::overload{
+                         [](const Mixed& m) {
+                             return m.is_null();
+                         },
+                         [](const std::vector<Mixed>&) {
+                             return false;
+                         },
+                     },
+                     m_args[n]);
     }
     bool is_argument_list(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).size() > 1;
+        static_assert(std::is_same_v<mpark::variant_alternative_t<1, Arg>, std::vector<Mixed>>);
+        return m_args[n].index() == 1;
     }
     DataType type_for_argument(size_t n)
     {
-        Arguments::verify_ndx(n);
-        return m_args.at(n)[0].get_type();
+        return mixed_for_argument(n).get_type();
     }
 
 private:
-    const std::vector<std::vector<Mixed>> m_args;
+    const Mixed& mixed_for_argument(size_t n)
+    {
+        Arguments::verify_ndx(n);
+        if (is_argument_list(n)) {
+            throw std::invalid_argument(
+                util::format("Request for scalar argument at index %1 but a list was provided", n));
+        }
+
+        return mpark::get<Mixed>(m_args[n]);
+    }
+
+    const std::vector<Arg> m_args;
 };
 
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
@@ -555,16 +569,16 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
-        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
+        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropertyNode*>(prop)->comp_type;
         if (cmp_type.value_or(ExpressionComparisonType::Any) != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
 
-    ValueNode min(limits->elements.at(0));
-    ValueNode max(limits->elements.at(1));
-    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, &min);
-    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, &max);
+    auto& min(limits->elements.at(0));
+    auto& max(limits->elements.at(1));
+    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, min);
+    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, max);
 
     Query q(drv->m_base_table);
     q.and_query(cmp1.visit(drv));
@@ -737,17 +751,18 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
     return q;
 }
 
-std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
 {
     bool is_keys = false;
+    std::string identifier = path->path_elems.back().id;
     if (identifier[0] == '@') {
         if (identifier == "@values") {
-            identifier = path->path_elems.back();
             path->path_elems.pop_back();
+            identifier = path->path_elems.back().id;
         }
         else if (identifier == "@keys") {
-            identifier = path->path_elems.back();
             path->path_elems.pop_back();
+            identifier = path->path_elems.back().id;
             is_keys = true;
         }
         else if (identifier == "@links") {
@@ -758,14 +773,11 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
         }
     }
     try {
-        auto link_chain = path->visit(drv, comp_type);
-        std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
-        if (index) {
+        m_link_chain = path->visit(drv, comp_type);
+        std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, identifier)};
+        if (!path->path_elems.back().index.is_null()) {
             if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
-                auto t = s->get_type();
-                auto idx = index->visit(drv, t);
-                Mixed key = idx->get_mixed();
-                subexpr = s->key(key).clone();
+                subexpr = s->key(path->path_elems.back().index).clone();
             }
         }
         if (is_keys) {
@@ -781,11 +793,11 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     }
     catch (const std::runtime_error& e) {
         // Is 'identifier' perhaps length operator?
-        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 1) {
             // If 'length' is the operator, the last id in the path must be the name
             // of a list property
-            auto prop = path->path_elems.back();
             path->path_elems.pop_back();
+            std::string& prop = path->path_elems.back().id;
             std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
                 if (auto length_expr = list->get_element_length())
@@ -798,7 +810,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv, DataType)
 {
     if (variable_name.size() < 2 || variable_name[0] != '$') {
         throw SyntaxError(util::format("The subquery variable '%1' is invalid. The variable must start with "
@@ -806,23 +818,24 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
                                        variable_name));
     }
     LinkChain lc = prop->path->visit(drv, prop->comp_type);
-    prop->identifier = drv->translate(lc, prop->identifier);
+    std::string identifier = prop->path->path_elems.back().id;
+    identifier = drv->translate(lc, identifier);
 
-    if (prop->identifier.find("@links") == 0) {
-        drv->backlink(lc, prop->identifier);
+    if (identifier.find("@links") == 0) {
+        drv->backlink(lc, identifier);
     }
     else {
-        ColKey col_key = lc.get_current_table()->get_column_key(prop->identifier);
+        ColKey col_key = lc.get_current_table()->get_column_key(identifier);
         if (col_key.is_list() && col_key.get_type() != col_type_LinkList) {
-            throw InvalidQueryError(util::format(
-                "A subquery can not operate on a list of primitive values (property '%1')", prop->identifier));
+            throw InvalidQueryError(
+                util::format("A subquery can not operate on a list of primitive values (property '%1')", identifier));
         }
         if (col_key.get_type() != col_type_LinkList) {
             throw InvalidQueryError(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
-                                                 prop->identifier,
+                                                 identifier,
                                                  realm::get_data_type_name(DataType(col_key.get_type()))));
         }
-        lc.link(prop->identifier);
+        lc.link(identifier);
     }
     TableRef previous_table = drv->m_base_table;
     drv->m_base_table = lc.get_current_table().cast_away_const();
@@ -878,50 +891,48 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
     return {};
 }
 
-std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv, DataType)
 {
-    auto link_chain = path->visit(drv);
-    auto subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
+    auto subexpr = property->visit(drv);
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
         throw InvalidQueryError(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
-                                             agg_op_type_to_str(aggr_op->type), link));
+                                             agg_op_type_to_str(type), property->identifier()));
     }
-    prop = drv->translate(link_chain, prop);
-    auto col_key = link_chain.get_current_table()->get_column_key(prop);
+    const LinkChain& link_chain = property->link_chain();
+    prop_name = drv->translate(link_chain, prop_name);
+    auto col_key = link_chain.get_current_table()->get_column_key(prop_name);
 
-    std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
         case col_type_Int:
-            sub_column = link_prop->column<Int>(col_key).clone();
+            subexpr = link_prop->column<Int>(col_key).clone();
             break;
         case col_type_Float:
-            sub_column = link_prop->column<float>(col_key).clone();
+            subexpr = link_prop->column<float>(col_key).clone();
             break;
         case col_type_Double:
-            sub_column = link_prop->column<double>(col_key).clone();
+            subexpr = link_prop->column<double>(col_key).clone();
             break;
         case col_type_Decimal:
-            sub_column = link_prop->column<Decimal>(col_key).clone();
+            subexpr = link_prop->column<Decimal>(col_key).clone();
             break;
         case col_type_Timestamp:
-            sub_column = link_prop->column<Timestamp>(col_key).clone();
+            subexpr = link_prop->column<Timestamp>(col_key).clone();
             break;
         default:
             throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
                                                  get_data_type_name(DataType(col_key.get_type()))));
     }
-    return aggr_op->visit(drv, sub_column.get());
+    return aggregate(subexpr.get());
 }
 
-std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv, DataType)
 {
-    auto link_chain = path->visit(drv);
-    std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
-    return aggr_op->visit(drv, subexpr.get());
+    auto subexpr = property->visit(drv);
+    return aggregate(subexpr.get());
 }
 
-std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
+std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
 {
     std::unique_ptr<Subexpr> agg;
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr)) {
@@ -1342,10 +1353,31 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+PathElem::PathElem(const PathElem& other)
+    : id(other.id)
+    , index(other.index)
+{
+    index.use_buffer(buffer);
+}
+
+PathElem& PathElem::operator=(const PathElem& other)
+{
+    id = other.id;
+    index = other.index;
+    index.use_buffer(buffer);
+
+    return *this;
+}
+
 LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
-    for (const std::string& raw_path_elem : path_elems) {
+    auto end = path_elems.end() - 1;
+    for (auto it = path_elems.begin(); it != end; ++it) {
+        if (!it->index.is_null()) {
+            throw InvalidQueryError("Index not supported");
+        }
+        std::string& raw_path_elem = it->id;
         auto path_elem = drv->translate(link_chain, raw_path_elem);
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
@@ -1455,6 +1487,25 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
+Mixed ParserDriver::get_arg_for_index(std::string i)
+{
+    REALM_ASSERT(i[0] == '$');
+    size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
+    if (m_args.is_argument_null(arg_no) || m_args.is_argument_list(arg_no)) {
+        throw InvalidQueryError("Invalid index parameter");
+    }
+    auto type = m_args.type_for_argument(arg_no);
+    switch (type) {
+        case type_Int:
+            return int64_t(m_args.long_for_argument(arg_no));
+            break;
+        case type_String:
+            return m_args.string_for_argument(arg_no);
+            break;
+        default:
+            throw InvalidQueryError("Invalid index type");
+    }
+}
 
 auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<SubexprPtr, SubexprPtr>
 {
@@ -1525,7 +1576,7 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
     link_chain.backlink(*origin_table, origin_column);
 }
 
-std::string ParserDriver::translate(LinkChain& link_chain, const std::string& identifier)
+std::string ParserDriver::translate(const LinkChain& link_chain, const std::string& identifier)
 {
     return m_mapping.translate(link_chain, identifier);
 }
@@ -1578,7 +1629,7 @@ std::string check_escapes(const char* str)
 
 } // namespace query_parser
 
-Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments) const
+Query Table::query(const std::string& query_string, const std::vector<MixedArguments::Arg>& arguments) const
 {
     MixedArguments args(arguments);
     return query(query_string, args, {});
@@ -1597,7 +1648,7 @@ Query Table::query(const std::string& query_string, const std::vector<Mixed>& ar
     return query(query_string, args, mapping);
 }
 
-Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
+Query Table::query(const std::string& query_string, const std::vector<MixedArguments::Arg>& arguments,
                    const query_parser::KeyPathMapping& mapping) const
 {
     MixedArguments args(arguments);

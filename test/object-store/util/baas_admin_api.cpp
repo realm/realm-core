@@ -71,11 +71,12 @@ class BaasRuleBuilder {
 public:
     using IncludePropCond = util::UniqueFunction<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
-                    const std::string& db_name)
+                    const std::string& db_name, bool is_flx_sync)
         : m_schema(schema)
         , m_partition_key(partition_key)
         , m_mongo_service_name(service_name)
         , m_mongo_db_name(db_name)
+        , m_is_flx_sync(is_flx_sync)
     {
     }
 
@@ -91,6 +92,7 @@ private:
     const Property& m_partition_key;
     const std::string& m_mongo_service_name;
     const std::string& m_mongo_db_name;
+    const bool m_is_flx_sync;
     nlohmann::json m_relationships;
     std::vector<std::string> m_current_path;
 };
@@ -99,7 +101,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
                                                             const IncludePropCond& include_prop, bool clear_path)
 {
     nlohmann::json required = nlohmann::json::array();
-    nlohmann::json properties;
+    nlohmann::json properties = nlohmann::json::object();
     for (const auto& prop : obj_schema.persisted_properties) {
         if (include_prop && !include_prop(prop)) {
             continue;
@@ -181,13 +183,12 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
 
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     auto& prop_sub_obj = schema_json["properties"];
-    if (!prop_sub_obj.contains(m_partition_key.name)) {
+    if (!prop_sub_obj.contains(m_partition_key.name) && !m_is_flx_sync) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
     }
-    std::string test = schema_json.dump();
     return {
         {"schema", schema_json},
         {"metadata", nlohmann::json::object({{"database", m_mongo_db_name},
@@ -581,6 +582,12 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
     return *sync_service;
 }
 
+void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t file_ident) const
+{
+    auto endpoint = apps(APIFamily::Private)[app_id]["sync"]["force_reset"];
+    endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
@@ -715,9 +722,17 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
     return false;
 }
 
-AdminAPIEndpoint AdminAPISession::apps() const
+AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
 {
-    return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
+    switch (family) {
+        case APIFamily::Admin:
+            return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+        case APIFamily::Private:
+            return AdminAPIEndpoint(util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+    }
+    REALM_UNREACHABLE();
 }
 
 AppCreateConfig default_app_config(const std::string& base_url)
@@ -1034,7 +1049,8 @@ AppSession create_app(const AppCreateConfig& config)
     // partition key, then add the rest of the properties. This ensures that the
     // targest of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname);
+    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
     for (const auto& obj_schema : config.schema) {
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);

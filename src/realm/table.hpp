@@ -19,6 +19,7 @@
 #ifndef REALM_TABLE_HPP
 #define REALM_TABLE_HPP
 
+#include "external/mpark/variant.hpp"
 #include <algorithm>
 #include <map>
 #include <utility>
@@ -200,7 +201,11 @@ public:
     ///
     /// \param col_key The key of a column of the table.
 
-    bool has_search_index(ColKey col_key) const noexcept;
+    IndexType search_index_type(ColKey col_key) const noexcept;
+    bool has_search_index(ColKey col_key) const noexcept
+    {
+        return search_index_type(col_key) == IndexType::General;
+    }
     void add_search_index(ColKey col_key, IndexType type = IndexType::General);
     void add_fulltext_index(ColKey col_key)
     {
@@ -399,8 +404,6 @@ public:
     StringIndex* get_search_index(ColKey col) const noexcept
     {
         check_column(col);
-        if (!has_search_index(col))
-            return nullptr;
         return m_index_accessors[col.get_index().val].get();
     }
     template <class T>
@@ -553,11 +556,13 @@ public:
     }
     Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments = {}) const;
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;

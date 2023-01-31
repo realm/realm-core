@@ -76,16 +76,19 @@ private:
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              MakeSharedTag)
     : m_config(std::move(config))
-    , m_frozen_version(std::move(version))
+    , m_frozen_version(version)
     , m_scheduler(m_config.scheduler)
 {
-    if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
+    if (version) {
+        m_auto_refresh = false;
+        REALM_ASSERT(*version != VersionID());
+    }
+    else if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_transaction = nullptr;
     }
-
     m_coordinator = std::move(coordinator);
 }
 
@@ -159,9 +162,7 @@ SharedRealm Realm::get_shared_realm(Config config)
 SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    SharedRealm realm = coordinator->get_realm(std::move(config), util::Optional<VersionID>(version));
-    realm->set_auto_refresh(false);
-    return realm;
+    return coordinator->get_realm(std::move(config), version);
 }
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<util::Scheduler> scheduler)
@@ -193,29 +194,31 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
-    // If there is a subscription store, then return the latest set
-    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
-        return flx_sub_store->get_latest();
+    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
+        throw std::runtime_error("Flexible sync is not enabled");
     }
-    // Otherwise, throw runtime_error
-    throw std::runtime_error("Flexible sync is not enabled");
+    // If there is a subscription store, then return the active set
+    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
+    REALM_ASSERT(flx_sub_store);
+    return flx_sub_store->get_latest();
 }
 
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
-    // If there is a subscription store, then return the active set
-    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
-        return flx_sub_store->get_active();
+    if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
+        throw std::runtime_error("Flexible sync is not enabled");
     }
-    // Otherwise, throw runtime_error
-    throw std::runtime_error("Flexible sync is not enabled");
+    // If there is a subscription store, then return the active set
+    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
+    REALM_ASSERT(flx_sub_store);
+    return flx_sub_store->get_active();
 }
 #endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference);
+    schema.copy_keys_from(reference, m_config.schema_subset_mode);
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -239,13 +242,14 @@ void Realm::read_schema_from_group_if_needed()
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
+
     if (m_coordinator)
         m_coordinator->cache_schema(schema, m_schema_version, m_schema_transaction_version);
 
     if (m_dynamic_schema) {
         if (m_schema == schema) {
             // The structure of the schema hasn't changed. Bring the table column indices up to date.
-            m_schema.copy_keys_from(schema);
+            m_schema.copy_keys_from(schema, SchemaSubsetMode::Strict);
         }
         else {
             // The structure of the schema has changed, so replace our copy of the schema.
@@ -254,7 +258,7 @@ void Realm::read_schema_from_group_if_needed()
     }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
-        m_schema.copy_keys_from(schema);
+        m_schema.copy_keys_from(schema, m_config.schema_subset_mode);
     }
     notify_schema_changed();
 }
@@ -331,15 +335,12 @@ Schema Realm::get_full_schema()
         do_refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
-    // the full schema
-    if (m_dynamic_schema)
+    // the full schema if it's been read
+    if (m_dynamic_schema && !m_schema.empty())
         return m_schema;
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
-    if (m_config.immutable())
-        return ObjectStore::schema_from_group(read_group());
-
     Schema actual_schema;
     uint64_t actual_version;
     uint64_t version = -1;
@@ -398,8 +399,16 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
-    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
 
+    // Frozen Realms never modify the schema on disk and we just need to verify
+    // that the requested schema is a subset of what actually exists
+    if (m_frozen_version) {
+        ObjectStore::verify_valid_external_changes(schema.compare(actual_schema, m_config.schema_mode, true));
+        set_schema(actual_schema, std::move(schema));
+        return;
+    }
+
+    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
         if (!was_in_read_transaction)
             m_transaction = nullptr;
@@ -434,6 +443,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         }
         cache_new_schema();
     }
+
+    schema.copy_keys_from(actual_schema, m_config.schema_subset_mode);
 
     uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
@@ -514,24 +525,26 @@ void Realm::add_schema_change_handler()
         if (m_dynamic_schema) {
             m_schema = *m_new_schema;
         }
-        else
-            m_schema.copy_keys_from(*m_new_schema);
-
+        else {
+            m_schema.copy_keys_from(*m_new_schema, m_config.schema_subset_mode);
+        }
         notify_schema_changed();
     });
 }
 
 void Realm::cache_new_schema()
 {
-    if (!is_closed()) {
-        auto new_version = transaction().get_version_of_current_transaction().version;
-        if (m_new_schema)
-            m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
-        else
-            m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
-        m_schema_transaction_version = new_version;
-        m_new_schema = util::none;
+    if (is_closed()) {
+        return;
     }
+
+    auto new_version = transaction().get_version_of_current_transaction().version;
+    if (m_new_schema)
+        m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
+    else
+        m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
+    m_schema_transaction_version = new_version;
+    m_new_schema = util::none;
 }
 
 void Realm::translate_schema_error()
@@ -1087,9 +1100,19 @@ void Realm::convert(const Config& config, bool merge_into_existing)
     verify_thread();
 
 #if REALM_ENABLE_SYNC
-    if (config.sync_config && config.sync_config->flx_sync_requested) {
-        throw std::logic_error("Realm cannot be converted if flexible sync is enabled");
+    auto src_is_flx_sync = m_config.sync_config && m_config.sync_config->flx_sync_requested;
+    auto dst_is_flx_sync = config.sync_config && config.sync_config->flx_sync_requested;
+    auto dst_is_pbs_sync = config.sync_config && !config.sync_config->flx_sync_requested;
+
+    if (dst_is_flx_sync && !src_is_flx_sync) {
+        throw std::logic_error(
+            "Realm cannot be converted to a flexible sync realm unless flexible sync is already enabled");
     }
+    if (dst_is_pbs_sync && src_is_flx_sync) {
+        throw std::logic_error(
+            "Realm cannot be converted from a flexible sync realm to a partition based sync realm");
+    }
+
 #endif
 
     if (merge_into_existing && util::File::exists(config.path)) {
@@ -1296,12 +1319,18 @@ bool Realm::is_frozen() const
 
 SharedRealm Realm::freeze()
 {
-    auto config = m_config;
-    auto version = read_transaction_version();
-    config.scheduler = util::Scheduler::make_frozen(version);
-    config.schema = m_schema;
-    config.schema_version = m_schema_version;
-    return Realm::get_frozen_realm(std::move(config), version);
+    read_group(); // Freezing requires a read transaction
+    return m_coordinator->freeze_realm(*this);
+}
+
+void Realm::copy_schema_from(const Realm& source)
+{
+    REALM_ASSERT(is_frozen());
+    REALM_ASSERT(m_frozen_version == source.read_transaction_version());
+    m_schema = source.m_schema;
+    m_schema_version = source.m_schema_version;
+    m_schema_transaction_version = m_frozen_version->version;
+    m_dynamic_schema = false;
 }
 
 void Realm::close()
