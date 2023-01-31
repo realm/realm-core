@@ -381,6 +381,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->is_frozen());
         REQUIRE(before->read_group().get_table("class_object"));
         REQUIRE(before->config().path == local_config.path);
+        REQUIRE(before->config().schema);
+        REQUIRE(before->schema_version() != ObjectStore::NotVersioned);
         REQUIRE(util::File::exists(local_config.path));
     };
     local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
@@ -867,8 +869,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 temp_config.persist();
                 temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
                 config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
-                config_copy->notify_before_client_reset = [&](SharedRealm) {
+                config_copy->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     ++before_callback_invoctions_2;
                 };
                 config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
@@ -876,11 +880,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     ++after_callback_invocations_2;
                 };
 
-                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm) {
+                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions;
                     REQUIRE(session);
                     REQUIRE(config_copy);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     session->update_configuration(*config_copy);
                 };
 
@@ -1801,7 +1807,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset]") {
         };
 
     // Expected behaviour is that the frozen realm passed in the callback should have no
-    // schema initialized if a client reset happens during an async open.
+    // schema initialized if a client reset happens during an async open and the realm has never been opened before.
     // SDK's should handle any edge cases which require the use of a schema i.e
     // calling set_schema_subset(...)
     realm_config.sync_config->notify_before_client_reset =

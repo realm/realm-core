@@ -19,7 +19,6 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
 
 #include <realm/util/optional.hpp>
