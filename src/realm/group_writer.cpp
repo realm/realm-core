@@ -132,8 +132,12 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+#if REALM_ENABLE_ENCRYPTION
     if (auto p = m_map.get_encrypted_mapping())
         p->set_marker(write_marker);
+#else
+    static_cast<void>(write_marker);
+#endif
 }
 
 GroupWriter::MapWindow::~MapWindow()

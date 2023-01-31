@@ -26,6 +26,21 @@
 #include <vector>
 #include <realm/util/file.hpp>
 
+namespace realm::util {
+class WriteObserver {
+public:
+    virtual bool no_concurrent_writer_seen() = 0;
+    virtual ~WriteObserver() {}
+};
+
+class WriteMarker {
+public:
+    virtual void mark(uint64_t page_offset) = 0;
+    virtual void unmark() = 0;
+    virtual ~WriteMarker() {}
+};
+} // namespace realm::util
+
 #if REALM_ENABLE_ENCRYPTION
 
 #if REALM_PLATFORM_APPLE
@@ -44,19 +59,6 @@ namespace realm::util {
 
 struct iv_table;
 class EncryptedFileMapping;
-
-class WriteObserver {
-public:
-    virtual bool no_concurrent_writer_seen() = 0;
-    virtual ~WriteObserver() {}
-};
-
-class WriteMarker {
-public:
-    virtual void mark(uint64_t page_offset) = 0;
-    virtual void unmark() = 0;
-    virtual ~WriteMarker() {}
-};
 
 class AESCryptor {
 public:
