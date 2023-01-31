@@ -580,4 +580,15 @@ TEST(File_GetUniqueID)
 }
 #endif
 
+TEST(File_Temp)
+{
+    auto tmp_file_name = make_temp_file("foo");
+    {
+        File file1;
+        file1.open(tmp_file_name, File::mode_Write);
+        CHECK(file1.is_attached());
+    }
+    remove(tmp_file_name.c_str());
+}
+
 #endif // TEST_FILE

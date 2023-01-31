@@ -120,6 +120,9 @@ bool try_remove_dir_recursive(const std::string& path);
 /// path to the new directory is returned without a trailing slash.
 std::string make_temp_dir();
 
+/// Create a new temporary file.
+std::string make_temp_file(const char* prefix);
+
 size_t page_size();
 
 

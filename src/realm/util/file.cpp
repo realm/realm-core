@@ -362,6 +362,42 @@ std::string make_temp_dir()
 #endif
 }
 
+std::string make_temp_file(const char* prefix)
+{
+#ifdef _WIN32 // Windows version
+    std::filesystem::path temp = std::filesystem::temp_directory_path();
+
+    wchar_t buffer[MAX_PATH];
+    std::filesystem::path path;
+    if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
+        throw std::system_error(GetLastError(), std::system_category(), "GetTempFileName() failed");
+    path = buffer;
+    return path.string();
+
+#else // POSIX.1-2008 version
+
+#if REALM_ANDROID
+    std::string base_dir = "/data/local/tmp/";
+#else
+    char* tmp_dir_env = getenv("TMPDIR");
+    std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
+    if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
+        base_dir = base_dir + "/";
+    }
+#endif
+    std::string tmp = base_dir + prefix + std::string("_XXXXXX") + std::string("\0", 1);
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
+    memcpy(buffer.get(), tmp.c_str(), tmp.size());
+    char* filename = buffer.get();
+    auto fd = mkstemp(filename);
+    if (fd == -1) {
+        throw std::system_error(errno, std::system_category(), "mkstemp() failed"); // LCOV_EXCL_LINE
+    }
+    close(fd);
+    return std::string(filename);
+#endif
+}
+
 size_t page_size()
 {
     return cached_page_size;
