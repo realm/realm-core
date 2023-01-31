@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Added `REALM_ARCHITECTURE_ARM32` and `REALM_ARCHITECTURE_ARM64` macros to `features.h` for easier platform detection. ([#6256](https://github.com/realm/realm-core/pull/6256))
 
 ----------------------------------------------
 
