@@ -191,19 +191,25 @@ TEST(Decimal_Array)
     arr.add(Decimal128(realm::null()));
     CHECK_EQUAL(arr.get_width(), 0);
     CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
+    CHECK(arr.is_null(0));
     arr.add(Decimal128());
     CHECK_EQUAL(arr.get_width(), 4);
     CHECK_EQUAL(arr.get(0), Decimal128(realm::null()));
     CHECK_EQUAL(arr.get(1), Decimal128());
+    CHECK(arr.is_null(0));
+    CHECK_NOT(arr.is_null(1));
 
     arr.clear();
     arr.add(Decimal128());
     CHECK_EQUAL(arr.get_width(), 0);
     CHECK_EQUAL(arr.get(0), Decimal128());
+    CHECK_NOT(arr.is_null(0));
     arr.add(Decimal128(realm::null()));
     CHECK_EQUAL(arr.get_width(), 4);
     CHECK_EQUAL(arr.get(0), Decimal128());
     CHECK_EQUAL(arr.get(1), Decimal128(realm::null()));
+    CHECK_NOT(arr.is_null(0));
+    CHECK(arr.is_null(1));
 
     arr.clear();
     arr.add(Decimal128(str0));

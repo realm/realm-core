@@ -61,7 +61,10 @@ public:
 
     bool is_null(size_t ndx) const
     {
-        return m_width == 0 || get(ndx).is_null();
+        if (m_width == 0) {
+            return !get_context_flag();
+        }
+        return get(ndx).is_null();
     }
 
     Decimal128 get(size_t ndx) const
