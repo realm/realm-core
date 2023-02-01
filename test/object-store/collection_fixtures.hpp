@@ -247,9 +247,36 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 
     static std::vector<realm::Mixed> values()
     {
-        return {Mixed{realm::UUID()}, Mixed{int64_t(1)},      Mixed{},
-                Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{Decimal128("300")},
-                Mixed{double(2.2)},   Mixed{float(3.3)}};
+        return {
+            Mixed{realm::UUID()},
+            Mixed{},
+            Mixed{realm::ObjectId()},
+
+            // Mixed sorting considers all numerics to be the same time, so
+            // ensure we have some interleaved values to test that
+            Mixed{int64_t(1)},
+            Mixed{int64_t(2)},
+            Mixed{int64_t(3)},
+
+            Mixed{double(1.2)},
+            Mixed{double(2.2)},
+            Mixed{double(3.2)},
+
+            Mixed{float(1.1)},
+            Mixed{float(2.1)},
+            Mixed{float(3.1)},
+
+            Mixed{Decimal128("1.3")},
+            Mixed{Decimal128("2.3")},
+            Mixed{Decimal128("3.3")},
+
+            // Mixed sorting considers strings and binary to be the same time, so
+            // ensure we have some interleaved values to test that
+            Mixed{"a string"},
+            Mixed{"b string"},
+            Mixed{BinaryData("a binary", 8)},
+            Mixed{BinaryData("b binary", 8)},
+        };
     }
     static Mixed min()
     {
@@ -261,11 +288,13 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
     }
     static Decimal128 sum()
     {
-        return Decimal128("300") + Decimal128(int64_t(1)) + Decimal128(double(2.2)) + Decimal128(float(3.3));
+        return Decimal128{int64_t(1)} + Decimal128{int64_t(2)} + Decimal128{int64_t(3)} + Decimal128{double(1.2)} +
+               Decimal128{double(2.2)} + Decimal128{double(3.2)} + Decimal128{float(1.1)} + Decimal128{float(2.1)} +
+               Decimal128{float(3.1)} + Decimal128("1.3") + Decimal128("2.3") + Decimal128("3.3");
     }
     static Decimal128 average()
     {
-        return (sum() / Decimal128(4));
+        return (sum() / Decimal128(12));
     }
     static Mixed empty_sum_value()
     {

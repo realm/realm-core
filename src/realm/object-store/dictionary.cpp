@@ -250,7 +250,7 @@ size_t Dictionary::find_any(Mixed value) const
     return dict().find_any(value);
 }
 
-bool Dictionary::contains(StringData key)
+bool Dictionary::contains(StringData key) const
 {
     return dict().contains(key);
 }

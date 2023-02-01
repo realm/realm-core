@@ -101,7 +101,7 @@ public:
     util::Optional<Mixed> try_get_any(StringData key) const;
     std::pair<StringData, Mixed> get_pair(size_t ndx) const;
     size_t find_any(Mixed value) const final;
-    bool contains(StringData key);
+    bool contains(StringData key) const;
 
     template <typename T, typename Context>
     void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);

@@ -658,15 +658,19 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         }
 
         SECTION("remove value from list") {
+            size_t index = 1;
+            if constexpr (TestType::can_minmax) {
+                index = list.find_any(TestType::min());
+            }
             advance_and_notify(*r);
             r->begin_transaction();
-            list.remove(1);
+            list.remove(index);
             r->commit_transaction();
 
             advance_and_notify(*r);
-            REQUIRE_INDICES(change.deletions, 1);
-            REQUIRE_INDICES(rchange.deletions, 1);
-            // values[1] is min(), so it's index 0 for non-optional and 1 for
+            REQUIRE_INDICES(change.deletions, index);
+            REQUIRE_INDICES(rchange.deletions, index);
+            // we removed min(), so it's index 0 for non-optional and 1 for
             // optional (as nulls sort to the front)
             REQUIRE_INDICES(srchange.deletions, TestType::is_optional);
         }

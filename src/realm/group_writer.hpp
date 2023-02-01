@@ -116,6 +116,11 @@ public:
         return m_backoff ? 0 : m_evacuation_limit;
     }
 
+    size_t get_free_list_size()
+    {
+        return m_free_positions.size() * size_per_free_list_entry();
+    }
+
     std::vector<size_t>& get_evacuation_progress()
     {
         return m_evacuation_progress;
@@ -254,6 +259,13 @@ private:
 
     /// Debug helper - extends the TopRefMap with list of reachable blocks
     void map_reachable();
+
+    size_t size_per_free_list_entry() const
+    {
+        // If current size is less than 128 MB, the database need not expand above 2 GB
+        // which means that the positions and sizes can still be in 32 bit.
+        return (m_logical_size < 0x8000000 ? 8 : 16) + 8;
+    }
 };
 
 

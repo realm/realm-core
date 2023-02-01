@@ -279,6 +279,18 @@ protected:
     }
 
 private:
+    template <class U>
+    static U unresolved_to_null(U value) noexcept
+    {
+        return value;
+    }
+
+    static Mixed unresolved_to_null(Mixed value) noexcept
+    {
+        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
+            return Mixed{};
+        return value;
+    }
     T do_get(size_t ndx, const char* msg) const;
 };
 
@@ -675,13 +687,7 @@ inline T Lst<T>::do_get(size_t ndx, const char* msg) const
     const auto current_size = size();
     CollectionBase::validate_index(msg, ndx, current_size);
 
-    auto value = m_tree->get(ndx);
-    if constexpr (std::is_same_v<T, Mixed>) {
-        // return a null for mixed unresolved link
-        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-            return Mixed{};
-    }
-    return value;
+    return unresolved_to_null(m_tree->get(ndx));
 }
 
 template <class T>

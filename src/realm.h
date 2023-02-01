@@ -1784,16 +1784,6 @@ RLM_API bool realm_list_clear(realm_list_t*);
 RLM_API bool realm_list_remove_all(realm_list_t*);
 
 /**
- * Replace the contents of a list with values.
- *
- * This is equivalent to calling `realm_list_clear()`, and then
- * `realm_list_insert()` repeatedly.
- *
- * @return True if no exception occurred.
- */
-RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -1844,10 +1834,11 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  * @param out_num_insertions The number of insertions. May be NULL.
  * @param out_num_modifications The number of modifications. May be NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
+ * @param out_collection_was_cleared a flag to signal if the collection has been cleared. May be NULL
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
 
 /**
  * Get the number of various types of changes in a collection notification,
@@ -2058,18 +2049,6 @@ RLM_API bool realm_set_clear(realm_set_t*);
 RLM_API bool realm_set_remove_all(realm_set_t*);
 
 /**
- * Replace the contents of a set with values.
- *
- * The provided values may contain duplicates, in which case the size of the set
- * after calling this function will be less than @a num_values.
- *
- * @param values The list of values to insert.
- * @param num_values The number of elements.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t num_values);
-
-/**
  * Subscribe to notifications for this object.
  *
  * @return A non-null pointer if no exception occurred.
@@ -2217,25 +2196,39 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, 
 RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool* out_erased);
 
 /**
+ * Return the list of keys stored in the dictionary
+ *
+ * @param out_size number of keys
+ * @param out_keys the list of keys in the dictionary, the memory has to be released once it is no longer used.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_get_keys(realm_dictionary_t*, size_t* out_size, realm_results_t** out_keys);
+
+/**
+ * Check if the dictionary contains a certain key
+ *
+ * @param key to search in the dictionary
+ * @param found True if the such key exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t*, realm_value_t key, bool* found);
+
+/**
+ * Check if the dictionary contains a certain value
+ *
+ * @param value to search in the dictionary
+ * @param index the index of the value in the dictionry if such value exists
+ * @return True if no exception occured
+ */
+RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t*, realm_value_t value, size_t* index);
+
+
+/**
  * Clear a dictionary.
  *
  * @return True if no exception occurred.
  */
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
-
-/**
- * Replace the contents of a dictionary with key/value pairs.
- *
- * The provided keys may contain duplicates, in which case the size of the
- * dictionary after calling this function will be less than @a num_pairs.
- *
- * @param keys An array of keys of length @a num_pairs.
- * @param values An array of values of length @a num_pairs.
- * @param num_pairs The number of key-value pairs to assign.
- * @return True if no exception occurred.
- */
-RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, const realm_value_t* keys,
-                                     const realm_value_t* values);
 
 /**
  * Subscribe to notifications for this object.

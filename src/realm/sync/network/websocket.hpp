@@ -197,6 +197,7 @@ enum class Error {
     bad_response_200_ok,
     bad_response_3xx_redirection,
     bad_response_301_moved_permanently,
+    bad_response_308_permanent_redirect,
     bad_response_4xx_client_errors,
     bad_response_401_unauthorized,
     bad_response_403_forbidden,
@@ -213,6 +214,8 @@ enum class Error {
 };
 
 const std::error_category& websocket_close_status_category() noexcept;
+
+std::error_code make_error_code(ErrorCodes::Error error) noexcept;
 
 const std::error_category& error_category() noexcept;
 

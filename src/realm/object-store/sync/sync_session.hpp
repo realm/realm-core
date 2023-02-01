@@ -293,6 +293,11 @@ public:
         {
             return session.send_test_command(std::move(request));
         }
+
+        static sync::SaltedFileIdent get_file_ident(SyncSession& session)
+        {
+            return session.get_file_ident();
+        }
     };
 
 private:
@@ -382,6 +387,8 @@ private:
 
     void add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
+
+    sync::SaltedFileIdent get_file_ident() const;
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 

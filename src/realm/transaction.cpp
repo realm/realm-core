@@ -930,9 +930,9 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 
 class NodeTree {
 public:
-    NodeTree(size_t evac_limit, size_t& work_limit)
+    NodeTree(size_t evac_limit, size_t work_limit)
         : m_evac_limit(evac_limit)
-        , m_work_limit(work_limit)
+        , m_work_limit(int64_t(work_limit))
         , m_moved(0)
     {
     }
@@ -952,18 +952,15 @@ public:
     ///                   to point to the node we have just processed
     bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
     {
+        if (m_work_limit < 0) {
+            return false;
+        }
         if (current_node.is_read_only()) {
-            auto byte_size = current_node.get_byte_size();
+            size_t byte_size = current_node.get_byte_size();
             if ((current_node.get_ref() + byte_size) > m_evac_limit) {
                 current_node.copy_on_write();
                 m_moved++;
-                if (m_work_limit > byte_size) {
-                    m_work_limit -= byte_size;
-                }
-                else {
-                    m_work_limit = 0;
-                    return false;
-                }
+                m_work_limit -= byte_size;
             }
         }
 
@@ -995,12 +992,12 @@ public:
 
 private:
     size_t m_evac_limit;
-    size_t m_work_limit;
+    int64_t m_work_limit;
     size_t m_moved;
 };
 
 
-void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t work_limit)
 {
     NodeTree node_tree(evac_limit, work_limit);
     if (progress.empty()) {

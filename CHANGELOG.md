@@ -1,14 +1,37 @@
 # NEXT RELEASE
 
 ### Enhancements
-* `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
-* Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
-* Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix a race condition which could result in "operation cancelled" errors being delivered to async open callbacks rather than the actual sync error which caused things to fail ([PR #5968](https://github.com/realm/realm-core/pull/5968), since the introduction of async open).
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
+* Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
+* Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+
+### Breaking changes
+* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Added `REALM_ARCHITECTURE_ARM32` and `REALM_ARCHITECTURE_ARM64` macros to `features.h` for easier platform detection. ([#6256](https://github.com/realm/realm-core/pull/6256))
+
+----------------------------------------------
+
+# 13.3.0 Release notes
+
+### Enhancements
+* `SyncSession::pause()` and `SyncSession::resume()` allow users to suspend a Realm's sync session until it is explicitly resumed in ([#6183](https://github.com/realm/realm-core/pull/6183)). Previously `SyncSession::log_out()` and `SyncSession::close()` could be resumed under a number of circumstances where `SyncSession::revive_if_needed()` were called (like when freezing a realm) - fixes ([#6085](https://github.com/realm/realm-core/issues/6085))
+* Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
+* Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
+* Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
+
+### Fixed
 * "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)
 * Value in List of Mixed would not be updated if new value is Binary and old value is StringData and the values otherwise matches ([#6201](https://github.com/realm/realm-core/issues/6201), since v6.0.0)
 * When client reset with recovery is used and the recovery does not actually result in any new local commits, the sync client may have gotten stuck in a cycle with a `A fatal error occured during client reset: 'A previous 'Recovery' mode reset from <timestamp> did not succeed, giving up on 'Recovery' mode to prevent a cycle'` error message. ([#6195](https://github.com/realm/realm-core/issues/6195), since v11.16.0)
@@ -17,11 +40,11 @@
 * Properties and types not present in the requested schema would be missing from the reported schema in several scenarios, such as if the Realm was being opened with a different schema version than the persisted one, and if the new tables or columns were added while the Realm instance did not have an active read transaction ([PR #6211](https://github.com/realm/realm-core/pull/6211), since v13.2.0).
 * If a client reset w/recovery or discard local is interrupted while the "fresh" realm is being downloaded, the sync client may crash with a MultpleSyncAgents exception ([#6217](https://github.com/realm/realm-core/issues/6217), since v11.13.0)
 * Changesets from the server sent during FLX bootstrapping that are larger than 16MB can cause the sync client to crash with a LogicError (PR [#6218](https://github.com/realm/realm-core/pull/6218), since v12.0.0)
-* Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
-* Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+* Online compaction may cause a single commit to take a long time ([#6245](https://github.com/realm/realm-core/pull/6245), since v13.0.0)
+* Expose `collection_was_cleared` in the C API ([#6200](https://github.com/realm/realm-core/issues/6200), since v.10.4.0)
+* `Set<Mixed>::sort()` used a different sort order from sorting any other collection, including a filtered `Set<Mixed>` ([PR #6238](https://github.com/realm/realm-core/pull/6238), since v13.0.0).
 
 ### Breaking changes
-* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))
 * Passing an empty `key_path_array` to `add_notification_callback now` now ignores nested property changes. Pass `std::nullopt` to achieve the old meaning. ([#6122](https://github.com/realm/realm-core/pull/6122))
 * Whether to report the file's complete schema or only the requested schema is now an option on RealmConfig (schema_subset_mode) rather than always being enabled for Additive schema modes. All schema modes which this applies to are now supported ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
@@ -38,6 +61,10 @@
 * Remove `File::is_removed` ([#6222](https://github.com/realm/realm-core/pull/6222))
 * Client reset recovery froze Realms for the callbacks in an invalid way. It is unclear if this resulted in any actual problems.
 * Fix default enabled debug output during realm-sync-tests ([#6233](https://github.com/realm/realm-core/issues/6233))
+* Migrate service and event loop into DefaultSyncSocket ([PR #6151](https://github.com/realm/realm-core/pull/6151))
+* Move BindingCallbackThreadObserver from object-store to sync ([PR #6151](https://github.com/realm/realm-core/pull/6151))
+* Update ClientImpl::Connection and DefaultWebSocketImpl to use the new WebSocketObserver callbacks ([PR #6219](https://github.com/realm/realm-core/pull/6219))
+* Switched client reset tests to using private `force_client_reset` server API ([PR #6216](https://github.com/realm/realm-core/pull/6216))
 
 ----------------------------------------------
 
@@ -83,8 +110,6 @@
 * Add c_api error category for resolve errors instead of reporting unknown category. ([PR #6157](https://github.com/realm/realm-core/pull/6157))
 * Add permanent redirect (308) as a supported redirect response from the server. ([#6162](https://github.com/realm/realm-core/issues/6162))
 * Integrate DefaultSocketProvider as SyncSocketProvider in sync client. ([PR #6171](https://github.com/realm/realm-core/pull/6171))
-* Migrate service and event loop into DefaultSyncSocket ([PR #6151](https://github.com/realm/realm-core/pull/6151))
-* Move BindingCallbackThreadObserver from object-store to sync ([PR #6151](https://github.com/realm/realm-core/pull/6151))
 
 ----------------------------------------------
 
