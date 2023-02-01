@@ -693,7 +693,7 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: [ "test_suite"]
+  tags: [ "for_pull_requests", "test_suite" ]
   commands:
   - command: shell.exec
     timeout_secs: 3600
@@ -936,8 +936,8 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    cron: "@daily"
-    patchable: false
+    #cron: "@daily"
+    #patchable: false
 
 
 - name: rhel70
