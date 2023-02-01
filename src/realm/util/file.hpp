@@ -787,10 +787,10 @@ public:
 
     /// See File::remap().
     ///
-    /// Calling this function on a Map instance that is not currently
-    /// attached to a memory mapped file has undefined behavior. The
-    /// returned pointer is the same as what will subsequently be
-    /// returned by get_addr().
+    /// Calling this function on a Map instance that is not currently attached
+    /// to a memory mapped file is equivalent to calling map(). The returned
+    /// pointer is the same as what will subsequently be returned by
+    /// get_addr().
     T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
 
     /// Try to extend the existing mapping to a given size
