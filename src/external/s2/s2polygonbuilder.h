@@ -17,8 +17,7 @@ using std::make_pair;
 #include <vector>
 using std::vector;
 
-#include <boost/scoped_ptr.hpp>
-using boost::scoped_ptr;
+#include "base/scoped_ptr.h"
 #include "base/basictypes.h"
 #include "s2.h"
 #include "s1angle.h"

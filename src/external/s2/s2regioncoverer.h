@@ -14,9 +14,7 @@ using std::make_pair;
 using std::vector;
 
 #include "base/macros.h"
-#include <boost/scoped_ptr.hpp>
-using boost::scoped_ptr;
-//#include "base/scoped_ptr.h"
+#include "base/scoped_ptr.h"
 #include "s2cell.h"
 #include "s2cellid.h"
 

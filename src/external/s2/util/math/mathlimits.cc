@@ -72,7 +72,7 @@ DEF_UNSIGNED_INT_LIMITS(unsigned long int)
 
 DEF_FP_LIMITS(float, FLT)
 DEF_FP_LIMITS(double, DBL)
-DEF_FP_LIMITS(long double, LDBL);
+DEF_FP_LIMITS(long double, LDBL)
 
 #undef DEF_COMMON_LIMITS
 #undef DEF_SIGNED_INT_LIMITS

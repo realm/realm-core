@@ -35,13 +35,13 @@ using std::swap;
 using std::reverse;
 
 #include <math.h>
-#include "base/basictypes.h"
-#include "base/logging.h"
-#include "base/template_util.h"
-#include "base/type_traits.h"
-#include "util/math/mathutil.h"
-#include "util/math/vector2.h"
-#include "util/math/vector3.h"
+#include "s2/base/basictypes.h"
+#include "s2/base/logging.h"
+#include "s2/base/template_util.h"
+#include "s2/base/type_traits.h"
+#include "s2/util/math/mathutil.h"
+#include "s2/util/math/vector2.h"
+#include "s2/util/math/vector3.h"
 
 template <typename VType>
 Vector4<VType>::Vector4() {

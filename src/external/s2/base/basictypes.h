@@ -5,9 +5,9 @@
 #ifndef _BASICTYPES_H_
 #define _BASICTYPES_H_
 
-#include "base/integral_types.h"
-#include "base/casts.h"
-#include "base/port.h"
+#include "s2/base/integral_types.h"
+#include "s2/base/casts.h"
+#include "s2/base/port.h"
 
 //
 // Google-specific types

@@ -17,8 +17,8 @@ using std::reverse;
 #include <vector>
 using std::vector;
 
-#include "base/basictypes.h"
-#include "base/logging.h"
+#include "s2/base/basictypes.h"
+#include "s2/base/logging.h"
 
 // Returns the sign of x:
 //   -1 if x < 0,

@@ -30,4 +30,48 @@ LogMessage::LogMessage(Severity severity, const char* file, int line)
 
 LogMessage::~LogMessage() = default;
 
+struct DefaultLogSink : LogMessageSink {
+    explicit DefaultLogSink(int verbosity) : DefaultLogSink(static_cast<LogMessage::Severity>(verbosity)) { }
+    explicit DefaultLogSink(LogMessage::Severity severity, const char* file = nullptr, int line = 0)
+        : _severity(severity) {
+        _os << "s2 ";
+        if (file)
+            _os << file << ":" << line << " ";
+    }
+
+    ~DefaultLogSink() override {
+        std::cout << "[" << static_cast<int>(_severity) << "]: " << _os.str() << std::endl;
+    }
+
+    std::ostream& stream() override { return _os; }
+
+    LogMessage::Severity _severity;
+    std::ostringstream _os;
+};
+
+struct DefaultLoggingEnv : LoggingEnv {
+    DefaultLoggingEnv() = default;
+    ~DefaultLoggingEnv() override {}
+
+    bool shouldVLog(int verbosity) override {
+        return static_cast<LogMessage::Severity>(verbosity) >= LogMessage::Severity::kWarning;
+    }
+
+    std::unique_ptr<LogMessageSink> makeSink(int verbosity) override {
+        return std::make_unique<DefaultLogSink>(verbosity);
+    }
+    std::unique_ptr<LogMessageSink> makeSink(LogMessage::Severity severity) override {
+        return std::make_unique<DefaultLogSink>(severity);
+    }
+    std::unique_ptr<LogMessageSink> makeSink(LogMessage::Severity severity,
+                                                     const char* file, int line) override {
+        return std::make_unique<DefaultLogSink>(severity, file, line);
+    }
+};
+
+LoggingEnv& globalLoggingEnv() {
+    static DefaultLoggingEnv p;
+    return p;
+}
+
 }  // namespace s2_env

@@ -49,7 +49,7 @@
 #define DCHECK_NE(x, y)  DCHECK((x) != (y))
 #endif
 
-#include "base/port.h"
+#include "s2/base/port.h"
 #define INFO s2_env::LogMessage(s2_env::LogMessage::Severity::kInfo).stream()
 #define WARN s2_env::LogMessage(s2_env::LogMessage::Severity::kWarning, __FILE__, __LINE__).stream()
 #define FATAL s2_env::LogMessage(s2_env::LogMessage::Severity::kFatal, __FILE__, __LINE__).stream()

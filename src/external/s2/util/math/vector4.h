@@ -14,7 +14,7 @@ using std::ostream;
 using std::cout;
 using std::endl;
   // NOLINT(readability/streams)
-#include "base/basictypes.h"
+#include "s2/base/basictypes.h"
 
 template <typename VType> class Vector4;
 // TODO(user): Look into creating conversion operators to remove the

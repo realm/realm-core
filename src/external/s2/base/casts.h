@@ -15,7 +15,7 @@
 #include <limits.h>         // for enumeration casts and tests
 #include <typeinfo>         // for enumeration casts and tests
 
-#include "base/macros.h"
+#include "s2/base/macros.h"
 
 
 // Use implicit_cast as a safe version of static_cast or const_cast

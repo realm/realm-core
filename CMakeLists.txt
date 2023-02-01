@@ -42,7 +42,7 @@ elseif(APPLE)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
-function(add_cxx_flag_if_supported flag)
+function(check_if_cxx_compiler_flag_supported flag out_var)
     if(flag MATCHES "^-Wno-")
         # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
         string(REPLACE "-Wno-" "-W" check_flag ${flag})
@@ -50,10 +50,23 @@ function(add_cxx_flag_if_supported flag)
         set(check_flag ${flag})
     endif()
 
-    check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
-    if(HAVE${check_flag})
+    check_cxx_compiler_flag(${check_flag} ${out_var})
+endfunction()
+
+function(add_cxx_flag_if_supported flag)
+    check_if_cxx_compiler_flag_supported(${flag} HAVE_${flag})
+    if(HAVE_${flag})
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
     endif()
+endfunction()
+
+function(add_target_option_if_supported target option_scope)
+    foreach(option ${ARGN})
+        check_if_cxx_compiler_flag_supported(${option} HAVE_${option})
+        if(HAVE_${option}})
+            target_compile_options(${target} ${option_scope}} ${option})
+        endif()
+    endforeach()
 endfunction()
 
 function(use_faster_linker)
@@ -90,7 +103,7 @@ else()
     if(ANDROID)
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
-        # FIXME: Re-introduce -Wold-style-cast 
+        # FIXME: Re-introduce -Wold-style-cast
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
@@ -127,7 +140,7 @@ if(ANDROID)
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     # - On some architectures char is unsigned by default. Make it signed
     # - Compile with -Oz in Release because on Android we favor code size over performance
-    # 
+    #
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 

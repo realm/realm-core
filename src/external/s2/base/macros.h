@@ -10,7 +10,7 @@
 #ifndef BASE_MACROS_H_
 #define BASE_MACROS_H_
 
-#include "base/definer.h"   // For OS_WINDOWS
+#include "s2/base/definer.h"   // For OS_WINDOWS
 
 #include <stddef.h>         // For size_t
 
