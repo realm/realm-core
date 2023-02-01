@@ -32,6 +32,7 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/geospatial.hpp"
 #include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
@@ -282,6 +283,29 @@ T Obj::get(ColKey col_key) const
     REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
 
     return _get<T>(col_key.get_index());
+}
+
+template <>
+Geospatial Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+    return Geospatial::from_link(get_linked_object(col_key));
+}
+
+template <>
+std::optional<Geospatial> Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+
+    auto geo = get_linked_object(col_key);
+    if (!geo) {
+        return {};
+    }
+    return Geospatial::from_link(geo);
 }
 
 template <class T>
@@ -1687,6 +1711,44 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
     size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
     Spec* spec = const_cast<Spec*>(&get_spec());
     values.set_spec(spec, spec_ndx);
+}
+
+template <>
+Obj& Obj::set(ColKey col_key, Geospatial value, bool)
+{
+    update_if_needed();
+    get_table()->check_column(col_key);
+    auto type = col_key.get_type();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw LogicError(LogicError::illegal_type);
+
+    Obj geo = create_and_set_linked_object(col_key);
+    value.assign_to(geo);
+    return *this;
+}
+
+template <>
+Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
+{
+    update_if_needed();
+    get_table()->check_column(col_key);
+    auto type = col_key.get_type();
+    auto attrs = col_key.get_attrs();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw LogicError(LogicError::illegal_type);
+    if (!value && !attrs.test(col_attr_Nullable))
+        throw LogicError(LogicError::column_not_nullable);
+
+    if (!value) {
+        set_null(col_key);
+    }
+    else {
+        Obj geo = create_and_set_linked_object(col_key);
+        value->assign_to(geo);
+    }
+    return *this;
 }
 
 template <class T>

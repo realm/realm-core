@@ -13,6 +13,7 @@ set(SOURCES
     collection_change_indices.cpp
     dictionary.cpp
     frozen_objects.cpp
+    geospatial.cpp
     index_set.cpp
     list.cpp
     main.cpp

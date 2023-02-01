@@ -22,6 +22,7 @@
 #include <realm/object-store/object_accessor.hpp>
 #include <realm/object-store/schema.hpp>
 
+#include <realm/geospatial.hpp>
 #include <realm/util/any.hpp>
 
 namespace realm {
@@ -65,6 +66,25 @@ public:
     util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
                                                 size_t /* property_index */) const
     {
+        if (auto geo = std::any_cast<Geospatial>(&dict)) {
+            if (prop.name == Geospatial::c_geo_point_type_col_name) {
+                return geo->get_type();
+            }
+            else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
+                std::vector<std::any> coords;
+                const std::vector<GeoPoint>& points = geo->get_points();
+                if (points.size()) {
+                    coords.push_back(points[0].longitude);
+                    coords.push_back(points[0].latitude);
+                    if (points[0].altitude) {
+                        coords.push_back(*points[0].altitude);
+                    }
+                }
+                return coords;
+            }
+            REALM_ASSERT_EX(false, prop.name); // unexpected property type
+        }
+
         auto const& v = util::any_cast<AnyDict&>(dict);
         auto it = v.find(prop.name);
         return it == v.end() ? util::none : util::make_optional(it->second);
