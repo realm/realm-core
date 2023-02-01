@@ -403,6 +403,19 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
+namespace {
+class DummyErrorCategory : public std::error_category {
+    const char* name() const noexcept final
+    {
+        return "realm::ErrorCodes";
+    }
+    std::string message(int error_code) const final
+    {
+        return std::string(ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code)));
+    }
+};
+DummyErrorCategory g_dummy_category;
+} // namespace
 
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
@@ -412,29 +425,37 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         return bool(m_websocket);
     }
 
-    auto&& status_code = status.code();
-    std::error_code error_code{static_cast<int>(status_code), websocket::websocket_close_status_category()};
+    int status_code = status.code();
+    std::error_code error_code;
+    if (status_code == ErrorCodes::SystemError) {
+        error_code = status.get_std_error_code();
+        status_code = error_code.value();
+    }
+    else {
+        // HACK:
+        error_code = std::error_code{status_code, g_dummy_category};
+    }
 
     // TODO: Use a switch statement once websocket errors have their own category in exception unification.
-    if (status_code == ErrorCodes::ResolveFailed || status_code == ErrorCodes::ConnectionFailed) {
+    if (status_code == ErrorCodes::WebSocketResolveFailed || status_code == ErrorCodes::WebSocketConnectionFailed) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
         constexpr bool try_again = true;
         involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
     }
-    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
+    else if (status_code == ErrorCodes::WebSocketReadError || status_code == ErrorCodes::WebSocketWriteError) {
         read_or_write_error(error_code);
     }
-    else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
-             status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
-             status_code == ErrorCodes::WebSocket_InvalidPayloadData ||
-             status_code == ErrorCodes::WebSocket_PolicyViolation ||
-             status_code == ErrorCodes::WebSocket_InavalidExtension) {
+    else if (status_code == ErrorCodes::WebSocketGoingAway || status_code == ErrorCodes::WebSocketProtocolError ||
+             status_code == ErrorCodes::WebSocketUnsupportedData || status_code == ErrorCodes::WebSocketReserved ||
+             status_code == ErrorCodes::WebSocketInvalidPayloadData ||
+             status_code == ErrorCodes::WebSocketPolicyViolation ||
+             status_code == ErrorCodes::WebSocketInavalidExtension) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
         constexpr bool try_again = true;
         SessionErrorInfo error_info{error_code, status.reason(), try_again};
         involuntary_disconnect(std::move(error_info));
     }
-    else if (status_code == ErrorCodes::WebSocket_MessageTooBig) {
+    else if (status_code == ErrorCodes::WebSocketMessageTooBig) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
         constexpr bool try_again = true;
         auto ec = make_error_code(ProtocolError::limits_exceeded);
@@ -444,40 +465,39 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
         involuntary_disconnect(std::move(error_info));
     }
-    else if (status_code == ErrorCodes::WebSocket_TLSHandshakeFailed) {
+    else if (status_code == ErrorCodes::WebSocketTLSHandshakeFailed) {
         error_code = ClientError::ssl_server_cert_rejected;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
+    else if (status_code == ErrorCodes::WebSocketClient_Too_Old) {
         error_code = ClientError::client_too_old_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
+    else if (status_code == ErrorCodes::WebSocketClient_Too_New) {
         error_code = ClientError::client_too_new_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
+    else if (status_code == ErrorCodes::WebSocketProtocol_Mismatch) {
         error_code = ClientError::protocol_mismatch;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
+    else if (status_code == ErrorCodes::WebSocketRetryError || status_code == ErrorCodes::WebSocketForbidden) {
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
-             status_code == ErrorCodes::WebSocket_MovedPermanently ||
-             status_code == ErrorCodes::WebSocket_InternalServerError ||
-             status_code == ErrorCodes::WebSocket_AbnormalClosure ||
-             status_code == ErrorCodes::WebSocket_Retry_Error) {
+    else if (status_code == ErrorCodes::WebSocketUnauthorized ||
+             status_code == ErrorCodes::WebSocketMovedPermanently ||
+             status_code == ErrorCodes::WebSocketInternalServerError ||
+             status_code == ErrorCodes::WebSocketAbnormalClosure || status_code == ErrorCodes::WebSocketRetryError) {
         constexpr bool is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws

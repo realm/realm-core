@@ -226,25 +226,44 @@ public:
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
 
-        WebSocketGoingAway = RLM_ERR_WEBSOCKET_GOINGAWAY,
-        WebSocketProtocolError = RLM_ERR_WEBSOCKET_PROTOCOLERROR,
-        WebSocketUnsupportedData = RLM_ERR_WEBSOCKET_UNSUPPORTEDDATA,
-        WebSocketReserved = RLM_ERR_WEBSOCKET_RESERVED,
-        WebSocketNoStatusReceived = RLM_ERR_WEBSOCKET_NOSTATUSRECEIVED,
-        WebSocketAbnormalClosure = RLM_ERR_WEBSOCKET_ABNORMALCLOSURE,
-        WebSocketInvalidPayloadData = RLM_ERR_WEBSOCKET_INVALIDPAYLOADDATA,
-        WebSocketPolicyViolation = RLM_ERR_WEBSOCKET_POLICYVIOLATION,
-        WebSocketMessageTooBig = RLM_ERR_WEBSOCKET_MESSAGETOOBIG,
-        WebSocketInavalidExtension = RLM_ERR_WEBSOCKET_INAVALIDEXTENSION,
-        WebSocketInternalServerError = RLM_ERR_WEBSOCKET_INTERNALSERVERERROR,
-        WebSocketTLSHandshakeFailed = RLM_ERR_WEBSOCKET_TLSHANDSHAKEFAILED, // Used by default WebSocket
+        WebSocketResolveFailed = RLM_ERR_WEBSOCKET_RESOLVE_FAILED,
+        WebSocketConnectionFailed = RLM_ERR_WEBSOCKET_CONNECTION_FAILED,
+        WebSocketReadError = RLM_ERR_WEBSOCKET_RETRY_ERROR,
+        WebSocketWriteError = RLM_ERR_WEBSOCKET_READ_ERROR,
+        WebSocketRetryError = RLM_ERR_WEBSOCKET_WRITE_ERROR,
+        WebSocketFatalError = RLM_ERR_WEBSOCKET_FATAL_ERROR,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
     };
 
+    enum WebSocketError : int32_t {
+        WebSocketOK = 1000,
+        WebSocketGoingAway = 1001,
+        WebSocketProtocolError = 1002,
+        WebSocketUnsupportedData = 1003,
+        WebSocketReserved = 1004,
+        WebSocketNoStatusReceived = 1005,
+        WebSocketAbnormalClosure = 1006,
+        WebSocketInvalidPayloadData = 1007,
+        WebSocketPolicyViolation = 1008,
+        WebSocketMessageTooBig = 1009,
+        WebSocketInavalidExtension = 1010,
+        WebSocketInternalServerError = 1011,
+        WebSocketTLSHandshakeFailed = 1015, // Used by default WebSocket
+
+        // WebSocket Errors - reported by server
+        WebSocketUnauthorized = 4001,
+        WebSocketForbidden = 4002,
+        WebSocketMovedPermanently = 4003,
+        WebSocketClient_Too_Old = 4004,
+        WebSocketClient_Too_New = 4005,
+        WebSocketProtocol_Mismatch = 4006,
+    };
+
     static ErrorCategory error_categories(Error code);
     static std::string_view error_string(Error code);
+    static std::string error_string(WebSocketError code);
     static Error from_string(std::string_view str);
     static std::vector<Error> get_all_codes();
     static std::vector<std::string_view> get_all_names();

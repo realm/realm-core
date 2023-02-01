@@ -207,18 +207,13 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
 
-        case WebSocketGoingAway:
-        case WebSocketProtocolError:
-        case WebSocketUnsupportedData:
-        case WebSocketReserved:
-        case WebSocketNoStatusReceived:
-        case WebSocketAbnormalClosure:
-        case WebSocketInvalidPayloadData:
-        case WebSocketPolicyViolation:
-        case WebSocketMessageTooBig:
-        case WebSocketInavalidExtension:
-        case WebSocketInternalServerError:
-        case WebSocketTLSHandshakeFailed:
+        case WebSocketResolveFailed:
+        case WebSocketConnectionFailed:
+        case WebSocketReadError:
+        case WebSocketWriteError:
+        case WebSocketRetryError:
+        case WebSocketFatalError:
+
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
 
         case UnknownError:
@@ -374,18 +369,12 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
-    {"WebSocketAbnormalClosure", ErrorCodes::WebSocketAbnormalClosure},
-    {"WebSocketGoingAway", ErrorCodes::WebSocketGoingAway},
-    {"WebSocketInavalidExtension", ErrorCodes::WebSocketInavalidExtension},
-    {"WebSocketInternalServerError", ErrorCodes::WebSocketInternalServerError},
-    {"WebSocketInvalidPayloadData", ErrorCodes::WebSocketInvalidPayloadData},
-    {"WebSocketMessageTooBig", ErrorCodes::WebSocketMessageTooBig},
-    {"WebSocketNoStatusReceived", ErrorCodes::WebSocketNoStatusReceived},
-    {"WebSocketPolicyViolation", ErrorCodes::WebSocketPolicyViolation},
-    {"WebSocketProtocolError", ErrorCodes::WebSocketProtocolError},
-    {"WebSocketReserved", ErrorCodes::WebSocketReserved},
-    {"WebSocketTLSHandshakeFailed", ErrorCodes::WebSocketTLSHandshakeFailed},
-    {"WebSocketUnsupportedData", ErrorCodes::WebSocketUnsupportedData},
+    {"WebSocketConnectionFailed", ErrorCodes::WebSocketConnectionFailed},
+    {"WebSocketFatalError", ErrorCodes::WebSocketFatalError},
+    {"WebSocketReadError", ErrorCodes::WebSocketReadError},
+    {"WebSocketResolveFailed", ErrorCodes::WebSocketResolveFailed},
+    {"WebSocketRetryError", ErrorCodes::WebSocketRetryError},
+    {"WebSocketWriteError", ErrorCodes::WebSocketWriteError},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
@@ -438,6 +427,54 @@ public:
 std::string_view ErrorCodes::error_string(Error code)
 {
     return error_codes_map[code];
+}
+
+std::string ErrorCodes::error_string(WebSocketError code)
+{
+    /// WebSocket error codes
+    switch (code) {
+        case WebSocketOK:
+            return "WebSocket: OK";
+        case WebSocketGoingAway:
+            return "WebSocket: Going Away";
+        case WebSocketProtocolError:
+            return "WebSocket: Protocol Error";
+        case WebSocketUnsupportedData:
+            return "WebSocket: Unsupported Data";
+        case WebSocketReserved:
+            return "WebSocket: Reserved";
+        case WebSocketNoStatusReceived:
+            return "WebSocket: No Status Received";
+        case WebSocketAbnormalClosure:
+            return "WebSocket: Abnormal Closure";
+        case WebSocketInvalidPayloadData:
+            return "WebSocket: Invalid Payload Data";
+        case WebSocketPolicyViolation:
+            return "WebSocket: Policy Violation";
+        case WebSocketMessageTooBig:
+            return "WebSocket: Message Too Big";
+        case WebSocketInavalidExtension:
+            return "WebSocket: Invalid Extension";
+        case WebSocketInternalServerError:
+            return "WebSocket: Internal Server Error";
+        case WebSocketTLSHandshakeFailed:
+            return "WebSocket: TLS Handshake Failed";
+
+        /// WebSocket Errors - reported by server
+        case WebSocketUnauthorized:
+            return "WebSocket: Unauthorized";
+        case WebSocketForbidden:
+            return "WebSocket: Forbidden";
+        case WebSocketMovedPermanently:
+            return "WebSocket: Moved Permanently";
+        case WebSocketClient_Too_Old:
+            return "WebSocket: Client Too Old";
+        case WebSocketClient_Too_New:
+            return "WebSocket: Client Too New";
+        case WebSocketProtocol_Mismatch:
+            return "WebSocket: Protocol Mismatch";
+    }
+    return "";
 }
 
 ErrorCodes::Error ErrorCodes::from_string(std::string_view name)

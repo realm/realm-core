@@ -1109,10 +1109,10 @@ class CloseStatusErrorCategory : public std::error_category {
     {
         // Converts an error_code to one of the pre-defined status codes in
         // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        if (error_code == 1000 || error_code == 0) {
-            return ErrorCodes::error_string(ErrorCodes::OK);
+        if (error_code == 0) {
+            return "OK";
         }
-        return ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code));
+        return ErrorCodes::error_string(static_cast<ErrorCodes::WebSocketError>(error_code));
     }
 };
 
@@ -1238,7 +1238,7 @@ const std::error_category& websocket::websocket_close_status_category() noexcept
     return category;
 }
 
-std::error_code websocket::make_error_code(ErrorCodes::Error error) noexcept
+std::error_code websocket::make_error_code(ErrorCodes::WebSocketError error) noexcept
 {
     return std::error_code{error, realm::sync::websocket::websocket_close_status_category()};
 }
