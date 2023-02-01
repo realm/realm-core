@@ -4943,6 +4943,7 @@ struct BCTOState {
 
 bool BCTOState::bcto_deleted;
 
+
 TEST_CASE("C API - binding callback thread observer") {
     auto bcto_user_data = new BCTOState();
     BCTOState::bcto_deleted = false;
@@ -5017,15 +5018,17 @@ TEST_CASE("C API - binding callback thread observer") {
         REQUIRE(userdata == reinterpret_cast<realm_userdata_t>(0x999123));
     };
 
-    c_api::CBindingThreadObserver observer(bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
-                                           dummy_userdata, dummy_user_data_free);
     auto config = cptr(realm_sync_client_config_new());
     realm_sync_client_config_set_default_binding_thread_observer(config.get(), bcto_on_thread_create,
                                                                  bcto_on_thread_destroy, bcto_on_thread_error,
                                                                  dummy_userdata, dummy_user_data_free);
+    REQUIRE(config->default_socket_provider_thread_observer);
     auto observer_ptr =
         static_cast<c_api::CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
-    REQUIRE(observer == *observer_ptr);
+    REQUIRE(observer_ptr->get_create_callback_func() == bcto_on_thread_create);
+    REQUIRE(observer_ptr->get_destroy_callback_func() == bcto_on_thread_destroy);
+    REQUIRE(observer_ptr->get_error_callback_func() == bcto_on_thread_error);
+    REQUIRE(observer_ptr->get_userdata_ptr() == dummy_userdata);
 }
 #endif
 
