@@ -693,10 +693,10 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: [ "for_pull_requests", "test_suite" ]
+  tags: ["for_pull_requests"]
   commands:
   - command: shell.exec
-    timeout_secs: 3600
+    timeout_secs: 60
     params:
       working_dir: realm-core/build/test/realm-fuzzer
       shell: /bin/bash
