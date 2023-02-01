@@ -31,7 +31,7 @@ run: test
 
 perf: test_perf
 	rm -f perf.core2
-	./test_perf ten.tsv /home/finn/Downloads/hits.tsv
+	./test_perf /home/finn/Downloads/hits.tsv
 
 lib: libstorage.a
 

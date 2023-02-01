@@ -264,9 +264,10 @@ int main(int argc, char* argv[])
     off_t size = lseek(fd, 0, SEEK_END);
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
-    long step_size = 1000000;
+    long step_size = 5000000;
+    int num_work_packages = 4;
     concurrent_queue<results*> to_reader;
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
     concurrent_queue<results*> to_writer;
 
@@ -421,7 +422,6 @@ int main(int argc, char* argv[])
         }
         std::cout << "shutting down..." << std::endl;
         to_writer.close();
-        writer.join();
 
         uint64_t from_size = 0;
         uint64_t to_size = 0;
@@ -436,5 +436,10 @@ int main(int argc, char* argv[])
         }
         std::cout << "Total effect: from " << from_size << " to " << to_size << " bytes ("
                   << 100 - (to_size * 100) / from_size << " pct reduction)" << std::endl;
+
+        for (int i = 0; i < num_work_packages; ++i)
+            delete to_reader.get();
+
+        writer.join();
     }
 }
