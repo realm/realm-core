@@ -361,6 +361,34 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }
 
+void trigger_client_reset(const AppSession& app_session)
+{
+    // cause a client reset by restarting the sync service
+    // this causes the server's sync history to be resynthesized
+    auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+    auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    timed_sleeping_wait_for([&] {
+        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+    });
+    app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
+    }
+
+    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
+    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
+    // our remote changes.
+    if (!app_session.config.flx_sync_config) {
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
+    }
+}
+
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)
 {
     auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());

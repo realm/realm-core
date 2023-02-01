@@ -1771,18 +1771,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset]") {
     create_user_and_log_in(app);
     SyncTestFile realm_config(app->current_user(), partition.value);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-    realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
-            return;
-        }
 
-        if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
-            err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
-            return;
-        }
-
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
-    };
     realm_config.sync_config->on_sync_client_event_hook =
         [&, client_reset_triggered = false](std::weak_ptr<SyncSession> weak_sess,
                                             const SyncClientHookData& event_data) mutable {
@@ -1811,14 +1800,14 @@ TEST_CASE("sync: Client reset during async open", "[client reset]") {
     // SDK's should handle any edge cases which require the use of a schema i.e
     // calling set_schema_subset(...)
     realm_config.sync_config->notify_before_client_reset =
-        [&schema, promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
+        [promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
             std::shared_ptr<Realm> realm) mutable {
             CHECK(realm->schema_version() == ObjectStore::NotVersioned);
             promise.get_promise().emplace_value();
         };
 
     realm_config.sync_config->notify_after_client_reset =
-        [&schema, promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
+        [promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
             std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
             CHECK(realm->schema_version() == ObjectStore::NotVersioned);
             promise.get_promise().emplace_value();
