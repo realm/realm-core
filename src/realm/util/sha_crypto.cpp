@@ -27,9 +27,12 @@
 #include <stdio.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
-#else
+#elif REALM_HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#else
+#include <sha1.h>
+#include <sha256.hpp>
 #endif
 
 namespace {
@@ -100,7 +103,7 @@ struct Hash {
     UCHAR hash_object_buffer[512];
     DWORD hash_size;
 };
-#else
+#elif REALM_HAVE_OPENSSL
 void message_digest(const EVP_MD* digest_type, const char* in_buffer, size_t in_buffer_size,
                     unsigned char* out_buffer, unsigned int* output_size)
 {
@@ -139,11 +142,13 @@ void sha1(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buffe
     Algorithm alg(BCRYPT_SHA1_ALGORITHM);
     Hash hash(alg, 20);
     hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
-#else
+#elif REALM_HAVE_OPENSSL
     const EVP_MD* digest_type = EVP_sha1();
     unsigned int output_size;
     message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
     REALM_ASSERT(output_size == 20);
+#else
+    SHA1(reinterpret_cast<char*>(out_buffer), in_buffer, in_buffer_size);
 #endif
 }
 
@@ -155,11 +160,16 @@ void sha256(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buf
     Algorithm alg(BCRYPT_SHA256_ALGORITHM);
     Hash hash(alg, 32);
     hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
-#else
+#elif REALM_HAVE_OPENSSL
     const EVP_MD* digest_type = EVP_sha256();
     unsigned int output_size;
     message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
     REALM_ASSERT(output_size == 32);
+#else
+    sha256_state s;
+    sha_init(s);
+    sha_process(s, in_buffer, uint32_t(in_buffer_size));
+    sha_done(s, out_buffer);
 #endif
 }
 

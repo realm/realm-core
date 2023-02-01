@@ -37,7 +37,7 @@
 #include <Windows.h>
 // 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
 // does not exist for 224 bits (only 128, 256, etc).
-#include <win32/kalven-sha2/sha224.hpp>
+#include <sha224.hpp>
 #include <bcrypt.h>
 #else
 #include <sys/mman.h>

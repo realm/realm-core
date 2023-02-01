@@ -35,7 +35,6 @@
 #include <direct.h>
 #else
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
 #include <sys/statvfs.h>
@@ -902,7 +901,7 @@ void File::prealloc(size_t size)
         // so this is some other runtime error and not OutOfDiskSpace
         throw std::system_error(err, std::system_category(), "ftruncate() inside prealloc() failed");
     }
-#elif REALM_ANDROID || defined(_WIN32)
+#elif REALM_ANDROID || defined(_WIN32) || defined(__EMSCRIPTEN__)
 
     consume_space_interlocked();
 
@@ -1882,7 +1881,8 @@ DirScanner::~DirScanner() noexcept
 
 bool DirScanner::next(std::string& name)
 {
-#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID
+#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID &&                \
+    !defined(__EMSCRIPTEN__)
 #error "readdir() is not known to be thread-safe on this platform"
 #endif
 

@@ -56,13 +56,6 @@
 #include <mutex>
 #include <thread>
 
-#if REALM_PLATFORM_APPLE
-#import <CommonCrypto/CommonHMAC.h>
-#else
-#include <openssl/sha.h>
-#include <openssl/hmac.h>
-#endif
-
 using namespace realm;
 using namespace realm::app;
 using util::any_cast;
@@ -100,6 +93,13 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 
 #if REALM_ENABLE_AUTH_TESTS
 
+#if REALM_PLATFORM_APPLE
+#import <CommonCrypto/CommonHMAC.h>
+#elif REALM_HAVE_OPENSSL
+#include <openssl/sha.h>
+#include <openssl/hmac.h>
+#endif
+
 static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 {
 #if REALM_PLATFORM_APPLE
@@ -108,7 +108,7 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
     CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), data.data(), data.size(),
            reinterpret_cast<uint8_t*>(const_cast<char*>(ret.data())));
     return ret;
-#else
+#elif REALM_HAVE_OPENSSL
     std::array<unsigned char, EVP_MAX_MD_SIZE> hash;
     unsigned int hashLen;
     HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), reinterpret_cast<unsigned char const*>(data.data()),
