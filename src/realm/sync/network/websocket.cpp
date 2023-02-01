@@ -725,11 +725,10 @@ public:
                                          data.size(), m_write_buffer.data(), m_config.websocket_get_random());
 
         util::Span<const char> frame_data(m_write_buffer.data(), message_size);
-        return m_config.async_write(frame_data)
-            .then([this](size_t) {
-                shrink_write_buffer();
-                return Status::OK();
-            });
+        return m_config.async_write(frame_data).then([this](size_t) {
+            shrink_write_buffer();
+            return Status::OK();
+        });
     }
 
     util::Future<websocket::Socket::Message> async_read_binary()
@@ -1013,10 +1012,9 @@ private:
         }
 
         // otherwise read again
-        return m_config.async_read(m_frame_reader.read_into())
-            .then([this](size_t) {
-                return do_next_frame_reader_future();
-            });
+        return m_config.async_read(m_frame_reader.read_into()).then([this](size_t) {
+            return do_next_frame_reader_future();
+        });
     }
 
     // frame_reader_loop() uses the frame_reader to read and process the incoming

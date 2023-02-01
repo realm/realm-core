@@ -840,9 +840,14 @@ util::Future<void> Connection::do_message_read_loop()
             if (msg.op_code != WebSocketInterface::Message::Opcode::binary) {
                 return Status{ErrorCodes::RuntimeError, "Invalid message type"};
             }
-            handle_message_received(msg.message_data);
+            std::error_code ec;
+            if (SimulatedFailure::trigger(SimulatedFailure::sync_client__read_head, ec)) {
+                read_or_write_error(ec);
+            }
+            else {
+                handle_message_received(msg.message_data);
+            }
             if (ws_wrapper->destroyed) {
-                ws_wrapper.reset(nullptr);
                 return Status::OK();
             }
             return do_message_read_loop();

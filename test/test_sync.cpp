@@ -4453,8 +4453,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = ec == sync::websocket::make_error_code(ErrorCodes::ReadError);
-        CHECK(valid_error);
+        CHECK_EQUAL(ec, sync::websocket::make_error_code(ErrorCodes::ConnectionClosed));
         bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
