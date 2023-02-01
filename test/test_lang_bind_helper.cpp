@@ -2423,8 +2423,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -3376,6 +3375,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
     std::vector<std::unique_ptr<SpawnedProcess>> readers;
     std::vector<std::unique_ptr<SpawnedProcess>> writers;
     SHARED_GROUP_TEST_PATH(path);
+    std::cout << "Path for prime suspect: " << std::string(path) << std::endl;
     auto key = crypt_key();
     auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
     if (process->is_child()) {
