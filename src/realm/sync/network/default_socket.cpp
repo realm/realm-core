@@ -470,7 +470,6 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 {
     REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
     util::seed_prng_nondeterministically(m_random); // Throws
-    start_keep_running_timer();                     // TODO: Update service so this timer is not needed
     if (auto_start) {
         start();
     }
@@ -479,8 +478,6 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 DefaultSocketProvider::~DefaultSocketProvider()
 {
     m_logger_ptr->trace("Default event loop teardown");
-    if (m_keep_running_timer)
-        m_keep_running_timer->cancel();
 
     // Wait for the thread to stop
     stop(true);
