@@ -139,6 +139,18 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
+SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
+                           realm::util::Optional<realm::Schema> schema, std::function<SyncSessionErrorHandler>&& error_handler)
+{
+    REALM_ASSERT(user);
+    sync_config = std::make_shared<realm::SyncConfig>(user, partition);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = std::move(error_handler);
+    schema_version = 1;
+    this->schema = std::move(schema);
+    schema_mode = SchemaMode::AdditiveExplicit;
+}
+
 SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema _schema, SyncConfig::FLXSyncEnabled)
 {
     REALM_ASSERT(user);
