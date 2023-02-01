@@ -140,7 +140,8 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
-                           realm::util::Optional<realm::Schema> schema, std::function<SyncSessionErrorHandler>&& error_handler)
+                           realm::util::Optional<realm::Schema> schema,
+                           std::function<SyncSessionErrorHandler>&& error_handler)
 {
     REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, partition);

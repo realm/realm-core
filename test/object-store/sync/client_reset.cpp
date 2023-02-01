@@ -1769,7 +1769,8 @@ TEST_CASE("sync: Client reset during async open", "[client reset]") {
     auto before_callback_called = util::make_promise_future<void>();
     auto after_callback_called = util::make_promise_future<void>();
     create_user_and_log_in(app);
-    SyncTestFile realm_config(app->current_user(), partition.value, std::nullopt, [](std::shared_ptr<SyncSession>, SyncError){/*noop*/});
+    SyncTestFile realm_config(app->current_user(), partition.value, std::nullopt,
+                              [](std::shared_ptr<SyncSession>, SyncError) { /*noop*/ });
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
 
     realm_config.sync_config->on_sync_client_event_hook =
