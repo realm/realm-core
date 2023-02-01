@@ -237,7 +237,37 @@ std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    m_socket_provider->post(std::move(handler));
+    {
+        std::lock_guard lock(m_drain_mutex);
+        ++m_outstanding_posts;
+        m_drained = false;
+    }
+    m_socket_provider->post([handler = std::move(handler), this](Status status) {
+        handler(status);
+
+        std::lock_guard lock(m_drain_mutex);
+        --m_outstanding_posts;
+        m_drain_cv.notify_all();
+    });
+}
+
+
+void ClientImpl::drain_connections()
+{
+    logger.debug("Draining connections during sync client shutdown");
+    for (auto& server_slot_pair : m_server_slots) {
+        auto& server_slot = server_slot_pair.second;
+
+        if (server_slot.connection) {
+            auto& conn = server_slot.connection;
+            conn->force_close();
+        }
+        else {
+            for (auto& conn_pair : server_slot.alt_connections) {
+                conn_pair.second->force_close();
+            }
+        }
+    }
 }
 
 
@@ -245,13 +275,25 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
                                                        SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    return m_socket_provider->create_timer(delay, std::move(handler));
+    {
+        std::lock_guard lock(m_drain_mutex);
+        ++m_outstanding_posts;
+        m_drained = false;
+    }
+    return m_socket_provider->create_timer(delay, [handler = std::move(handler), this](Status status) {
+        handler(status);
+
+        std::lock_guard lock(m_drain_mutex);
+        --m_outstanding_posts;
+        m_drain_cv.notify_all();
+    });
 }
+
 
 ClientImpl::SyncTrigger ClientImpl::create_trigger(SyncSocketProvider::FunctionHandler&& handler)
 {
     REALM_ASSERT(m_socket_provider);
-    return std::make_unique<Trigger<SyncSocketProvider>>(m_socket_provider.get(), std::move(handler));
+    return std::make_unique<Trigger<ClientImpl>>(this, std::move(handler));
 }
 
 
@@ -345,6 +387,24 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
+void Connection::force_close()
+{
+    if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
+        m_reconnect_disconnect_timer.reset();
+        m_disconnect_delay_in_progress = false;
+        m_reconnect_delay_in_progress = false;
+    }
+
+    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
+    REALM_ASSERT(m_num_active_sessions == 0);
+    if (m_state == ConnectionState::disconnected) {
+        return;
+    }
+
+    voluntary_disconnect();
+    logger.info("Force disconnected");
+}
+
 
 void Connection::websocket_connected_handler(const std::string& protocol)
 {
@@ -424,7 +484,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         constexpr bool try_again = true;
         involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
     }
-    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
+    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError ||
+             status_code == ErrorCodes::ConnectionClosed) {
         read_or_write_error(error_code);
     }
     else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
@@ -662,6 +723,20 @@ void Connection::handle_reconnect_wait(Status status)
         initiate_reconnect(); // Throws
 }
 
+void Connection::reset_websocket_wrapper(std::unique_ptr<WebSocketInterface>&& ws)
+{
+    if (m_websocket_wrapper) {
+        m_websocket_wrapper->destroyed = true;
+        m_websocket_wrapper->websocket.reset();
+        m_websocket_wrapper.reset();
+    }
+    if (ws == nullptr) {
+        m_websocket = nullptr;
+        return;
+    }
+    m_websocket_wrapper = util::make_bind<WebSocketWrapper>(std::move(ws));
+    m_websocket = m_websocket_wrapper->get();
+}
 
 void Connection::initiate_reconnect()
 {
@@ -669,11 +744,7 @@ void Connection::initiate_reconnect()
 
     m_state = ConnectionState::connecting;
     report_connection_state_change(ConnectionState::connecting); // Throws
-    if (m_websocket_lifecycle_sentinel) {
-        m_websocket_lifecycle_sentinel->destroyed = true;
-        m_websocket_lifecycle_sentinel.reset();
-    }
-    m_websocket.reset();
+    reset_websocket_wrapper(nullptr);
 
     // In most cases, the reconnect delay will be counting from the point in
     // time of the initiation of the last reconnect operation (the initiation of
@@ -705,9 +776,8 @@ void Connection::initiate_reconnect()
         }
     }
 
-    m_websocket_lifecycle_sentinel = util::make_bind<LifetimeSentinel>();
     m_websocket_error_received = false;
-    m_websocket = m_client.m_socket_provider->connect(
+    reset_websocket_wrapper(m_client.m_socket_provider->connect(
         this, WebSocketEndpoint{
                   m_address,
                   m_port,
@@ -720,7 +790,7 @@ void Connection::initiate_reconnect()
                   m_ssl_trust_certificate_path,
                   m_ssl_verify_callback,
                   m_proxy_config,
-              });
+              }));
 }
 
 
@@ -759,8 +829,8 @@ util::Future<void> Connection::do_message_read_loop()
 {
     return m_websocket->async_read_message().then(
         [this,
-         sentinel = m_websocket_lifecycle_sentinel](StatusWith<WebSocketInterface::Message> sw_msg) -> Future<void> {
-            if (sentinel->destroyed) {
+         ws_wrapper = m_websocket_wrapper](StatusWith<WebSocketInterface::Message> sw_msg) mutable -> Future<void> {
+            if (ws_wrapper->destroyed) {
                 return Status::OK();
             }
             if (!sw_msg.is_ok()) {
@@ -771,7 +841,8 @@ util::Future<void> Connection::do_message_read_loop()
                 return Status{ErrorCodes::RuntimeError, "Invalid message type"};
             }
             handle_message_received(msg.message_data);
-            if (sentinel->destroyed) {
+            if (ws_wrapper->destroyed) {
+                ws_wrapper.reset(nullptr);
                 return Status::OK();
             }
             return do_message_read_loop();
@@ -807,8 +878,12 @@ void Connection::handle_connection_established()
     }
 
     report_connection_state_change(ConnectionState::connected); // Throws
-    do_message_read_loop().get_async([this](Status status) {
-        if (status == ErrorCodes::OperationAborted || status == ErrorCodes::BrokenPromise) {
+    do_message_read_loop().get_async([this, ws_wrapper = m_websocket_wrapper](Status status) mutable {
+        if (ws_wrapper->destroyed) {
+            ws_wrapper.reset(nullptr);
+            return;
+        }
+        if (status == ErrorCodes::OperationAborted) {
             return;
         }
         logger.info("Read loop terminated. %1", status);
@@ -878,8 +953,9 @@ void Connection::initiate_ping_delay(milliseconds_type now)
     m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(delay), [this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
-        else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+        REALM_ASSERT(status.is_ok());
+        // else if (!status.is_ok())
+        //     throw ExceptionForStatus(status);
 
         handle_ping_delay();                                    // Throws
     });                                                         // Throws
@@ -913,8 +989,9 @@ void Connection::initiate_pong_timeout()
     m_heartbeat_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         if (status == ErrorCodes::OperationAborted)
             return;
-        else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+        REALM_ASSERT(status.is_ok());
+        // else if (!status.is_ok())
+        //     throw ExceptionForStatus(status);
 
         handle_pong_timeout(); // Throws
     });                        // Throws
@@ -936,37 +1013,40 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     if (m_websocket_error_received)
         return;
 
-    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
-        if (status == ErrorCodes::OperationAborted)
-            return;
-        else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()})
+        .get_async([ws_wrapper = m_websocket_wrapper, sess, this](Status status) mutable {
+            if (ws_wrapper->destroyed) {
+                ws_wrapper.reset(nullptr);
+                return;
+            }
+            if (status == ErrorCodes::OperationAborted) {
+                return;
+            }
 
-        handle_write_message(); // Throws
-    });                         // Throws
-    m_sending_session = sess;
+            if (status == ErrorCodes::ConnectionClosed || status == ErrorCodes::WriteError) {
+                websocket_closed_handler(false, status);
+                return;
+            }
+
+            REALM_ASSERT(status.is_ok());
+            sess->message_sent();
+            if (sess->m_state == Session::Deactivated) {
+                // Session is now deactivated, so remove and destroy it.
+                session_ident_type ident = sess->m_ident;
+                m_sessions.erase(ident);
+            }
+
+            m_sending = false;
+            send_next_message();
+        });
+
     m_sending = true;
-}
-
-
-void Connection::handle_write_message()
-{
-    m_sending_session->message_sent(); // Throws
-    if (m_sending_session->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = m_sending_session->m_ident;
-        m_sessions.erase(ident);
-    }
-    m_sending_session = nullptr;
-    m_sending = false;
-    send_next_message(); // Throws
 }
 
 
 void Connection::send_next_message()
 {
     REALM_ASSERT(m_state == ConnectionState::connected);
-    REALM_ASSERT(!m_sending_session);
     REALM_ASSERT(!m_sending);
     if (m_send_ping) {
         send_ping(); // Throws
@@ -1020,24 +1100,27 @@ void Connection::send_ping()
 
 void Connection::initiate_write_ping(const OutputBuffer& out)
 {
-    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()}, [this](Status status) {
-        if (status == ErrorCodes::OperationAborted)
-            return;
-        else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+    m_websocket->async_write_binary(util::Span<const char>{out.data(), out.size()})
+        .get_async([ws_wrapper = m_websocket_wrapper, this](Status status) {
+            if (ws_wrapper->destroyed) {
+                return;
+            }
 
-        handle_write_ping(); // Throws
-    });                      // Throws
+            if (status == ErrorCodes::OperationAborted) {
+                return;
+            }
+
+            if (status == ErrorCodes::ConnectionClosed || status == ErrorCodes::WriteError) {
+                websocket_closed_handler(false, status);
+                return;
+            }
+
+            REALM_ASSERT(status.is_ok());
+            m_sending = false;
+            send_next_message();
+        });
+
     m_sending = true;
-}
-
-
-void Connection::handle_write_ping()
-{
-    REALM_ASSERT(m_sending);
-    REALM_ASSERT(!m_sending_session);
-    m_sending = false;
-    send_next_message(); // Throws
 }
 
 
@@ -1060,6 +1143,7 @@ void Connection::initiate_disconnect_wait()
 
     milliseconds_type time = m_client.m_connection_linger_time;
 
+    logger.debug("Waiting %1 milliseconds before closing connection", time);
     m_reconnect_disconnect_timer = m_client.create_timer(std::chrono::milliseconds(time), [this](Status status) {
         // If the operation is aborted, the connection object may have been
         // destroyed.
@@ -1186,13 +1270,8 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_heartbeat_timer.reset();
     m_previous_ping_rtt = 0;
 
-    if (m_websocket_lifecycle_sentinel) {
-        m_websocket_lifecycle_sentinel->destroyed = true;
-        m_websocket_lifecycle_sentinel.reset();
-    }
-    m_websocket.reset();
+    reset_websocket_wrapper(nullptr);
     m_input_body_buffer.reset();
-    m_sending_session = nullptr;
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 

@@ -136,8 +136,9 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    /// This calls stop() on the socket provider respectively.
     void stop() noexcept;
+
+    void drain();
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -148,7 +149,7 @@ public:
     void post(SyncSocketProvider::FunctionHandler&& handler);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
                                                SyncSocketProvider::FunctionHandler&& handler);
-    using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
+    using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
     std::mt19937_64& get_random() noexcept;
@@ -210,7 +211,14 @@ private:
     // Must be accessed only by event loop thread
     connection_ident_type m_prev_connection_ident = 0;
 
-    util::Mutex m_mutex;
+    std::mutex m_drain_mutex;
+    std::condition_variable m_drain_cv;
+
+    size_t m_num_connections = 0;   // Protected by `m_drain_mutex`
+    size_t m_outstanding_posts = 0; // Protected by `m_drain_mutex`
+    bool m_drained = false;         // Protected by `m_drain_mutex`
+
+    std::mutex m_mutex;
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
@@ -230,11 +238,15 @@ private:
     SessionWrapperStack m_abandoned_session_wrappers;
 
     // Protected by `m_mutex`.
-    util::CondVar m_wait_or_client_stopped_cond;
+    std::condition_variable m_wait_or_client_stopped_cond;
 
+    void drain_connections();
+    bool is_draining_connections();
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
     void actualize_and_finalize_session_wrappers();
+    void drain_connections_on_loop();
+    void trigger_actualize_and_finalize_session_wrappers(std::lock_guard<std::mutex>&);
 
     // Get or create a connection. If a connection exists for the specified
     // endpoint, it will be returned, otherwise a new connection will be
@@ -381,6 +393,8 @@ public:
     /// activated.
     void cancel_reconnect_delay();
 
+    void force_close();
+
     /// Returns zero until the HTTP response is received. After that point in
     /// time, it returns the negotiated protocol version, which is based on the
     /// contents of the `Sec-WebSocket-Protocol` header in the HTTP
@@ -414,8 +428,22 @@ public:
 
 private:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    struct LifetimeSentinel : public util::AtomicRefCountBase {
-        bool destroyed = false;
+
+    struct WebSocketWrapper : public util::AtomicRefCountBase {
+        bool destroyed = true;
+        std::unique_ptr<WebSocketInterface> websocket;
+
+        explicit WebSocketWrapper(std::unique_ptr<WebSocketInterface>&& ws)
+            : websocket(std::move(ws))
+        {
+            REALM_ASSERT(destroyed);
+            destroyed = false;
+        }
+
+        WebSocketInterface* get() const noexcept
+        {
+            return websocket.get();
+        }
     };
 
     template <class H>
@@ -442,6 +470,7 @@ private:
     void on_idle();
 
     std::string get_http_request_path() const;
+    void reset_websocket_wrapper(std::unique_ptr<WebSocketInterface>&& ws);
 
     void initiate_reconnect_wait();
     void handle_reconnect_wait(Status status);
@@ -456,11 +485,9 @@ private:
     void initiate_pong_timeout();
     void handle_pong_timeout();
     void initiate_write_message(const OutputBuffer&, Session*);
-    void handle_write_message();
     void send_next_message();
     void send_ping();
     void initiate_write_ping(const OutputBuffer&);
-    void handle_write_ping();
     void handle_message_received(util::Span<const char> data);
     util::Future<void> do_message_read_loop();
     void initiate_disconnect_wait();
@@ -503,8 +530,8 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    util::bind_ptr<LifetimeSentinel> m_websocket_lifecycle_sentinel;
-    std::unique_ptr<WebSocketInterface> m_websocket;
+    util::bind_ptr<WebSocketWrapper> m_websocket_wrapper;
+    WebSocketInterface* m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -597,8 +624,6 @@ private:
     // currently being written, the first session is taken out of the queue, and
     // then granted an opportunity to send a message.
     std::deque<Session*> m_sessions_enlisted_to_send;
-
-    Session* m_sending_session = nullptr;
 
     std::unique_ptr<char[]> m_input_body_buffer;
     OutputBuffer m_output_buffer;
@@ -1255,8 +1280,9 @@ inline void ClientImpl::Connection::one_less_active_unsuspended_session()
     if (--m_num_active_unsuspended_sessions != 0)
         return;
     // Dropped from one to zero
-    if (m_state != ConnectionState::disconnected)
+    if (m_state != ConnectionState::disconnected) {
         initiate_disconnect_wait(); // Throws
+    }
 }
 
 // Sessions, and the connection, should get the output_buffer and insert a message,

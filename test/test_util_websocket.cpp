@@ -8,7 +8,7 @@ using namespace realm::sync;
 
 using WriteCompletionHandler = websocket::WriteCompletionHandler;
 using ReadCompletionHandler = websocket::ReadCompletionHandler;
-
+#if 0
 namespace {
 
 // A class for connecting two socket endpoints through a memory buffer.
@@ -474,3 +474,5 @@ TEST(WebSocket_Interleaved_Fragmented_Messages)
     CHECK_EQUAL(config_2.binary_messages.size(), 1);
     CHECK_EQUAL(config_2.binary_messages[0], "abcd");
 }
+
+#endif

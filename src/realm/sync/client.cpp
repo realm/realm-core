@@ -393,15 +393,14 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
+    drain();
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
-
-    // thread to exit before tearing down the client.
-    m_socket_provider->stop(true);
 
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
     REALM_ASSERT(m_unactualized_session_wrappers.empty());
+    REALM_ASSERT(m_stopped);
 }
 
 
@@ -445,7 +444,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // Thread safety required
 
     {
-        util::LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_sessions_terminated = false;
     }
 
@@ -472,14 +471,14 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        util::LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
     }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_mutex};
+        std::unique_lock lock{m_mutex};
         while (!m_sessions_terminated && !m_stopped)
             m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_stopped;
@@ -487,16 +486,45 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     return completion_condition_was_satisfied;
 }
 
+void ClientImpl::drain_connections_on_loop()
+{
+    post([this](Status status) mutable {
+        REALM_ASSERT(status.is_ok());
+        actualize_and_finalize_session_wrappers();
+        drain_connections();
+    });
+}
+
+void ClientImpl::drain()
+{
+    stop();
+    {
+        std::lock_guard lock{m_drain_mutex};
+        if (m_drained) {
+            return;
+        }
+    }
+
+    drain_connections_on_loop();
+
+    std::unique_lock lock{m_drain_mutex};
+
+    logger.debug("Waiting for %1 connections to drain", m_num_connections);
+    m_drain_cv.wait(lock, [&] {
+        return m_num_connections == 0 && m_outstanding_posts == 0;
+    });
+
+    m_drained = true;
+}
 
 void ClientImpl::stop() noexcept
 {
-    {
-        util::LockGuard lock{m_mutex};
-        if (m_stopped)
-            return;
-        m_stopped = true;
-        m_wait_or_client_stopped_cond.notify_all();
-    }
+    std::lock_guard lock{m_mutex};
+    if (m_stopped)
+        return;
+
+    m_stopped = true;
+    m_wait_or_client_stopped_cond.notify_all();
 }
 
 
@@ -504,9 +532,37 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
 {
     // Thread safety required.
 
-    util::LockGuard lock{m_mutex};
+    std::lock_guard lock{m_mutex};
     REALM_ASSERT(m_actualize_and_finalize);
     m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
+    trigger_actualize_and_finalize_session_wrappers(lock);
+}
+
+
+void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper> wrapper) noexcept
+{
+    // Thread safety required.
+
+    std::lock_guard lock{m_mutex};
+    REALM_ASSERT(m_actualize_and_finalize);
+
+    // If the session wrapper has not yet been actualized (on the event loop
+    // thread), it can be immediately finalized. This ensures that we will
+    // generally not actualize a session wrapper that has already been
+    // abandoned.
+    auto i = m_unactualized_session_wrappers.find(wrapper.get());
+    if (i != m_unactualized_session_wrappers.end()) {
+        m_unactualized_session_wrappers.erase(i);
+        wrapper->finalize_before_actualization();
+        return;
+    }
+    m_abandoned_session_wrappers.push(std::move(wrapper));
+    trigger_actualize_and_finalize_session_wrappers(lock);
+}
+
+
+void ClientImpl::trigger_actualize_and_finalize_session_wrappers(std::lock_guard<std::mutex>&)
+{
     bool retrigger = !m_actualize_and_finalize_needed;
     m_actualize_and_finalize_needed = true;
     // The conditional triggering needs to happen before releasing the mutex,
@@ -522,42 +578,13 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
         m_actualize_and_finalize->trigger();
 }
 
-
-void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper> wrapper) noexcept
-{
-    // Thread safety required.
-
-    util::LockGuard lock{m_mutex};
-    REALM_ASSERT(m_actualize_and_finalize);
-
-    // If the session wrapper has not yet been actualized (on the event loop
-    // thread), it can be immediately finalized. This ensures that we will
-    // generally not actualize a session wrapper that has already been
-    // abandoned.
-    auto i = m_unactualized_session_wrappers.find(wrapper.get());
-    if (i != m_unactualized_session_wrappers.end()) {
-        m_unactualized_session_wrappers.erase(i);
-        wrapper->finalize_before_actualization();
-        return;
-    }
-    m_abandoned_session_wrappers.push(std::move(wrapper));
-    bool retrigger = !m_actualize_and_finalize_needed;
-    m_actualize_and_finalize_needed = true;
-    // The conditional triggering needs to happen before releasing the
-    // mutex. See implementation of register_unactualized_session_wrapper() for
-    // details.
-    if (retrigger)
-        m_actualize_and_finalize->trigger();
-}
-
-
 // Must be called from the event loop thread.
 void ClientImpl::actualize_and_finalize_session_wrappers()
 {
     std::map<SessionWrapper*, ServerEndpoint> unactualized_session_wrappers;
     SessionWrapperStack abandoned_session_wrappers;
     {
-        util::LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_actualize_and_finalize_needed = false;
         swap(m_unactualized_session_wrappers, unactualized_session_wrappers);
         swap(m_abandoned_session_wrappers, abandoned_session_wrappers);
@@ -609,6 +636,10 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
     }
     m_prev_connection_ident = ident;
     was_created = true;
+    {
+        std::lock_guard lk(m_drain_mutex);
+        ++m_num_connections;
+    }
     return conn;
 }
 
@@ -632,6 +663,12 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
         REALM_ASSERT(j != server_slot.alt_connections.end()); // Must be found
         REALM_ASSERT(&*j->second == &conn);
         server_slot.alt_connections.erase(j);
+    }
+
+    {
+        std::lock_guard lk(m_drain_mutex);
+        --m_num_connections;
+        m_drain_cv.notify_all();
     }
 }
 
@@ -1299,7 +1336,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::lock_guard lock{m_client.m_mutex};
         target_mark = ++m_target_upload_mark;
     }
 
@@ -1326,7 +1363,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::unique_lock lock{m_client.m_mutex};
         while (m_reached_upload_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1342,7 +1379,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::lock_guard lock{m_client.m_mutex};
         target_mark = ++m_target_download_mark;
     }
 
@@ -1369,7 +1406,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::unique_lock lock{m_client.m_mutex};
         while (m_reached_download_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1547,7 +1584,7 @@ void SessionWrapper::on_upload_completion()
         m_download_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
-    util::LockGuard lock{m_client.m_mutex};
+    std::lock_guard lock{m_client.m_mutex};
     if (m_staged_upload_mark > m_reached_upload_mark) {
         m_reached_upload_mark = m_staged_upload_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1578,7 +1615,7 @@ void SessionWrapper::on_download_completion()
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
-    util::LockGuard lock{m_client.m_mutex};
+    std::lock_guard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1838,6 +1875,10 @@ void Client::stop() noexcept
     m_impl->stop();
 }
 
+void Client::drain()
+{
+    m_impl->drain();
+}
 
 void Client::cancel_reconnect_delay()
 {

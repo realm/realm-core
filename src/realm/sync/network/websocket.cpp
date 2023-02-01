@@ -731,6 +731,9 @@ public:
                 return Status::OK();
             })
             .on_error([this](Status status) {
+                if (status == ErrorCodes::BrokenPromise) {
+                    return status;
+                }
                 if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
                     stop();
                 }
@@ -1027,7 +1030,11 @@ private:
                 if (result.is_ok()) {
                     return result;
                 }
+
                 const auto& status = result.get_status();
+                if (status == ErrorCodes::BrokenPromise) {
+                    return result;
+                }
                 if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
                     stop();
                 }

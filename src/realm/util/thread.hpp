@@ -199,6 +199,7 @@ public:
     bool holds_lock() noexcept;
 
 private:
+    friend class CondVar;
     Mutex* m_mutex;
     bool m_is_locked;
 };

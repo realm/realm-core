@@ -48,6 +48,8 @@ public:
     /// Thread-safe.
     void stop() noexcept;
 
+    void drain();
+
     /// \brief Cancel current or next reconnect delay for all servers.
     ///
     /// This corresponds to calling Session::cancel_reconnect_delay() on all

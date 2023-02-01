@@ -139,6 +139,7 @@ TEST(Sync_BadVirtualPath)
     int nerrors = 0;
 
     using ErrorInfo = Session::ErrorInfo;
+
     auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
@@ -2997,6 +2998,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
+    client.drain();
     socket_provider->stop(true);
 }
 
@@ -3156,7 +3158,6 @@ TEST(Sync_UploadDownloadProgress_1)
         });
 
         client.stop();
-        socket_provider->stop(true);
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3497,7 +3498,6 @@ TEST(Sync_UploadDownloadProgress_3)
     client.stop();
 
     server_thread.join();
-    socket_provider->stop(true);
 }
 
 
@@ -3621,18 +3621,17 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    bool cond_var_signaled = false;
-    std::mutex mutex;
-    std::condition_variable cond_var;
+    auto pf = util::make_promise_future<void>();
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
     Session session = fixture.make_session(db);
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [this, promise = util::CopyablePromiseHolder(std::move(pf.promise))](
+                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -3640,20 +3639,14 @@ TEST(Sync_UploadDownloadProgress_5)
 
         if (progress_version > 0) {
             CHECK_EQUAL(snapshot_version, 3);
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            promise.get_promise().emplace_value();
         }
     };
 
     session.set_progress_handler(progress_handler);
 
-    std::unique_lock<std::mutex> lock(mutex);
     fixture.bind_session(session, "/test");
-    cond_var.wait(lock, [&] {
-        return cond_var_signaled;
-    });
+    pf.future.get();
 
     // The check is that we reach this point.
 }
@@ -3720,8 +3713,9 @@ TEST(Sync_UploadDownloadProgress_6)
         session->bind();
     }
 
-    client.stop();
+    client.drain();
     server.stop();
+
     socket_provider->stop(true);
     server_thread.join();
 
@@ -4340,6 +4334,7 @@ TEST(Sync_MergeMultipleChangesets)
         fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
+        session_1.detach();
         // Stop first client.
         fixture.stop_client(0);
 
@@ -5066,7 +5061,6 @@ TEST_IF(Sync_SSL_Certificates, false)
         session.bind();
 
         session.wait_for_download_complete_or_client_stopped();
-        client.stop();
     }
 }
 
