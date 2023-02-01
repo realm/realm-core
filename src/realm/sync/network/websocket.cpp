@@ -729,15 +729,6 @@ public:
             .then([this](size_t) {
                 shrink_write_buffer();
                 return Status::OK();
-            })
-            .on_error([this](Status status) {
-                if (status == ErrorCodes::BrokenPromise) {
-                    return status;
-                }
-                if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
-                    stop();
-                }
-                return status;
             });
     }
 
@@ -1025,20 +1016,6 @@ private:
         return m_config.async_read(m_frame_reader.read_into())
             .then([this](size_t) {
                 return do_next_frame_reader_future();
-            })
-            .on_completion([this](StatusWith<size_t> result) -> StatusWith<size_t> {
-                if (result.is_ok()) {
-                    return result;
-                }
-
-                const auto& status = result.get_status();
-                if (status == ErrorCodes::BrokenPromise) {
-                    return result;
-                }
-                if (status != ErrorCodes::OperationAborted && status != ErrorCodes::ConnectionClosed) {
-                    stop();
-                }
-                return status;
             });
     }
 
