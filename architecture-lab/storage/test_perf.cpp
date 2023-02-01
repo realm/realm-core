@@ -248,7 +248,6 @@ int main(int argc, char* argv[])
     */
     Db& db = Db::create("perf.core2");
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
     Snapshot& ss = db.create_changes();
     Table t = ss.create_table(fields);
     Field<String> f_s[max_fields];
@@ -265,7 +264,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 4;
+    int num_work_packages = 16;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -273,6 +272,7 @@ int main(int argc, char* argv[])
 
     std::thread writer([&]() {
         std::cout << "Initial scan / object creation" << std::endl;
+        std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
         long total_lines = 0;
         start = std::chrono::high_resolution_clock::now();
         const char* line_start = (const char*)file_start;
@@ -357,6 +357,7 @@ int main(int argc, char* argv[])
     // now populate dataset
     {
         std::cout << std::endl << "Ingesting data.... " << std::endl;
+        std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
         long num_line = 0;
         std::vector<std::unique_ptr<string_compressor>> compressors;
         compressors.resize(105);
@@ -437,6 +438,7 @@ int main(int argc, char* argv[])
         std::cout << "Total effect: from " << from_size << " to " << to_size << " bytes ("
                   << 100 - (to_size * 100) / from_size << " pct reduction)" << std::endl;
 
+        compressors.clear();
         for (int i = 0; i < num_work_packages; ++i)
             delete to_reader.get();
 
