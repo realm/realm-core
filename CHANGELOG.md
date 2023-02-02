@@ -18,6 +18,7 @@
 
 ### Internals
 * Added `REALM_ARCHITECTURE_ARM32` and `REALM_ARCHITECTURE_ARM64` macros to `features.h` for easier platform detection. ([#6256](https://github.com/realm/realm-core/pull/6256))
+* Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
 * Add Binding Callback Thread Observer CAPI Test and updated Sync_MultipleSyncAgentsNotAllowed test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ----------------------------------------------
@@ -42,6 +43,7 @@
 * Online compaction may cause a single commit to take a long time ([#6245](https://github.com/realm/realm-core/pull/6245), since v13.0.0)
 * Expose `collection_was_cleared` in the C API ([#6200](https://github.com/realm/realm-core/issues/6200), since v.10.4.0)
 * `Set<Mixed>::sort()` used a different sort order from sorting any other collection, including a filtered `Set<Mixed>` ([PR #6238](https://github.com/realm/realm-core/pull/6238), since v13.0.0).
+* Fix issue where calling `RealmCoordinator::get_realm(Realm::Config, util::Optional<VersionID>)` would not correctly set `m_schema_version` to `ObjectStore::NotVersioned` if no schema was provided in the config when the realm is first opened ([PR #6236](https://github.com/realm/realm-core/pull/6236), since v10.0.0).
 
 ### Breaking changes
 * `SyncSession::log_out()` has been renamed to `SyncSession::force_close()` to reflect what it actually does ([#6183](https://github.com/realm/realm-core/pull/6183))

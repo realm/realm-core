@@ -3357,6 +3357,32 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     }
 }
 
+TEST_CASE("SharedRealm: Schema version set correctly") {
+    SECTION("Set schema versions") {
+        TestFile config;
+
+        auto schema = Schema{{"object1",
+                              {
+                                  {"value", PropertyType::Int},
+                              }},
+                             {"object2",
+                              {
+                                  {"value", PropertyType::Int},
+                              }}};
+        auto r1 = Realm::get_shared_realm(config);
+        r1->read_group();
+        auto frozen = Realm::get_frozen_realm(config, r1->read_transaction_version());
+        CHECK(r1->schema_version() == ObjectStore::NotVersioned);
+        CHECK(frozen->schema_version() == ObjectStore::NotVersioned);
+        r1->update_schema(schema);
+        frozen = Realm::get_frozen_realm(config, r1->read_transaction_version());
+        frozen->set_schema_subset(schema);
+
+        CHECK(r1->schema_version() != ObjectStore::NotVersioned);
+        CHECK(frozen->schema_version() != ObjectStore::NotVersioned);
+    }
+}
+
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;

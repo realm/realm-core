@@ -32,7 +32,7 @@ functions:
         script: |-
           set -o errexit
           git submodule update --init --recursive
-
+  
   "compile":
     - command: shell.exec
       params:
@@ -79,6 +79,10 @@ functions:
           if [ -n "${enable_valgrind|}" ]; then
               set_cmake_var realm_vars REALM_VALGRIND BOOL On
               set_cmake_var realm_vars REALM_ENABLE_ALLOC_SET_ZERO BOOL On
+          fi
+
+          if [ -n "${enable_fuzzer|}" ]; then
+              set_cmake_var realm_vars REALM_LIBFUZZER BOOL On
           fi
 
           if [ -z "${disable_sync|}" ]; then
@@ -224,6 +228,35 @@ functions:
       content_type: text/text
       display_name: install baas output
       optional: true
+  
+  "upload fuzzer results":
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      script: |-
+        if ls crash-*> /dev/null 2>&1; then
+          echo "Found crash file"
+          mv crash-* realm-fuzzer-crash.txt
+        fi
+    
+  - command: s3.put
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/build/test/realm-fuzzer/realm-fuzzer-crash.txt'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-fuzzer-crash.txt'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: Fuzzer crash report
+      optional: true
+
+  - command: shell.exec
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      script: |-
+        rm realm-fuzzer-crash.txt
 
   "run hang analyzer":
   - command: shell.exec
@@ -659,6 +692,16 @@ tasks:
         echo $out
         exit 1
 
+- name: fuzzer
+  commands:
+  - command: shell.exec
+    timeout_secs: 3600
+    params:
+      working_dir: realm-core/build/test/realm-fuzzer
+      shell: /bin/bash
+      script: |-
+        ${cmake_build_type|Debug}/realm-libfuzz
+
 task_groups:
 - name: compile_test_and_package
   max_hosts: 1
@@ -730,6 +773,19 @@ task_groups:
   tasks:
   - long-running-core-tests
 
+- name: fuzzer-tests
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: realm-libfuzz
+  teardown_task:
+  - func: "upload fuzzer results"
+  tasks:
+  - fuzzer
+  
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -862,6 +918,26 @@ buildvariants:
     distros:
     - ubuntu2004-large
 
+- name: ubuntu2004-fuzzer
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Fuzzer)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_ubsan: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    cmake_build_type: RelWithDebInfo
+    run_with_encryption: On
+    enable_fuzzer: On
+  tasks:
+  - name: fuzzer-tests
+    cron: "@daily"
+    patchable: false
+    
 - name: rhel70
   display_name: "RHEL 7 x86_64"
   run_on: rhel70-small
