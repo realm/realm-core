@@ -35,10 +35,8 @@
 
 #if defined(_WIN32)
 #include <Windows.h>
-// 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
-// does not exist for 224 bits (only 128, 256, etc).
-#include <sha224.hpp>
 #include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
 #else
 #include <sys/mman.h>
 #include <unistd.h>
@@ -47,6 +45,7 @@
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
+#include <realm/util/sha_crypto.hpp>
 #endif
 
 namespace realm::util {
@@ -234,7 +233,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
     uint8_t buffer[224 / 8];
-    calc_hmac(src, len, buffer, m_hmacKey);
+    hmac_sha224(Span(reinterpret_cast<const uint8_t*>(src), len), buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
@@ -357,7 +356,7 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noe
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
+            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -421,61 +420,6 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     // Finalize the encryption. Should not output further data.
     if (!EVP_CipherFinal_ex(m_ctx, reinterpret_cast<uint8_t*>(dst) + len, &len))
         handle_error();
-#endif
-}
-
-void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const
-{
-#if REALM_PLATFORM_APPLE
-    CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
-#else
-    uint8_t ipad[64];
-    for (size_t i = 0; i < 32; ++i)
-        ipad[i] = key[i] ^ 0x36;
-    memset(ipad + 32, 0x36, 32);
-
-    uint8_t opad[64] = {0};
-    for (size_t i = 0; i < 32; ++i)
-        opad[i] = key[i] ^ 0x5C;
-    memset(opad + 32, 0x5C, 32);
-
-    // Full hmac operation is sha224(opad + sha224(ipad + data))
-#ifdef _WIN32
-    sha224_state s;
-    sha_init(s);
-    sha_process(s, ipad, 64);
-    sha_process(s, static_cast<const uint8_t*>(src), uint32_t(len));
-    sha_done(s, dst);
-
-    sha_init(s);
-    sha_process(s, opad, 64);
-    sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
-    sha_done(s, dst);
-#elif OPENSSL_VERSION_NUMBER >= 0x10101000L // 1.1.1
-    std::unique_ptr<EVP_MD_CTX, void (*)(EVP_MD_CTX*)> ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
-    EVP_DigestInit(ctx.get(), EVP_sha224());
-    EVP_DigestUpdate(ctx.get(), ipad, 64);
-    EVP_DigestUpdate(ctx.get(), static_cast<const uint8_t*>(src), len);
-    EVP_DigestFinal(ctx.get(), dst, nullptr);
-
-    ctx = {EVP_MD_CTX_new(), EVP_MD_CTX_free};
-    EVP_DigestInit(ctx.get(), EVP_sha224());
-    EVP_DigestUpdate(ctx.get(), opad, 64);
-    EVP_DigestUpdate(ctx.get(), dst, SHA224_DIGEST_LENGTH);
-    EVP_DigestFinal(ctx.get(), dst, nullptr);
-#else
-    SHA256_CTX ctx;
-    SHA224_Init(&ctx);
-    SHA256_Update(&ctx, ipad, 64);
-    SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
-    SHA256_Final(dst, &ctx);
-
-    SHA224_Init(&ctx);
-    SHA256_Update(&ctx, opad, 64);
-    SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
-    SHA256_Final(dst, &ctx);
-#endif
-
 #endif
 }
 

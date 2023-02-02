@@ -339,7 +339,7 @@ endif()
 
 # On systems without a built-in SHA-2 implementation (or one provided by a dependency)
 # we need to bundle the public domain implementation.
-# Note: This is also used on Windows because Windows lacks a native SHA224 hash
+# Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
 if(NOT APPLE AND NOT REALM_HAVE_OPENSSL)
     add_library(sha2 OBJECT ${RealmCore_SOURCE_DIR}/external/sha-2/sha224.cpp ${RealmCore_SOURCE_DIR}/external/sha-2/sha256.cpp)
     target_include_directories(Storage PRIVATE ${RealmCore_SOURCE_DIR}/external/sha-2)
