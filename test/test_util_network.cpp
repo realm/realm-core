@@ -167,6 +167,19 @@ TEST(Network_RunUntilStopped)
         });
         return std::move(future);
     };
+
+    auto timer_to_service = [](network::DeadlineTimer& timer) {
+        auto [promise, future] = util::make_promise_future<void>();
+        timer.async_wait(std::chrono::milliseconds{250}, [promise = std::move(promise)](Status s) mutable {
+            if (!s.is_ok()) {
+                promise.set_error(s);
+                return;
+            }
+            promise.emplace_value();
+        });
+        return std::move(future);
+    };
+
     auto before_run = post_to_service();
 
     auto [thread_stopped_promise, thread_stopped_future] = util::make_promise_future<void>();
@@ -180,6 +193,14 @@ TEST(Network_RunUntilStopped)
     // Post while it's running. This should get fulfilled immediately.
     post_to_service().get();
     CHECK_NOT(thread_stopped_future.is_ready());
+
+    network::DeadlineTimer timer_1(service), timer_2(service);
+    auto timer_1_ran = timer_to_service(timer_1);
+    auto timer_2_ran = timer_to_service(timer_2);
+
+    timer_1_ran.get();
+    timer_2_ran.get();
+
     service.stop();
     thread.join();
 
