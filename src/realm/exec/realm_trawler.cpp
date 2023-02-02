@@ -1102,27 +1102,10 @@ int main(int argc, const char* argv[])
                 else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
                     curr_arg++;
-                    char chars[128];
-                    std::cout << "Using key: ";
-                    for (int idx = 0; idx < 128; ++idx) {
-                        char c;
-                        do {
-                            key_file.get(c);
-                            // todo: check for failure
-                        } while (!is_hex(c));
-                        chars[idx] = c;
-                        std::cout << c;
-                    }
-                    std::cout << std::endl;
+                    const char* chars = argv[curr_arg];
                     for (int idx = 0; idx < 64; ++idx) {
                         key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
                     }
-                    std::cout << "Key again: ";
-                    for (int idx = 0; idx < 64; ++idx) {
-                        char c = key[idx];
-                        std::cout << to_hex_char(c >> 4) << to_hex_char(c & 0xf);
-                    }
-                    std::cout << std::endl;
                     key_ptr = key;
                 }
                 else if (strcmp(argv[curr_arg], "--top") == 0) {
