@@ -56,7 +56,9 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
     list.insert(list.end(), list2.begin(), list2.end());
     list2.clear();
     if (list.size() > 1) {
-        std::sort(begin(list), end(list), [](T& a, T& b) { return a.start < b.start; });
+        std::sort(begin(list), end(list), [](T& a, T& b) {
+            return a.start < b.start;
+        });
 
         auto prev = list.begin();
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
@@ -79,7 +81,11 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         }
 
         // Remove all of the now zero-size chunks from the free list
-        list.erase(std::remove_if(begin(list), end(list), [](T& chunk) { return chunk.length == 0; }), end(list));
+        list.erase(std::remove_if(begin(list), end(list),
+                                  [](T& chunk) {
+                                      return chunk.length == 0;
+                                  }),
+                   end(list));
     }
 }
 
@@ -507,7 +513,9 @@ std::string human_readable(uint64_t val)
 uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
-    std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
+    std::for_each(list.begin(), list.end(), [&](const Entry& e) {
+        sz += e.length;
+    });
     return sz;
 }
 
@@ -1036,6 +1044,42 @@ void RealmFile::changes() const
     }
 }
 
+bool is_hex(char c)
+{
+    if (c >= '0' && c <= '9')
+        return true;
+    if (c >= 'a' && c <= 'f')
+        return true;
+    if (c >= 'A' && c <= 'F')
+        return true;
+    return false;
+}
+
+unsigned int hex_char_to_bin(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    exit(-1);
+}
+
+unsigned int hex_to_bin(char first, char second)
+{
+    return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
+}
+
+char to_hex_char(char c)
+{
+    if (c < 10)
+        return c + '0';
+    if (c < 16)
+        return c - 10 + 'a';
+    return '!';
+}
+
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {
@@ -1054,6 +1098,32 @@ int main(int argc, const char* argv[])
                     key_file.read(key, sizeof(key));
                     key_ptr = key;
                     curr_arg++;
+                }
+                else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
+                    std::ifstream key_file(argv[curr_arg + 1]);
+                    curr_arg++;
+                    char chars[128];
+                    std::cout << "Using key: ";
+                    for (int idx = 0; idx < 128; ++idx) {
+                        char c;
+                        do {
+                            key_file.get(c);
+                            // todo: check for failure
+                        } while (!is_hex(c));
+                        chars[idx] = c;
+                        std::cout << c;
+                    }
+                    std::cout << std::endl;
+                    for (int idx = 0; idx < 64; ++idx) {
+                        key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
+                    }
+                    std::cout << "Key again: ";
+                    for (int idx = 0; idx < 64; ++idx) {
+                        char c = key[idx];
+                        std::cout << to_hex_char(c >> 4) << to_hex_char(c & 0xf);
+                    }
+                    std::cout << std::endl;
+                    key_ptr = key;
                 }
                 else if (strcmp(argv[curr_arg], "--top") == 0) {
                     char* end;
