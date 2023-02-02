@@ -169,8 +169,8 @@ TEST(Network_RunUntilStopped)
     };
     auto before_run = post_to_service();
 
-    auto [ thread_stopped_promise, thread_stopped_future ] = util::make_promise_future<void>();
-    std::thread thread([&service, promise = std::move(thread_stopped_promise) ]() mutable {
+    auto [thread_stopped_promise, thread_stopped_future] = util::make_promise_future<void>();
+    std::thread thread([&service, promise = std::move(thread_stopped_promise)]() mutable {
         service.run_until_stopped();
         promise.emplace_value();
     });
