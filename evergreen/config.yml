@@ -693,7 +693,6 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: ["for_pull_requests"]
   commands:
   - command: shell.exec
     timeout_secs: 3600
@@ -938,8 +937,7 @@ buildvariants:
   - name: fuzzer-tests
     cron: "@daily"
     patchable: false
-
-
+    
 - name: rhel70
   display_name: "RHEL 7 x86_64"
   run_on: rhel70-small
