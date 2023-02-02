@@ -553,7 +553,7 @@ void DefaultSocketProvider::event_loop()
     });
 
     try {
-        m_service.run(); // Throws
+        m_service.run_until_stopped(); // Throws
     }
     catch (const std::exception& e) {
         std::unique_lock<std::mutex> lock(m_mutex);

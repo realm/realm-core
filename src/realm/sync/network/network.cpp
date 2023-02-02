@@ -1,12 +1,14 @@
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-#include <cerrno>
-#include <limits>
 #include <algorithm>
-#include <vector>
+#include <cerrno>
+#include <condition_variable>
+#include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 #include <fcntl.h>
 
@@ -20,7 +22,6 @@
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/misc_errors.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
 #include <realm/sync/network/network.hpp>
 
@@ -1376,69 +1377,12 @@ public:
 
     void run()
     {
-        //bool no_incomplete_resolve_operations;
-
-    on_handlers_executed_or_interrupted : {
-        std::lock_guard lock{m_mutex};
-        if (m_stopped)
-            return;
-        // Note: Order of post operations must be preserved.
-        m_completed_operations.push_back(m_completed_operations_2);
-        //no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
-
-        if (m_completed_operations.empty())
-            goto on_time_progressed;
+        run_impl(true);
     }
 
-    on_operations_completed : {
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-        m_handler_exec_start_time = clock::now();
-#endif
-        while (LendersOperPtr op = m_completed_operations.pop_front())
-            execute(op); // Throws
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-        m_handler_exec_time += clock::now() - m_handler_exec_start_time;
-#endif
-        goto on_handlers_executed_or_interrupted;
-    }
-
-    on_time_progressed : {
-        clock::time_point now = clock::now();
-        if (process_timers(now))
-            goto on_operations_completed;
-
-        /*
-        bool no_incomplete_operations =
-            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
-        if (no_incomplete_operations) {
-            // We can only get to this point when there are no completion
-            // handlers ready to execute. It happens either because of a
-            // fall-through from on_operations_completed, or because of a
-            // jump to on_time_progressed, but that only happens if no
-            // completions handlers became ready during
-            // wait_and_process_io().
-            //
-            // We can also only get to this point when there are no
-            // asynchronous operations in progress (due to the preceeding
-            // if-condition.
-            //
-            // It is possible that an other thread has added new post
-            // operations since we checked, but there is really no point in
-            // rechecking that, as it is always possible, even after a
-            // recheck, that new post handlers get added after we decide to
-            // return, but before we actually do return. Also, if would
-            // offer no additional guarantees to the application.
-            return; // Out of work
-        }*/
-
-        // Blocking wait for I/O
-        bool interrupted = false;
-        if (wait_and_process_io(now, interrupted)) // Throws
-            goto on_operations_completed;
-        if (interrupted)
-            goto on_handlers_executed_or_interrupted;
-        goto on_time_progressed;
-    }
+    void run_until_stopped()
+    {
+        run_impl(false);
     }
 
     void stop() noexcept
@@ -1606,7 +1550,71 @@ private:
     clock::time_point m_handler_exec_start_time;
     clock::duration m_handler_exec_time = clock::duration::zero();
 #endif
+    void run_impl(bool return_when_idle)
+    {
+        bool no_incomplete_resolve_operations;
 
+    on_handlers_executed_or_interrupted : {
+        std::lock_guard lock{m_mutex};
+        if (m_stopped)
+            return;
+        // Note: Order of post operations must be preserved.
+        m_completed_operations.push_back(m_completed_operations_2);
+        no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
+
+        if (m_completed_operations.empty())
+            goto on_time_progressed;
+    }
+
+    on_operations_completed : {
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_start_time = clock::now();
+#endif
+        while (LendersOperPtr op = m_completed_operations.pop_front())
+            execute(op); // Throws
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_time += clock::now() - m_handler_exec_start_time;
+#endif
+        goto on_handlers_executed_or_interrupted;
+    }
+
+    on_time_progressed : {
+        clock::time_point now = clock::now();
+        if (process_timers(now))
+            goto on_operations_completed;
+
+        bool no_incomplete_operations =
+            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
+        if (no_incomplete_operations && return_when_idle) {
+            // We can only get to this point when there are no completion
+            // handlers ready to execute. It happens either because of a
+            // fall-through from on_operations_completed, or because of a
+            // jump to on_time_progressed, but that only happens if no
+            // completions handlers became ready during
+            // wait_and_process_io().
+            //
+            // We can also only get to this point when there are no
+            // asynchronous operations in progress (due to the preceeding
+            // if-condition.
+            //
+            // It is possible that an other thread has added new post
+            // operations since we checked, but there is really no point in
+            // rechecking that, as it is always possible, even after a
+            // recheck, that new post handlers get added after we decide to
+            // return, but before we actually do return. Also, if would
+            // offer no additional guarantees to the application.
+            return; // Out of work
+        }
+
+        // Blocking wait for I/O
+        bool interrupted = false;
+        if (wait_and_process_io(now, interrupted)) // Throws
+            goto on_operations_completed;
+        if (interrupted)
+            goto on_handlers_executed_or_interrupted;
+        goto on_time_progressed;
+    }
+    }
     bool process_timers(clock::time_point now)
     {
         bool any_operations_completed = false;
@@ -1760,6 +1768,12 @@ Service::~Service() noexcept {}
 void Service::run()
 {
     m_impl->run(); // Throws
+}
+
+
+void Service::run_until_stopped()
+{
+    m_impl->run_until_stopped();
 }
 
 
