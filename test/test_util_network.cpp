@@ -6,6 +6,7 @@
 #include <thread>
 
 #include <realm/status.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/trigger.hpp>
@@ -151,6 +152,46 @@ TEST(Network_PostOperation)
     CHECK_EQUAL(var_2, 191);
 }
 
+
+TEST(Network_RunUntilStopped)
+{
+    network::Service service;
+    auto post_to_service = [&] {
+        auto [promise, future] = util::make_promise_future<void>();
+        service.post([promise = std::move(promise)](Status s) mutable {
+            if (!s.is_ok()) {
+                promise.set_error(s);
+                return;
+            }
+            promise.emplace_value();
+        });
+        return std::move(future);
+    };
+    auto before_run = post_to_service();
+
+    auto [ thread_stopped_promise, thread_stopped_future ] = util::make_promise_future<void>();
+    std::thread thread([&service, promise = std::move(thread_stopped_promise) ]() mutable {
+        service.run_until_stopped();
+        promise.emplace_value();
+    });
+
+    before_run.get();
+    CHECK_NOT(thread_stopped_future.is_ready());
+    // Post while it's running. This should get fulfilled immediately.
+    post_to_service().get();
+    CHECK_NOT(thread_stopped_future.is_ready());
+    service.stop();
+    thread.join();
+
+    thread_stopped_future.get();
+
+    auto after_stop = post_to_service();
+    CHECK_NOT(after_stop.is_ready());
+
+    service.reset();
+    service.run();
+    after_stop.get();
+}
 
 TEST(Network_EventLoopStopAndReset_1)
 {
