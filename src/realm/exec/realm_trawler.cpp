@@ -1093,14 +1093,13 @@ int main(int argc, const char* argv[])
             const char* key_ptr = nullptr;
             char key[64];
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
-                if (strcmp(argv[curr_arg], "--key") == 0) {
+                if (strcmp(argv[curr_arg], "--keyfile") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
                     key_file.read(key, sizeof(key));
                     key_ptr = key;
                     curr_arg++;
                 }
                 else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
-                    std::ifstream key_file(argv[curr_arg + 1]);
                     curr_arg++;
                     const char* chars = argv[curr_arg];
                     for (int idx = 0; idx < 64; ++idx) {
@@ -1165,7 +1164,10 @@ int main(int argc, const char* argv[])
         }
     }
     else {
-        std::cout << "Usage: realm-trawler [-afmsw] [--key crypt_key] [--top top_ref] <realmfile>" << std::endl;
+        std::cout << "Usage: realm-trawler [-afmsw] [--keyfile file-with-binary-crypt-key] [--hexkey "
+                     "crypt-key-in-hex] [--top "
+                     "top_ref] <realmfile>"
+                  << std::endl;
         std::cout << "   f : free list analysis" << std::endl;
         std::cout << "   m : memory leak check" << std::endl;
         std::cout << "   s : schema dump" << std::endl;
