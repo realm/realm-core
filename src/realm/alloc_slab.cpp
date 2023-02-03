@@ -108,10 +108,13 @@ void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_
 
 inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     : ref_end(r)
-    , size(s)
+    , size((s + 0x3F) & ~0x3Full)
 {
+    struct alignas(64) Vec {
+        int64_t vec[8];
+    };
     total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
-    addr = new char[size];
+    addr = reinterpret_cast<char*>(new Vec[size >> 6]);
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
 #endif
