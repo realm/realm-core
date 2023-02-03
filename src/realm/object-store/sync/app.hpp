@@ -385,6 +385,7 @@ private:
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
+    std::string m_host;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;

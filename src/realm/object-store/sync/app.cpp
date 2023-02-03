@@ -321,6 +321,7 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
     // Update url components based on new hostname value
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
+    m_host = hostname;
     m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
     std::string this_app_path = app_path + "/" + m_config.app_id;
     m_app_route = m_base_route + this_app_path;
@@ -858,7 +859,12 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
                 manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
             });
 
+        #ifdef EMSCRIPTEN
+            self->update_hostname(hostname, ws_hostname);
+        #else    
             self->update_hostname(self->m_sync_manager->app_metadata());
+        #endif    
+            
         }
         catch (const AppError&) {
             // Pass the response back to completion
@@ -888,6 +894,13 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
                 return self->handle_possible_redirect_response(std::move(request), *response, std::move(completion));
             }
 
+#ifdef EMSCRIPTEN
+            // WASM does not rely on the internal Realm to store the Sync Metadata
+            if (request.url.rfind(base_url, 0) != std::string::npos &&
+                self->m_host != base_url) {
+                request.url.replace(0, base_url.size(), self->m_host);
+            }
+#else
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
@@ -896,6 +909,7 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
                 app_metadata->hostname != base_url) {
                 request.url.replace(0, base_url.size(), app_metadata->hostname);
             }
+#endif            
             // Retry the original request with the updated url
             self->m_config.transport->send_request_to_server(
                 std::move(request), [self = std::move(self), completion = std::move(completion)](
