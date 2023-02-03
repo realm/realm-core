@@ -1858,12 +1858,11 @@ DirScanner::~DirScanner() = default;
 bool DirScanner::next(std::string& name)
 {
     const std::filesystem::directory_iterator end;
-    if (m_iterator != end) {
-        name = m_iterator->path().filename().string();
-        m_iterator++;
-        return true;
-    }
-    return false;
+    if (m_iterator == end)
+        return false;
+    name = m_iterator->path().filename().string();
+    m_iterator++;
+    return true;
 }
 
 #elif !defined(_WIN32)
