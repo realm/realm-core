@@ -936,9 +936,7 @@ buildvariants:
   tasks:
   - name: fuzzer-tests
     cron: "@daily"
-    patchable: false
-    distros:
-    - ubuntu2004-large
+    patchable: true
     
 - name: rhel70
   display_name: "RHEL 7 x86_64"
