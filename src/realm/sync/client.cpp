@@ -187,6 +187,7 @@ public:
     void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
+    void reset_connection_state_change_listener();
 
     void initiate();
     void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
@@ -1187,6 +1188,15 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 }
 
 
+inline void SessionWrapper::reset_connection_state_change_listener()
+{
+    // Drop the connection state change listener, so state notifications aren't propagated to the sync session
+    // This is used when a redirection occurs while connecting to the server due to deployment model changing
+    // and the session is restarted.
+    m_connection_state_change_listener.release();
+}
+
+
 inline void SessionWrapper::initiate()
 {
     // FIXME: Storing connection related information in the session object seems
@@ -1888,6 +1898,12 @@ void Session::set_progress_handler(util::UniqueFunction<ProgressHandler> handler
 void Session::set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener> listener)
 {
     m_impl->set_connection_state_change_listener(std::move(listener)); // Throws
+}
+
+
+void Session::reset_connection_state_change_listener()
+{
+    m_impl->reset_connection_state_change_listener(); // Throws
 }
 
 

@@ -103,6 +103,36 @@ void SyncSession::become_active()
     }
 }
 
+void SyncSession::restart_session()
+{
+    util::CheckedLockGuard lock(m_state_mutex);
+    // Don't update the state if it is currently paused
+    if (m_state != State::Paused)
+        m_state = State::Inactive;
+
+    if (m_session) {
+        // Assume connection is disconnected and don't propagate
+        // connection state changes back to the client
+        m_session->reset_connection_state_change_listener();
+        m_session.reset();
+        {
+            // Update the state to disconnected for later state change notifications
+            // but don't propagate those changes back to the client
+            util::CheckedLockGuard lock(m_connection_state_mutex);
+            m_connection_state = ConnectionState::Disconnected;
+        }
+    }
+
+    // If this sync session is paused, do not automatically start a new session
+    if (m_state != State::Paused) {
+        // Create a new session and re-register the completion callbacks
+        // The latest server path will be retrieved from sync_manager when
+        // the new session is created by create_sync_session() in become
+        // active.
+        become_active();
+    }
+}
+
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Dying);
@@ -233,9 +263,9 @@ static bool check_for_redirect_response(const app::AppError& error)
 }
 
 util::UniqueFunction<void(util::Optional<app::AppError>)>
-SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
+SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session](util::Optional<app::AppError> error) {
+    return [session, restart_session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
@@ -285,7 +315,16 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
             }
         }
         else {
-            session->update_access_token(session_user->access_token());
+            // If the session needs to be restarted, then restart the session now
+            // The latest access token and server url will be pulled from the sync
+            // manager when the new session is started.
+            if (restart_session) {
+                session->restart_session();
+            }
+            // Otherwise, update the access token and reconnect
+            else {
+                session->update_access_token(session_user->access_token());
+            }
         }
     };
 }
@@ -662,13 +701,14 @@ void SyncSession::handle_error(SyncError error)
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        if (error_code.category() == sync::websocket::websocket_close_status_category() &&
-            (error_code.value() == ErrorCodes::WebSocket_Unauthorized ||
-             error_code.value() == ErrorCodes::WebSocket_AbnormalClosure ||
-             error_code.value() == ErrorCodes::WebSocket_MovedPermanently)) {
-            if (auto u = user()) {
-                u->refresh_custom_data(handle_refresh(shared_from_this()));
-                return;
+        if (error_code.category() == sync::websocket::websocket_close_status_category()) {
+            bool restart_session = error_code.value() == ErrorCodes::WebSocket_MovedPermanently;
+            if (restart_session || error_code.value() == ErrorCodes::WebSocket_Unauthorized ||
+                error_code.value() == ErrorCodes::WebSocket_AbnormalClosure) {
+                if (auto u = user()) {
+                    u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
+                    return;
+                }
             }
         }
         // Unrecognized error code.

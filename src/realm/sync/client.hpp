@@ -519,6 +519,18 @@ public:
     /// under Session for more on this.
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
 
+    /// \brief Reset the connection state notification handlers.
+    ///
+    /// This function is used when the session inside a sync session is being
+    /// restarted without propagating the connection state change status of the
+    /// old session/connection back to the client. Currently, this only occurs
+    /// when a redirection is detected while trying to connect to the server
+    /// after the deployment model has been changed. In this case, the session
+    /// inside sync session needs to be recreated to grab the updated server
+    /// URL information cached in the sync manager that was updated when the
+    /// access token was refreshed.
+    void reset_connection_state_change_listener();
+
     //@{
     /// Deprecated! Use set_connection_state_change_listener() instead.
     using ErrorHandler = void(const SessionErrorInfo&);

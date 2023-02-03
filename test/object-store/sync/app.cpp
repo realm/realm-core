@@ -30,6 +30,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/sync/network/default_socket.hpp>
 
 #include "collection_fixtures.hpp"
 #include "sync_test_utils.hpp"
@@ -2131,6 +2132,72 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::Optional<Response> simulated_response;
     };
 
+    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+        struct HookedObserver : public sync::WebSocketObserver {
+            HookedObserver(HookedSocketProvider& provider, WebSocketObserver* observer)
+                : m_hooked_provider(provider)
+                , m_observer(observer)
+            {
+                REQUIRE(m_observer);
+            }
+
+            void websocket_connected_handler(const std::string& protocol) override
+            {
+                if (m_hooked_provider.m_connected_func)
+                    m_hooked_provider.m_connected_func(m_observer, protocol);
+                else
+                    m_observer->websocket_connected_handler(protocol);
+            }
+            void websocket_error_handler() override
+            {
+                if (m_hooked_provider.m_error_func)
+                    m_hooked_provider.m_error_func(m_observer);
+                else
+                    m_observer->websocket_error_handler();
+            }
+            bool websocket_binary_message_received(util::Span<const char> data) override
+            {
+                if (m_hooked_provider.m_binary_message_func)
+                    return m_hooked_provider.m_binary_message_func(m_observer, data);
+                else
+                    return m_observer->websocket_binary_message_received(data);
+            }
+
+            bool websocket_closed_handler(bool was_clean, Status status) override
+            {
+                if (m_hooked_provider.m_closed_func)
+                    return m_hooked_provider.m_closed_func(m_observer, was_clean, status);
+                else
+                    return m_observer->websocket_closed_handler(was_clean, status);
+            }
+
+            HookedSocketProvider& m_hooked_provider;
+            WebSocketObserver* m_observer;
+        };
+
+        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                             AutoStart auto_start = AutoStart{true})
+            : DefaultSocketProvider(logger, user_agent, auto_start)
+        {
+        }
+
+        std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+                                                          sync::WebSocketEndpoint&& endpoint) override
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_observers.push_back(std::make_unique<HookedObserver>(*this, observer));
+            return DefaultSocketProvider::connect(m_observers.back().get(), std::move(endpoint));
+        }
+
+        std::function<void(sync::WebSocketObserver*, const std::string&)> m_connected_func;
+        std::function<void(sync::WebSocketObserver*)> m_error_func;
+        std::function<bool(sync::WebSocketObserver*, util::Span<const char>)> m_binary_message_func;
+        std::function<bool(sync::WebSocketObserver*, bool was_clean, Status status)> m_closed_func;
+        // A list of observers created by connect() so they can be cleaned up later
+        std::mutex m_mutex;
+        std::vector<std::unique_ptr<HookedObserver>> m_observers;
+    };
+
     {
         std::unique_ptr<realm::AppSession> app_session;
         std::string base_file_path = util::make_temp_dir() + random_string(10);
@@ -2309,7 +2376,90 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(error->http_status_code == 500);
                 });
         }
+#if 0
+        SECTION("Test server moved while session active") {
+            int request_count = 0;
+            // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+            std::string original_host = "localhost:9090";
+            std::string redirect_scheme = "http://";
+            std::string redirect_host = "127.0.0.1:9090";
+            std::string redirect_url = "http://127.0.0.1:9090";
+            redir_transport->request_hook = [&](const Request& request) {
+                if (request_count == 0) {
+                    if (request.url.find("https://") != std::string::npos) {
+                        redirect_scheme = "https://";
+                    }
+                    if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                        redirect_host = "localhost:9090";
+                        original_host = "127.0.0.1:9090";
+                    }
+                    redirect_url = redirect_scheme + redirect_host;
+                    logger->trace("redirect_url (%1): %2", request_count, redirect_url);
+                    request_count++;
+                }
+                else if (request_count == 1) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.redirect_count);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 2) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find("somehost:9090") != std::string::npos);
+                    redir_transport->simulated_response = {
+                        308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 3) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_url) != std::string::npos);
+                    redir_transport->simulated_response = {
+                        301,
+                        0,
+                        {{"Location", redirect_scheme + original_host}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                    request_count++;
+                }
+                else if (request_count == 4) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
+                    // Let the init_app_metadata request go through
+                    redir_transport->simulated_response = util::none;
+                    request_count++;
+                }
+                else if (request_count == 5) {
+                    // This is the original request after the init app metadata
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    auto sync_manager = redir_app->sync_manager();
+                    REQUIRE(sync_manager);
+                    auto app_metadata = sync_manager->app_metadata();
+                    REQUIRE(app_metadata);
+                    logger->trace("Deployment model: %1", app_metadata->deployment_model);
+                    logger->trace("Location: %1", app_metadata->location);
+                    logger->trace("Hostname: %1", app_metadata->hostname);
+                    logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
+                    REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
+                    redir_transport->simulated_response = util::none;
+                    // Validate the retry count tracked in the original message
+                    REQUIRE(request.redirect_count == 3);
+                    request_count++;
+                }
+            };
+
+            // This will be successful after a couple of retries due to the redirect response
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                });
+        }
+#endif
     }
+
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
