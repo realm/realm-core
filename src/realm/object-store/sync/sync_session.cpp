@@ -106,22 +106,25 @@ void SyncSession::become_active()
 void SyncSession::restart_session()
 {
     util::CheckedLockGuard lock(m_state_mutex);
-    // Don't update the state if it is currently paused
-    if (m_state != State::Paused)
-        m_state = State::Inactive;
+    // Nothing to do if the sync session is currently paused
+    // It will be resumed when resume() is called
+    if (m_state == State::Paused)
+        return;
+
+    // Go straignt to inactive so the progress completion waiters will
+    // continue to wait until the session restarts and completes the
+    // upload/download sync
+    m_state = State::Inactive;
 
     if (m_session) {
         m_session.reset();
     }
 
-    // If this sync session is paused, do not automatically start a new session
-    if (m_state != State::Paused) {
-        // Create a new session and re-register the completion callbacks
-        // The latest server path will be retrieved from sync_manager when
-        // the new session is created by create_sync_session() in become
-        // active.
-        become_active();
-    }
+    // Create a new session and re-register the completion callbacks
+    // The latest server path will be retrieved from sync_manager when
+    // the new session is created by create_sync_session() in become
+    // active.
+    become_active();
 }
 
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
