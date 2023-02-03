@@ -156,24 +156,15 @@ TEST(Network_PostOperation)
 TEST(Network_RunUntilStopped)
 {
     network::Service service;
-    auto post_to_service = [&] {
+    auto post_to_service = [&](util::UniqueFunction<void()> func = {}) {
         auto [promise, future] = util::make_promise_future<void>();
-        service.post([promise = std::move(promise)](Status s) mutable {
+        service.post([promise = std::move(promise), func = std::move(func)](Status s) mutable {
             if (!s.is_ok()) {
                 promise.set_error(s);
                 return;
             }
-            promise.emplace_value();
-        });
-        return std::move(future);
-    };
-
-    auto timer_to_service = [](network::DeadlineTimer& timer) {
-        auto [promise, future] = util::make_promise_future<void>();
-        timer.async_wait(std::chrono::milliseconds{250}, [promise = std::move(promise)](Status s) mutable {
-            if (!s.is_ok()) {
-                promise.set_error(s);
-                return;
+            if (func) {
+                func();
             }
             promise.emplace_value();
         });
@@ -194,12 +185,23 @@ TEST(Network_RunUntilStopped)
     post_to_service().get();
     CHECK_NOT(thread_stopped_future.is_ready());
 
-    network::DeadlineTimer timer_1(service), timer_2(service);
-    auto timer_1_ran = timer_to_service(timer_1);
-    auto timer_2_ran = timer_to_service(timer_2);
+    util::Optional<util::Future<void>> timer_ran_future;
+    network::DeadlineTimer timer(service);
+    post_to_service([&] {
+        auto [promise, future] = util::make_promise_future<void>();
+        timer.async_wait(std::chrono::milliseconds{250}, [promise = std::move(promise)](Status s) mutable {
+            if (!s.is_ok()) {
+                promise.set_error(s);
+                return;
+            }
+            promise.emplace_value();
+        });
+        timer_ran_future = std::move(future);
+    }).get();
 
-    timer_1_ran.get();
-    timer_2_ran.get();
+    CHECK_NOT(thread_stopped_future.is_ready());
+    CHECK(timer_ran_future);
+    timer_ran_future->get();
 
     service.stop();
     thread.join();
