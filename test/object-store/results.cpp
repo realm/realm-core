@@ -106,7 +106,9 @@ TEST_CASE("notifications: async delivery") {
 #ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
 #endif
-    InMemoryTestFile config;
+    TestFile config;
+    config.in_memory = true;
+    config.encryption_key = std::vector<char>();
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -4146,7 +4148,7 @@ TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFrom
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
                    ResultsFromLinkView, ResultsFromLinkSet)
 {
-    InMemoryTestFile config;
+    TestFile config;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
