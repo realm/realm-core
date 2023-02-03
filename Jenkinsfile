@@ -789,7 +789,7 @@ def doBuildEmscripten(String buildType) {
 
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'make -j$(nproc)',
+                        script: 'make -j$(nproc) 2>&1',
                         name: "emscripten-${buildType}",
                         filters: warningFilters,
                     )

@@ -2896,7 +2896,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
 
         std::vector<ObjKey> vec;
 
-        size_t n = 0;
 #if defined REALM_DEBUG || REALM_ANDROID
         for (int i = 0; i < 4; i++) {
 #else
@@ -2916,7 +2915,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
                         ObjKey key =
                             ttt.create_object().set_all(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA").get_key();
                         if (!longstrings) {
-                            n++;
                             vec.push_back(key);
                         }
                     }
