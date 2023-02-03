@@ -32,6 +32,7 @@ let syncServerSources: [String] =  [
 let syncExcludes: [String] = [
     // Server files
     "realm/sync/noinst/server/crypto_server_openssl.cpp",
+    "realm/sync/noinst/server/crypto_server_stub.cpp",
 
     // CLI Tools
     "realm/sync/tools",
