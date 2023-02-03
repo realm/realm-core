@@ -1193,7 +1193,7 @@ inline void SessionWrapper::reset_connection_state_change_listener()
     // Drop the connection state change listener, so state notifications aren't propagated to the sync session
     // This is used when a redirection occurs while connecting to the server due to deployment model changing
     // and the session is restarted.
-    m_connection_state_change_listener.release();
+    m_connection_state_change_listener = nullptr;
 }
 
 
