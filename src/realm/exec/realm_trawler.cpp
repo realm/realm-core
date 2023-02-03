@@ -1044,17 +1044,6 @@ void RealmFile::changes() const
     }
 }
 
-bool is_hex(char c)
-{
-    if (c >= '0' && c <= '9')
-        return true;
-    if (c >= 'a' && c <= 'f')
-        return true;
-    if (c >= 'A' && c <= 'F')
-        return true;
-    return false;
-}
-
 unsigned int hex_char_to_bin(char c)
 {
     if (c >= '0' && c <= '9')
@@ -1063,7 +1052,7 @@ unsigned int hex_char_to_bin(char c)
         return c - 'a' + 10;
     if (c >= 'A' && c <= 'F')
         return c - 'A' + 10;
-    exit(-1);
+    throw std::invalid_argument("Illegal key (not a hex digit)");
 }
 
 unsigned int hex_to_bin(char first, char second)
@@ -1094,10 +1083,10 @@ int main(int argc, const char* argv[])
                 else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
                     curr_arg++;
                     const char* chars = argv[curr_arg];
+                    if (strlen(chars) != 128) {
+                        throw std::invalid_argument("Key string must be 128 chars long");
+                    }
                     for (int idx = 0; idx < 64; ++idx) {
-                        if (!is_hex(chars[idx * 2] || !is_hex(chars[idx * 2 + 1]))) {
-                            throw std::runtime_error("Illegal key (wrong length or not hex)");
-                        }
                         key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
                     }
                     key_ptr = key;
