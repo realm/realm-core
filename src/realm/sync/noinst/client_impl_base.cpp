@@ -403,20 +403,6 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
-namespace {
-class DummyErrorCategory : public std::error_category {
-    const char* name() const noexcept final
-    {
-        return "realm::ErrorCodes";
-    }
-    std::string message(int error_code) const final
-    {
-        return std::string(ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code)));
-    }
-};
-DummyErrorCategory g_dummy_category;
-} // namespace
-
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
