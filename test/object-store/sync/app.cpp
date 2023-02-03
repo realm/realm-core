@@ -126,8 +126,8 @@ static std::string create_jwt(const std::string& appId)
     std::string jwtPayload = encoded_header + "." + encoded_payload;
 
     std::array<unsigned char, 32> hmac;
-    unsigned char key[32] = "My_very_confidential_secrettttt";
-    util::hmac_sha256(util::unsafe_span_cast<unsigned char>(jwtPayload), hmac, key);
+    unsigned char key[] = "My_very_confidential_secretttttt";
+    util::hmac_sha256(util::unsafe_span_cast<unsigned char>(jwtPayload), hmac, util::Span(key).first<32>());
 
     std::string signature;
     signature.resize(util::base64_encoded_size(hmac.size()));
