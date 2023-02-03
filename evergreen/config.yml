@@ -700,7 +700,7 @@ tasks:
       working_dir: realm-core/build/test/realm-fuzzer
       shell: /bin/bash
       script: |-
-        ${cmake_build_type|Debug}/realm-libfuzz
+        ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0
 
 task_groups:
 - name: compile_test_and_package
@@ -937,6 +937,8 @@ buildvariants:
   - name: fuzzer-tests
     cron: "@daily"
     patchable: false
+    distros:
+    - ubuntu2004-large
     
 - name: rhel70
   display_name: "RHEL 7 x86_64"
