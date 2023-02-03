@@ -82,6 +82,7 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
 {
     if (version) {
         m_auto_refresh = false;
+        REALM_ASSERT(*version != VersionID());
     }
     else if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_transaction = coordinator->begin_read();
@@ -1327,7 +1328,7 @@ void Realm::copy_schema_from(const Realm& source)
     REALM_ASSERT(m_frozen_version == source.read_transaction_version());
     m_schema = source.m_schema;
     m_schema_version = source.m_schema_version;
-    m_schema_transaction_version = source.m_schema_transaction_version;
+    m_schema_transaction_version = m_frozen_version->version;
     m_dynamic_schema = false;
 }
 

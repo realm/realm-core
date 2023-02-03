@@ -71,4 +71,8 @@ void PrefixLogger::do_log(Level level, const std::string& message)
     Logger::do_log(m_chained_logger, level, m_prefix + message); // Throws
 }
 
+void LocalThresholdLogger::do_log(Logger::Level level, std::string const& message)
+{
+    Logger::do_log(*m_chained_logger, level, message); // Throws
+}
 } // namespace realm::util

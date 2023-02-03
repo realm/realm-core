@@ -409,36 +409,6 @@ private:
     patterns m_include, m_exclude;
 };
 
-
-class IntraTestLogger : public Logger {
-public:
-    // Logger with a local log level used for the different test threads
-    IntraTestLogger(const std::shared_ptr<Logger>& base_logger_ptr, Level threshold)
-        : Logger(base_logger_ptr)
-        , m_local_log_level(threshold)
-    {
-    }
-
-    Level get_level_threshold() const noexcept override
-    {
-        return m_local_log_level;
-    }
-
-    void set_level_threshold(Level level) noexcept override
-    {
-        m_local_log_level = level;
-    }
-
-    void do_log(Logger::Level level, std::string const& message) override final
-    {
-        Logger::do_log(*m_base_logger_ptr, level, message); // Throws
-    }
-
-protected:
-    Level m_local_log_level;
-};
-
-
 } // anonymous namespace
 
 
@@ -496,7 +466,7 @@ public:
     ThreadContextImpl(SharedContextImpl& sc, int ti, const std::shared_ptr<util::Logger>& attached_logger)
         : ThreadContext(sc, ti, attached_logger ? attached_logger : sc.report_logger_ptr)
         , intra_test_logger(
-              std::make_shared<IntraTestLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
+              std::make_shared<LocalThresholdLogger>(ThreadContext::report_logger_ptr, sc.intra_test_log_level))
         , shared_context(sc)
     {
     }
