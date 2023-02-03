@@ -28,10 +28,10 @@
 #include <streambuf>
 #include <string>
 
-#ifndef _WIN32
-#include <dirent.h> // POSIX.1-2001
-#else
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <dirent.h> // POSIX.1-2001
 #endif
 
 #include <realm/utilities.hpp>
@@ -596,8 +596,11 @@ public:
     // Return the path of the open file, or an empty string if
     // this file has never been opened.
     std::string get_path() const;
-    // Return false if the file doesn't exist. Otherwise uid will be set.
-    static bool get_unique_id(const std::string& path, UniqueID& uid);
+
+    // Return none if the file doesn't exist. Throws on other errors.
+    static std::optional<UniqueID> get_unique_id(const std::string& path);
+
+    // Return the unique id for the file descriptor. Throws if the underlying stat operation fails.
     static UniqueID get_unique_id(FileDesc file);
 
     class ExclusiveLock;
@@ -1361,7 +1364,7 @@ inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
     return lhs.id_info.VolumeSerialNumber == rhs.id_info.VolumeSerialNumber &&
-           memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(FILE_ID_128)) == 0;
+           memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(lhs.id_info.FileId)) == 0;
 #else // POSIX version
     return lhs.device == rhs.device && lhs.inode == rhs.inode;
 #endif
@@ -1376,9 +1379,8 @@ inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
     return lhs.id_info.VolumeSerialNumber < rhs.id_info.VolumeSerialNumber &&
-           std::lexicographical_compare(
-               lhs.id_info.FileId.Identifier, lhs.id_info.FileId.Identifier + sizeof(FILE_ID_128),
-               rhs.id_info.FileId.Identifier, rhs.id_info.FileId.Identifier + sizeof(FILE_ID_128));
+           memcmp(lhs.id_info.FileId.Identifier, rhs.id_info.FileId.Identifier,
+                  sizeof(lhs.id_info.FileId.Identifier)) < 0;
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;

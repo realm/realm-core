@@ -2113,9 +2113,9 @@ TEST_CASE("migration: SoftResetFile") {
     };
 
     auto get_fileid = [&] {
-        util::File::UniqueID id;
-        REQUIRE(util::File::get_unique_id(config.path, id));
-        return id;
+        auto id = util::File::get_unique_id(config.path);
+        REQUIRE(id);
+        return *id;
     };
 #ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);
@@ -2183,9 +2183,9 @@ TEST_CASE("migration: HardResetFile") {
     };
 
     auto get_fileid = [&] {
-        util::File::UniqueID id;
-        REQUIRE(util::File::get_unique_id(config.path, id));
-        return id;
+        auto id = util::File::get_unique_id(config.path);
+        REQUIRE(id);
+        return *id;
     };
 #ifndef _WIN32
     util::File holder(config.path, util::File::mode_Write);

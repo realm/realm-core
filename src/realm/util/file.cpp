@@ -137,6 +137,39 @@ struct WindowsFileHandleHolder {
 
 #endif
 
+#if REALM_HAVE_STD_FILESYSTEM
+void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
+{
+    if (!error)
+        return;
+
+    // create_directory doesn't raise an error if the path already exists
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
+}
+
+void throwIfFileError(std::error_code error, const std::string& path) 
+{
+    if (!error)
+        return;
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system ||
+        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
+        error == errc::file_exists || error == errc::directory_not_empty) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
+}
+#endif
+
 } // anonymous namespace
 
 
@@ -149,18 +182,8 @@ bool try_make_dir(const std::string& path)
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
     bool result = std::filesystem::create_directory(path, error);
-
-    if (!error) {
-        return result;
-    }
-
-    using std::errc;
-    if (error == errc::permission_denied || error == errc::read_only_file_system) {
-        throw File::PermissionDenied(error.message(), path);
-    }
-    else {
-        throw File::AccessError(error.message(), path);
-    }
+    throwIfCreateDirectoryError(error, path);
+    return result;
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
@@ -193,8 +216,9 @@ void make_dir(const std::string& path)
 void make_dir_recursive(std::string path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    std::error_code ignored;
-    std::filesystem::create_directories(path, ignored);
+    std::error_code error;
+    std::filesystem::create_directories(path, error);
+    throwIfCreateDirectoryError(error, path);
 #else
     // Skip the first separator as we're assuming an absolute path
     size_t pos = path.find_first_of("/\\");
@@ -233,20 +257,8 @@ bool try_remove_dir(const std::string& path)
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
     bool result = std::filesystem::remove(path, error);
-
-    if (!error) {
-        return result;
-    }
-
-    using std::errc;
-    if (error == errc::permission_denied || error == errc::read_only_file_system ||
-        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
-        error == errc::file_exists || error == errc::directory_not_empty) {
-        throw File::PermissionDenied(error.message(), path);
-    }
-    else {
-        throw File::AccessError(error.message(), path);
-    }
+    throwIfFileError(error, path);
+    return result;
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
         return true;
@@ -286,19 +298,8 @@ bool try_remove_dir_recursive(const std::string& path)
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
     auto removed_count = std::filesystem::remove_all(path, error);
-    if (!error) {
-        return removed_count > 0;
-    }
-
-    using std::errc;
-    if (error == errc::permission_denied || error == errc::read_only_file_system ||
-        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
-        error == errc::file_exists || error == errc::directory_not_empty) {
-        throw File::PermissionDenied(error.message(), path);
-    }
-    else {
-        throw File::AccessError(error.message(), path);
-    }
+    throwIfFileError(error, path);
+    return removed_count > 0;
 #else
     {
         bool allow_missing = true;
@@ -1422,20 +1423,8 @@ bool File::try_remove(const std::string& path)
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
     bool result = std::filesystem::remove(path, error);
-
-    if (!error) {
-        return result;
-    }
-
-    using std::errc;
-    if (error == errc::permission_denied || error == errc::read_only_file_system ||
-        error == errc::device_or_resource_busy || error == errc::text_file_busy ||
-        error == errc::operation_not_permitted) {
-        throw PermissionDenied(error.message(), path);
-    }
-    else {
-        throw AccessError(error.message(), path);
-    }
+    throwIfFileError(error, path);
+    return result;
 #else // POSIX
     if (::unlink(path.c_str()) == 0)
         return true;
@@ -1464,22 +1453,11 @@ void File::move(const std::string& old_path, const std::string& new_path)
     std::error_code error;
     std::filesystem::rename(old_path, new_path, error);
 
-    if (!error) {
-        return;
-    }
-
-    using std::errc;
-    if (error == errc::permission_denied || error == errc::read_only_file_system || error == errc::text_file_busy ||
-        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
-        error == errc::file_exists || error == errc::directory_not_empty) {
-        throw PermissionDenied(error.message(), old_path);
-    }
-    else if (error == errc::no_such_file_or_directory) {
+    if (error == std::errc::no_such_file_or_directory)
+    {
         throw NotFound(error.message(), old_path);
     }
-    else {
-        throw AccessError(error.message(), old_path);
-    }
+    throwIfFileError(error, old_path);
 #else
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
@@ -1566,33 +1544,32 @@ FileDesc File::get_descriptor() const
     return m_fd;
 }
 
-bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
+std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
 {
 #ifdef _WIN32 // Windows version
+    // CreateFile2 with creationDisposition OPEN_EXISTING will return a file handle only if the file exists
+    // otherwise it will raise ERROR_FILE_NOT_FOUND
     WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
                                                      FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                      OPEN_EXISTING, nullptr));
 
     if (fileHandle == INVALID_HANDLE_VALUE) {
         if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-            return false;
+            return none;
         }
         throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
     }
 
-    uid = get_unique_id(fileHandle);
-    return true;
+    return get_unique_id(fileHandle);
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
-        uid.device = statbuf.st_dev;
-        uid.inode = statbuf.st_ino;
-        return true;
+        return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     int err = errno; // Eliminate any risk of clobbering
     // File doesn't exist
     if (err == ENOENT)
-        return false;
+        return none;
     throw std::system_error(err, std::system_category(), "stat() failed");
 #endif
 }
@@ -1600,13 +1577,15 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
 File::UniqueID File::get_unique_id(FileDesc file)
 {
 #ifdef _WIN32 // Windows version
+    REALM_ASSERT(file != nullptr);
     File::UniqueID ret;
-    if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(FILE_ID_INFO)) == 0) {
+    if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(ret.id_info)) == 0) {
         throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
     }
 
     return ret;
 #else // POSIX version
+    REALM_ASSERT(0 <= file);
     struct stat statbuf;
     if (::fstat(file, &statbuf) == 0) {
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
@@ -1643,11 +1622,8 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::filesystem::path path_(path.empty() ? "." : path);
-    if (path_.is_absolute())
-        return path;
-
     return (std::filesystem::path(base_dir) / path_).string();
-#elif !defined(_WIN32)
+#else
     char dir_sep = '/';
     std::string path_2 = path;
     std::string base_dir_2 = base_dir;
@@ -1682,10 +1658,6 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
-#else
-    static_cast<void>(path);
-    static_cast<void>(base_dir);
-    throw util::runtime_error("Not yet supported");
 #endif
 }
 
