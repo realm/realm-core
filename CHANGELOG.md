@@ -31,7 +31,7 @@
 * Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
 
 ### Breaking changes
-* None.
+* Remove Group::compute_aggregated_byte_size(), which is no longer used by anything.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

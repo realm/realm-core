@@ -675,25 +675,3 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         auto realm3 = Realm::get_shared_realm(config3);
     }
 }
-
-
-TEST_CASE("sync: stable IDs", "[sync]") {
-    if (!EventLoop::has_implementation())
-        return;
-
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-
-    SECTION("ID column isn't visible in schema read from Group") {
-        SyncTestFile config(init_sync_manager.app(), "schema-test");
-        config.schema_version = 1;
-        config.schema = Schema{
-            {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
-        };
-
-        auto realm = Realm::get_shared_realm(config);
-
-        ObjectSchema object_schema(realm->read_group(), "object", TableKey());
-        REQUIRE(object_schema == *config.schema->find("object"));
-    }
-}

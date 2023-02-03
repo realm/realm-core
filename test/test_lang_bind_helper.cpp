@@ -657,8 +657,6 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     size_t free_space, used_space;
     sg->get_stats(free_space, used_space);
-    auto state_size = rt->compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
-    CHECK_EQUAL(used_space, state_size);
 
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
@@ -787,9 +785,6 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     }
 
     rt->advance_read();
-    auto size_all =
-        rt->compute_aggregated_byte_size(Group::SizeAggregateControl(Group::SizeAggregateControl::size_of_all));
-    CHECK_EQUAL(used_space, size_all);
     auto used_space1 = rt->get_used_space();
     CHECK_EQUAL(used_space, used_space1);
 }
