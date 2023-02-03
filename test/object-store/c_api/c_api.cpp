@@ -4232,15 +4232,15 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("notifications") {
                 struct State {
                     CPtr<realm_collection_changes_t> changes;
+                    CPtr<realm_dictionary_changes_t> dictionary_changes;
                     CPtr<realm_async_error_t> error;
                     bool destroyed = false;
                 };
 
                 State state;
-
-                auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
+                auto on_dictionary_change = [](void* userdata, const realm_dictionary_changes_t* changes) {
                     auto* state = static_cast<State*>(userdata);
-                    state->changes = clone_cptr(changes);
+                    state->dictionary_changes = clone_cptr(changes);
                 };
 
                 CPtr<realm_dictionary_t> strings =
@@ -4252,7 +4252,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change));
+                        strings.get(), &state, nullptr, nullptr, on_dictionary_change));
                     checked(realm_refresh(realm, nullptr));
                     return token;
                 };

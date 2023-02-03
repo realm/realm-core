@@ -372,8 +372,10 @@ typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
+typedef struct realm_dictionary_changes realm_dictionary_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
+typedef void (*realm_on_dictionary_change_func_t)(realm_userdata_t userdata, const realm_dictionary_changes_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
 typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
 typedef void (*realm_async_begin_write_func_t)(realm_userdata_t userdata);
@@ -2296,7 +2298,7 @@ RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
 RLM_API realm_notification_token_t*
 realm_dictionary_add_notification_callback(realm_dictionary_t*, realm_userdata_t userdata,
                                            realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
-                                           realm_on_collection_change_func_t on_change);
+                                           realm_on_dictionary_change_func_t on_change);
 
 /**
  * Get an dictionary from a thread-safe reference, potentially originating in a
