@@ -587,6 +587,49 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
     }
 }
 
+TEST_CASE("session restart", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    TestSyncManager init_sync_manager({}, {false});
+    auto& server = init_sync_manager.sync_server();
+    auto app = init_sync_manager.app();
+    Realm::Config config;
+    auto schema = Schema{
+        {"object",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+    };
+
+    auto user = app->sync_manager()->get_user("userid", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                              ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
+    auto session = sync_session(
+        user, "/test-restart", [&](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded, nullptr, schema,
+        &config);
+
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+
+    server.start();
+
+    // Add an object so there's something to upload
+    auto realm = Realm::get_shared_realm(config);
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+    realm->begin_transaction();
+    table->create_object_with_primary_key(0);
+    realm->commit_transaction();
+
+    // Close the current session and start a new one
+    // The stop policy is ignored when closing the current session
+    session->restart_session();
+
+    REQUIRE(session->state() == SyncSession::State::Active);
+    REQUIRE(!wait_for_upload(*realm));
+}
+
 TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;

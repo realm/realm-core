@@ -112,4 +112,15 @@ private:
     std::thread m_thread;               // protected by m_mutex
 };
 
+/// Class for the Default Socket Provider websockets that allows a simulated
+/// http response to be specified for testing.
+class DefaultWebSocket : public WebSocketInterface {
+public:
+    virtual ~DefaultWebSocket() = default;
+
+    virtual void force_handshake_response_for_testing(int status_code, std::string body = "") = 0;
+
+protected:
+};
+
 } // namespace realm::sync::websocket
