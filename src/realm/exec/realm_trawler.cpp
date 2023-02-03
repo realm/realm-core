@@ -1071,14 +1071,6 @@ unsigned int hex_to_bin(char first, char second)
     return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
 }
 
-char to_hex_char(char c)
-{
-    if (c < 10)
-        return c + '0';
-    if (c < 16)
-        return c - 10 + 'a';
-    return '!';
-}
 
 int main(int argc, const char* argv[])
 {
@@ -1103,6 +1095,9 @@ int main(int argc, const char* argv[])
                     curr_arg++;
                     const char* chars = argv[curr_arg];
                     for (int idx = 0; idx < 64; ++idx) {
+                        if (!is_hex(chars[idx * 2] || !is_hex(chars[idx * 2 + 1]))) {
+                            throw std::runtime_error("Illegal key (wrong length or not hex)");
+                        }
                         key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
                     }
                     key_ptr = key;
