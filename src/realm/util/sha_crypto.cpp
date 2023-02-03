@@ -26,19 +26,22 @@
 #include <windows.h>
 #include <stdio.h>
 #include <bcrypt.h>
-#include <sha224.hpp>
 #pragma comment(lib, "bcrypt.lib")
+#define REALM_USE_BUNDLED_SHA2 1
 #elif REALM_HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #else
 #include <sha1.h>
-#include <sha224.hpp>
-#include <sha256.hpp>
+#define REALM_USE_BUNDLED_SHA2 1
 #endif
 
+#if REALM_USE_BUNDLED_SHA2
+#include <sha224.hpp>
+#include <sha256.hpp>
 #include <cstring>
+#endif
 
 namespace {
 
@@ -135,7 +138,7 @@ void message_digest(const EVP_MD* digest_type, const char* in_buffer, size_t in_
 }
 #endif
 
-#if !REALM_PLATFORM_APPLE && !REALM_HAVE_OPENSSL
+#if REALM_USE_BUNDLED_SHA2
 using namespace realm::util;
 template <typename sha_state, size_t digest_length>
 void hmac(Span<const uint8_t> in_buffer, Span<uint8_t, digest_length> out_buffer, Span<const uint8_t, 32> key)
@@ -212,6 +215,9 @@ void hmac_sha224(Span<const uint8_t> in_buffer, Span<uint8_t, 28> out_buffer, Sp
 #if REALM_PLATFORM_APPLE
     static_assert(CC_SHA224_DIGEST_LENGTH == out_buffer.size());
     CCHmac(kCCHmacAlgSHA224, key.data(), key.size(), in_buffer.data(), in_buffer.size(), out_buffer.data());
+#elif REALM_USE_BUNDLED_SHA2
+    static_assert(28 == out_buffer.size());
+    hmac<sha224_state>(in_buffer, out_buffer, key);
 #elif REALM_HAVE_OPENSSL
     static_assert(SHA224_DIGEST_LENGTH == out_buffer.size());
     unsigned int hashLen;
@@ -219,8 +225,7 @@ void hmac_sha224(Span<const uint8_t> in_buffer, Span<uint8_t, 28> out_buffer, Sp
          out_buffer.data(), &hashLen);
     REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
 #else
-    static_assert(28 == out_buffer.size());
-    hmac<sha224_state>(in_buffer, out_buffer, key);
+#error "No SHA224 digest implementation on this platform."
 #endif
 }
 
@@ -229,6 +234,9 @@ void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Sp
 #if REALM_PLATFORM_APPLE
     static_assert(CC_SHA256_DIGEST_LENGTH == out_buffer.size());
     CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), in_buffer.data(), in_buffer.size(), out_buffer.data());
+#elif REALM_USE_BUNDLED_SHA2
+    static_assert(32 == out_buffer.size());
+    hmac<sha256_state>(in_buffer, out_buffer, key);
 #elif REALM_HAVE_OPENSSL
     static_assert(SHA256_DIGEST_LENGTH == out_buffer.size());
     unsigned int hashLen;
@@ -236,8 +244,7 @@ void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Sp
          out_buffer.data(), &hashLen);
     REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
 #else
-    static_assert(32 == out_buffer.size());
-    hmac<sha256_state>(in_buffer, out_buffer, key);
+#error "No SHA56 digest implementation on this platform."
 #endif
 }
 
