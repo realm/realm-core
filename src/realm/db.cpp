@@ -1184,7 +1184,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
                        << ".";
-                    throw Exception(ErrorCodes::IllegalOperation, ss.str());
+                    throw LogicError(ErrorCodes::IllegalOperation, ss.str());
                 }
 
                 // We need per session agreement among all participants on the
@@ -1356,7 +1356,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     // Verify that the lock file is still attached. There is no attempt to guard against
     // a race between close() and compact().
     if (is_attached() == false) {
-        throw Exception(ErrorCodes::IllegalOperation, m_db_path + ": compact must be done on an open/attached DB");
+        throw IllegalOperation(m_db_path + ": compact must be done on an open/attached DB");
     }
     SharedInfo* info = m_file_map.get_addr();
     Durability dura = Durability(info->durability);
@@ -1457,8 +1457,7 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
-            throw Exception(ErrorCodes::IllegalOperation,
-                            "All client changes must be integrated in server before writing copy");
+            throw IllegalOperation("All client changes must be integrated in server before writing copy");
         }
     }
 

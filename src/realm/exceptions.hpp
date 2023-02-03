@@ -28,7 +28,6 @@ namespace realm {
 
 class Exception : public std::exception {
 public:
-    Exception(ErrorCodes::Error err, std::string_view str);
     explicit Exception(Status status);
 
     const char* what() const noexcept final;
@@ -37,6 +36,9 @@ public:
     ErrorCodes::Error code() const noexcept;
     ErrorCategory category() const noexcept;
     std::string_view code_string() const noexcept;
+
+protected:
+    Exception(ErrorCodes::Error err, std::string_view str);
 
 private:
     Status m_status;

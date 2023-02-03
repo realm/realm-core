@@ -998,7 +998,7 @@ ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
-        throw Exception(ErrorCodes::InvalidatedObject, "Object was deleted");
+        throw LogicError(ErrorCodes::InvalidatedObject, "Object was deleted");
     }
     ClusterNode::State state;
     k = m_root->get(ndx, state);

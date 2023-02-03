@@ -1795,7 +1795,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw Exception(ErrorCodes::InvalidQuery, "negation of empty query is not supported");
+        throw query_parser::InvalidQueryError("negation of empty query is not supported");
     Query q(m_table);
     q.Not();
     q.and_query(*this);

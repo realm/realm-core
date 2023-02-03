@@ -2551,7 +2551,7 @@ TableView Table::find_all_string(ColKey col_key, StringData value) const
 
 TableView Table::find_all_binary(ColKey, BinaryData)
 {
-    throw Exception(ErrorCodes::IllegalOperation, "Table::find_all_binary not supported");
+    throw LogicError(ErrorCodes::IllegalOperation, "Table::find_all_binary not supported");
 }
 
 TableView Table::find_all_binary(ColKey col_key, BinaryData value) const

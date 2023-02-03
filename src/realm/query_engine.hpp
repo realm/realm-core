@@ -2280,11 +2280,11 @@ public:
         m_condition_column_key1 = column1;
         m_condition_column_key2 = column2;
         if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
-            throw Exception(ErrorCodes::InvalidQuery,
-                            util::format("queries comparing two properties are not yet supported for "
-                                         "collections (list/set/dictionary) (%1 and %2)",
-                                         ParentNode::m_table->get_column_name(m_condition_column_key1),
-                                         ParentNode::m_table->get_column_name(m_condition_column_key2)));
+            throw query_parser::InvalidQueryError(
+                util::format("queries comparing two properties are not yet supported for "
+                             "collections (list/set/dictionary) (%1 and %2)",
+                             ParentNode::m_table->get_column_name(m_condition_column_key1),
+                             ParentNode::m_table->get_column_name(m_condition_column_key2)));
         }
     }
 

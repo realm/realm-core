@@ -34,9 +34,11 @@ void validate_key_value(const Mixed& key)
         auto str = key.get_string();
         if (str.size()) {
             if (str[0] == '$')
-                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not start with '$'");
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryKey,
+                                      "Dictionary::insert: key must not start with '$'");
             if (memchr(str.data(), '.', str.size()))
-                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not contain '.'");
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryKey,
+                                      "Dictionary::insert: key must not contain '.'");
         }
     }
 }
@@ -73,7 +75,7 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
     }
     if (!(m_key_type == type_String || m_key_type == type_Int))
-        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
+        throw InvalidArgument(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
 }
 
 Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)

@@ -1020,7 +1020,7 @@ BinaryData Group::write_to_mem() const
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
     if (!buffer)
-        throw Exception(ErrorCodes::OutOfMemory, "Could not allocate memory while dumping to memory");
+        throw RuntimeError(ErrorCodes::OutOfMemory, "Could not allocate memory while dumping to memory");
     MemoryOutputStream out; // Throws
     out.set_buffer(buffer.get(), buffer.get() + max_size);
     write(out); // Throws

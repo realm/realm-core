@@ -19,6 +19,7 @@
 * Changesets from the server sent during FLX bootstrapping that are larger than 16MB can cause the sync client to crash with a LogicError (PR [#6218](https://github.com/realm/realm-core/pull/6218), since v12.0.0)
 * Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
 * Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+* Never throw a pure Exception object  ([#6231](https://github.com/realm/realm-core/issues/6231), never released)
 
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
