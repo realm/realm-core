@@ -153,7 +153,7 @@ void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
     }
 }
 
-void throwIfFileError(std::error_code error, const std::string& path) 
+void throwIfFileError(std::error_code error, const std::string& path)
 {
     if (!error)
         return;
@@ -1450,8 +1450,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
     std::error_code error;
     std::filesystem::rename(old_path, new_path, error);
 
-    if (error == std::errc::no_such_file_or_directory)
-    {
+    if (error == std::errc::no_such_file_or_directory) {
         throw NotFound(error.message(), old_path);
     }
     throwIfFileError(error, old_path);
