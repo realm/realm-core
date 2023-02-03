@@ -41,7 +41,7 @@ public:
     }
     bool is_same_as(const Scheduler* other) const noexcept override
     {
-        return reinterpret_cast<const EmscriptenScheduler*>(other) != nullptr;
+        return dynamic_cast<const EmscriptenScheduler*>(other) != nullptr;
     }
     bool can_invoke() const noexcept override
     {
