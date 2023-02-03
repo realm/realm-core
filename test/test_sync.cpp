@@ -23,6 +23,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/instructions.hpp>
+#include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/websocket.hpp>
@@ -363,21 +364,13 @@ TEST(Sync_AsyncWaitCancellation)
         CHECK_EQUAL(util::error::operation_aborted, ec);
         bowl.add_stone();
     };
-    auto&& [pause_future, pause_promise] = util::make_promise_future<void>();
     {
-        fixture.get_client().post_for_testing([test_promise = std::move(pause_promise)](const Status&) mutable {
-            // Block the client's event loop thread to stop traffic with the server before
-            // creating the session
-            test_promise.get();
-        });
         Session session = fixture.make_bound_session(db, "/test");
         session.async_wait_for_upload_completion(upload_completion_handler);
         session.async_wait_for_download_completion(download_completion_handler);
         session.async_wait_for_sync_completion(sync_completion_handler);
         // Destruction of session cancels wait operations
     }
-    // Resume the client event loop thread
-    pause_future.emplace_value();
     fixture.start();
     bowl.get_stone();
     bowl.get_stone();
@@ -2975,6 +2968,8 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 
     Client::Config config;
     config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
+    config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
     Client client(config);
 
@@ -3002,6 +2997,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.wait_for_download_complete_or_client_stopped();
 
     client.stop();
+    socket_provider->stop(true);
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3124,6 +3120,8 @@ TEST(Sync_UploadDownloadProgress_1)
 
         Client::Config config;
         config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+        auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(config.logger, "");
+        config.socket_provider = socket_provider;
         config.reconnect_mode = ReconnectMode::testing;
         Client client(config);
 
@@ -3158,7 +3156,7 @@ TEST(Sync_UploadDownloadProgress_1)
         });
 
         client.stop();
-
+        socket_provider->stop(true);
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3387,8 +3385,11 @@ TEST(Sync_UploadDownloadProgress_3)
         wt.commit();
     }
 
+
     Client::Config client_config;
     client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_config.logger, "");
+    client_config.socket_provider = socket_provider;
     client_config.reconnect_mode = ReconnectMode::testing;
     Client client(client_config);
 
@@ -3496,6 +3497,7 @@ TEST(Sync_UploadDownloadProgress_3)
     client.stop();
 
     server_thread.join();
+    socket_provider->stop(true);
 }
 
 
@@ -3683,6 +3685,8 @@ TEST(Sync_UploadDownloadProgress_6)
 
     Client::Config client_config;
     client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_config.logger, "");
+    client_config.socket_provider = socket_provider;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     Client client(client_config);
@@ -3693,11 +3697,8 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, db, nullptr, std::move(session_config)}};
-
     std::mutex mutex;
-    std::condition_variable progress_cv;
-
+    auto session = std::make_unique<Session>(client, db, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -3710,23 +3711,18 @@ TEST(Sync_UploadDownloadProgress_6)
         CHECK_EQUAL(snapshot_version, 1);
         std::lock_guard lock{mutex};
         session.reset();
-        progress_cv.notify_all();
     };
 
     session->set_progress_handler(progress_handler);
 
-    std::unique_lock lock{mutex};
-    session->bind();
-
-    // Wait for the progress handler to be called, since client.stop() doesn't
-    // currently wait for the event loop thread to be terminated
-    // TODO: Update this after event loop stop is updated
-    progress_cv.wait_for(lock, std::chrono::seconds(15), [&]() {
-        return session == nullptr;
-    });
+    {
+        std::lock_guard lock{mutex};
+        session->bind();
+    }
 
     client.stop();
     server.stop();
+    socket_provider->stop(true);
     server_thread.join();
 
     // The check is that we reach this point without deadlocking.
@@ -4333,10 +4329,15 @@ TEST(Sync_MergeMultipleChangesets)
         TEST_DIR(dir);
         MultiClientServerFixture fixture(2, 1, dir, test_context);
 
+
         // Start server and upload changes of first client.
         Session session_1 = fixture.make_session(0, db_1);
         fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
         fixture.start_server(0);
+        fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
         // Stop first client.
@@ -4344,8 +4345,7 @@ TEST(Sync_MergeMultipleChangesets)
 
         // Start the second client and upload their changes.
         // Wait to integrate changes from the first client.
-        Session session_2 = fixture.make_session(1, db_2);
-        fixture.bind_session(session_2, 0, "/test");
+        fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
     }

@@ -294,4 +294,18 @@ TEST(Utils_File_ForEach)
     }
 }
 
+TEST(Utils_File_Lock)
+{
+    TEST_DIR(dir);
+    util::try_make_dir(dir);
+    auto file = File::resolve("test", dir);
+    File f1(file, File::mode_Write);
+    File f2(file);
+    CHECK(f1.try_rw_lock_exclusive());
+    CHECK_NOT(f2.try_rw_lock_shared());
+    f1.rw_unlock();
+    CHECK(f1.try_rw_lock_shared());
+    CHECK_NOT(f2.try_rw_lock_exclusive());
+}
+
 #endif

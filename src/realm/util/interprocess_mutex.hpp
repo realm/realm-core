@@ -330,7 +330,7 @@ inline void InterprocessMutex::lock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
     std::unique_lock mutex_lock(m_lock_info->m_local_mutex);
-    m_lock_info->m_file.lock_exclusive();
+    m_lock_info->m_file.lock();
     mutex_lock.release();
 #else
 
@@ -351,7 +351,7 @@ inline bool InterprocessMutex::try_lock()
     if (!mutex_lock.owns_lock()) {
         return false;
     }
-    bool success = m_lock_info->m_file.try_lock_exclusive();
+    bool success = m_lock_info->m_file.try_lock();
     if (success) {
         mutex_lock.release();
         return true;
