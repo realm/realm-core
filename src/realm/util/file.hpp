@@ -514,9 +514,6 @@ public:
     bool is_same_file(const File&) const;
     static bool is_same_file_static(FileDesc f1, FileDesc f2);
 
-    // FIXME: Get rid of this method
-    bool is_removed() const;
-
     /// Resolve the specified path against the specified base directory.
     ///
     /// If \a path is absolute, or if \a base_dir is empty, \p path is returned
