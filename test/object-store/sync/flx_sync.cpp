@@ -2983,6 +2983,54 @@ TEST_CASE("flx: really big bootstraps", "[sync][flx][app]") {
     REQUIRE(err.error_code == sync::ClientError::bad_changeset_size);
 }
 
+TEST_CASE("flx: possible deadlock", "[sync][flx][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{{"origin",
+                   {
+                       {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+                       {"rank", PropertyType::Int},
+                   }}};
+
+    auto server_app_config = minimal_app_config(base_url, "flx_test", schema);
+    server_app_config.dev_mode_enabled = false;
+    AppCreateConfig::FLXSyncConfig flx_config;
+    flx_config.queryable_fields.push_back("rank");
+    server_app_config.flx_sync_config = std::move(flx_config);
+
+    TestAppSession test_session(create_app(server_app_config));
+    auto user1 = test_session.app()->current_user();
+    SyncTestFile config(user1, schema, SyncConfig::FLXSyncEnabled{});
+    auto r1 = Realm::get_shared_realm(config);
+    bool commit_done = false;
+
+    auto origin = r1->read_group().get_table("class_origin");
+    {
+        auto new_query = r1->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign("Foo", origin->query("rank == 1"));
+        new_query.commit();
+    }
+
+    r1->async_begin_transaction([&] {
+        origin->create_object_with_primary_key(ObjectId::gen()).set("rank", 1);
+        r1->async_commit_transaction([&](std::exception_ptr) {
+            commit_done = true;
+        });
+    });
+
+    {
+        auto new_query = r1->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign("Foo", origin->query("rank >= 1"));
+        new_query.commit();
+    }
+
+    util::EventLoop::main().run_until([&] {
+        return commit_done;
+    });
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
