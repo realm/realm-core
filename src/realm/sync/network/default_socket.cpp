@@ -73,19 +73,20 @@ private:
     {
         m_logger.error("Reading failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WebSocketReadError, ec.message()});
+        websocket_error_and_close_handler(was_clean,
+                                          Status{make_error_code(ErrorCodes::WebSocketReadError), ec.message()});
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
         m_logger.error("Writing failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WebSocketWriteError, ec.message()});
+        websocket_error_and_close_handler(was_clean,
+                                          Status{make_error_code(ErrorCodes::WebSocketWriteError), ec.message()});
     }
     void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
                                            const std::string_view* body) override
     {
         ErrorCodes::WebSocketError error = ErrorCodes::WebSocketOK;
-        ErrorCodes::Error error_code = ErrorCodes::OK;
         bool was_clean = true;
 
         if (ec == websocket::Error::bad_response_301_moved_permanently ||
@@ -93,7 +94,7 @@ private:
             error = ErrorCodes::WebSocketMovedPermanently;
         }
         else if (ec == websocket::Error::bad_response_3xx_redirection) {
-            error_code = ErrorCodes::WebSocketRetryError;
+            error = ErrorCodes::WebSocketRetryError;
             was_clean = false;
         }
         else if (ec == websocket::Error::bad_response_401_unauthorized) {
@@ -111,7 +112,7 @@ private:
             was_clean = false;
         }
         else {
-            error_code = ErrorCodes::WebSocketFatalError;
+            error = ErrorCodes::WebSocketFatalError;
             was_clean = false;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
@@ -138,12 +139,7 @@ private:
             }
         }
 
-        if (error != ErrorCodes::WebSocketOK) {
-            websocket_error_and_close_handler(was_clean, Status{make_error_code(error), ec.message()});
-        }
-        else {
-            websocket_error_and_close_handler(was_clean, Status{error_code, ec.message()});
-        }
+        websocket_error_and_close_handler(was_clean, Status{make_error_code(error), ec.message()});
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
@@ -275,8 +271,8 @@ void DefaultWebSocketImpl::handle_resolve(std::error_code ec, network::Endpoint:
     if (ec) {
         m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean,
-                                          Status{ErrorCodes::WebSocketResolveFailed, ec.message()}); // Throws
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(ErrorCodes::WebSocketResolveFailed), ec.message()}); // Throws
         return;
     }
 
@@ -316,8 +312,8 @@ void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpo
         // All endpoints failed
         m_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean,
-                                          Status{ErrorCodes::WebSocketConnectionFailed, ec.message()}); // Throws
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(ErrorCodes::WebSocketConnectionFailed), ec.message()}); // Throws
         return;
     }
 
@@ -357,8 +353,8 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
         if (ec && ec != util::error::operation_aborted) {
             m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             constexpr bool was_clean = false;
-            websocket_error_and_close_handler(was_clean,
-                                              Status{ErrorCodes::WebSocketConnectionFailed, ec.message()}); // Throws
+            websocket_error_and_close_handler(
+                was_clean, Status{make_error_code(ErrorCodes::WebSocketConnectionFailed), ec.message()}); // Throws
             return;
         }
 
@@ -366,7 +362,7 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
             m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             constexpr bool was_clean = false;
             websocket_error_and_close_handler(
-                was_clean, Status{ErrorCodes::WebSocketConnectionFailed, response.reason}); // Throws
+                was_clean, Status{make_error_code(ErrorCodes::WebSocketConnectionFailed), response.reason}); // Throws
             return;
         }
 

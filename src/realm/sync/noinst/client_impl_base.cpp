@@ -425,16 +425,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         return bool(m_websocket);
     }
 
-    int status_code = status.code();
-    std::error_code error_code;
-    if (status_code == ErrorCodes::SystemError) {
-        error_code = status.get_std_error_code();
-        status_code = error_code.value();
-    }
-    else {
-        // HACK:
-        error_code = std::error_code{status_code, g_dummy_category};
-    }
+    auto error_code = status.get_std_error_code();
+    auto status_code = error_code.value();
 
     // TODO: Use a switch statement once websocket errors have their own category in exception unification.
     if (status_code == ErrorCodes::WebSocketResolveFailed || status_code == ErrorCodes::WebSocketConnectionFailed) {

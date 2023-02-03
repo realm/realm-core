@@ -207,15 +207,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
 
-        case WebSocketResolveFailed:
-        case WebSocketConnectionFailed:
-        case WebSocketReadError:
-        case WebSocketWriteError:
-        case WebSocketRetryError:
-        case WebSocketFatalError:
-
-            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
-
         case UnknownError:
             break;
     }
@@ -369,12 +360,6 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
-    {"WebSocketConnectionFailed", ErrorCodes::WebSocketConnectionFailed},
-    {"WebSocketFatalError", ErrorCodes::WebSocketFatalError},
-    {"WebSocketReadError", ErrorCodes::WebSocketReadError},
-    {"WebSocketResolveFailed", ErrorCodes::WebSocketResolveFailed},
-    {"WebSocketRetryError", ErrorCodes::WebSocketRetryError},
-    {"WebSocketWriteError", ErrorCodes::WebSocketWriteError},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
@@ -473,6 +458,19 @@ std::string ErrorCodes::error_string(WebSocketError code)
             return "WebSocket: Client Too New";
         case WebSocketProtocol_Mismatch:
             return "WebSocket: Protocol Mismatch";
+
+        case WebSocketResolveFailed:
+            return "WebSocket: Resolve Failed";
+        case WebSocketConnectionFailed:
+            return "WebSocket: Connection Failed";
+        case WebSocketReadError:
+            return "WebSocket: Read Error";
+        case WebSocketWriteError:
+            return "WebSocket: Write Error";
+        case WebSocketRetryError:
+            return "WebSocket: Retry Error";
+        case WebSocketFatalError:
+            return "WebSocket: Fatal Error";
     }
     return "";
 }
