@@ -111,7 +111,7 @@ void SyncSession::restart_session()
     if (m_state == State::Paused)
         return;
 
-    // Go straignt to inactive so the progress completion waiters will
+    // Go straight to inactive so the progress completion waiters will
     // continue to wait until the session restarts and completes the
     // upload/download sync
     m_state = State::Inactive;
