@@ -240,8 +240,10 @@
 /* Device (iPhone or iPad) or simulator. */
 #define REALM_IOS 1
 #define REALM_APPLE_DEVICE !TARGET_OS_SIMULATOR
+#define REALM_MACCATALYST TARGET_OS_MACCATALYST
 #else
 #define REALM_IOS 0
+#define REALM_MACCATALYST 0
 #endif
 #if TARGET_OS_WATCH == 1
 /* Device (Apple Watch) or simulator. */
@@ -259,6 +261,7 @@
 #endif
 #else
 #define REALM_PLATFORM_APPLE 0
+#define REALM_MACCATALYST 0
 #define REALM_IOS 0
 #define REALM_WATCHOS 0
 #define REALM_TVOS 0

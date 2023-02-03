@@ -511,18 +511,29 @@ public:
         : m_file(file)
         , m_mutex(mutex)
     {
-        std::lock_guard lock(m_mutex);
-        size_t size = static_cast<size_t>(m_file.get_size());
-        m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
-        m_info = m_reader_map.get_addr();
-        m_local_max_entry = m_info->readers.capacity();
-        REALM_ASSERT(sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry) == size);
+        size_t size = 0, required_size = sizeof(SharedInfo);
+        while (size < required_size) {
+            // Map the file without the lock held. This could result in the
+            // mapping being too small and having to remap if the file is grown
+            // concurrently, but if this is the case we should always see a bigger
+            // size the next time.
+            auto new_size = static_cast<size_t>(m_file.get_size());
+            REALM_ASSERT(new_size > size);
+            size = new_size;
+            m_reader_map.remap(m_file, File::access_ReadWrite, size, File::map_NoSync);
+            m_info = m_reader_map.get_addr();
+
+            std::lock_guard lock(m_mutex);
+            m_local_max_entry = m_info->readers.capacity();
+            required_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(m_local_max_entry);
+            REALM_ASSERT(required_size >= size);
+        }
     }
 
     void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
     {
         std::lock_guard lock(m_mutex);
-        ensure_full_reader_mapping();
+        ensure_reader_mapping();
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
     }
 
@@ -533,9 +544,25 @@ public:
 
     VersionID get_version_id_of_latest_snapshot()
     {
+        {
+            // First check the local cache. This is an unlocked read, so it may
+            // race with adding a new version. If this happens we'll either see
+            // a stale value (acceptable for a racing write on one thread and
+            // a read on another), or a new value which is guaranteed to not
+            // be an active index in the local cache.
+            std::lock_guard lock(m_local_mutex);
+            auto index = m_info->readers.newest.load();
+            if (index < m_local_readers.size()) {
+                auto& r = m_local_readers[index];
+                if (r.is_active()) {
+                    return {r.version, index};
+                }
+            }
+        }
+
         std::lock_guard lock(m_mutex);
-        ensure_full_reader_mapping();
-        uint_fast32_t index = m_info->readers.newest;
+        auto index = m_info->readers.newest.load();
+        ensure_reader_mapping(index);
         return {m_info->readers.get(index).version, index};
     }
 
@@ -569,34 +596,39 @@ public:
         if (try_grab_local_read_lock(read_lock, type, version_id))
             return read_lock;
 
-        const bool pick_specific = version_id.version != VersionID().version;
-
-        std::lock_guard lock(m_mutex);
-        auto newest = m_info->readers.newest.load();
-        REALM_ASSERT(newest != VersionList::nil);
-        read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
-        ensure_full_reader_mapping();
-        bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
-        auto& r = m_info->readers.get(read_lock.m_reader_idx);
-        if (pick_specific && version_id.version != r.version)
-            throw BadVersion();
-        if (!picked_newest) {
-            if (type == ReadLockInfo::Frozen && r.count_frozen == 0 && r.count_live == 0)
+        {
+            const bool pick_specific = version_id.version != VersionID().version;
+            std::lock_guard lock(m_mutex);
+            auto newest = m_info->readers.newest.load();
+            REALM_ASSERT(newest != VersionList::nil);
+            read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
+            ensure_reader_mapping((unsigned int)read_lock.m_reader_idx);
+            bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
+            auto& r = m_info->readers.get(read_lock.m_reader_idx);
+            if (pick_specific && version_id.version != r.version)
                 throw BadVersion();
-            if (type != ReadLockInfo::Frozen && r.count_live == 0)
-                throw BadVersion();
+            if (!picked_newest) {
+                if (type == ReadLockInfo::Frozen && r.count_frozen == 0 && r.count_live == 0)
+                    throw BadVersion();
+                if (type != ReadLockInfo::Frozen && r.count_live == 0)
+                    throw BadVersion();
+            }
+            populate_read_lock(read_lock, r, type);
         }
-        populate_read_lock(read_lock, r, type);
 
-        std::lock_guard local_lock(m_local_mutex);
-        grow_local_cache(read_lock.m_reader_idx + 1);
-        auto& r2 = m_local_readers[read_lock.m_reader_idx];
-        if (!r2.is_active()) {
-            r2 = r;
-            r2.count_full = r2.count_live = r2.count_frozen = 0;
+        {
+            std::lock_guard local_lock(m_local_mutex);
+            grow_local_cache(read_lock.m_reader_idx + 1);
+            auto& r2 = m_local_readers[read_lock.m_reader_idx];
+            if (!r2.is_active()) {
+                r2.version = read_lock.m_version;
+                r2.filesize = read_lock.m_file_size;
+                r2.current_top = read_lock.m_top_ref;
+                r2.count_full = r2.count_live = r2.count_frozen = 0;
+            }
+            REALM_ASSERT(field_for_type(r2, type) == 0);
+            field_for_type(r2, type) = 1;
         }
-        REALM_ASSERT(field_for_type(r2, type) == 0);
-        field_for_type(r2, type) = 1;
 
         return read_lock;
     }
@@ -604,7 +636,7 @@ public:
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
         std::lock_guard lock(m_mutex);
-        ensure_full_reader_mapping();
+        ensure_reader_mapping();
         if (m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version)) {
             return;
         }
@@ -628,15 +660,17 @@ public:
     }
 
 private:
-    void ensure_full_reader_mapping()
+    void ensure_reader_mapping(unsigned int required = -1)
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
 
-        auto index = m_info->readers.capacity() - 1;
-        if (index >= m_local_max_entry) {
+        if (required < m_local_max_entry)
+            return;
+
+        auto new_max_entry = m_info->readers.capacity();
+        if (new_max_entry > m_local_max_entry) {
             // handle mapping expansion if required
-            auto new_max_entry = m_info->readers.capacity();
             size_t info_size = sizeof(DB::SharedInfo) + m_info->readers.compute_required_space(new_max_entry);
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
             m_local_max_entry = new_max_entry;
@@ -787,7 +821,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         File::CloseGuard fcg(m_file);
         m_file.set_fifo_path(coordination_dir, "lock.fifo");
 
-        if (m_file.try_lock_exclusive()) { // Throws
+        if (m_file.try_rw_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
 
             // We're alone in the world, and it is Ok to initialize the
@@ -819,12 +853,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
         // if the lock is already open in shared mode, so we work around it by
         // busy waiting. This should occur only briefly during session initialization.
-        while (!m_file.try_lock_shared()) {
+        while (!m_file.try_rw_lock_shared()) {
             sched_yield();
         }
 #else
-        m_file.lock_shared(); // Throws
+        m_file.rw_lock_shared(); // Throws
 #endif
+        File::UnlockGuard ulg(m_file);
+
         // The coordination/management dir is created as a side effect of the lock
         // operation above if needed for lock emulation. But it may also be needed
         // for other purposes, so make sure it exists.
@@ -1234,6 +1270,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
         }
+        ulg.release(); // Do not release shared lock
         break;
     }
 
@@ -1594,7 +1631,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // interleave which is not permitted on Windows. It is permitted on *nix.
         m_file_map.unmap();
         m_version_manager.reset();
-        m_file.unlock();
+        m_file.rw_unlock();
         // info->~SharedInfo(); // DO NOT Call destructor
         m_file.close();
     }
@@ -2315,7 +2352,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock&& callba
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
     lockfile.set_fifo_path(realm_path + ".management", "lock.fifo");
-    if (lockfile.try_lock_exclusive()) { // Throws
+    if (lockfile.try_rw_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
     }
