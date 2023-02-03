@@ -14,7 +14,7 @@ namespace {
 ///
 /// DefaultWebSocketImpl - websocket implementation for the default socket provider
 ///
-class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
+class DefaultWebSocketImpl final : public DefaultWebSocket, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
                          std::mt19937_64& random, const std::string user_agent, WebSocketObserver& observer,
@@ -41,6 +41,11 @@ public:
     std::string_view get_appservices_request_id() const noexcept override
     {
         return m_app_services_coid;
+    }
+
+    void force_handshake_response_for_testing(int status_code, std::string body = "") override
+    {
+        m_websocket.force_handshake_response_for_testing(status_code, body);
     }
 
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private

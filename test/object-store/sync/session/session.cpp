@@ -627,7 +627,7 @@ TEST_CASE("session restart", "[sync]") {
     session->restart_session();
 
     REQUIRE(session->state() == SyncSession::State::Active);
-    wait_for_upload(*realm);
+    REQUIRE(!wait_for_upload(*realm));
 }
 
 TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
