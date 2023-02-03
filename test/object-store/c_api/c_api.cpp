@@ -4292,6 +4292,9 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(deletions != nullptr);
                     CHECK(insertions != nullptr);
                     CHECK(modifications == nullptr);
+                    realm_release(deletions);
+                    realm_release(insertions);
+                    realm_release(modifications);
                 }
             }
 
