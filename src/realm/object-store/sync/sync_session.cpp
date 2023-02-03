@@ -111,16 +111,7 @@ void SyncSession::restart_session()
         m_state = State::Inactive;
 
     if (m_session) {
-        // Assume connection is disconnected and don't propagate
-        // connection state changes back to the client
-        m_session->reset_connection_state_change_listener();
         m_session.reset();
-        {
-            // Update the state to disconnected for later state change notifications
-            // but don't propagate those changes back to the client
-            util::CheckedLockGuard lock(m_connection_state_mutex);
-            m_connection_state = ConnectionState::Disconnected;
-        }
     }
 
     // If this sync session is paused, do not automatically start a new session
