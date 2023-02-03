@@ -259,6 +259,30 @@ RLM_API void realm_collection_changes_get_ranges(
     }
 }
 
+RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes,
+                                          realm_value_t** out_deletion_keys, size_t* out_deletions_size,
+                                          realm_value_t** out_insertion_keys, size_t* out_insertions_size,
+                                          realm_value_t** out_modification_keys, size_t* out_modifications_size)
+{
+    auto fill = [](auto collection, realm_value_t** out, size_t* n) {
+        if (!out || !n)
+            return;
+        if (collection.size() == 0) {
+            *n = 0;
+            return;
+        }
+        *out = new realm_value_t[collection.size()];
+        size_t i = 0;
+        for (auto val : collection)
+            *out[i++] = to_capi(val);
+        *n = i;
+    };
+
+    fill(changes->deletions, out_deletion_keys, out_deletions_size);
+    fill(changes->insertions, out_insertion_keys, out_insertions_size);
+    fill(changes->modifications, out_modification_keys, out_modifications_size);
+}
+
 static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, size_t max)
 {
     size_t i = 0;
