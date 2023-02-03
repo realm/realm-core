@@ -602,7 +602,7 @@ public:
             auto newest = m_info->readers.newest.load();
             REALM_ASSERT(newest != VersionList::nil);
             read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
-            ensure_reader_mapping(read_lock.m_reader_idx);
+            ensure_reader_mapping((unsigned int)read_lock.m_reader_idx);
             bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
             auto& r = m_info->readers.get(read_lock.m_reader_idx);
             if (pick_specific && version_id.version != r.version)
