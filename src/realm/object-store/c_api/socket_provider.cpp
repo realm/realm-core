@@ -96,8 +96,8 @@ private:
 
 struct CAPIWebSocketObserver : sync::WebSocketObserver {
 public:
-    CAPIWebSocketObserver(sync::WebSocketObserver& observer)
-        : m_observer(observer)
+    CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
+        : m_observer(std::move(observer))
     {
     }
 
@@ -105,26 +105,26 @@ public:
 
     void websocket_connected_handler(const std::string& protocol) final
     {
-        m_observer.websocket_connected_handler(protocol);
+        m_observer->websocket_connected_handler(protocol);
     }
 
     void websocket_error_handler() final
     {
-        m_observer.websocket_error_handler();
+        m_observer->websocket_error_handler();
     }
 
     bool websocket_binary_message_received(util::Span<const char> data) final
     {
-        return m_observer.websocket_binary_message_received(data);
+        return m_observer->websocket_binary_message_received(data);
     }
 
     bool websocket_closed_handler(bool was_clean, Status status) final
     {
-        return m_observer.websocket_closed_handler(was_clean, status);
+        return m_observer->websocket_closed_handler(was_clean, status);
     }
 
 private:
-    sync::WebSocketObserver& m_observer;
+    std::unique_ptr<sync::WebSocketObserver> m_observer;
 };
 
 struct CAPISyncSocketProvider : sync::SyncSocketProvider {
@@ -165,10 +165,10 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         m_free(m_userdata);
     }
 
-    std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
-        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(*observer);
+        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(std::move(observer));
         return std::make_unique<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
                                                m_websocket_free, new realm_websocket_observer_t(capi_observer),
                                                std::move(endpoint));

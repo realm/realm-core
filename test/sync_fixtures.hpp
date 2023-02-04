@@ -567,6 +567,7 @@ public:
     {
         unit_test::TestContext& test_context = m_test_context;
         stop();
+        m_clients.clear();
         m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
@@ -668,8 +669,7 @@ public:
             });
         }
         // We can't wait for clearing the simulated failure since some tests stop the client early
-        client.stop();
-        m_client_socket_providers[index]->stop(true);
+        client.drain();
     }
 
     void stop()
