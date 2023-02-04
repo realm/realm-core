@@ -141,13 +141,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_fix_up_object_ids{config.fix_up_object_ids}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
-    , m_user_agent_string{make_user_agent_string(config)} // Throws
-    , m_socket_provider{[&]() -> std::shared_ptr<SyncSocketProvider> {
-        if (config.socket_provider)
-            return config.socket_provider;
-
-        return std::make_shared<websocket::DefaultSocketProvider>(logger_ptr, get_user_agent_string());
-    }()}
+    , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_random{}
@@ -182,7 +176,6 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
-    logger.debug("User agent string: '%1'", get_user_agent_string());
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -193,6 +186,8 @@ ClientImpl::ClientImpl(ClientConfig config)
         logger.warn("Testing/debugging feature 'dry run' enabled - "
                     "never do this in production!");
     }
+
+    REALM_ASSERT_EX(m_socket_provider, "Must provide socket provider in sync Client config");
 
     if (m_one_connection_per_session) {
         // FIXME: Re-enable this warning when the load balancer is able to handle
@@ -218,19 +213,6 @@ ClientImpl::ClientImpl(ClientConfig config)
             throw ExceptionForStatus(status);
         actualize_and_finalize_session_wrappers(); // Throws
     });
-}
-
-
-std::string ClientImpl::make_user_agent_string(ClientConfig& config)
-{
-    std::string platform_info = std::move(config.user_agent_platform_info);
-    if (platform_info.empty())
-        platform_info = util::get_platform_info(); // Throws
-    std::ostringstream out;
-    out << "RealmSync/" REALM_VERSION_STRING " (" << platform_info << ")"; // Throws
-    if (!config.user_agent_application_info.empty())
-        out << " " << config.user_agent_application_info; // Throws
-    return out.str();                                     // Throws
 }
 
 

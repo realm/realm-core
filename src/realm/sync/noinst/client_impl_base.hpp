@@ -279,8 +279,6 @@ private:
     void drain_connections();
     void drain_connections_on_loop();
 
-    static std::string make_user_agent_string(ClientConfig&);
-
     session_ident_type get_next_session_ident() noexcept;
 
     friend class ClientImpl::Connection;
