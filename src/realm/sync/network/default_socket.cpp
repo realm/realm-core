@@ -490,7 +490,7 @@ DefaultSocketProvider::~DefaultSocketProvider()
     REALM_ASSERT(m_state == State::Stopped);
 
 
-    //FIXME this should go away when we remove the need for the keep running timer altogether.
+    // FIXME this should go away when we remove the need for the keep running timer altogether.
     m_service.post([this](Status status) {
         REALM_ASSERT(status.is_ok());
         m_keep_running_timer->cancel();

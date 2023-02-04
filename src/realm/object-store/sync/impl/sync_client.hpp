@@ -116,9 +116,7 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
-    ~SyncClient()
-    {
-    }
+    ~SyncClient() {}
 
 private:
     std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
