@@ -3400,7 +3400,6 @@ TEST(Sync_UploadDownloadProgress_3)
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
     // not running, and it is started by progress_handler().
-    int entry = 0;
 
     bool should_signal_cond_var = false;
     auto signal_pf = util::make_promise_future<void>();
@@ -3412,7 +3411,7 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler = [&, promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
+    auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
                                 uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
                                 uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
