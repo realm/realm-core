@@ -325,7 +325,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 
 // TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
-class ClientImpl::Connection final : public WebSocketObserver {
+class ClientImpl::Connection {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -401,10 +401,10 @@ public:
     int get_negotiated_protocol_version() noexcept;
 
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
-    void websocket_connected_handler(const std::string& protocol) override;
-    bool websocket_binary_message_received(util::Span<const char> data) override;
-    void websocket_error_handler() override;
-    bool websocket_closed_handler(bool, Status) override;
+    void websocket_connected_handler(const std::string& protocol);
+    bool websocket_binary_message_received(util::Span<const char> data);
+    void websocket_error_handler();
+    bool websocket_closed_handler(bool, Status);
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -427,7 +427,7 @@ private:
     struct LifecycleSentinel : public util::AtomicRefCountBase {
         bool destroyed = false;
     };
-    struct WebSocketObserverImpl;
+    struct WebSocketObserverShim;
 
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 

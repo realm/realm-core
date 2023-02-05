@@ -702,8 +702,8 @@ void Connection::handle_reconnect_wait(Status status)
         initiate_reconnect(); // Throws
 }
 
-struct Connection::WebSocketObserverImpl : public sync::WebSocketObserver {
-    explicit WebSocketObserverImpl(Connection* conn)
+struct Connection::WebSocketObserverShim : public sync::WebSocketObserver {
+    explicit WebSocketObserverShim(Connection* conn)
         : conn(conn)
         , sentinel(conn->m_websocket_sentinel)
     {
@@ -793,7 +793,7 @@ void Connection::initiate_reconnect()
 
     m_websocket_error_received = false;
     m_websocket =
-        m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverImpl>(this),
+        m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverShim>(this),
                                             WebSocketEndpoint{
                                                 m_address,
                                                 m_port,
