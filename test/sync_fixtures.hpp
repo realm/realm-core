@@ -539,7 +539,6 @@ public:
             m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
                 m_client_loggers[i], "", websocket::DefaultSocketProvider::AutoStart{false}));
             config_2.socket_provider = m_client_socket_providers.back();
-            config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
@@ -567,6 +566,7 @@ public:
     {
         unit_test::TestContext& test_context = m_test_context;
         stop();
+        m_clients.clear();
         m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
@@ -668,8 +668,7 @@ public:
             });
         }
         // We can't wait for clearing the simulated failure since some tests stop the client early
-        client.stop();
-        m_client_socket_providers[index]->stop(true);
+        client.drain();
     }
 
     void stop()

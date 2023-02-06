@@ -65,7 +65,7 @@ public:
     /// Stops the internal event loop (provided by network::Service)
     void stop(bool wait_for_stop = false) override;
 
-    std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override;
+    std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver>, WebSocketEndpoint&&) override;
 
     void post(FunctionHandler&& handler) override
     {
@@ -99,6 +99,17 @@ private:
     State m_state;                      // protected by m_mutex
     std::condition_variable m_state_cv; // uses m_mutex
     std::thread m_thread;               // protected by m_mutex
+};
+
+/// Class for the Default Socket Provider websockets that allows a simulated
+/// http response to be specified for testing.
+class DefaultWebSocket : public WebSocketInterface {
+public:
+    virtual ~DefaultWebSocket() = default;
+
+    virtual void force_handshake_response_for_testing(int status_code, std::string body = "") = 0;
+
+protected:
 };
 
 } // namespace realm::sync::websocket
