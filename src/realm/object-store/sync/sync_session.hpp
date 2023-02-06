@@ -201,6 +201,16 @@ public:
     // for any other reason this will also resume it.
     void resume() REQUIRES(!m_state_mutex, !m_config_mutex);
 
+    // Drop the current session and restart a new one from scratch using the latest configuration in
+    // the sync manager. Used to respond to redirect responses from the server when the deployment
+    // model has changed while the user is logged in and a session is active.
+    // If this sync session is currently paused, a new session will not be started until resume() is
+    // called.
+    // NOTE: This method ignores the current stop policy and closes the current session immediately,
+    //       since a new session will be created as part of this call. The new session will adhere to
+    //       the stop policy if it is manually closed.
+    void restart_session() REQUIRES(!m_state_mutex, !m_connection_state_mutex, !m_config_mutex);
+
     // Shut down the synchronization session (sync::Session) and wait for the Realm file to no
     // longer be open on behalf of it.
     void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
@@ -294,6 +304,11 @@ public:
         {
             return session.send_test_command(std::move(request));
         }
+
+        static sync::SaltedFileIdent get_file_ident(SyncSession& session)
+        {
+            return session.get_file_ident();
+        }
     };
 
 private:
@@ -341,7 +356,7 @@ private:
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
-    handle_refresh(const std::shared_ptr<SyncSession>&);
+    handle_refresh(const std::shared_ptr<SyncSession>&, bool = false);
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
@@ -384,6 +399,8 @@ private:
 
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
+
+    sync::SaltedFileIdent get_file_ident() const;
 
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 

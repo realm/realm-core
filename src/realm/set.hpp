@@ -792,6 +792,9 @@ inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
     set_sorted_indices(sz, indices, ascending);
 }
 
+template <>
+void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const;
+
 template <class T>
 inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {

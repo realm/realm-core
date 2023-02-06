@@ -126,6 +126,34 @@ RLM_API bool realm_dictionary_erase(realm_dictionary_t* dict, realm_value_t key,
     });
 }
 
+RLM_API bool realm_dictionary_get_keys(realm_dictionary_t* dict, size_t* out_size, realm_results_t** out_keys)
+{
+    return wrap_err([&]() {
+        auto keys = dict->get_keys();
+        *out_size = keys.size();
+        *out_keys = new realm_results_t{keys};
+        return true;
+    });
+}
+
+RLM_API bool realm_dictionary_contains_key(const realm_dictionary_t* dict, realm_value_t key, bool* found)
+{
+    return wrap_err([&]() {
+        StringData k{key.string.data, key.string.size};
+        *found = dict->contains(k);
+        return true;
+    });
+}
+
+RLM_API bool realm_dictionary_contains_value(const realm_dictionary_t* dict, realm_value_t value, size_t* index)
+{
+    return wrap_err([&]() {
+        auto val = from_capi(value);
+        *index = dict->find_any(val);
+        return true;
+    });
+}
+
 RLM_API bool realm_dictionary_clear(realm_dictionary_t* dict)
 {
     return wrap_err([&]() {

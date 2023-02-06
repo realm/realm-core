@@ -168,6 +168,10 @@ public:
     /// initiate_server_handshake().
     void stop() noexcept;
 
+    /// Specifies an alternate status code for the handshake response to simulate
+    /// failures returned from the server.
+    void force_handshake_response_for_testing(int status_code, std::string body = "");
+
 private:
     class Impl;
     std::unique_ptr<Impl> m_impl;
@@ -197,6 +201,7 @@ enum class Error {
     bad_response_200_ok,
     bad_response_3xx_redirection,
     bad_response_301_moved_permanently,
+    bad_response_308_permanent_redirect,
     bad_response_4xx_client_errors,
     bad_response_401_unauthorized,
     bad_response_403_forbidden,
@@ -213,6 +218,8 @@ enum class Error {
 };
 
 const std::error_category& websocket_close_status_category() noexcept;
+
+std::error_code make_error_code(ErrorCodes::Error error) noexcept;
 
 const std::error_category& error_category() noexcept;
 

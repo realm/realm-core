@@ -389,6 +389,13 @@ void trigger_client_reset(const AppSession& app_session)
     }
 }
 
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)
+{
+    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());
+    REQUIRE(file_ident.ident != 0);
+    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
+}
+
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
                     TestAppSession& test_app_session)
@@ -442,9 +449,6 @@ struct BaasClientReset : public TestClientReset {
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            wait_for_object_to_persist_to_atlas(m_local_config.sync_config->user, app_session, object_schema_name,
-                                                {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
-
             session->pause();
 
             realm->begin_transaction();
@@ -455,7 +459,7 @@ struct BaasClientReset : public TestClientReset {
             realm->commit_transaction();
         }
 
-        trigger_client_reset(app_session);
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -547,16 +551,13 @@ struct BaasFLXClientReset : public TestClientReset {
             return ret;
         }();
 
-        wait_for_object_to_persist_to_atlas(m_local_config.sync_config->user, app_session,
-                                            std::string(c_object_schema_name),
-                                            {{std::string(c_id_col_name), pk_of_added_object}});
         session->pause();
 
         if (m_make_local_changes) {
             m_make_local_changes(realm);
         }
 
-        trigger_client_reset(app_session);
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -616,12 +617,13 @@ private:
         Query query_for_added_object = table->where().equal(id_col, pk);
         mut_subs.insert_or_assign(query_for_added_object);
         auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (create_object) {
             realm->begin_transaction();
             table->create_object_with_primary_key(pk, {{str_col, "initial value"}});
             realm->commit_transaction();
         }
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_upload(*realm);
     }
 
     void load_initial_data(SharedRealm realm)

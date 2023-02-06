@@ -445,6 +445,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                                                 {"sum_of_list_field", sum}}));
 
                 realm->commit_transaction();
+                wait_for_upload(*realm);
                 return pk_of_added_object;
             })
             ->make_local_changes([&](SharedRealm local_realm) {
