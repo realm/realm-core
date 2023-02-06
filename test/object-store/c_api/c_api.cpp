@@ -25,6 +25,7 @@
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/sync/client_base.hpp>
+#include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
@@ -5799,5 +5800,108 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         realm_release(c_wrap_query_foo);
         realm_release(c_wrap_query_bar);
     });
+}
+
+TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
+    using namespace realm::app;
+    using namespace realm::sync;
+    using namespace realm::sync::websocket;
+
+    struct TestWebSocket : realm::c_api::WrapC, WebSocketInterface {
+    public:
+        TestWebSocket(DefaultSocketProvider& socket_provider, realm_websocket_endpoint_t endpoint,
+                      realm_websocket_observer_t* realm_websocket_observer)
+        {
+            WebSocketEndpoint ws_endpoint;
+            ws_endpoint.address = endpoint.address;
+            ws_endpoint.port = endpoint.port;
+            ws_endpoint.path = endpoint.path;
+            for (size_t i = 0; i < endpoint.num_protocols; ++i) {
+                ws_endpoint.protocols.push_back(endpoint.protocols[i]);
+            }
+            ws_endpoint.is_ssl = endpoint.is_ssl;
+
+            m_websocket = socket_provider.connect(realm_websocket_observer->get(), std::move(ws_endpoint));
+        }
+
+        void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
+        {
+            m_websocket->async_write_binary(data, std::move(handler));
+        }
+
+    private:
+        std::unique_ptr<WebSocketInterface> m_websocket;
+    };
+
+    struct TestSyncTimer : realm::c_api::WrapC, SyncSocketProvider::Timer {
+    public:
+        TestSyncTimer(DefaultSocketProvider& socket_provider, std::chrono::milliseconds delay,
+                      SyncSocketProvider::FunctionHandler&& handler)
+        {
+            m_timer = socket_provider.create_timer(delay, std::move(handler));
+        }
+
+        void cancel() override
+        {
+            m_timer->cancel();
+        }
+
+    private:
+        SyncSocketProvider::SyncTimer m_timer;
+    };
+
+    auto logger = std::make_shared<util::StderrLogger>();
+    DefaultSocketProvider default_socket_provider(logger, "SocketProvider");
+
+    auto post_fn = [](realm_userdata_t userdata, realm_sync_socket_callback_t* callback) {
+        auto socket_provider = static_cast<DefaultSocketProvider*>(userdata);
+        auto cb = [callback_copy = callback](Status s) {
+            realm_sync_socket_callback_complete(callback_copy, static_cast<status_error_code_e>(s.code()),
+                                                s.reason().c_str());
+        };
+        socket_provider->post(std::move(cb));
+    };
+    auto create_timer_fn = [](realm_userdata_t userdata, uint64_t delay_ms,
+                              realm_sync_socket_callback_t* callback) -> realm_sync_socket_timer_t {
+        auto socket_provider = static_cast<DefaultSocketProvider*>(userdata);
+        return static_cast<realm_sync_socket_timer_t>(
+            new TestSyncTimer(*socket_provider, std::chrono::milliseconds(delay_ms), std::move(**callback)));
+    };
+    auto cancel_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t timer_userdata) {
+        auto timer = static_cast<TestSyncTimer*>(timer_userdata);
+        timer->cancel();
+    };
+    auto free_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t timer_userdata) {
+        realm_release(timer_userdata);
+    };
+    auto websocket_connect_fn =
+        [](realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
+           realm_websocket_observer_t* realm_websocket_observer) -> realm_sync_socket_websocket_t {
+        auto socket_provider = static_cast<DefaultSocketProvider*>(userdata);
+        return static_cast<realm_sync_socket_websocket_t>(
+            new TestWebSocket(*socket_provider, endpoint, realm_websocket_observer));
+    };
+    auto websocket_async_write_fn = [](realm_userdata_t, realm_sync_socket_websocket_t websocket_userdata,
+                                       const char* data, size_t size, realm_sync_socket_callback_t* callback) {
+        auto websocket = static_cast<TestWebSocket*>(websocket_userdata);
+        websocket->async_write_binary(util::Span{data, size}, std::move(**callback));
+    };
+    auto websocket_free_fn = [](realm_userdata_t, realm_sync_socket_websocket_t websocket_userdata) {
+        realm_release(websocket_userdata);
+    };
+
+    auto socket_provider = realm_sync_socket_new(
+        static_cast<realm_userdata_t>(&default_socket_provider), [](realm_userdata_t) {}, post_fn, create_timer_fn,
+        cancel_timer_fn, free_timer_fn, websocket_connect_fn, websocket_async_write_fn, websocket_free_fn);
+
+    // Test drive.
+    FLXSyncTestHarness harness("c_api_websocket_provider", FLXSyncTestHarness::default_server_schema(),
+                               instance_of<SynchronousTestTransport>, *socket_provider);
+
+    SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    auto realm = Realm::get_shared_realm(test_config);
+    wait_for_download(*realm);
+
+    realm_release(socket_provider);
 }
 #endif // REALM_ENABLE_AUTH_TESTS
