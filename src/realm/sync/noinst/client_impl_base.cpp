@@ -278,6 +278,13 @@ ClientImpl::SyncTrigger ClientImpl::create_trigger(SyncSocketProvider::FunctionH
     return std::make_unique<Trigger<ClientImpl>>(this, std::move(handler));
 }
 
+Connection::~Connection()
+{
+    if (m_websocket_sentinel) {
+        m_websocket_sentinel->destroyed = true;
+        m_websocket_sentinel.reset();
+    }
+}
 
 void Connection::activate()
 {

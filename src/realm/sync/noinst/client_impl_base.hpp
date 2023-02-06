@@ -1212,8 +1212,6 @@ inline int ClientImpl::Connection::get_negotiated_protocol_version() noexcept
     return m_negotiated_protocol_version;
 }
 
-inline ClientImpl::Connection::~Connection() {}
-
 template <class H>
 void ClientImpl::Connection::for_each_active_session(H handler)
 {
