@@ -1190,8 +1190,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
-            m_version_manager = std::move(version_manager);
-            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*m_version_manager);
+            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
                 top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
@@ -1366,7 +1365,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     top.init_from_ref(top_ref);
                     file_size = Group::get_logical_file_size(top);
                 }
-                m_version_manager->init_versioning(top_ref, file_size, version);
+                version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
                 // Durability setting must be consistent across a session. An
@@ -1431,6 +1430,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             ++info->num_participants;
 
             // Keep the mappings and file open:
+            m_version_manager = std::move(version_manager);
             alloc_detach_guard.release();
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
