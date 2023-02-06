@@ -3367,17 +3367,14 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-// NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
-ONLY(LangBindHelper_TestForYavor)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
 
     std::vector<std::unique_ptr<SpawnedProcess>> readers;
     std::vector<std::unique_ptr<SpawnedProcess>> writers;
-    //    SHARED_GROUP_TEST_PATH(path);
-    std::string path = "a_fixed_path_for_yavor.realm";
-    std::cout << "Path for prime suspect: " << std::string(path) << std::endl;
+    SHARED_GROUP_TEST_PATH(path);
     auto key = crypt_key();
     auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
     if (process->is_child()) {
