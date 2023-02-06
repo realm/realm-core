@@ -5902,6 +5902,7 @@ TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
     auto realm = Realm::get_shared_realm(test_config);
     wait_for_download(*realm);
 
+    default_socket_provider.stop(true);
     realm_release(socket_provider);
 }
 #endif // REALM_ENABLE_AUTH_TESTS
