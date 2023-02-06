@@ -95,6 +95,7 @@ void transform_transactions(TestContext& test_context)
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
@@ -175,6 +176,7 @@ void transform_instructions(TestContext& test_context)
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
@@ -253,6 +255,7 @@ void connected_objects(TestContext& test_context)
         fixture.start_client(1);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
+        session_2.detach();
         fixture.stop_client(1);
 
         // Upload changes of first client and wait to integrate changes from second client.
