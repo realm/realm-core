@@ -43,12 +43,12 @@ constexpr int get_current_protocol_version() noexcept
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
-    return "com.mongodb.realm-sync/";
+    return "com.mongodb.realm-sync#";
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
-    return "com.mongodb.realm-query-sync/";
+    return "com.mongodb.realm-query-sync#";
 }
 
 enum class SyncServerMode { PBS, FLX };

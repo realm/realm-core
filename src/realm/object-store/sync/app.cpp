@@ -261,7 +261,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
 {
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
-    if (auto metadata = m_sync_manager->app_metadata()) {
+    if (auto metadata = get_metadata()) {
         update_hostname(metadata);
     }
 }
@@ -827,7 +827,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_sync_manager->app_metadata()) {
+    if (!new_hostname && get_metadata()) {
         // Skip if the app_metadata has already been initialized and a new hostname is not provided
         return completion(util::none); // early return
     }
@@ -854,11 +854,8 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             auto ws_hostname = get<std::string>(json, "ws_hostname");
             auto deployment_model = get<std::string>(json, "deployment_model");
             auto location = get<std::string>(json, "location");
-            self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
-                manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
-            });
-
-            self->update_hostname(self->m_sync_manager->app_metadata());
+            self->set_metadata(deployment_model, location, hostname, ws_hostname);
+            self->update_hostname(self->get_metadata());
         }
         catch (const AppError&) {
             // Pass the response back to completion
@@ -866,6 +863,34 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
         }
         completion(util::none);
     });
+}
+
+std::optional<SyncAppMetadata> App::get_metadata() const
+{
+    if (m_sync_manager->has_persistent_metadata()) {
+        return m_sync_manager->app_metadata();
+    }
+    else {
+        return m_metadata;
+    }
+}
+
+void App::set_metadata(const std::string& deployment_model, const std::string& location, const std::string& hostname,
+                       const std::string& ws_hostname)
+{
+    if (m_sync_manager->has_persistent_metadata()) {
+        m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+            manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
+        });
+    }
+    else {
+        SyncAppMetadata metadata;
+        metadata.deployment_model = deployment_model;
+        metadata.location = location;
+        metadata.hostname = hostname;
+        metadata.ws_hostname = ws_hostname;
+        m_metadata.emplace(std::move(metadata));
+    }
 }
 
 void App::post(std::string&& route, UniqueFunction<void(Optional<AppError>)>&& completion, const BsonDocument& body)
@@ -891,7 +916,7 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            auto app_metadata = self->m_sync_manager->app_metadata();
+            auto app_metadata = self->get_metadata();
             if (app_metadata && request.url.rfind(base_url, 0) != std::string::npos &&
                 app_metadata->hostname != base_url) {
                 request.url.replace(0, base_url.size(), app_metadata->hostname);
@@ -911,7 +936,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     request.timeout_ms = default_timeout_ms;
 
     // Normal do_request operation, just send the request to the server and return the response
-    if (m_sync_manager->app_metadata()) {
+    if (get_metadata()) {
         m_config.transport->send_request_to_server(
             std::move(request), [self = shared_from_this(), completion = std::move(completion)](
                                     Request&& request, const Response& response) mutable {

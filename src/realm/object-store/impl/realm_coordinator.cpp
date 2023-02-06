@@ -486,12 +486,16 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+#ifdef __EMSCRIPTEN__
+            m_db = DB::create(std::move(history), options);
+#else
             if (m_config.path.size()) {
                 m_db = DB::create(std::move(history), m_config.path, options);
             }
             else {
                 m_db = DB::create(std::move(history), options);
             }
+#endif
         }
         else {
             m_db = DB::create(m_config.path, true, options);
@@ -560,8 +564,12 @@ void RealmCoordinator::init_external_helpers()
         std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
         SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
             if (auto self = weak_self.lock()) {
+#ifndef __EMSCRIPTEN__
                 if (self->m_notifier)
                     self->m_notifier->notify_others();
+#else
+                self->on_change();
+#endif
             }
         });
     }

@@ -25,10 +25,6 @@
 #endif // RLM_NO_DLLIMPORT
 #endif // Realm_EXPORTS
 
-#elif defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-#define RLM_EXPORT EMSCRIPTEN_KEEPALIVE
-
 #else
 // Not Win32
 #define RLM_EXPORT __attribute__((visibility("default")))

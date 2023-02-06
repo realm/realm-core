@@ -243,6 +243,12 @@ public:
         return m_config;
     }
 
+    bool has_persistent_metadata() const REQUIRES(!m_file_system_mutex)
+    {
+        util::CheckedLockGuard lock(m_file_system_mutex);
+        return bool(m_metadata_manager);
+    }
+
     // Return the cached logger
     const std::shared_ptr<util::Logger>& get_logger() const REQUIRES(!m_mutex);
 
@@ -279,7 +285,6 @@ private:
     mutable util::CheckedMutex m_mutex;
 
     bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
-    void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // internally create a new logger - used by configure() and set_logger_factory()
     void do_make_logger() REQUIRES(m_mutex);

@@ -25,6 +25,7 @@
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/push_client.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
 
 #include <realm/object_id.hpp>
 #include <realm/util/logger.hpp>
@@ -388,6 +389,13 @@ private:
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
+
+    // used for runtime metadata when the SyncManager is initialized with MetadataMode::NoMetadata
+    // the accessors below use this field or the SyncMetadataManager if available
+    std::optional<SyncAppMetadata> m_metadata;
+    std::optional<SyncAppMetadata> get_metadata() const;
+    void set_metadata(const std::string& deployment_model, const std::string& location, const std::string& hostname,
+                      const std::string& ws_hostname);
 
     /// m_Logger_ptr is not set until the first call to one of these functions.
     /// If configure() not been called, a logger will not be available yet.
