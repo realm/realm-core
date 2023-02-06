@@ -1921,7 +1921,6 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_sup
         {
             std::unique_ptr<Replication> hist_w(make_in_realm_history());
             DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
-            
             WriteTransaction wt(sg_w);
             wt.get_table("table")->clear();
             wt.commit();
