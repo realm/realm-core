@@ -29,6 +29,7 @@
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -108,14 +109,14 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
         {"object",
          {
              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
+             {"value", PropertyType::String},
              partition_prop,
          }},
     };
@@ -144,6 +145,101 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
+    std::vector<ObjectId> expected_obj_ids;
+    {
+        auto obj_id = ObjectId::gen();
+        expected_obj_ids.push_back(obj_id);
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "object",
+                       std::any(AnyDict{{"_id", obj_id},
+                                        {"value", std::string{"hello world"}},
+                                        {partition.property_name, partition.value}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        reset_utils::wait_for_object_to_persist_to_atlas(app->current_user(), test_app_session.app_session(),
+                                                         "object", {{"_id", obj_id}});
+        realm->sync_session()->pause();
+    }
+
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
+    {
+        SyncTestFile realm_config(app->current_user(), partition.value, schema);
+        auto second_realm = Realm::get_shared_realm(realm_config);
+
+        second_realm->begin_transaction();
+        CppContext c(second_realm);
+        for (size_t i = 0; i < 100; ++i) {
+            auto obj_id = ObjectId::gen();
+            expected_obj_ids.push_back(obj_id);
+            Object::create(c, second_realm, "object",
+                           std::any(AnyDict{{"_id", obj_id},
+                                            {"value", random_string(1024 * 128)},
+                                            {partition.property_name, partition.value}}));
+        }
+        second_realm->commit_transaction();
+
+        wait_for_upload(*second_realm);
+    }
+
+    realm->sync_session()->resume();
+    timed_wait_for([&] {
+        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+    });
+    realm->sync_session()->pause();
+    realm->sync_session()->resume();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    realm->refresh();
+    auto table = realm->read_group().get_table("class_object");
+    REQUIRE(table->size() == expected_obj_ids.size());
+    std::vector<ObjectId> found_object_ids;
+    for (const auto& obj : *table) {
+        found_object_ids.push_back(obj.get_primary_key().get_object_id());
+    }
+
+    std::stable_sort(expected_obj_ids.begin(), expected_obj_ids.end());
+    std::stable_sort(found_object_ids.begin(), found_object_ids.end());
+    REQUIRE(expected_obj_ids == found_object_ids);
+}
+
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset]") {
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
+
+    create_user_and_log_in(app);
+    SyncTestFile realm_config(app->current_user(), partition.value, schema);
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+        if (err.error_code == sync::websocket::make_error_code(ErrorCodes::ReadError)) {
+            return;
+        }
+
+        if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
+            err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
+            return;
+        }
+
+        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+    };
+
+    auto realm = Realm::get_shared_realm(realm_config);
     auto obj_id = ObjectId::gen();
     {
         realm->begin_transaction();
@@ -153,16 +249,14 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             std::any(AnyDict{{"_id", obj_id}, {"value", int64_t(5)}, {partition.property_name, partition.value}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
-        reset_utils::wait_for_object_to_persist_to_atlas(app->current_user(), test_app_session.app_session(),
-                                                         "object", {{"_id", obj_id}, {"value", 5}});
     }
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 
-    reset_utils::trigger_client_reset(test_app_session.app_session());
+    reset_utils::trigger_client_reset(test_app_session.app_session(), realm);
 
     wait_for_download(*realm, std::chrono::minutes(10));
 }
@@ -287,6 +381,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->is_frozen());
         REQUIRE(before->read_group().get_table("class_object"));
         REQUIRE(before->config().path == local_config.path);
+        REQUIRE_FALSE(before->schema().empty());
+        REQUIRE(before->schema_version() != ObjectStore::NotVersioned);
         REQUIRE(util::File::exists(local_config.path));
     };
     local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
@@ -773,8 +869,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 temp_config.persist();
                 temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
                 config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
-                config_copy->notify_before_client_reset = [&](SharedRealm) {
+                config_copy->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     ++before_callback_invoctions_2;
                 };
                 config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
@@ -782,11 +880,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     ++after_callback_invocations_2;
                 };
 
-                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm) {
+                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions;
                     REQUIRE(session);
                     REQUIRE(config_copy);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     session->update_configuration(*config_copy);
                 };
 
@@ -1645,6 +1745,98 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
     } // end: The server can prohibit recovery
+}
+
+TEST_CASE("sync: Client reset during async open", "[client reset]") {
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::String},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
+
+    auto before_callback_called = util::make_promise_future<void>();
+    auto after_callback_called = util::make_promise_future<void>();
+    create_user_and_log_in(app);
+    SyncTestFile realm_config(app->current_user(), partition.value, std::nullopt,
+                              [](std::shared_ptr<SyncSession>, SyncError) { /*noop*/ });
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+
+    realm_config.sync_config->on_sync_client_event_hook =
+        [&, client_reset_triggered = false](std::weak_ptr<SyncSession> weak_sess,
+                                            const SyncClientHookData& event_data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess) {
+                return SyncClientHookAction::NoAction;
+            }
+            if (sess->path() != realm_config.path) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (event_data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (client_reset_triggered) {
+                return SyncClientHookAction::NoAction;
+            }
+            client_reset_triggered = true;
+            reset_utils::trigger_client_reset(test_app_session.app_session());
+            return SyncClientHookAction::EarlyReturn;
+        };
+
+    // Expected behaviour is that the frozen realm passed in the callback should have no
+    // schema initialized if a client reset happens during an async open and the realm has never been opened before.
+    // SDK's should handle any edge cases which require the use of a schema i.e
+    // calling set_schema_subset(...)
+    realm_config.sync_config->notify_before_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
+            std::shared_ptr<Realm> realm) mutable {
+            CHECK(realm->schema_version() == ObjectStore::NotVersioned);
+            promise.get_promise().emplace_value();
+        };
+
+    realm_config.sync_config->notify_after_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
+            std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
+            CHECK(realm->schema_version() == ObjectStore::NotVersioned);
+            promise.get_promise().emplace_value();
+        };
+
+    auto realm_task = Realm::get_synchronized_realm(realm_config);
+    auto realm_pf = util::make_promise_future<SharedRealm>();
+    realm_task->start([promise_holder = util::CopyablePromiseHolder(std::move(realm_pf.promise))](
+                          ThreadSafeReference ref, std::exception_ptr ex) mutable {
+        auto promise = promise_holder.get_promise();
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+            return;
+        }
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        if (!realm) {
+            promise.set_error({ErrorCodes::RuntimeError, "could not get realm from threadsaferef"});
+        }
+        promise.emplace_value(std::move(realm));
+    });
+    auto realm = realm_pf.future.get();
+    before_callback_called.future.get();
+    after_callback_called.future.get();
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

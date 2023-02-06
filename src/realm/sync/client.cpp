@@ -393,11 +393,11 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = m_running;
-    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
-
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
+
+    // thread to exit before tearing down the client.
+    m_socket_provider->stop(true);
 
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
@@ -490,19 +490,15 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 
 void ClientImpl::stop() noexcept
 {
-    util::LockGuard lock{m_mutex};
-    if (m_stopped)
-        return;
-    m_stopped = true;
-    m_wait_or_client_stopped_cond.notify_all();
+    {
+        util::LockGuard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+        m_wait_or_client_stopped_cond.notify_all();
+    }
+    // TODO: in the future we will need to block here until all the sessions have been torn down
     m_socket_provider->stop();
-}
-
-
-void ClientImpl::run()
-{
-    auto ta = util::make_temp_assign(m_running, true);
-    m_socket_provider->run();
 }
 
 
@@ -754,7 +750,18 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     bool new_batch = false;
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    try {
+        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    }
+    catch (const LogicError& ex) {
+        if (ex.kind() == LogicError::binary_too_big) {
+            IntegrationException ex(ClientError::bad_changeset_size,
+                                    "bootstrap changeset too large to store in pending bootstrap store");
+            on_integration_failure(ex);
+            return true;
+        }
+        throw;
+    }
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
@@ -805,11 +812,16 @@ void SessionImpl::process_pending_flx_bootstrap()
     int64_t query_version = -1;
     size_t changesets_processed = 0;
 
+    // Used to commit each batch after it was transformed.
+    TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
         auto start_time = std::chrono::steady_clock::now();
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // bootstrap store requires a write transaction itself.
+            transact->close();
             bootstrap_store->clear();
             return;
         }
@@ -826,6 +838,7 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
+            transact,
             [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
@@ -1820,12 +1833,6 @@ Client::Client(Client&& client) noexcept
 
 
 Client::~Client() noexcept {}
-
-
-void Client::run()
-{
-    m_impl->run(); // Throws
-}
 
 
 void Client::stop() noexcept

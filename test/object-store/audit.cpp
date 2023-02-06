@@ -1778,8 +1778,9 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE(error.message.find(
-                        "client connected using partition based sync when app is using flexible sync") == 0);
+            REQUIRE_THAT(error.message,
+                         Catch::Matchers::ContainsSubstring(
+                             "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);
         }
 

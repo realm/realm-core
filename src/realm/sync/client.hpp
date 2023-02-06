@@ -12,6 +12,7 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/sync/client_base.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 
 namespace realm::sync {
@@ -40,7 +41,7 @@ public:
     /// Run the internal event-loop of the client. At most one thread may
     /// execute run() at any given time. The call will not return until somebody
     /// calls stop().
-    void run();
+    void run() noexcept;
 
     /// See run().
     ///

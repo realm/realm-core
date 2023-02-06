@@ -52,9 +52,6 @@ namespace {
 #endif
 #endif
 
-#define REALM_MERGE_ASSERT(condition)                                                                                \
-    (REALM_LIKELY(condition) ? static_cast<void>(0) : throw sync::TransformError{"Assertion failed: " #condition})
-
 } // unnamed namespace
 
 using namespace realm;
@@ -895,6 +892,25 @@ void TransformerImpl::MinorSide::prepend(InputIterator begin, InputIterator end)
 
 namespace {
 
+REALM_NORETURN void throw_bad_merge(std::string msg)
+{
+    throw sync::TransformError{std::move(msg)};
+}
+
+template <class... Params>
+REALM_NORETURN void bad_merge(const char* msg, Params&&... params)
+{
+    throw_bad_merge(util::format(msg, std::forward<Params>(params)...));
+}
+
+REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::PathInstruction instr,
+                              const std::string& msg)
+{
+    std::stringstream ss;
+    side.m_changeset->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
+    bad_merge("%1 (instruction target: %2)", msg, ss.str());
+}
+
 template <class LeftInstruction, class RightInstruction, class Enable = void>
 struct Merge;
 template <class Outer>
@@ -975,7 +991,7 @@ struct MergeUtils {
                 return left.data.uuid == right.data.uuid;
         }
 
-        REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
+        bad_merge("Invalid payload type in instruction");
     }
 
     bool same_path_element(const Instruction::Path::Element& left,
@@ -1210,7 +1226,7 @@ struct MergeUtils {
         REALM_ASSERT(mpark::holds_alternative<uint32_t>(left.path.back()));
         size_t index = left.path.size() - 1;
         if (!mpark::holds_alternative<uint32_t>(right.path[index])) {
-            throw TransformError{"Inconsistent paths"};
+            bad_merge("Inconsistent paths");
         }
         return mpark::get<uint32_t>(right.path[index]);
     }
@@ -1389,44 +1405,35 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                 StringData left_pk_name = left_side.get_string(left_spec->pk_field);
                 StringData right_pk_name = right_side.get_string(right_spec->pk_field);
                 if (left_pk_name != right_pk_name) {
-                    std::stringstream ss;
-                    ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "' on one side, but primary key '" << right_pk_name << "' on the other.";
-                    throw SchemaMismatchError(ss.str());
+                    bad_merge(
+                        "Schema mismatch: '%1' has primary key '%2' on one side, but primary key '%3' on the other.",
+                        left_name, left_pk_name, right_pk_name);
                 }
 
                 if (left_spec->pk_type != right_spec->pk_type) {
-                    std::stringstream ss;
-                    ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is of type " << get_type_name(left_spec->pk_type) << " on one side and type "
-                       << get_type_name(right_spec->pk_type) << " on the other.";
-                    throw SchemaMismatchError(ss.str());
+                    bad_merge("Schema mismatch: '%1' has primary key '%2', which is of type %3 on one side and type "
+                              "%4 on the other.",
+                              left_name, left_pk_name, get_type_name(left_spec->pk_type),
+                              get_type_name(right_spec->pk_type));
                 }
 
                 if (left_spec->pk_nullable != right_spec->pk_nullable) {
-                    std::stringstream ss;
-                    ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is nullable on one side, but not the other.";
-                    throw SchemaMismatchError(ss.str());
+                    bad_merge("Schema mismatch: '%1' has primary key '%2', which is nullable on one side, but not "
+                              "the other.",
+                              left_name, left_pk_name);
                 }
 
                 if (left_spec->is_asymmetric != right_spec->is_asymmetric) {
-                    std::stringstream ss;
-                    ss << "Schema mismatch: '" << left_name << "' is asymmetric on one side, but not on the other.";
-                    throw SchemaMismatchError(ss.str());
+                    bad_merge("Schema mismatch: '%1' is asymmetric on one side, but not on the other.", left_name);
                 }
             }
             else {
-                std::stringstream ss;
-                ss << "Schema mismatch: '" << left_name << "' has a primary key on one side, but not on the other.";
-                throw SchemaMismatchError(ss.str());
+                bad_merge("Schema mismatch: '%1' has a primary key on one side, but not on the other.", left_name);
             }
         }
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
-                std::stringstream ss;
-                ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other.";
-                throw SchemaMismatchError(ss.str());
+                bad_merge("Schema mismatch: '%1' is an embedded table on one side, but not the other.", left_name);
             }
         }
 
@@ -1601,15 +1608,19 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
     if (same_path(left, right)) {
         bool left_is_default = false;
         bool right_is_default = false;
-        REALM_MERGE_ASSERT(left.is_array_update() == right.is_array_update());
+        if (!(left.is_array_update() == right.is_array_update())) {
+            bad_merge(left_side, left, "Merge error: left.is_array_update() == right.is_array_update()");
+        }
 
         if (!left.is_array_update()) {
-            REALM_MERGE_ASSERT(!right.is_array_update());
+            if (right.is_array_update()) {
+                bad_merge(right_side, right, "Merge error: !right.is_array_update()");
+            }
             left_is_default = left.is_default;
             right_is_default = right.is_default;
         }
-        else {
-            REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        else if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
         }
 
         if (left.value.type != right.value.type) {
@@ -1661,7 +1672,10 @@ DEFINE_MERGE(Instruction::AddInteger, Instruction::Update)
         // RESOLUTION: If the Add was later than the Set, add its value to
         // the payload of the Set instruction. Otherwise, discard it.
 
-        REALM_MERGE_ASSERT(right.value.type == Instruction::Payload::Type::Int || right.value.is_null());
+        if (!(right.value.type == Instruction::Payload::Type::Int || right.value.is_null())) {
+            bad_merge(right_side, right,
+                      "Merge error: right.value.type == Instruction::Payload::Type::Int || right.value.is_null()");
+        }
 
         bool right_is_default = !right.is_array_update() && right.is_default;
 
@@ -1698,9 +1712,15 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
 {
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() <= left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() <= left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() <= left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
         right.prior_size += 1;
         if (right.index() >= left.index()) {
             right.index() += 1; // --->
@@ -1713,8 +1733,12 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::Update)
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
 
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
 
         // FIXME: This marks both sides as dirty, even when they are unmodified.
         merge_get_vs_move(right.index(), left.index(), left.ndx_2);
@@ -1725,9 +1749,15 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 {
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
 
         // CONFLICT: Update of a removed element.
         //
@@ -1775,18 +1805,14 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
     if (same_column(left, right)) {
         StringData left_name = left_side.get_string(left.field);
         if (left.type != right.type) {
-            std::stringstream ss;
-            ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
-               << "' is of type " << get_type_name(left.type) << " on one side and type " << get_type_name(right.type)
-               << " on the other.";
-            throw SchemaMismatchError(ss.str());
+            bad_merge(
+                "Schema mismatch: Property '%1' in class '%2' is of type %3 on one side and type %4 on the other.",
+                left_name, left_side.get_string(left.table), get_type_name(left.type), get_type_name(right.type));
         }
 
         if (left.nullable != right.nullable) {
-            std::stringstream ss;
-            ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
-               << "' is nullable on one side and not on the other.";
-            throw SchemaMismatchError(ss.str());
+            bad_merge("Schema mismatch: Property '%1' in class '%2' is nullable on one side and not on the other.",
+                      left_name, left_side.get_string(left.table));
         }
 
         if (left.collection_type != right.collection_type) {
@@ -1807,20 +1833,17 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
             std::stringstream ss;
             const char* left_type = collection_type_name(left.collection_type);
             const char* right_type = collection_type_name(right.collection_type);
-            ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
-               << "' is a " << left_type << " on one side, and a " << right_type << " on the other.";
-            throw SchemaMismatchError(ss.str());
+            bad_merge("Schema mismatch: Property '%1' in class '%2' is a %3 on one side, and a %4 on the other.",
+                      left_name, left_side.get_string(left.table), left_type, right_type);
         }
 
         if (left.type == Instruction::Payload::Type::Link) {
             StringData left_target = left_side.get_string(left.link_target_table);
             StringData right_target = right_side.get_string(right.link_target_table);
             if (left_target != right_target) {
-                std::stringstream ss;
-                ss << "Schema mismatch: Link property '" << left_name << "' in class '"
-                   << left_side.get_string(left.table) << "' points to class '" << left_target
-                   << "' on one side and to '" << right_target << "' on the other.";
-                throw SchemaMismatchError(ss.str());
+                bad_merge("Schema mismatch: Link property '%1' in class '%2' points to class '%3' on one side and to "
+                          "'%4' on the other.",
+                          left_name, left_side.get_string(left.table), left_target, right_target);
             }
         }
 
@@ -1880,7 +1903,9 @@ DEFINE_NESTED_MERGE(Instruction::ArrayInsert)
 DEFINE_MERGE(Instruction::ArrayInsert, Instruction::ArrayInsert)
 {
     if (same_container(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(right_side, right, "Exception: left.prior_size == right.prior_size");
+        }
         left.prior_size++;
         right.prior_size++;
 
@@ -1943,9 +1968,15 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayInsert)
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 {
     if (same_container(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() <= right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() <= right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: right.index() <= right.prior_size");
+        }
 
         left.prior_size++;
         right.prior_size--;
@@ -1977,11 +2008,21 @@ DEFINE_NESTED_MERGE(Instruction::ArrayMove)
 DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayMove)
 {
     if (same_container(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
-        REALM_MERGE_ASSERT(left.ndx_2 < left.prior_size);
-        REALM_MERGE_ASSERT(right.ndx_2 < right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
+        if (!(left.ndx_2 < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.ndx_2 < left.prior_size");
+        }
+        if (!(right.ndx_2 < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.ndx_2 < right.prior_size");
+        }
 
         if (left.index() < right.index()) {
             right.index() -= 1; // <---
@@ -2062,9 +2103,15 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayMove)
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 {
     if (same_container(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
 
         right.prior_size -= 1;
 
@@ -2129,9 +2176,15 @@ DEFINE_NESTED_MERGE(Instruction::ArrayErase)
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 {
     if (same_container(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        REALM_MERGE_ASSERT(left.index() < left.prior_size);
-        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        if (!(left.prior_size == right.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.prior_size == right.prior_size");
+        }
+        if (!(left.index() < left.prior_size)) {
+            bad_merge(left_side, left, "Merge error: left.index() < left.prior_size");
+        }
+        if (!(right.index() < right.prior_size)) {
+            bad_merge(right_side, right, "Merge error: right.index() < right.prior_size");
+        }
 
         left.prior_size -= 1;
         right.prior_size -= 1;

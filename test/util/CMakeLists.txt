@@ -32,7 +32,6 @@ set(TEST_UTIL_HEADERS
     semaphore.hpp
     spawned_process.hpp
     super_int.hpp
-    test_logger.hpp
     test_only.hpp
     test_path.hpp
     test_types.hpp

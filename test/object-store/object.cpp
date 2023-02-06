@@ -164,6 +164,7 @@ TEST_CASE("object") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
         {"table",
          {
@@ -1772,6 +1773,24 @@ TEST_CASE("object") {
         create(AnyDict{{"_id", std::any()}}, "nullable object id pk");
         create(AnyDict{{"_id", ObjectId::gen()}}, "nullable object id pk");
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
+    }
+
+    SECTION("create only requires properties explicitly in the schema") {
+        config.schema = Schema{{"all types", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}}};
+        auto subset_realm = Realm::get_shared_realm(config);
+        subset_realm->begin_transaction();
+        REQUIRE_NOTHROW(Object::create(d, subset_realm, "all types", std::any(AnyDict{{"_id", INT64_C(123)}})));
+        subset_realm->commit_transaction();
+
+        r->refresh();
+        auto obj = *r->read_group().get_table("class_all types")->begin();
+        REQUIRE(obj.get<int64_t>("_id") == 123);
+
+        // Other columns should have the default unset values
+        REQUIRE(obj.get<bool>("bool") == false);
+        REQUIRE(obj.get<int64_t>("int") == 0);
+        REQUIRE(obj.get<float>("float") == 0);
+        REQUIRE(obj.get<StringData>("string") == "");
     }
 
     SECTION("getters and setters") {

@@ -3005,7 +3005,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3052,7 +3052,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3104,7 +3104,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3170,7 +3170,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
 
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3222,7 +3222,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3276,7 +3276,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());

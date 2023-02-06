@@ -582,6 +582,12 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
     return *sync_service;
 }
 
+void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t file_ident) const
+{
+    auto endpoint = apps(APIFamily::Private)[app_id]["sync"]["force_reset"];
+    endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
@@ -716,9 +722,17 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
     return false;
 }
 
-AdminAPIEndpoint AdminAPISession::apps() const
+AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
 {
-    return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
+    switch (family) {
+        case APIFamily::Admin:
+            return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+        case APIFamily::Private:
+            return AdminAPIEndpoint(util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+    }
+    REALM_UNREACHABLE();
 }
 
 AppCreateConfig default_app_config(const std::string& base_url)

@@ -195,6 +195,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
                                          const std::string& schema_name, const bson::BsonDocument& filter_bson);
 
 void trigger_client_reset(const AppSession& app_session);
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

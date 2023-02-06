@@ -77,10 +77,14 @@ private:
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              MakeSharedTag)
     : m_config(std::move(config))
-    , m_frozen_version(std::move(version))
+    , m_frozen_version(version)
     , m_scheduler(m_config.scheduler)
 {
-    if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
+    if (version) {
+        m_auto_refresh = false;
+        REALM_ASSERT(*version != VersionID());
+    }
+    else if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
@@ -110,9 +114,8 @@ Group& Realm::read_group()
 Transaction& Realm::transaction()
 {
     verify_open();
-    if (!m_transaction) {
+    if (!m_transaction)
         begin_read(m_frozen_version.value_or(VersionID{}));
-    }
     return *m_transaction;
 }
 
@@ -160,9 +163,7 @@ SharedRealm Realm::get_shared_realm(Config config)
 SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    SharedRealm realm = coordinator->get_realm(std::move(config), util::Optional<VersionID>(version));
-    realm->set_auto_refresh(false);
-    return realm;
+    return coordinator->get_realm(std::move(config), version);
 }
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<util::Scheduler> scheduler)
@@ -218,7 +219,7 @@ sync::SubscriptionSet Realm::get_active_subscription_set()
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
-    schema.copy_keys_from(reference, m_config.is_schema_additive());
+    schema.copy_keys_from(reference, m_config.schema_subset_mode);
     m_schema = std::move(schema);
     notify_schema_changed();
 }
@@ -233,12 +234,12 @@ void Realm::read_schema_from_group_if_needed()
         }
         return;
     }
+
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
     if (m_schema_transaction_version == current_version)
         return;
 
-    auto previous_transaction_version = m_schema_transaction_version;
     m_schema_transaction_version = current_version;
     m_schema_version = ObjectStore::get_schema_version(group);
     auto schema = ObjectStore::schema_from_group(group);
@@ -249,20 +250,16 @@ void Realm::read_schema_from_group_if_needed()
     if (m_dynamic_schema) {
         if (m_schema == schema) {
             // The structure of the schema hasn't changed. Bring the table column indices up to date.
-            m_schema.copy_keys_from(schema);
+            m_schema.copy_keys_from(schema, SchemaSubsetMode::Strict);
         }
         else {
             // The structure of the schema has changed, so replace our copy of the schema.
             m_schema = std::move(schema);
         }
     }
-    else if (m_config.is_schema_additive() && m_schema_transaction_version < previous_transaction_version) {
-        // no verification of schema changes when opening a past version of the schema
-        m_schema.copy_keys_from(schema, m_config.is_schema_additive());
-    }
     else {
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
-        m_schema.copy_keys_from(schema);
+        m_schema.copy_keys_from(schema, m_config.schema_subset_mode);
     }
     notify_schema_changed();
 }
@@ -339,16 +336,12 @@ Schema Realm::get_full_schema()
         do_refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
-    // the full schema
-    if (m_dynamic_schema) {
+    // the full schema if it's been read
+    if (m_dynamic_schema && !m_schema.empty())
         return m_schema;
-    }
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
-    if (m_config.immutable())
-        return ObjectStore::schema_from_group(read_group());
-
     Schema actual_schema;
     uint64_t actual_version;
     uint64_t version = -1;
@@ -407,8 +400,16 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
-    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
 
+    // Frozen Realms never modify the schema on disk and we just need to verify
+    // that the requested schema is a subset of what actually exists
+    if (m_frozen_version) {
+        ObjectStore::verify_valid_external_changes(schema.compare(actual_schema, m_config.schema_mode, true));
+        set_schema(actual_schema, std::move(schema));
+        return;
+    }
+
+    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
         if (!was_in_read_transaction)
             m_transaction = nullptr;
@@ -444,9 +445,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         cache_new_schema();
     }
 
+    schema.copy_keys_from(actual_schema, m_config.schema_subset_mode);
+
     uint64_t old_schema_version = m_schema_version;
-    bool is_schema_additive = m_config.is_schema_additive();
-    if (migration_function && !is_schema_additive) {
+    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit ||
+                    m_config.schema_mode == SchemaMode::ReadOnly;
+    if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
             config.schema_mode = SchemaMode::ReadOnly;
@@ -476,7 +481,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     else {
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version, m_config.schema_mode,
                                           required_changes, m_config.automatically_handle_backlinks_in_migrations);
-        REALM_ASSERT_DEBUG(is_schema_additive ||
+        REALM_ASSERT_DEBUG(additive ||
                            (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
@@ -522,7 +527,7 @@ void Realm::add_schema_change_handler()
             m_schema = *m_new_schema;
         }
         else {
-            m_schema.copy_keys_from(*m_new_schema, m_config.is_schema_additive());
+            m_schema.copy_keys_from(*m_new_schema, m_config.schema_subset_mode);
         }
         notify_schema_changed();
     });
@@ -530,15 +535,17 @@ void Realm::add_schema_change_handler()
 
 void Realm::cache_new_schema()
 {
-    if (!is_closed()) {
-        auto new_version = transaction().get_version_of_current_transaction().version;
-        if (m_new_schema)
-            m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
-        else
-            m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
-        m_schema_transaction_version = new_version;
-        m_new_schema = util::none;
+    if (is_closed()) {
+        return;
     }
+
+    auto new_version = transaction().get_version_of_current_transaction().version;
+    if (m_new_schema)
+        m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
+    else
+        m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
+    m_schema_transaction_version = new_version;
+    m_new_schema = util::none;
 }
 
 void Realm::translate_schema_error()
@@ -1311,12 +1318,18 @@ bool Realm::is_frozen() const
 
 SharedRealm Realm::freeze()
 {
-    auto config = m_config;
-    auto version = read_transaction_version();
-    config.scheduler = util::Scheduler::make_frozen(version);
-    auto frozen_realm = Realm::get_frozen_realm(std::move(config), version);
-    frozen_realm->set_schema(frozen_realm->m_schema, m_schema);
-    return frozen_realm;
+    read_group(); // Freezing requires a read transaction
+    return m_coordinator->freeze_realm(*this);
+}
+
+void Realm::copy_schema_from(const Realm& source)
+{
+    REALM_ASSERT(is_frozen());
+    REALM_ASSERT(m_frozen_version == source.read_transaction_version());
+    m_schema = source.m_schema;
+    m_schema_version = source.m_schema_version;
+    m_schema_transaction_version = m_frozen_version->version;
+    m_dynamic_schema = false;
 }
 
 void Realm::close()

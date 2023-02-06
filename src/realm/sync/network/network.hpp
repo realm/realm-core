@@ -1381,19 +1381,19 @@ enum class ResolveErrors {
     host_not_found = 1,
 
     /// Host not found (non-authoritative).
-    host_not_found_try_again,
+    host_not_found_try_again = 2,
 
     /// The query is valid but does not have associated address data.
-    no_data,
+    no_data = 3,
 
     /// A non-recoverable error occurred.
-    no_recovery,
+    no_recovery = 4,
 
     /// The service is not supported for the given socket type.
-    service_not_found,
+    service_not_found = 5,
 
     /// The socket type is not supported.
-    socket_type_not_supported
+    socket_type_not_supported = 6,
 };
 
 /// The error category associated with ResolveErrors. The name of this category is
