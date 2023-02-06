@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Disable failing check in Metrics_TransactionTimings test ([PR #6206](https://github.com/realm/realm-core/pull/6206))
 
 ----------------------------------------------
 
