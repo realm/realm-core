@@ -279,7 +279,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
+size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer)
 {
     REALM_ASSERT_EX(size % block_size == 0, size, block_size);
     // We need to throw DecryptionFailed if the key is incorrect or there has been a corruption in the data but
@@ -295,10 +295,16 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     auto retry = [&](std::string_view page_data, const iv_table& iv, const char* debug_from) {
         constexpr auto max_retry_period = std::chrono::seconds(5);
         auto elapsed = std::chrono::steady_clock::now() - retry_start_time;
-        if (elapsed > max_retry_period) {
+        bool we_are_alone = true;
+        // not having an observer set means that we're alone. (or should mean it)
+        if (observer) {
+            we_are_alone = observer->no_concurrent_writer_seen();
+        }
+        if (elapsed > max_retry_period || we_are_alone) {
             auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);
+            // std::cerr << std::endl << "*Timeout: " << str << std::endl;
             throw DecryptionFailed(str);
         }
         else {
@@ -318,6 +324,13 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
     };
 
     auto should_retry = [&]() -> bool {
+        // if we don't have an observer object, we're guaranteed to be alone in the world,
+        // and retrying will not help us, since the file is not being changed.
+        if (!observer)
+            return false;
+        // if no-one is mutating the file, retrying will also not help:
+        if (observer && observer->no_concurrent_writer_seen())
+            return false;
         // if we do not observe identical data or iv within several sequential reads then
         // this is a multiprocess reader starvation scenario so keep trying until we get a match
         return retry_count <= 5 || (retry_count - num_identical_reads > 1 && retry_count < 20);
@@ -436,7 +449,7 @@ void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
     crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
 }
 
-void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
+void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -456,8 +469,12 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noe
             // they're different.
         } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 28) == 0));
 
+        if (marker)
+            marker->mark(pos);
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+        if (marker)
+            marker->unmark();
 
         pos += block_size;
         src += block_size;
@@ -573,12 +590,15 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 }
 
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
-                                           File::AccessMode access)
+                                           File::AccessMode access, util::WriteObserver* observer,
+                                           util::WriteMarker* marker)
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
     , m_blocks_per_page(static_cast<size_t>(1ULL << m_page_shift) / block_size)
     , m_num_decrypted(0)
     , m_access(access)
+    , m_observer(observer)
+    , m_marker(marker)
 #ifdef REALM_DEBUG
     , m_validate_buffer(new char[static_cast<size_t>(1ULL << m_page_shift)])
 #endif
@@ -651,7 +671,8 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         size_t size = static_cast<size_t>(1ULL << m_page_shift);
-        size_t actual = m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size);
+        size_t actual =
+            m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, size, m_observer);
         if (actual < size) {
             if (actual >= required) {
                 memset(addr + actual, 0x55, size - actual);
@@ -749,7 +770,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 
     const size_t page_ndx_in_file = local_page_ndx + m_first_page;
     if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), m_validate_buffer.get(),
-                             static_cast<size_t>(1ULL << m_page_shift)))
+                             static_cast<size_t>(1ULL << m_page_shift), m_observer))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
@@ -905,7 +926,7 @@ void EncryptedFileMapping::flush() noexcept
 
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
-                             static_cast<size_t>(1ULL << m_page_shift));
+                             static_cast<size_t>(1ULL << m_page_shift), m_marker);
         clear(m_page_state[local_page_ndx], Dirty);
 #if REALM_ENCRYPTION_VERIFICATION
         pages_written.push_back(page_ndx_in_file);

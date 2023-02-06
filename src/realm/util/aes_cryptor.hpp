@@ -16,12 +16,30 @@
  *
  **************************************************************************/
 
+#ifndef AES_CRYPTOR_HPP
+#define AES_CRYPTOR_HPP
+
 #include <cstddef>
 #include <memory>
 #include <realm/util/features.h>
 #include <cstdint>
 #include <vector>
 #include <realm/util/file.hpp>
+
+namespace realm::util {
+class WriteObserver {
+public:
+    virtual bool no_concurrent_writer_seen() = 0;
+    virtual ~WriteObserver() {}
+};
+
+class WriteMarker {
+public:
+    virtual void mark(uint64_t page_offset) = 0;
+    virtual void unmark() = 0;
+    virtual ~WriteMarker() {}
+};
+} // namespace realm::util
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -49,9 +67,9 @@ public:
 
     void set_file_size(off_t new_size);
 
-    size_t read(FileDesc fd, off_t pos, char* dst, size_t size);
+    size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
-    void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
+    void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
 
     void check_key(const uint8_t* key);
 
@@ -118,3 +136,4 @@ struct SharedFileInfo {
 } // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
+#endif // AES_CRYPTOR_HPP

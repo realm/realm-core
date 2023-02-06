@@ -79,7 +79,8 @@ namespace {
 // 12      Change `number_of_versions` to an atomic rather than guarding it
 //         with a lock.
 // 13      New impl of VersionList and added mutex for it (former RingBuffer)
-const uint_fast16_t g_shared_info_version = 13;
+// 14      Added field for tracking ongoing encrypted writes
+const uint_fast16_t g_shared_info_version = 14;
 
 
 struct VersionList {
@@ -462,6 +463,8 @@ struct alignas(8) DB::SharedInfo {
     InterprocessCondVar::SharedPart pick_next_writer;
     std::atomic<uint32_t> next_ticket;
     std::atomic<uint32_t> next_served = 0;
+    std::atomic<uint64_t> writing_page_offset;
+    std::atomic<uint64_t> write_counter;
 
     // IMPORTANT: The VersionList MUST be the last field in SharedInfo - see above.
     VersionList readers;
@@ -760,6 +763,30 @@ private:
         }
     }
 
+    void mark_page_for_writing(uint64_t page_offset)
+    {
+        m_info->writing_page_offset = page_offset + 1;
+        m_info->write_counter++;
+    }
+    void clear_writing_marker()
+    {
+        m_info->write_counter++;
+        m_info->writing_page_offset = 0;
+    }
+    // returns false if no page is marked.
+    // if a page is marked, returns true and optionally the offset of the page marked for writing
+    // in all cases returns optionally the write counter
+    bool observe_writer(uint64_t* page_offset, uint64_t* write_counter)
+    {
+        if (write_counter) {
+            *write_counter = m_info->write_counter;
+        }
+        uint64_t marked = m_info->writing_page_offset;
+        if (marked && page_offset) {
+            *page_offset = marked - 1;
+        }
+        return marked != 0;
+    }
     std::mutex m_local_mutex;
     std::vector<VersionList::ReadCount> m_local_readers;
 
@@ -768,6 +795,45 @@ private:
     File& m_file;
     File::Map<DB::SharedInfo> m_reader_map;
     util::InterprocessMutex& m_mutex;
+
+    friend class DB::EncryptionMarkerObserver;
+};
+
+// adapter class for marking/observing encrypted writes
+class DB::EncryptionMarkerObserver : public util::WriteMarker, public util::WriteObserver {
+public:
+    EncryptionMarkerObserver(DB::VersionManager& vm)
+        : vm(vm)
+    {
+    }
+    bool no_concurrent_writer_seen() override
+    {
+        uint64_t tmp_write_count;
+        auto page_may_have_been_written = vm.observe_writer(nullptr, &tmp_write_count);
+        if (tmp_write_count != last_seen_count) {
+            page_may_have_been_written = true;
+            last_seen_count = tmp_write_count;
+        }
+        if (page_may_have_been_written) {
+            calls_since_last_writer_observed = 0;
+            return false;
+        }
+        ++calls_since_last_writer_observed;
+        return (calls_since_last_writer_observed >= 5);
+    }
+    void mark(uint64_t pos) override
+    {
+        vm.mark_page_for_writing(pos);
+    }
+    void unmark() override
+    {
+        vm.clear_writing_marker();
+    }
+
+private:
+    DB::VersionManager& vm;
+    uint64_t last_seen_count = 0;
+    int calls_since_last_writer_observed = 0;
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -784,6 +850,8 @@ public:
     PageRefresher(DB& db)
         : m_db(db)
     {
+        REALM_ASSERT(m_db.m_marker_observer.get());
+        REALM_ASSERT(m_db.m_alloc.m_write_observer);
         start();
     }
     ~PageRefresher()
@@ -795,6 +863,8 @@ public:
         auto& alloc = m_db.m_alloc;
         std::optional<uint64_t> change_from;
         while (m_should_run) {
+            REALM_ASSERT(m_db.m_marker_observer.get());
+            REALM_ASSERT(m_db.m_alloc.m_write_observer);
             // wait for change
             bool changed = true;
             if (change_from) {
@@ -1120,8 +1190,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
+            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
-                top_ref = alloc.attach_file(path, cfg); // Throws
+                top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
             catch (const SlabAlloc::Retry&) {
                 // On a SlabAlloc::Retry file mappings are already unmapped, no
@@ -1571,7 +1642,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.clear_file = false;
         cfg.encryption_key = write_key;
         ref_type top_ref;
-        top_ref = m_alloc.attach_file(m_db_path, cfg);
+        top_ref = m_alloc.attach_file(m_db_path, cfg, m_marker_observer.get());
         m_alloc.convert_from_streaming_form(top_ref);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
@@ -2430,7 +2501,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     transaction.update_num_objects();
 #endif // REALM_METRICS
 
-    GroupWriter out(transaction, Durability(info->durability)); // Throws
+    GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
 
     if (auto limit = out.get_evacuation_limit()) {

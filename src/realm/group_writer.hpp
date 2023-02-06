@@ -72,7 +72,7 @@ public:
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
     using Durability = DBOptions::Durability;
-    GroupWriter(Group&, Durability dura = Durability::Full);
+    GroupWriter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
     ~GroupWriter();
 
     void set_versions(uint64_t current, TopRefMap& top_refs, bool any_num_unreachables) noexcept;
@@ -182,6 +182,7 @@ private:
     int64_t m_backoff;
     size_t m_logical_size = 0;
     Durability m_durability;
+    util::WriteMarker* m_write_marker = nullptr;
 
     //  m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;

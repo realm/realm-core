@@ -22,6 +22,7 @@
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/features.h>
+#include <realm/util/aes_cryptor.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -38,7 +39,8 @@ struct SharedFileInfo;
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, File::AccessMode access);
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, File::AccessMode access,
+                         util::WriteObserver* observer = nullptr, util::WriteMarker* marker = nullptr);
     ~EncryptedFileMapping();
 
     // Default implementations of copy/assign can trigger multiple destructions
@@ -99,6 +101,14 @@ public:
     {
         return m_first_page;
     }
+    void set_marker(WriteMarker* marker)
+    {
+        m_marker = marker;
+    }
+    void set_observer(WriteObserver* observer)
+    {
+        m_observer = observer;
+    }
 
 private:
     SharedFileInfo& m_file;
@@ -142,7 +152,8 @@ private:
     static constexpr size_t page_to_chunk_factor = size_t(1) << page_to_chunk_shift;
 
     File::AccessMode m_access;
-
+    util::WriteObserver* m_observer = nullptr;
+    util::WriteMarker* m_marker = nullptr;
 #ifdef REALM_DEBUG
     std::unique_ptr<char[]> m_validate_buffer;
 #endif

@@ -31,6 +31,7 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/version_id.hpp>
 
 #include <functional>
@@ -432,6 +433,7 @@ private:
     class AsyncCommitHelper;
     class PageRefresher;
     class VersionManager;
+    class EncryptionMarkerObserver;
     struct PageRefresherGuard;
     struct SharedInfo;
     struct ReadCount;
@@ -464,6 +466,7 @@ private:
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
     std::unique_ptr<VersionManager> m_version_manager;
+    std::unique_ptr<EncryptionMarkerObserver> m_marker_observer;
     Replication* m_replication = nullptr;
     size_t m_free_space GUARDED_BY(m_mutex) = 0;
     size_t m_locked_space GUARDED_BY(m_mutex) = 0;
