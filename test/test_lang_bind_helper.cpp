@@ -2253,8 +2253,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt->commit();
     }
 
-    struct ObserverError {
-    };
+    struct ObserverError {};
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -3454,6 +3453,39 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     CHECK_EQUAL(3, obj.get<int64_t>(c2));
     CHECK(!table->has_search_index(c1));
     rt->verify();
+}
+
+
+unsigned int hex_char_to_bin(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    throw std::invalid_argument("Illegal key (not a hex digit)");
+}
+
+unsigned int hex_to_bin(char first, char second)
+{
+    return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
+}
+
+
+ONLY(OpenEncrypted)
+{
+    std::string path = "/home/finn/Downloads/compacted-realm-java.realm";
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    const char enc_key[129] = "772e6c7679795d75697b2843653238505570555a3f304277467c4d474745214e71646d5a22522f2f257c67"
+                              "3d214c526f44437c52795a6261572b222a4e763f62";
+    char key[64];
+    for (int i = 0; i < 64; ++i) {
+        key[i] = hex_to_bin(enc_key[i * 2], enc_key[i * 2 + 1]);
+    }
+    DBOptions options;
+    options.encryption_key = key;
+    DBRef sg = DB::create(*hist, path, options);
 }
 
 TEST(LangBindHelper_HandoverQuery)
