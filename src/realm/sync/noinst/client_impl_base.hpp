@@ -139,6 +139,8 @@ public:
     /// This calls stop() on the socket provider respectively.
     void stop() noexcept;
 
+    void drain();
+
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
@@ -148,7 +150,7 @@ public:
     void post(SyncSocketProvider::FunctionHandler&& handler);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
                                                SyncSocketProvider::FunctionHandler&& handler);
-    using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
+    using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
     std::mt19937_64& get_random() noexcept;
@@ -210,7 +212,13 @@ private:
     // Must be accessed only by event loop thread
     connection_ident_type m_prev_connection_ident = 0;
 
-    util::Mutex m_mutex;
+    std::mutex m_drain_mutex;
+    std::condition_variable m_drain_cv;
+    bool m_drained = false;
+    uint64_t m_outstanding_posts = 0;
+    uint64_t m_num_connections = 0;
+
+    std::mutex m_mutex;
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
@@ -230,7 +238,7 @@ private:
     SessionWrapperStack m_abandoned_session_wrappers;
 
     // Protected by `m_mutex`.
-    util::CondVar m_wait_or_client_stopped_cond;
+    std::condition_variable m_wait_or_client_stopped_cond;
 
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
@@ -268,7 +276,8 @@ private:
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
 
-    static std::string make_user_agent_string(ClientConfig&);
+    void drain_connections();
+    void drain_connections_on_loop();
 
     session_ident_type get_next_session_ident() noexcept;
 
@@ -316,7 +325,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 
 // TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
-class ClientImpl::Connection final : public WebSocketObserver {
+class ClientImpl::Connection {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -381,6 +390,8 @@ public:
     /// activated.
     void cancel_reconnect_delay();
 
+    void force_close();
+
     /// Returns zero until the HTTP response is received. After that point in
     /// time, it returns the negotiated protocol version, which is based on the
     /// contents of the `Sec-WebSocket-Protocol` header in the HTTP
@@ -390,10 +401,10 @@ public:
     int get_negotiated_protocol_version() noexcept;
 
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
-    void websocket_connected_handler(const std::string& protocol) override;
-    bool websocket_binary_message_received(util::Span<const char> data) override;
-    void websocket_error_handler() override;
-    bool websocket_closed_handler(bool, Status) override;
+    void websocket_connected_handler(const std::string& protocol);
+    bool websocket_binary_message_received(util::Span<const char> data);
+    void websocket_error_handler();
+    bool websocket_closed_handler(bool, Status);
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -413,6 +424,11 @@ public:
     ~Connection();
 
 private:
+    struct LifecycleSentinel : public util::AtomicRefCountBase {
+        bool destroyed = false;
+    };
+    struct WebSocketObserverShim;
+
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     template <class H>
@@ -499,6 +515,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
+    util::bind_ptr<LifecycleSentinel> m_websocket_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
@@ -1194,8 +1211,6 @@ inline int ClientImpl::Connection::get_negotiated_protocol_version() noexcept
 {
     return m_negotiated_protocol_version;
 }
-
-inline ClientImpl::Connection::~Connection() {}
 
 template <class H>
 void ClientImpl::Connection::for_each_active_session(H handler)

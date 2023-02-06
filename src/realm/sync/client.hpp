@@ -48,6 +48,10 @@ public:
     /// Thread-safe.
     void stop() noexcept;
 
+    /// Forces all connections to close and waits for any pending work on the event
+    /// loop to complete. All sessions must be destroyed before calling drain.
+    void drain();
+
     /// \brief Cancel current or next reconnect delay for all servers.
     ///
     /// This corresponds to calling Session::cancel_reconnect_delay() on all
