@@ -21,7 +21,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-#include <csignal>
 #include <chrono>
 #include <thread>
 #include "testsettings.hpp"
@@ -919,17 +918,16 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_InsertTable, testing_su
 
     auto process = test_util::spawn_process(test_context.test_details.test_name, "add_table");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history());
-        DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
-
-        WriteTransaction wt(sg_w);
-        wt.get_group().add_table("new table");
-
-        wt.get_table("table1")->create_object();
-        wt.get_table("table2")->create_object();
-        wt.get_table("table2")->create_object();
-
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist_w(realm::make_in_realm_history());
+            DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            wt.get_group().add_table("new table");
+            wt.get_table("table1")->create_object();
+            wt.get_table("table2")->create_object();
+            wt.get_table("table2")->create_object();
+            wt.commit();
+        } // clean up sg before exit
         exit(0);
     }
     else {
@@ -1042,21 +1040,23 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     // Create 5 columns, and make 3 of them indexed
     auto process = test_util::spawn_process(test_context.test_details.test_name, "init");
     if (process->is_child()) {
-        std::vector<ObjKey> keys;
-        std::unique_ptr<Replication> hist = make_in_realm_history();
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.add_table("t");
-        ColKey col_int = table_w->add_column(type_Int, "i0");
-        table_w->add_column(type_String, "s1");
-        ColKey col_str2 = table_w->add_column(type_String, "s2");
-        table_w->add_column(type_Int, "i3");
-        ColKey col_int4 = table_w->add_column(type_Int, "i4");
-        table_w->add_search_index(col_int);
-        table_w->add_search_index(col_str2);
-        table_w->add_search_index(col_int4);
-        table_w->create_objects(8, keys);
-        wt.commit();
+        {
+            std::vector<ObjKey> keys;
+            std::unique_ptr<Replication> hist = make_in_realm_history();
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            TableRef table_w = wt.add_table("t");
+            ColKey col_int = table_w->add_column(type_Int, "i0");
+            table_w->add_column(type_String, "s1");
+            ColKey col_str2 = table_w->add_column(type_String, "s2");
+            table_w->add_column(type_Int, "i3");
+            ColKey col_int4 = table_w->add_column(type_Int, "i4");
+            table_w->add_search_index(col_int);
+            table_w->add_search_index(col_str2);
+            table_w->add_search_index(col_int4);
+            table_w->create_objects(8, keys);
+            wt.commit();
+        } // clean up sg before exit
         exit(0);
     }
 
@@ -1081,18 +1081,20 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     // Remove the previous search indexes and add 2 new ones
     process = test_util::spawn_process(test_context.test_details.test_name, "change_indexes");
     if (process->is_child()) {
-        std::vector<ObjKey> keys;
-        std::unique_ptr<Replication> hist = make_in_realm_history();
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->create_objects(8, keys);
-        table_w->remove_search_index(table_w->get_column_key("s2"));
-        table_w->add_search_index(table_w->get_column_key("i3"));
-        table_w->remove_search_index(table_w->get_column_key("i0"));
-        table_w->add_search_index(table_w->get_column_key("s1"));
-        table_w->remove_search_index(table_w->get_column_key("i4"));
-        wt.commit();
+        {
+            std::vector<ObjKey> keys;
+            std::unique_ptr<Replication> hist = make_in_realm_history();
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            TableRef table_w = wt.get_table("t");
+            table_w->create_objects(8, keys);
+            table_w->remove_search_index(table_w->get_column_key("s2"));
+            table_w->add_search_index(table_w->get_column_key("i3"));
+            table_w->remove_search_index(table_w->get_column_key("i0"));
+            table_w->add_search_index(table_w->get_column_key("s1"));
+            table_w->remove_search_index(table_w->get_column_key("i4"));
+            wt.commit();
+        }
         exit(0);
     }
 
@@ -1117,18 +1119,20 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     // Add some searchable contents
     process = test_util::spawn_process(test_context.test_details.test_name, "add_content");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist = make_in_realm_history();
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        int_fast64_t v = 7;
-        for (auto obj : *table_w) {
-            std::string out(util::to_string(v));
-            obj.set(table_w->get_column_key("s1"), StringData(out));
-            obj.set(table_w->get_column_key("i3"), v);
-            v = (v + 1581757577LL) % 1000;
+        {
+            std::unique_ptr<Replication> hist = make_in_realm_history();
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            TableRef table_w = wt.get_table("t");
+            int_fast64_t v = 7;
+            for (auto obj : *table_w) {
+                std::string out(util::to_string(v));
+                obj.set(table_w->get_column_key("s1"), StringData(out));
+                obj.set(table_w->get_column_key("i3"), v);
+                v = (v + 1581757577LL) % 1000;
+            }
+            wt.commit();
         }
-        wt.commit();
         exit(0);
     }
     if (process->is_parent()) {
@@ -1155,13 +1159,15 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_su
     // Move the indexed columns by removal
     process = test_util::spawn_process(test_context.test_details.test_name, "move_and_remove");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist = make_in_realm_history();
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->remove_column(table_w->get_column_key("i0"));
-        table_w->remove_column(table_w->get_column_key("s2"));
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist = make_in_realm_history();
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            TableRef table_w = wt.get_table("t");
+            table_w->remove_column(table_w->get_column_key("i0"));
+            table_w->remove_column(table_w->get_column_key("s2"));
+            wt.commit();
+        }
         exit(0);
     }
     if (process->is_parent()) {
@@ -1491,20 +1497,22 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     }
     auto process = test_util::spawn_process(test_context.test_details.test_name, "initial_write");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        TableRef alpha_w = wt.add_table("alpha");
-        TableRef beta_w = wt.add_table("beta");
-        TableRef gamma_w = wt.add_table("gamma");
-        TableRef delta_w = wt.add_table("delta");
-        TableRef epsilon_w = wt.add_table("epsilon");
-        alpha_w->add_column(type_Int, "alpha-1");
-        beta_w->add_column(*delta_w, "beta-1");
-        gamma_w->add_column(*gamma_w, "gamma-1");
-        delta_w->add_column(type_Int, "delta-1");
-        epsilon_w->add_column(*delta_w, "epsilon-1");
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            TableRef alpha_w = wt.add_table("alpha");
+            TableRef beta_w = wt.add_table("beta");
+            TableRef gamma_w = wt.add_table("gamma");
+            TableRef delta_w = wt.add_table("delta");
+            TableRef epsilon_w = wt.add_table("epsilon");
+            alpha_w->add_column(type_Int, "alpha-1");
+            beta_w->add_column(*delta_w, "beta-1");
+            gamma_w->add_column(*gamma_w, "gamma-1");
+            delta_w->add_column(type_Int, "delta-1");
+            epsilon_w->add_column(*delta_w, "epsilon-1");
+            wt.commit();
+        } // clean up sg before exit
         exit(0);
     }
     else if (process->is_parent()) {
@@ -1534,11 +1542,13 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     // target.
     process = test_util::spawn_process(test_context.test_details.test_name, "remove_alpha");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        wt.get_group().remove_table("alpha");
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            wt.get_group().remove_table("alpha");
+            wt.commit();
+        }
         exit(0);
     }
     else if (process->is_parent()) {
@@ -1567,11 +1577,13 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     // Remove table with link column, and table is not a link target.
     process = test_util::spawn_process(test_context.test_details.test_name, "remove_beta");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        wt.get_group().remove_table("beta");
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            wt.get_group().remove_table("beta");
+            wt.commit();
+        }
         exit(0);
     }
     else if (process->is_parent()) {
@@ -1601,11 +1613,13 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     // columns of other tables.
     process = test_util::spawn_process(test_context.test_details.test_name, "remove_gamma");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        wt.get_group().remove_table("gamma");
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            wt.get_group().remove_table("gamma");
+            wt.commit();
+        }
         exit(0);
     }
     else if (process->is_parent()) {
@@ -1635,11 +1649,13 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns,
     // tables.
     process = test_util::spawn_process(test_context.test_details.test_name, "remove_delta");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        CHECK_THROW(wt.get_group().remove_table("delta"), CrossTableLinkTarget);
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist, path, DBOptions(crypt_key()));
+            WriteTransaction wt(sg_w);
+            CHECK_THROW(wt.get_group().remove_table("delta"), CrossTableLinkTarget);
+            wt.commit();
+        }
         exit(0);
     }
     else if (process->is_parent()) {
@@ -1902,12 +1918,14 @@ NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_sup
 
     auto process = test_util::spawn_process(test_context.test_details.test_name, "external_clear");
     if (process->is_child()) {
-        std::unique_ptr<Replication> hist_w(make_in_realm_history());
-        DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
-
-        WriteTransaction wt(sg_w);
-        wt.get_table("table")->clear();
-        wt.commit();
+        {
+            std::unique_ptr<Replication> hist_w(make_in_realm_history());
+            DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
+            
+            WriteTransaction wt(sg_w);
+            wt.get_table("table")->clear();
+            wt.commit();
+        }
         exit(0);
     }
     else if (process->is_parent()) {
@@ -3352,15 +3370,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #if !REALM_ANDROID && !REALM_IOS
 
-static std::stringstream s_ss;
-static void signal_handler(int signal)
-{
-    std::cout << "signal handler: " << signal << std::endl;
-    util::Backtrace::capture().print(s_ss);
-    std::cout << "trace: " << s_ss.str() << std::endl;
-    exit(signal);
-}
-
 // fork should not be used on android or ios.
 // This test must be non-concurrant due to fork. If a child process
 // is created while a static mutex is locked (eg. util::GlobalRandom::m_mutex)
@@ -3379,8 +3388,6 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
     auto key = crypt_key();
     auto process = test_util::spawn_process(test_context.test_details.test_name, "populate");
     if (process->is_child()) {
-        std::signal(SIGSEGV, signal_handler);
-        std::signal(SIGABRT, signal_handler);
         try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path, DBOptions(key));

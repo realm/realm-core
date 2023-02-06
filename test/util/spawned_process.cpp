@@ -26,7 +26,9 @@
 #include <unistd.h>
 #endif
 
+#include <csignal>
 #include <iostream>
+#include <sstream>
 
 namespace realm {
 namespace test_util {
@@ -120,6 +122,15 @@ int SpawnedProcess::wait_for_child_to_finish()
 #endif
 }
 
+static std::stringstream s_ss;
+static void signal_handler(int signal)
+{
+    std::cout << "signal handler: " << signal << std::endl;
+    util::Backtrace::capture().print(s_ss);
+    std::cout << "trace: " << s_ss.str() << std::endl;
+    exit(signal);
+}
+
 std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, const std::string& process_ident)
 {
     std::unique_ptr<SpawnedProcess> process = std::make_unique<SpawnedProcess>(test_name, process_ident);
@@ -128,6 +139,8 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
+        std::signal(SIGSEGV, signal_handler);
+        std::signal(SIGABRT, signal_handler);
         util::post_fork_in_child();
     }
     process->set_pid(pid);
@@ -168,6 +181,10 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
                             process_ident);
         }
         process->set_pid(pi);
+    }
+    else {
+        std::signal(SIGSEGV, signal_handler);
+        std::signal(SIGABRT, signal_handler);
     }
 #endif
     return process;
