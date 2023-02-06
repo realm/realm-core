@@ -128,9 +128,9 @@ TEST(File_NoSpuriousTryLockFailures)
         try {
             File file(path, File::mode_Write);
             for (int i = 0; i != num_rounds; ++i) {
-                bool good_lock = file.try_lock_exclusive();
+                bool good_lock = file.try_rw_lock_exclusive();
                 if (good_lock)
-                    file.unlock();
+                    file.rw_unlock();
                 {
                     LockGuard l(mutex);
                     if (good_lock)
@@ -208,7 +208,7 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
             }
 
             // All threads race for the lock
-            bool owns_lock = file.try_lock_exclusive();
+            bool owns_lock = file.try_rw_lock_exclusive();
 
             barrier_2 = 0;
 
@@ -226,7 +226,7 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
             CHECK_EQUAL(lock_taken.load(), size_t(1));
 
             if(owns_lock) {
-                file.unlock();
+                file.rw_unlock();
             }
 
             barrier_1 = 0;

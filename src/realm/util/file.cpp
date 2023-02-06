@@ -1063,12 +1063,109 @@ static void _unlock(int m_fd)
 }
 #endif
 
+bool File::rw_lock(bool exclusive, bool non_blocking)
+{
+    // exclusive blocking rw locks not implemented for emulation
+    REALM_ASSERT(!exclusive || non_blocking);
+
+#ifndef REALM_FILELOCK_EMULATION
+    return lock(exclusive, non_blocking);
+#else
+    REALM_ASSERT(!m_has_exclusive_lock && !has_shared_lock());
+
+    // First obtain an exclusive lock on the file proper
+    int operation = LOCK_EX;
+    if (non_blocking)
+        operation |= LOCK_NB;
+    int status;
+    do {
+        status = flock(m_fd, operation);
+    } while (status != 0 && errno == EINTR);
+    if (status != 0 && errno == EWOULDBLOCK)
+        return false;
+    if (status != 0)
+        throw std::system_error(errno, std::system_category(), "flock() failed");
+    m_has_exclusive_lock = true;
+
+    // Every path through this function except for successfully acquiring an
+    // exclusive lock needs to release the flock() before returning.
+    UnlockGuard ulg(*this);
+
+    // now use a named pipe to emulate locking in conjunction with using exclusive lock
+    // on the file proper.
+    // exclusively locked: we can't sucessfully write to the pipe.
+    //                     AND we continue to hold the exclusive lock.
+    //                     (unlock must lift the exclusive lock).
+    // shared locked: we CAN succesfully write to the pipe. We open the pipe for reading
+    //                before releasing the exclusive lock.
+    //                (unlock must close the pipe for reading)
+    REALM_ASSERT_RELEASE(m_pipe_fd == -1);
+    if (m_fifo_path.empty())
+        m_fifo_path = m_path + ".fifo";
+
+    // Due to a bug in iOS 10-12 we need to open in read-write mode for shared
+    // or the OS will deadlock when un-suspending the app.
+    int mode = exclusive ? O_WRONLY | O_NONBLOCK : O_RDWR | O_NONBLOCK;
+
+    // Optimistically try to open the fifo. This may fail due to the fifo not
+    // existing, but since it usually exists this is faster than trying to create
+    // it first.
+    int fd = ::open(m_fifo_path.c_str(), mode);
+    if (fd == -1) {
+        int err = errno;
+        if (exclusive) {
+            if (err == ENOENT || err == ENXIO) {
+                // If the fifo either doesn't exist or there's no readers with the
+                // other end of the pipe open (ENXIO) then we have an exclusive lock
+                // and are done.
+                ulg.release();
+                return true;
+            }
+
+            // Otherwise we got an unexpected error
+            throw std::system_error(err, std::system_category(), "opening lock fifo for writing failed");
+        }
+
+        if (err == ENOENT) {
+            // The fifo doesn't exist and we're opening in shared mode, so we
+            // need to create it.
+            if (!m_fifo_dir_path.empty())
+                try_make_dir(m_fifo_dir_path);
+            status = mkfifo(m_fifo_path.c_str(), 0666);
+            if (status != 0)
+                throw std::system_error(errno, std::system_category(), "creating lock fifo for reading failed");
+
+            // Try again to open the fifo now that it exists
+            fd = ::open(m_fifo_path.c_str(), mode);
+            err = errno;
+        }
+
+        if (fd == -1)
+            throw std::system_error(err, std::system_category(), "opening lock fifo for reading failed");
+    }
+
+    // We successfully opened the pipe. If we're trying to acquire an exclusive
+    // lock that means there's a reader (aka a shared lock) and we've failed.
+    // Release the exclusive lock and back out.
+    if (exclusive) {
+        ::close(fd);
+        return false;
+    }
+
+    // We're in shared mode, so opening the fifo means we've successfully acquired
+    // a shared lock and are done.
+    ulg.release();
+    rw_unlock();
+    m_pipe_fd = fd;
+    return true;
+#endif // REALM_FILELOCK_EMULATION
+}
+
 bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
-
     REALM_ASSERT_RELEASE(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
@@ -1092,104 +1189,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == ERROR_LOCK_VIOLATION)
         return false;
     throw std::system_error(err, std::system_category(), "LockFileEx() failed");
-
-#else
-#ifdef REALM_FILELOCK_EMULATION
-    // If we already have any form of lock, release it before trying to acquire a new
-    if (m_has_exclusive_lock || has_shared_lock())
-        unlock();
-
-    // First obtain an exclusive lock on the file proper
-    int operation = LOCK_EX;
-    if (non_blocking)
-        operation |= LOCK_NB;
-    int status;
-    do {
-        status = flock(m_fd, operation);
-    } while (status != 0 && errno == EINTR);
-    if (status != 0 && errno == EWOULDBLOCK)
-        return false;
-    if (status != 0)
-        throw std::system_error(errno, std::system_category(), "flock() failed");
-    m_has_exclusive_lock = true;
-
-    // now use a named pipe to emulate locking in conjunction with using exclusive lock
-    // on the file proper.
-    // exclusively locked: we can't sucessfully write to the pipe.
-    //                     AND we continue to hold the exclusive lock.
-    //                     (unlock must lift the exclusive lock).
-    // shared locked: we CAN succesfully write to the pipe. We open the pipe for reading
-    //                before releasing the exclusive lock.
-    //                (unlock must close the pipe for reading)
-    REALM_ASSERT_RELEASE(m_pipe_fd == -1);
-    if (m_fifo_path.empty())
-        m_fifo_path = m_path + ".fifo";
-    status = mkfifo(m_fifo_path.c_str(), 0666);
-    if (status) {
-        int err = errno;
-        REALM_ASSERT_EX(status == -1, status);
-        if (err == ENOENT) {
-            // The management directory doesn't exist, so there's clearly no
-            // readers. This can happen when calling DB::call_with_lock() or
-            // if the management directory has been removed by DB::call_with_lock()
-            if (exclusive) {
-                return true;
-            }
-            // open shared:
-            // We need the fifo in order to make a shared lock. If we have it
-            // in a management directory, we may need to create that first:
-            if (!m_fifo_dir_path.empty())
-                try_make_dir(m_fifo_dir_path);
-            // now we can try creating the FIFO again
-            status = mkfifo(m_fifo_path.c_str(), 0666);
-            if (status) {
-                // If we fail it must be because it already exists
-                err = errno;
-                REALM_ASSERT_EX(err == EEXIST, err);
-            }
-        }
-        else {
-            // if we failed to create the fifo and not because dir is missing,
-            // it must be because the fifo already exists!
-            REALM_ASSERT_EX(err == EEXIST, err);
-        }
-    }
-    if (exclusive) {
-        // check if any shared locks are already taken by trying to open the pipe for writing
-        // shared locks are indicated by one or more readers already having opened the pipe
-        int fd;
-        do {
-            fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
-        } while (fd == -1 && errno == EINTR);
-        if (fd == -1 && errno != ENXIO)
-            throw std::system_error(errno, std::system_category(), "opening lock fifo for writing failed");
-        if (fd == -1) {
-            // No reader was present so we have the exclusive lock!
-            return true;
-        }
-        else {
-            ::close(fd);
-            // shared locks exist. Back out. Release exclusive lock on file
-            unlock();
-            return false;
-        }
-    }
-    else {
-        // lock shared. We need to release the real exclusive lock on the file,
-        // but first we must mark the lock as shared by opening the pipe for reading
-        // Open pipe for reading!
-        // Due to a bug in iOS 10-12 we need to open in read-write mode or the OS
-        // will deadlock when un-suspending the app.
-        int fd = ::open(m_fifo_path.c_str(), O_RDWR | O_NONBLOCK);
-        if (fd == -1)
-            throw std::system_error(errno, std::system_category(), "opening lock fifo for reading failed");
-        unlock();
-        m_pipe_fd = fd;
-        return true;
-    }
-
-
-#else // BSD / Linux flock()
+#else // _WIN32
     // NOTE: It would probably have been more portable to use fcntl()
     // based POSIX locks, however these locks are not recursive within
     // a single process, and since a second attempt to acquire such a
@@ -1207,7 +1207,6 @@ bool File::lock(bool exclusive, bool non_blocking)
     //
     // Fortunately, on both Linux and Darwin, flock() does not suffer
     // from this 'spurious unlocking issue'.
-
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |= LOCK_NB;
@@ -1219,16 +1218,12 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == EWOULDBLOCK)
         return false;
     throw std::system_error(err, std::system_category(), "flock() failed");
-
-#endif
 #endif
 }
-
 
 void File::unlock() noexcept
 {
 #ifdef _WIN32 // Windows version
-
     if (!m_have_lock)
         return;
 
@@ -1241,10 +1236,20 @@ void File::unlock() noexcept
 
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
-
 #else
-#ifdef REALM_FILELOCK_EMULATION
+    // The Linux man page for flock() does not state explicitely that
+    // unlocking is idempotent, however, we will assume it since there
+    // is no mention of the error that would be reported if a
+    // non-locked file were unlocked.
+    _unlock(m_fd);
+#endif
+}
 
+void File::rw_unlock() noexcept
+{
+#ifndef REALM_FILELOCK_EMULATION
+    unlock();
+#else
     // Coming here with an exclusive lock, we must release that lock.
     // Coming here with a shared lock, we must close the pipe that we have opened for reading.
     //   - we have to do that under the protection of a proper exclusive lock to serialize
@@ -1260,21 +1265,13 @@ void File::unlock() noexcept
         ::close(m_pipe_fd);
         m_pipe_fd = -1;
     }
+    else {
+        REALM_ASSERT(m_has_exclusive_lock);
+    }
     _unlock(m_fd);
     m_has_exclusive_lock = false;
-
-#else // BSD / Linux flock()
-
-    // The Linux man page for flock() does not state explicitely that
-    // unlocking is idempotent, however, we will assume it since there
-    // is no mention of the error that would be reported if a
-    // non-locked file were unlocked.
-    _unlock(m_fd);
-
-#endif
-#endif
+#endif // REALM_FILELOCK_EMULATION
 }
-
 
 void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
 {

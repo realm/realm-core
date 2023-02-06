@@ -17,9 +17,30 @@
 -----------
 
 ### Internals
+* Add Binding Callback Thread Observer CAPI Test and updated Sync_MultipleSyncAgentsNotAllowed test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+
+----------------------------------------------
+
+# 13.4.0 Release notes
+
+### Enhancements
+* Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
+
+### Fixed
+* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
+* Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * Added `REALM_ARCHITECTURE_ARM32` and `REALM_ARCHITECTURE_ARM64` macros to `features.h` for easier platform detection. ([#6256](https://github.com/realm/realm-core/pull/6256))
 * Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
-* Add Binding Callback Thread Observer CAPI Test and updated Sync_MultipleSyncAgentsNotAllowed test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ----------------------------------------------
 
