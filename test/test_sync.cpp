@@ -2996,8 +2996,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
-    client.stop();
-    socket_provider->stop(true);
+    client.drain();
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3156,7 +3155,6 @@ TEST(Sync_UploadDownloadProgress_1)
         });
 
         client.stop();
-        socket_provider->stop(true);
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3402,12 +3400,9 @@ TEST(Sync_UploadDownloadProgress_3)
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
     // not running, and it is started by progress_handler().
-    int entry = 0;
 
     bool should_signal_cond_var = false;
-    bool cond_var_signaled = false;
-    std::mutex mutex;
-    std::condition_variable cond_var;
+    auto signal_pf = util::make_promise_future<void>();
 
     uint_fast64_t downloaded_bytes_1 = 123; // Not zero
     uint_fast64_t downloadable_bytes_1 = 123;
@@ -3416,9 +3411,10 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
+                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3441,10 +3437,7 @@ TEST(Sync_UploadDownloadProgress_3)
         }
 
         if (should_signal_cond_var) {
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            promise.get_promise().emplace_value();
         }
 
         entry++;
@@ -3481,12 +3474,7 @@ TEST(Sync_UploadDownloadProgress_3)
         session.nonsync_transact_notify(commited_version);
     }
 
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        cond_var.wait(lock, [&] {
-            return cond_var_signaled;
-        });
-    }
+    signal_pf.future.get();
 
     CHECK_EQUAL(downloaded_bytes_1, 0);
     CHECK_EQUAL(downloadable_bytes_1, 0);
@@ -3494,10 +3482,7 @@ TEST(Sync_UploadDownloadProgress_3)
     CHECK_NOT_EQUAL(uploadable_bytes_1, 0);
     CHECK_EQUAL(snapshot_version_1, commited_version);
 
-    client.stop();
-
     server_thread.join();
-    socket_provider->stop(true);
 }
 
 
@@ -3621,18 +3606,17 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    bool cond_var_signaled = false;
-    std::mutex mutex;
-    std::condition_variable cond_var;
+    auto [progress_handled_promise, progress_handled] = util::make_promise_future<void>();
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
     Session session = fixture.make_session(db);
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&, promise = util::CopyablePromiseHolder(std::move(progress_handled_promise))](
+                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -3640,20 +3624,14 @@ TEST(Sync_UploadDownloadProgress_5)
 
         if (progress_version > 0) {
             CHECK_EQUAL(snapshot_version, 3);
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            promise.get_promise().emplace_value();
         }
     };
 
     session.set_progress_handler(progress_handler);
 
-    std::unique_lock<std::mutex> lock(mutex);
     fixture.bind_session(session, "/test");
-    cond_var.wait(lock, [&] {
-        return cond_var_signaled;
-    });
+    progress_handled.get();
 
     // The check is that we reach this point.
 }
@@ -3720,9 +3698,8 @@ TEST(Sync_UploadDownloadProgress_6)
         session->bind();
     }
 
-    client.stop();
+    client.drain();
     server.stop();
-    socket_provider->stop(true);
     server_thread.join();
 
     // The check is that we reach this point without deadlocking.
@@ -4340,6 +4317,7 @@ TEST(Sync_MergeMultipleChangesets)
         fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
+        session_1.detach();
         // Stop first client.
         fixture.stop_client(0);
 
@@ -4458,8 +4436,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = ec == sync::websocket::make_error_code(ErrorCodes::ReadError);
-        CHECK(valid_error);
+        CHECK_EQUAL(ec, sync::websocket::make_error_code(ErrorCodes::ReadError));
         bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
@@ -5066,7 +5043,6 @@ TEST_IF(Sync_SSL_Certificates, false)
         session.bind();
 
         session.wait_for_download_complete_or_client_stopped();
-        client.stop();
     }
 }
 
