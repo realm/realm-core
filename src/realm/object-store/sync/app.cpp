@@ -320,6 +320,7 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
 {
     // Update url components based on new hostname value
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
+    REALM_ASSERT(m_sync_manager);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
     m_base_route = (hostname.length() > 0 ? hostname : default_base_url) + base_path;
     std::string this_app_path = app_path + "/" + m_config.app_id;
@@ -328,7 +329,7 @@ void App::update_hostname(const std::string& hostname, const Optional<std::strin
     if (ws_hostname && ws_hostname->length() > 0) {
         m_sync_manager->set_sync_route(*ws_hostname + base_path + this_app_path + sync_path);
     }
-    else if (m_sync_manager) {
+    else {
         m_sync_manager->set_sync_route(make_sync_route(m_app_route));
     }
 }
