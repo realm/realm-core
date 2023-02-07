@@ -475,7 +475,6 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 {
     REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
     util::seed_prng_nondeterministically(m_random); // Throws
-    start_keep_running_timer();                     // TODO: Update service so this timer is not needed
     if (auto_start) {
         start();
     }
@@ -488,15 +487,6 @@ DefaultSocketProvider::~DefaultSocketProvider()
     stop(true);
     // Shutting down - no need to lock mutex before check
     REALM_ASSERT(m_state == State::Stopped);
-
-
-    // FIXME this should go away when we remove the need for the keep running timer altogether.
-    m_service.post([this](Status status) {
-        REALM_ASSERT(status.is_ok());
-        m_keep_running_timer->cancel();
-    });
-    m_service.reset();
-    m_service.run();
 }
 
 void DefaultSocketProvider::start()
@@ -567,7 +557,7 @@ void DefaultSocketProvider::event_loop()
     });
 
     try {
-        m_service.run(); // Throws
+        m_service.run_until_stopped(); // Throws
     }
     catch (const std::exception& e) {
         std::unique_lock<std::mutex> lock(m_mutex);

@@ -281,6 +281,10 @@ public:
     /// ready. If there are no completion handlers ready for execution, and
     /// there are no asynchronous operations in progress, run() returns.
     ///
+    /// run_until_stopped() will continue running even if there are no completion
+    /// handlers ready for execution, and no asynchronous operations in progress,
+    /// until stop() is called.
+    ///
     /// All completion handlers, including handlers submitted via post() will be
     /// executed from run(), that is, by the thread that executes run(). If no
     /// thread executes run(), then the completion handlers will not be
@@ -292,6 +296,7 @@ public:
     /// Syncronous operations (e.g., Socket::connect()) execute independently of
     /// the event loop, and do not require that any thread calls run().
     void run();
+    void run_until_stopped();
 
     /// @{ \brief Stop event loop execution.
     ///
