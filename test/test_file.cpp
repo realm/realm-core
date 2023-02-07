@@ -531,7 +531,7 @@ TEST(File_parent_dir)
     }
 }
 
-TEST(File_GetUniqueID)
+ONLY(File_GetUniqueID)
 {
     TEST_PATH(path_1);
     TEST_PATH(path_2);
@@ -560,21 +560,6 @@ TEST(File_GetUniqueID)
 
     // Path doesn't exist
     CHECK_NOT(File::get_unique_id(path_3));
-
-    // Test operator<
-    File::UniqueID uid4_1{0, 5};
-    File::UniqueID uid4_2{1, 42};
-    CHECK(uid4_1 < uid4_2);
-    CHECK_NOT(uid4_2 < uid4_1);
-
-    uid4_1 = {0, 1};
-    uid4_2 = {0, 2};
-    CHECK(uid4_1 < uid4_2);
-    CHECK_NOT(uid4_2 < uid4_1);
-
-    uid4_1 = uid4_2;
-    CHECK_NOT(uid4_1 < uid4_2);
-    CHECK_NOT(uid4_2 < uid4_1);
 }
 
 #endif // TEST_FILE

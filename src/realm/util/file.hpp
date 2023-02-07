@@ -1351,38 +1351,6 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
     return !(lhs == rhs);
 }
 
-inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-#ifdef _WIN32 // Windows version
-    return lhs.id_info.VolumeSerialNumber < rhs.id_info.VolumeSerialNumber &&
-           memcmp(lhs.id_info.FileId.Identifier, rhs.id_info.FileId.Identifier,
-                  sizeof(lhs.id_info.FileId.Identifier)) < 0;
-#else // POSIX version
-    if (lhs.device < rhs.device)
-        return true;
-    if (lhs.device > rhs.device)
-        return false;
-    if (lhs.inode < rhs.inode)
-        return true;
-    return false;
-#endif
-}
-
-inline bool operator>(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return rhs < lhs;
-}
-
-inline bool operator<=(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return !(lhs > rhs);
-}
-
-inline bool operator>=(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return !(lhs < rhs);
-}
-
 } // namespace realm::util
 
 #endif // REALM_UTIL_FILE_HPP
