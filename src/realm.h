@@ -1972,10 +1972,34 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
     realm_collection_move_t* out_moves, size_t max_moves);
 
-RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* dict, realm_value_t** deletions,
-                                          size_t* out_deletions_size, realm_value_t** insertions,
-                                          size_t* out_insertion_size, realm_value_t** modifications,
-                                          size_t* out_modification_size);
+/**
+ * Returns the number of changes occured to the dictionary passed as argument
+ *
+ * @param changes valid ptr to the dictionary changes structure
+ * @param out_deletions_size number of deletions
+ * @param out_insertion_size number of insertions
+ * @param out_modification_size number of modifications
+ */
+RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
+                                          size_t* out_insertion_size, size_t* out_modification_size);
+
+ /**
+  * Returns the list of keys changed for the dictionary passed as argument.
+  * The user must assure that there is enough memory to accomodate all the keys
+  * calling `realm_dictionary_get_changes` before.
+  * 
+  * @param changes valid ptr to the dictionary changes structure
+  * @param deletions list of deleted keys
+  * @param deletions_size size of the list of deleted keys
+  * @param insertions list of inserted keys
+  * @param insertions_size size of the list of inserted keys
+  * @param modifications list of modified keys
+  * @param modification_size size of the list of modified keys 
+  */
+RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes, 
+                                            realm_value_t* deletions, size_t* deletions_size,
+                                            realm_value_t* insertions, size_t* insertions_size,
+                                            realm_value_t* modifications, size_t* modification_size);
 
 /**
  * Get a set instance for the property of an object.

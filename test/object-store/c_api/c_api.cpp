@@ -4283,18 +4283,22 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(state.dictionary_changes);
 
                     size_t num_deletions, num_insertions, num_modifications;
-                    realm_value_t *deletions, *insertions, *modifications;
-                    realm_dictionary_get_changes(state.dictionary_changes.get(), &deletions, &num_deletions,
-                                                 &insertions, &num_insertions, &modifications, &num_modifications);
+                    realm_dictionary_get_changes(state.dictionary_changes.get(), &num_deletions, &num_insertions,
+                                                 &num_modifications);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 0);
+                    realm_value_t *deletions = nullptr, *insertions = nullptr, *modifications = nullptr;
+                    deletions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_deletions);
+                    insertions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_insertions);
+                    realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
+                                                      insertions, &num_insertions, modifications, &num_modifications);
                     CHECK(deletions != nullptr);
                     CHECK(insertions != nullptr);
                     CHECK(modifications == nullptr);
-                    realm_release(deletions);
-                    realm_release(insertions);
-                    realm_release(modifications);
+                    realm_free(deletions);
+                    realm_free(insertions);
+                    realm_free(modifications);
                 }
             }
 
