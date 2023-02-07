@@ -262,6 +262,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
+        // If there is app metadata stored, then update the hostname/syncroute using that info
         update_hostname(metadata);
     }
 }
@@ -310,7 +311,7 @@ std::string App::make_sync_route(const std::string& http_app_route)
 
 void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
 {
-    // Update url components based on new hostname value
+    // Update url components based on new hostname value from the app metadata
     if (metadata) {
         update_hostname(metadata->hostname, metadata->ws_hostname);
     }
@@ -318,7 +319,7 @@ void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
 
 void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname)
 {
-    // Update url components based on new hostname value
+    // Update url components based on new hostname (and optional websocket hostname) values
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
     REALM_ASSERT(m_sync_manager);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
@@ -828,8 +829,8 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_sync_manager->app_metadata()) {
-        // Skip if the app_metadata has already been initialized and a new hostname is not provided
+    if (!new_hostname && (m_sync_manager->app_metadata() || m_location_updated)) {
+        // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
         return completion(util::none); // early return
     }
     else {
@@ -855,11 +856,17 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             auto ws_hostname = get<std::string>(json, "ws_hostname");
             auto deployment_model = get<std::string>(json, "deployment_model");
             auto location = get<std::string>(json, "location");
-            self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
-                manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
-            });
-
-            self->update_hostname(self->m_sync_manager->app_metadata());
+            if (self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+                    manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
+                })) {
+                // Update the hostname and sync route using the new app metadata info
+                self->update_hostname(self->m_sync_manager->app_metadata());
+            }
+            else {
+                // No metadata in use, update the hostname and sync route directly
+                self->update_hostname(hostname, ws_hostname);
+            }
+            self->m_location_updated = true;
         }
         catch (const AppError&) {
             // Pass the response back to completion

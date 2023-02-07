@@ -2344,6 +2344,100 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 });
         }
     }
+    SECTION("Test app redirect with no metadata") {
+        std::unique_ptr<realm::AppSession> app_session;
+        std::string base_file_path = util::make_temp_dir() + random_string(10);
+        auto redir_transport = std::make_shared<HookedTransport>();
+        AutoVerifiedEmailCredentials creds, creds2;
+
+        auto app_config = get_config(redir_transport, session.app_session());
+        set_app_config_defaults(app_config, redir_transport);
+
+        util::try_make_dir(base_file_path);
+        SyncClientConfig sc_config;
+        sc_config.base_file_path = base_file_path;
+        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
+
+        // initialize app and sync client
+        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+
+        int request_count = 0;
+        // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+        std::string original_host = "localhost:9090";
+        std::string original_scheme = "http://";
+        std::string websocket_url = "ws://some-websocket:9090";
+        std::string original_url;
+        redir_transport->request_hook = [&](const Request& request) {
+            if (request_count == 0) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                if (request.url.find("https://") != std::string::npos) {
+                    original_scheme = "https://";
+                }
+                // using local baas
+                if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                    original_host = "127.0.0.1:9090";
+                }
+                // using baas docker
+                else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
+                    original_host = "mongodb-realm:9090";
+                }
+                original_url = original_scheme + original_host;
+                logger->trace("original_url (%1): %2", request_count, original_url);
+            }
+            else if (request_count == 1) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(!request.redirect_count);
+                redir_transport->simulated_response = {
+                    308,
+                    0,
+                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                    "Some body data"};
+            }
+            else if (request_count == 2) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
+                REQUIRE(request.url.find("location") != std::string::npos);
+                // app hostname will be updated via the metadata info
+                redir_transport->simulated_response = {
+                    static_cast<int>(sync::HTTPStatus::Ok),
+                    0,
+                    {{"Content-Type", "application/json"}},
+                    util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
+                                 "hostname\":\"%2\"}",
+                                 original_url, websocket_url)};
+            }
+            else {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request.url.find(original_url) != std::string::npos);
+                redir_transport->simulated_response.reset();
+            }
+            request_count++;
+        };
+
+        // This will be successful after a couple of retries due to the redirect response
+        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+            });
+        REQUIRE(!redir_app->sync_manager()->app_metadata()); // no stored app metadata
+        REQUIRE(redir_app->sync_manager()->sync_route().find(websocket_url) != std::string::npos);
+
+        // Register another email address and verify location data isn't requested again
+        request_count = 0;
+        redir_transport->request_hook = [&](const Request& request) {
+            logger->trace("request.url (%1): %2", request_count, request.url);
+            redir_transport->simulated_response.reset();
+            REQUIRE(request.url.find("location") == std::string::npos);
+            request_count++;
+        };
+
+        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+            creds2.email, creds2.password, [&](util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+            });
+    }
+
     SECTION("Test websocket redirect with existing session") {
         std::string original_host = "localhost:9090";
         std::string redirect_scheme = "http://";
