@@ -133,46 +133,6 @@ static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1
 using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
 struct ClientConfig {
-    ///
-    /// DEPRECATED - Will be removed in a future release
-    ///
-    /// An optional custom platform description to be sent to server as part
-    /// of a user agent description (HTTP `User-Agent` header).
-    ///
-    /// If left empty, the platform description will be whatever is returned
-    /// by util::get_platform_info().
-    std::string user_agent_platform_info;
-
-    ///
-    /// DEPRECATED - Will be removed in a future release
-    ///
-    /// Optional information about the application to be added to the user
-    /// agent description as sent to the server. The intention is that the
-    /// application describes itself using the following (rough) syntax:
-    ///
-    ///     <application info>  ::=  (<space> <layer>)*
-    ///     <layer>             ::=  <name> "/" <version> [<space> <details>]
-    ///     <name>              ::=  (<alnum>)+
-    ///     <version>           ::=  <digit> (<alnum> | "." | "-" | "_")*
-    ///     <details>           ::=  <parentherized>
-    ///     <parentherized>     ::=  "(" (<nonpar> | <parentherized>)* ")"
-    ///
-    /// Where `<space>` is a single space character, `<digit>` is a decimal
-    /// digit, `<alnum>` is any alphanumeric character, and `<nonpar>` is
-    /// any character other than `(` and `)`.
-    ///
-    /// When multiple levels are present, the innermost layer (the one that
-    /// is closest to this API) should appear first.
-    ///
-    /// Example:
-    ///
-    ///     RealmJS/2.13.0 RealmStudio/2.9.0
-    ///
-    /// Note: The user agent description is not intended for machine
-    /// interpretation, but should still follow the specified syntax such
-    /// that it remains easily interpretable by human beings.
-    std::string user_agent_application_info;
-
     /// An optional logger to be used by the client. If no logger is
     /// specified, the client will use an instance of util::StderrLogger
     /// with the log level threshold set to util::Logger::Level::info. The

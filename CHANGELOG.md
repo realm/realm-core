@@ -2,11 +2,34 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The lifecycle of the sync client is now separated from the event loop/socket provider it uses for async I/O/timers. The sync client will wait for all outstanding callbacks/sockets to be closed during destruction. The SyncSocketProvider passed to the sync client must run until after the sync client is destroyed but does not need to be stopped as part of tearing down the sync client. ([PR #6276](https://github.com/realm/realm-core/pull/6276))
+* The default event loop will now keep running until it is explicitly stopped rather than until there are no more timers/IO to process. Previously there was a timer set for very far in the future to force the event loop to keep running. ([PR #6265](https://github.com/realm/realm-core/pull/6265))
+
+----------------------------------------------
+
+# 13.4.0 Release notes
+
+### Enhancements
+* Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
+
+### Fixed
 * Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
+* Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
 
 ### Breaking changes
 * None.
@@ -19,7 +42,6 @@
 ### Internals
 * Added `REALM_ARCHITECTURE_ARM32` and `REALM_ARCHITECTURE_ARM64` macros to `features.h` for easier platform detection. ([#6256](https://github.com/realm/realm-core/pull/6256))
 * Create the fuzzer framework project in order to run fuzz testing on evergreen ([PR #5940](https://github.com/realm/realm-core/pull/5940))
-
 
 ----------------------------------------------
 

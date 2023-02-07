@@ -20,6 +20,8 @@
 #define REALM_OS_SYNC_CLIENT_HPP
 
 #include <realm/sync/client.hpp>
+#include <realm/sync/network/default_socket.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <thread>
@@ -37,15 +39,20 @@ namespace _impl {
 struct SyncClient {
     SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
                std::weak_ptr<const SyncManager> weak_sync_manager)
-        : m_client([&] {
+        : m_socket_provider([&]() -> std::shared_ptr<sync::SyncSocketProvider> {
+            if (config.socket_provider) {
+                return config.socket_provider;
+            }
+            auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),
+                                           config.user_agent_binding_info, config.user_agent_application_info);
+            return std::make_shared<sync::websocket::DefaultSocketProvider>(logger, std::move(user_agent));
+        }())
+        , m_client([&] {
             sync::Client::Config c;
             c.logger = logger;
-            c.socket_provider = config.socket_provider;
+            c.socket_provider = m_socket_provider;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
-            /// DEPRECATED - Will be removed in a future release
-            c.user_agent_application_info =
-                util::format("%1 %2", config.user_agent_binding_info, config.user_agent_application_info);
 
             // Only set the timeouts if they have sensible values
             if (config.timeouts.connect_timeout >= 1000)
@@ -109,12 +116,10 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
-    ~SyncClient()
-    {
-        stop();
-    }
+    ~SyncClient() {}
 
 private:
+    std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
     sync::Client m_client;
     std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
