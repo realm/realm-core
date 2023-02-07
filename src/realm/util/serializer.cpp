@@ -19,6 +19,7 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/geospatial.hpp>
 #include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
@@ -196,6 +197,23 @@ template <>
 std::string print_value<>(realm::TypeOfValue type)
 {
     return '"' + type.to_string() + '"';
+}
+
+template <>
+std::string print_value<>(realm::Geospatial geo)
+{
+    std::string data_str;
+    const auto& data = geo.get_points();
+    for (size_t i = 0; i < data.size(); ++i) {
+        const GeoPoint& point = data[i];
+        if (point.altitude) {
+            data_str += util::format("%1, %2, %3", point.longitude, point.latitude, *point.altitude);
+        }
+        else {
+            data_str += util::format("%1, %2", point.longitude, point.latitude);
+        }
+    }
+    return util::format("Geospatial('%1', [%2])", geo.get_type(), data_str);
 }
 
 // The variable name must be unique with respect to the already chosen variables at

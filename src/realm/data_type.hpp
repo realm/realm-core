@@ -152,6 +152,7 @@ static constexpr DataType type_OldDateTime = DataType{7};
 static_assert(!type_OldTable.is_valid());
 static_assert(!type_OldDateTime.is_valid());
 static constexpr DataType type_TypeOfValue = DataType{18};
+static constexpr DataType type_Geospatial = DataType{19};
 
 constexpr inline DataType::operator util::Printable() const noexcept
 {
@@ -193,6 +194,9 @@ constexpr inline DataType::operator util::Printable() const noexcept
     }
     if (*this == type_TypeOfValue) {
         return "type_TypeOfValue";
+    }
+    if (*this == type_Geospatial) {
+        return "type_Geospatial";
     }
     return "type_UNKNOWN";
 }

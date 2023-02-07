@@ -19,6 +19,7 @@
 #ifndef REALM_GEOSPATIAL_HPP
 #define REALM_GEOSPATIAL_HPP
 
+#include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
 #include <optional>
@@ -39,6 +40,11 @@ struct GeoPoint {
     }
 };
 
+struct GeoBox {
+    GeoPoint p1;
+    GeoPoint p2;
+};
+
 class Geospatial {
 public:
     Geospatial(GeoPoint point)
@@ -46,13 +52,18 @@ public:
         , m_points({point})
     {
     }
-
+    Geospatial(GeoBox box)
+        : m_type("Box")
+        , m_points({box.p1, box.p2})
+    {
+    }
     Geospatial(StringData invalid_type)
         : m_type(invalid_type)
         , m_is_valid(false)
     {
     }
 
+    static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
     void assign_to(Obj& link) const;
 
@@ -65,6 +76,8 @@ public:
     {
         return m_is_valid;
     }
+
+    bool is_within(const Geospatial& bounds) const noexcept;
 
     const std::vector<GeoPoint>& get_points() const
     {
@@ -93,22 +106,7 @@ private:
     bool m_is_valid = true;
 };
 
-inline std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
-{
-    std::string data_str;
-    const auto& data = geo.get_points();
-    for (size_t i = 0; i < data.size(); ++i) {
-        const GeoPoint& point = data[i];
-        if (point.altitude) {
-            data_str += util::format("%1, %2, %3", point.longitude, point.latitude, *point.altitude);
-        }
-        else {
-            data_str += util::format("%1, %2", point.longitude, point.latitude);
-        }
-    }
-    ostr << util::format("Geospatial('%1', [%2])", geo.get_type(), data_str);
-    return ostr;
-}
+std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);
 
 } // namespace realm
 
