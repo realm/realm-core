@@ -2367,6 +2367,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::string original_host = "localhost:9090";
         std::string original_scheme = "http://";
         std::string websocket_url = "ws://some-websocket:9090";
+        std::string original_url;
         redir_transport->request_hook = [&](const Request& request) {
             if (request_count == 0) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
@@ -2381,7 +2382,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
                     original_host = "mongodb-realm:9090";
                 }
-                logger->trace("original_url (%1): %2%3", request_count, original_scheme, original_host);
+                original_url = original_scheme + original_host;
+                logger->trace("original_url (%1): %2", request_count, original_url);
             }
             else if (request_count == 1) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
@@ -2401,12 +2403,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     static_cast<int>(sync::HTTPStatus::Ok),
                     0,
                     {{"Content-Type", "application/json"}},
-                    util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%2%1\",\"ws_"
-                                 "hostname\":\"%3\"}",
-                                 original_host, original_scheme, websocket_url)};
+                    util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
+                                 "hostname\":\"%2\"}",
+                                 original_url, websocket_url)};
             }
             else {
                 logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request.url.find(original_url) != std::string::npos);
                 redir_transport->simulated_response.reset();
             }
             request_count++;
