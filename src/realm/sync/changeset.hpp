@@ -13,7 +13,10 @@ namespace sync {
 using InternStrings = std::vector<StringBufferRange>;
 
 struct BadChangesetError : ExceptionWithBacktrace<std::runtime_error> {
-    using ExceptionWithBacktrace<std::runtime_error>::ExceptionWithBacktrace;
+    BadChangesetError(const std::string& msg)
+        : ExceptionWithBacktrace<std::runtime_error>(util::format("%1. Please contact support", msg))
+    {
+    }
 };
 
 struct Changeset {
