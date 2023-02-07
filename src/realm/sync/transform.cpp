@@ -908,7 +908,7 @@ REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::P
 {
     std::stringstream ss;
     side.m_changeset->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
-    bad_merge("%1 (instruction target: %2)", msg, ss.str());
+    bad_merge("%1 (instruction target: %2). Please contact support", msg, ss.str());
 }
 
 template <class LeftInstruction, class RightInstruction, class Enable = void>

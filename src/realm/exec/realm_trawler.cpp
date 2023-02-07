@@ -56,7 +56,9 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
     list.insert(list.end(), list2.begin(), list2.end());
     list2.clear();
     if (list.size() > 1) {
-        std::sort(begin(list), end(list), [](T& a, T& b) { return a.start < b.start; });
+        std::sort(begin(list), end(list), [](T& a, T& b) {
+            return a.start < b.start;
+        });
 
         auto prev = list.begin();
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
@@ -79,7 +81,11 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         }
 
         // Remove all of the now zero-size chunks from the free list
-        list.erase(std::remove_if(begin(list), end(list), [](T& chunk) { return chunk.length == 0; }), end(list));
+        list.erase(std::remove_if(begin(list), end(list),
+                                  [](T& chunk) {
+                                      return chunk.length == 0;
+                                  }),
+                   end(list));
     }
 }
 
@@ -507,7 +513,9 @@ std::string human_readable(uint64_t val)
 uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
-    std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
+    std::for_each(list.begin(), list.end(), [&](const Entry& e) {
+        sz += e.length;
+    });
     return sz;
 }
 
@@ -1036,6 +1044,23 @@ void RealmFile::changes() const
     }
 }
 
+unsigned int hex_char_to_bin(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    throw std::invalid_argument("Illegal key (not a hex digit)");
+}
+
+unsigned int hex_to_bin(char first, char second)
+{
+    return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
+}
+
+
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {
@@ -1049,11 +1074,22 @@ int main(int argc, const char* argv[])
             const char* key_ptr = nullptr;
             char key[64];
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
-                if (strcmp(argv[curr_arg], "--key") == 0) {
+                if (strcmp(argv[curr_arg], "--keyfile") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
                     key_file.read(key, sizeof(key));
                     key_ptr = key;
                     curr_arg++;
+                }
+                else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
+                    curr_arg++;
+                    const char* chars = argv[curr_arg];
+                    if (strlen(chars) != 128) {
+                        throw std::invalid_argument("Key string must be 128 chars long");
+                    }
+                    for (int idx = 0; idx < 64; ++idx) {
+                        key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
+                    }
+                    key_ptr = key;
                 }
                 else if (strcmp(argv[curr_arg], "--top") == 0) {
                     char* end;
@@ -1112,7 +1148,10 @@ int main(int argc, const char* argv[])
         }
     }
     else {
-        std::cout << "Usage: realm-trawler [-afmsw] [--key crypt_key] [--top top_ref] <realmfile>" << std::endl;
+        std::cout << "Usage: realm-trawler [-afmsw] [--keyfile file-with-binary-crypt-key] [--hexkey "
+                     "crypt-key-in-hex] [--top "
+                     "top_ref] <realmfile>"
+                  << std::endl;
         std::cout << "   f : free list analysis" << std::endl;
         std::cout << "   m : memory leak check" << std::endl;
         std::cout << "   s : schema dump" << std::endl;

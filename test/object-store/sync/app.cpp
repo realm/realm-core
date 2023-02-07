@@ -2139,14 +2139,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         {
         }
 
-        std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                           sync::WebSocketEndpoint&& endpoint) override
         {
             int status_code = 101;
             std::string body;
             bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
 
-            auto websocket = DefaultSocketProvider::connect(observer, std::move(endpoint));
+            auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
             if (use_simulated_response) {
                 auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
                 if (default_websocket)
