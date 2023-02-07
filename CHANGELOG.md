@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Expose ad hoc interface for querying dictionary key changes in the C-API. ([#6228](https://github.com/realm/realm-core/issues/6228), since v10.3.3)
 
 ### Breaking changes
 * None.
