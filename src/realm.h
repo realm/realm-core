@@ -1972,9 +1972,9 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
     realm_collection_move_t* out_moves, size_t max_moves);
 
-RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* dict, realm_value_t** deletions,
-                                          size_t* out_deletions_size, realm_value_t** insertions,
-                                          size_t* out_insertion_size, realm_value_t** modifications,
+RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* dict, realm_value_t* deletions,
+                                          size_t* out_deletions_size, realm_value_t* insertions,
+                                          size_t* out_insertion_size, realm_value_t* modifications,
                                           size_t* out_modification_size);
 
 /**
