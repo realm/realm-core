@@ -1251,8 +1251,14 @@ TEST_CASE("SharedRealm: convert") {
                                   {
                                       {"_id", PropertyType::Int, Property::IsPrimary{true}},
                                       {"value", PropertyType::Int},
+                                      {"embedded_link", PropertyType::Object | PropertyType::Nullable, "embedded"},
                                   }};
-    Schema schema{object_schema};
+    ObjectSchema embedded_schema = {"embedded",
+                                    ObjectSchema::ObjectType::Embedded,
+                                    {
+                                        {"name", PropertyType::String | PropertyType::Nullable},
+                                    }};
+    Schema schema{object_schema, embedded_schema};
 
     SyncTestFile sync_config1(tsm.app(), "default");
     sync_config1.schema = schema;
@@ -1263,7 +1269,12 @@ TEST_CASE("SharedRealm: convert") {
     SECTION("can copy a synced realm to a synced realm") {
         auto sync_realm1 = Realm::get_shared_realm(sync_config1);
         sync_realm1->begin_transaction();
+        // 'embedded_link' property is null.
         sync_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        // 'embedded_link' property is not null.
+        auto obj = sync_realm1->read_group().get_table("class_object")->create_object_with_primary_key(1);
+        auto col_key = sync_realm1->read_group().get_table("class_object")->get_column_key("embedded_link");
+        obj.create_and_set_linked_object(col_key);
         sync_realm1->commit_transaction();
         wait_for_upload(*sync_realm1);
         wait_for_download(*sync_realm1);
@@ -1277,18 +1288,18 @@ TEST_CASE("SharedRealm: convert") {
         auto sync_realm2 = Realm::get_shared_realm(sync_config2);
 
         // Check that the data also exists in the new realm
-        REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 1);
+        REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 2);
 
         // Verify that sync works and objects created in the new copy will get
         // synchronized to the old copy
         sync_realm2->begin_transaction();
-        sync_realm2->read_group().get_table("class_object")->create_object_with_primary_key(1);
+        sync_realm2->read_group().get_table("class_object")->create_object_with_primary_key(2);
         sync_realm2->commit_transaction();
         wait_for_upload(*sync_realm2);
         wait_for_download(*sync_realm1);
 
         sync_realm1->refresh();
-        REQUIRE(sync_realm1->read_group().get_table("class_object")->size() == 2);
+        REQUIRE(sync_realm1->read_group().get_table("class_object")->size() == 3);
     }
 
     SECTION("can convert a synced realm to a local realm") {
