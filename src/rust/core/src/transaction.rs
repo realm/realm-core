@@ -80,6 +80,10 @@ impl Transaction {
         Ok(unsafe { TableRef::from_sys(table) })
     }
 
+    pub fn get_table_keys(&self) -> Vec<sys::TableKey> {
+        self.txn.get_table_keys()
+    }
+
     pub fn freeze(&self) -> Result<FrozenTransaction, Error> {
         Ok(FrozenTransaction {
             txn: Transaction {

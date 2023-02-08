@@ -1,6 +1,7 @@
 #include "bridge.hpp"
 #include "realm/db_options.hpp"
 #include "realm/version_id.hpp"
+#include "realm/array_string.hpp"
 #include "realm-sys.hpp"
 
 namespace realm::rust {
@@ -34,6 +35,10 @@ inline realm::StringData bridge(::rust::Str str) noexcept
 
 inline ::rust::Str bridge(StringData str) noexcept
 {
+    // Protect against putting null pointers into `&str`.
+    if (str.is_null()) {
+        return "";
+    }
     return ::rust::Str{str.data(), str.size()};
 }
 
@@ -175,6 +180,15 @@ bool txn_promote_to_write(const Transaction& txn, bool nonblocking)
 realm::TransactionRef txn_freeze(const Transaction& txn)
 {
     return const_cast<Transaction&>(txn).freeze();
+}
+
+::rust::Vec<realm::rust::TableKey> txn_get_table_keys(const Transaction& txn) noexcept
+{
+    ::rust::Vec<realm::rust::TableKey> vec;
+    for (auto key : txn.get_table_keys()) {
+        vec.push_back(bridge(key));
+    }
+    return vec;
 }
 
 bool txn_has_table(const Transaction& txn, ::rust::Str name) noexcept
@@ -352,6 +366,21 @@ NodeHeaderWidthType array_get_width_type(const Array& array) noexcept
 {
     char* header = array.get_mem().get_addr();
     return Array::get_wtype_from_header(header);
+}
+
+::rust::Slice<const uint8_t> array_get_data(const Array& array) noexcept
+{
+    const char* data = array.m_data;
+    REALM_ASSERT(data != nullptr);
+    const size_t byte_size_including_header = array.get_byte_size();
+    REALM_ASSERT(byte_size_including_header >= NodeHeader::header_size);
+    const size_t byte_size = byte_size_including_header - NodeHeader::header_size;
+    return ::rust::Slice<const uint8_t>{reinterpret_cast<const uint8_t*>(data), byte_size};
+}
+
+::rust::Str array_string_get(const ArrayString& array, size_t ndx)
+{
+    return bridge(array.get(ndx));
 }
 
 } // namespace realm::rust

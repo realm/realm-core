@@ -5,6 +5,8 @@
 #include <realm/alloc.hpp>
 #include <realm/db.hpp>
 #include <realm/transaction.hpp>
+#include <realm/array_string.hpp>
+
 #include <rust/cxx.h>
 
 namespace realm::rust {
@@ -23,6 +25,7 @@ using TransactStage = realm::DB::TransactStage;
 using IteratorControl = realm::IteratorControl;
 using Cluster = realm::Cluster;
 using Array = realm::Array;
+using ArrayString = realm::ArrayString;
 
 using Replication = realm::Replication;
 using realm::make_in_realm_history;
@@ -64,6 +67,7 @@ void txn_rollback_and_continue_as_read(const Transaction&);
 void txn_advance_read(const Transaction&, VersionID target_version);
 bool txn_promote_to_write(const Transaction&, bool nonblocking);
 realm::TransactionRef txn_freeze(const Transaction&);
+::rust::Vec<TableKey> txn_get_table_keys(const Transaction&) noexcept;
 bool txn_has_table(const Transaction&, ::rust::Str name) noexcept;
 TableKey txn_find_table(const Transaction&, ::rust::Str name) noexcept;
 ::rust::Str txn_get_table_name(const Transaction&, TableKey key);
@@ -105,10 +109,19 @@ void obj_set_int(const Obj& obj, ColKey col_key, int64_t value);
 ref_type cluster_get_keys_ref(const Cluster& cluster) noexcept;
 ref_type cluster_get_column_ref(const Cluster& cluster, size_t column_ndx) noexcept;
 
-std::unique_ptr<Array> array_new_unattached(const Allocator& alloc)
+inline std::unique_ptr<Array> array_new_unattached(const Allocator& alloc)
 {
     return std::make_unique<Array>(const_cast<Allocator&>(alloc));
 }
 NodeHeaderWidthType array_get_width_type(const Array&) noexcept;
+::rust::Slice<const uint8_t> array_get_data(const Array&) noexcept;
+
+inline std::unique_ptr<ArrayString> array_string_new_unattached(const Allocator& alloc)
+{
+    return std::make_unique<ArrayString>(const_cast<Allocator&>(alloc));
+}
+
+::rust::Str array_string_get(const ArrayString& array, size_t ndx);
+
 
 } // namespace realm::rust

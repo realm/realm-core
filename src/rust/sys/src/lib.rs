@@ -296,6 +296,7 @@ mod ffi {
         fn size(self: &Transaction) -> usize;
 
         fn txn_has_table(txn: &Transaction, name: &str) -> bool;
+        fn txn_get_table_keys(txn: &Transaction) -> Vec<TableKey>;
         fn txn_find_table(txn: &Transaction, name: &str) -> TableKey;
         fn txn_get_table_name(txn: &Transaction, key: TableKey) -> Result<&str>;
         fn txn_table_is_public(txn: &Transaction, key: TableKey) -> Result<bool>;
@@ -410,6 +411,7 @@ mod ffi {
         /// Array constructor.
         fn array_new_unattached<'a>(alloc: &'a Allocator) -> Result<UniquePtr<Array<'a>>>;
         fn array_get_width_type(array: &Array) -> NodeHeaderWidthType;
+        fn array_get_data<'a, 'alloc>(array: &'a Array<'alloc>) -> &'a [u8];
 
         /// Unsafe because the ref must be valid for the allocator that the
         /// array was initialized with.
@@ -426,10 +428,32 @@ mod ffi {
         fn get_width(self: &Array) -> usize;
         fn has_refs(self: &Array) -> bool;
         fn is_inner_bptree_node(self: &Array) -> bool;
+        fn get_context_flag(self: &Array) -> bool;
         fn get_byte_size(self: &Array) -> usize;
 
         /// Unsafe because no bounds check.
         unsafe fn get(self: &Array, ndx: usize) -> i64;
+    }
+
+    unsafe extern "C++" {
+        pub type ArrayString<'alloc>;
+
+        fn array_string_new_unattached<'a>(
+            alloc: &'a Allocator,
+        ) -> Result<UniquePtr<ArrayString<'a>>>;
+
+        unsafe fn init_from_ref(self: Pin<&mut ArrayString>, ref_: usize);
+        fn size(self: &ArrayString) -> usize;
+
+        /// Unsafe because it does not perform bounds checks.
+        #[cxx_name = "is_null"]
+        unsafe fn is_null_unchecked(self: &ArrayString, ndx: usize) -> Result<bool>;
+
+        /// Unsafe because it does not perform bounds checks.
+        unsafe fn array_string_get<'a, 'alloc>(
+            array: &'a ArrayString<'alloc>,
+            ndx: usize,
+        ) -> Result<&'a str>;
     }
 
     // Free utility functions.
@@ -532,6 +556,10 @@ impl Transaction {
     pub fn freeze(&self) -> Result<cxx::SharedPtr<Transaction>, cxx::Exception> {
         txn_freeze(self)
     }
+
+    pub fn get_table_keys(&self) -> Vec<TableKey> {
+        txn_get_table_keys(self)
+    }
 }
 
 impl Table {
@@ -632,6 +660,78 @@ impl<'a> Array<'a> {
             NodeHeaderWidthType::wtype_Ignore => 8,
             NodeHeaderWidthType::wtype_Multiply => width * 8,
             _ => width,
+        }
+    }
+
+    pub fn data(&self) -> &[u8] {
+        array_get_data(self)
+    }
+}
+
+impl<'a> ArrayString<'a> {
+    pub fn new(alloc: &'a Allocator) -> Result<cxx::UniquePtr<ArrayString<'a>>, cxx::Exception> {
+        array_string_new_unattached(alloc)
+    }
+
+    pub fn len(&self) -> usize {
+        self.size()
+    }
+
+    pub fn is_null(&self, ndx: usize) -> Result<bool, cxx::Exception> {
+        assert!(ndx < self.len());
+        unsafe { self.is_null_unchecked(ndx) }
+    }
+
+    pub unsafe fn get_unchecked(&self, ndx: usize) -> Result<&str, cxx::Exception> {
+        array_string_get(self, ndx)
+    }
+
+    pub fn get(&self, ndx: usize) -> Result<&str, cxx::Exception> {
+        assert!(ndx < self.len());
+        unsafe { self.get_unchecked(ndx) }
+    }
+
+    pub fn iter<'b>(&'b self) -> ArrayStringIter<'b, 'a> {
+        ArrayStringIter {
+            array: self,
+            i: 0,
+            len: self.len(),
+        }
+    }
+}
+
+impl<'a, 'alloc> IntoIterator for &'a ArrayString<'alloc> {
+    type IntoIter = ArrayStringIter<'a, 'alloc>;
+    type Item = Option<&'a str>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct ArrayStringIter<'a, 'alloc> {
+    array: &'a ArrayString<'alloc>,
+    i: usize,
+    len: usize,
+}
+
+impl<'a, 'alloc> Iterator for ArrayStringIter<'a, 'alloc> {
+    type Item = Option<&'a str>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i < self.len {
+            let i = self.i;
+            self.i += 1;
+            unsafe {
+                // SAFETY: Implicit bounds due to how the iterator is constructed.
+                if !self.array.is_null_unchecked(i).unwrap() {
+                    Some(Some(self.array.get_unchecked(i).unwrap()))
+                } else {
+                    Some(None)
+                }
+            }
+        } else {
+            None
         }
     }
 }
