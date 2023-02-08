@@ -688,7 +688,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto&& [error_future2, err_handler2] = make_error_handler();
             config_copy.sync_config->error_handler = err_handler2;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            auto sync_error = std::move(error_future2).get();
+            auto sync_error = wait_for_future(std::move(error_future2)).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
             REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
@@ -710,7 +710,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            ClientResyncMode mode = client_reset_future.get();
+            ClientResyncMode mode = wait_for_future(std::move(client_reset_future)).get();
             REQUIRE(mode == ClientResyncMode::DiscardLocal);
             realm_post_reset->refresh();
             auto table = realm_post_reset->read_group().get_table("class_TopLevel");
@@ -2539,7 +2539,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         auto sub_set = setup_subs(problem_realm);
         auto sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
 
-        sub_complete_future.get();
+        wait_for_future(std::move(sub_complete_future)).get();
         wait_for_advance(*problem_realm);
 
         sub_set.refresh();

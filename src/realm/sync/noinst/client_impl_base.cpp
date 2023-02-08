@@ -131,7 +131,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
-    , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
+    , m_connection_linger_time{config.connection_linger_time}
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
@@ -143,7 +143,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
-    , m_one_connection_per_session{config.one_connection_per_session}
+    , m_one_connection_per_session{false}
     , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.
@@ -228,6 +228,7 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT_DEBUG(m_outstanding_posts > 0);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -266,6 +267,7 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT_DEBUG(m_outstanding_posts > 0);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -318,6 +320,7 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT_DEBUG(m_num_active_sessions);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
@@ -379,14 +382,18 @@ void Connection::cancel_reconnect_delay()
 
 void Connection::force_close()
 {
+    m_force_closing = true;
     if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
         m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
         m_reconnect_delay_in_progress = false;
     }
 
-    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
-    REALM_ASSERT(m_num_active_sessions == 0);
+    if (m_num_active_unsuspended_sessions || m_num_active_sessions) {
+        logger.detail("All active sessions must end before closing connection.");
+        return;
+    }
+
     if (m_state == ConnectionState::disconnected) {
         return;
     }
@@ -1733,8 +1740,9 @@ void Session::activate()
     }
     catch (const IntegrationException& error) {
         logger.error("Error integrating bootstrap changesets: %1", error.what());
-        on_suspended(SessionErrorInfo{error.code(), false});
+        m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(SessionErrorInfo{error.code(), false});
     }
 
     if (has_pending_client_reset) {

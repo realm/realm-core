@@ -668,6 +668,7 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 
     {
         std::lock_guard lk(m_drain_mutex);
+        REALM_ASSERT_DEBUG(m_num_connections);
         --m_num_connections;
         m_drain_cv.notify_all();
     }

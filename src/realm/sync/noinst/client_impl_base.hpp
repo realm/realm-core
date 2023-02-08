@@ -569,6 +569,8 @@ private:
 
     bool m_websocket_error_received = false;
 
+    bool m_force_closing = false;
+
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.
     //
@@ -1262,8 +1264,15 @@ inline void ClientImpl::Connection::one_more_active_unsuspended_session()
 
 inline void ClientImpl::Connection::one_less_active_unsuspended_session()
 {
+
+    REALM_ASSERT_DEBUG(m_num_active_unsuspended_sessions);
     if (--m_num_active_unsuspended_sessions != 0)
         return;
+
+    if (m_force_closing) {
+        logger.info("Force closing connection during drain");
+        voluntary_disconnect();
+    }
     // Dropped from one to zero
     if (m_state != ConnectionState::disconnected)
         initiate_disconnect_wait(); // Throws
