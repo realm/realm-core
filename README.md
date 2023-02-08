@@ -3,7 +3,9 @@
 Realm is a mobile database that runs directly inside phones, tablets or wearables - check out [realm.io](https://realm.io). 
 
 This repository holds the source code for the core database component used by all the Realm Mobile Database products:
+* [Realm Dart](https://github.com/realm/realm-dart)
 * [Realm Java](https://github.com/realm/realm-java)
+* [Realm Kotlin](https://github.com/realm/realm-kotlin)
 * [Realm Objective-C](https://github.com/realm/realm-cocoa)
 * [Realm React Native](https://github.com/realm/realm-js)
 * [Realm Swift](https://github.com/realm/realm-cocoa)
