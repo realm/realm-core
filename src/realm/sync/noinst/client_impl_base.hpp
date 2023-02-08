@@ -35,7 +35,7 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type>;
+using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type, std::string>;
 
 class SessionWrapper;
 
@@ -793,6 +793,7 @@ public:
     ~Session();
 
     util::Future<std::string> send_test_command(std::string body);
+    void trigger_reconnect();
 
 private:
     using SyncTransactReporter = ClientHistory::SyncTransactReporter;

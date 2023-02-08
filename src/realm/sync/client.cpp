@@ -214,6 +214,7 @@ public:
     void on_new_flx_subscription_set(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string body);
+    void trigger_reconnect();
 
     void handle_pending_client_reset_acknowledgement();
 
@@ -225,6 +226,7 @@ private:
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
     const port_type m_server_port;
+    const std::string m_user_id;
     const std::string m_authorization_header_name;
     const std::map<std::string, std::string> m_custom_http_headers;
     const bool m_verify_servers_ssl_certificate;
@@ -960,6 +962,11 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
             REALM_ASSERT(!err_processing_err);
             return SyncClientHookAction::EarlyReturn;
         }
+        case realm::SyncClientHookAction::TriggerReconnect: {
+            m_conn.voluntary_disconnect();
+            logger.debug("Reconnect triggered from debug hook");
+            return SyncClientHookAction::EarlyReturn;
+        }
         default:
             return action;
     }
@@ -1060,6 +1067,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
+    , m_user_id{config.user_id}
     , m_authorization_header_name{config.authorization_header_name}
     , m_custom_http_headers{config.custom_http_headers}
     , m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate}
@@ -1561,7 +1569,7 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
 void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port)
 {
     REALM_ASSERT(!m_initiated);
-    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port};
+    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, m_user_id};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_initiated = true;
 }
@@ -1700,6 +1708,15 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     }
 
     return m_sess->send_test_command(std::move(body));
+}
+
+void SessionWrapper::trigger_reconnect()
+{
+    if (!m_sess) {
+        return;
+    }
+
+    m_sess->trigger_reconnect();
 }
 
 void SessionWrapper::handle_pending_client_reset_acknowledgement()
@@ -2012,6 +2029,11 @@ void Session::on_new_flx_sync_subscription(int64_t new_version)
 util::Future<std::string> Session::send_test_command(std::string body)
 {
     return m_impl->send_test_command(std::move(body));
+}
+
+void Session::trigger_reconnect()
+{
+    m_impl->trigger_reconnect();
 }
 
 const std::error_category& client_error_category() noexcept

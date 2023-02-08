@@ -379,7 +379,6 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
-
 void Connection::force_close()
 {
     m_force_closing = true;
@@ -1542,6 +1541,18 @@ void Session::cancel_resumption_delay()
     on_resumed(); // Throws
 }
 
+void Session::trigger_reconnect()
+{
+    get_client().post([this](Status status) {
+        if (status == ErrorCodes::OperationAborted) {
+            return;
+        }
+
+        REALM_ASSERT(status.is_ok());
+        m_conn.voluntary_disconnect();
+        logger.info("Reconnect triggered");
+    });
+}
 
 void Session::gather_pending_compensating_writes(util::Span<Changeset> changesets,
                                                  std::vector<ProtocolErrorInfo>* out)

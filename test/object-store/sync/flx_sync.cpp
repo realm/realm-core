@@ -2449,9 +2449,8 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
                 REQUIRE(table->find_primary_key(bar_obj_id));
                 REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-                sess->pause();
                 promise.get_promise().emplace_value();
-                return SyncClientHookAction::NoAction;
+                return SyncClientHookAction::TriggerReconnect;
             };
         auto problem_realm = Realm::get_shared_realm(triggered_config);
 
@@ -2479,7 +2478,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
         auto sub_complete_future = sub_set.get_state_change_notification(sync::SubscriptionSet::State::Complete);
 
         interrupted.get();
-        problem_realm->sync_session()->shutdown_and_wait();
+        problem_realm->sync_session()->pause();
         REQUIRE(!sub_complete_future.is_ready());
         sub_set.refresh();
         REQUIRE(sub_set.state() == sync::SubscriptionSet::State::AwaitingMark);
@@ -2512,7 +2511,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
                 REQUIRE(table->find_primary_key(bar_obj_id));
                 REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
         auto problem_realm = Realm::get_shared_realm(triggered_config);
 
@@ -2749,7 +2748,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
                 REQUIRE_FALSE(data.error_info->compensating_writes.empty());
                 promise.get_promise().emplace_value();
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
 
         auto realm = Realm::get_shared_realm(config);
@@ -2780,7 +2779,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
         realm->commit_transaction();
 
         error_received_pf.future.get();
-        realm->sync_session()->shutdown_and_wait();
+        realm->sync_session()->pause();
         config.sync_config->on_sync_client_event_hook = {};
     }
 
@@ -2821,6 +2820,9 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::unique_lock<std::mutex> lk(errors_mutex);
+        if (error.error_code == make_error_code(sync::ClientError::bad_session_ident)) {
+            return;
+        }
         REQUIRE(error.error_code == make_error_code(sync::ProtocolError::compensating_write));
         for (const auto& compensating_write : error.compensating_writes_info) {
             auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
@@ -2835,6 +2837,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     };
 
     auto realm = Realm::get_shared_realm(config);
+    realm->sync_session()->resume();
 
     wait_for_upload(*realm);
     wait_for_download(*realm);

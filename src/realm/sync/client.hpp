@@ -321,6 +321,10 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
+        /// the string from of the user id of the logged in user the signed user token
+        /// is associated with.
+        std::string user_id;
+
         using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
@@ -738,6 +742,8 @@ public:
     void on_new_flx_sync_subscription(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string command_body);
+
+    void trigger_reconnect();
 
 private:
     SessionWrapper* m_impl = nullptr;
