@@ -164,7 +164,6 @@ realm_dictionary_add_notification_callback(realm_dictionary_t* dict, realm_userd
         cb.m_userdata = UserdataPtr{userdata, free};
         cb.m_on_change = on_change;
         auto token = dict->add_key_based_notification_callback(std::move(cb), build_key_path_array(key_path_array));
-        // auto token = dict->add_notification_callback(std::move(cb), build_key_path_array(key_path_array));
         return new realm_notification_token_t{std::move(token)};
     });
 }
