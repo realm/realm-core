@@ -744,7 +744,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
                     wait_for_upload(sync_session);
                 }
                 else {
-                    sync_session->log_out();
+                    sync_session->force_close();
                     m_open_paths.erase(m_current_realm->config().path);
                 }
             }

@@ -121,6 +121,18 @@ realm_value_t rlm_decimal_val(double d)
     return val;
 }
 
+realm_value_t rlm_decimal_nan()
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_DECIMAL128;
+
+    realm::Decimal128 dec = realm::Decimal128::nan("0");
+    val.decimal128.w[0] = dec.raw()->w[0];
+    val.decimal128.w[1] = dec.raw()->w[1];
+
+    return val;
+}
+
 realm_value_t rlm_uuid_val(const char* str)
 {
     realm_value_t val;
@@ -625,7 +637,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         });
     }
 
-    SECTION("realm_sync_error_code to_capi()") {
+    SECTION("realm_sync_error_code") {
         using namespace realm::sync;
         std::string message;
 
@@ -636,25 +648,51 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(error_code.message() == error.message);
         CHECK(message == error.message);
 
+        std::error_code ec_check;
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::client_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
         error_code = make_error_code(sync::ProtocolError::connection_closed);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::protocol_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(sync::ProtocolError::session_closed);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
 
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::protocol_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
         error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
 
-        error_code = make_error_code(sync::network::ResolveErrors::host_not_found);
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == std::system_category());
+        CHECK(ec_check.value() == int(error_code.value()));
+
+        error_code = make_error_code(sync::network::ResolveErrors::socket_type_not_supported);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
+        CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::sync::network::resolve_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(util::error::misc_errors::unknown);
         error = c_api::to_capi(error_code, message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
+
+        c_api::sync_error_to_error_code(error, &ec_check);
+        CHECK(ec_check.category() == realm::util::error::basic_system_error_category());
+        CHECK(ec_check.value() == int(error_code.value()));
     }
 
 
@@ -2243,6 +2281,26 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
             }
 
+            SECTION("decimal NaN") {
+                realm_value_t decimal = rlm_decimal_nan();
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
+                });
+                realm_query_arg_t args[] = {realm_query_arg_t{1, false, &decimal}};
+                auto q_decimal = cptr_checked(realm_query_parse(realm, class_foo.key, "decimal == $0", 1, args));
+                realm_value_t out_value;
+                bool out_found;
+                CHECK(realm_query_find_first(q_decimal.get(), &out_value, &out_found));
+                CHECK(out_found);
+                auto link = obj1->obj().get_link();
+                realm_value_t expected;
+                expected.type = RLM_TYPE_LINK;
+                expected.link.target_table = link.get_table_key().value;
+                expected.link.target = link.get_obj_key().value;
+                CHECK(rlm_val_eq(out_value, expected));
+            }
+
             SECTION("interpolate all types") {
                 realm_value_t int_arg = rlm_int_val(123);
                 realm_value_t bool_arg = rlm_bool_val(true);
@@ -3245,11 +3303,13 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(num_moves == 0);
 
                     size_t num_deletions, num_insertions, num_modifications;
+                    bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves);
+                                                             &num_modifications, &num_moves, &collection_cleared);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 1);
+                    CHECK(collection_cleared == false);
 
                     realm_index_range_t deletions, insertions, modifications, modifications_after;
                     realm_collection_move_t moves;
@@ -3286,6 +3346,14 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(modifications_v[1] == size_t(-1));
                     CHECK(modifications_after_v[0] == 2);
                     CHECK(modifications_after_v[1] == size_t(-1));
+
+                    write([&]() {
+                        checked(realm_list_clear(strings.get()));
+                    });
+
+                    realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
+                                                             &num_modifications, &num_moves, &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
         }
@@ -3704,6 +3772,16 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(deletion_range.to == 1);
                     CHECK(insertion_range.from == 0);
                     CHECK(insertion_range.to == 2);
+
+                    write([&]() {
+                        checked(realm_set_clear(strings.get()));
+                    });
+
+                    size_t num_deletions, num_insertions, num_modifications;
+                    bool collection_cleared = false;
+                    realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
+                                                             &num_modifications, &num_moves, &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
         }
@@ -4220,6 +4298,56 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(deletion_range.to == 1);
                     CHECK(insertion_range.from == 0);
                     CHECK(insertion_range.to == 2);
+                }
+            }
+
+            SECTION("realm_dictionary_content_checks") {
+                auto ints = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["int_dict"]));
+                CHECK(ints);
+                CHECK(!realm_is_frozen(ints.get()));
+                realm_value_t key1 = rlm_str_val("k");
+                realm_value_t key2 = rlm_str_val("k2");
+                realm_value_t integer1 = rlm_int_val(987);
+                realm_value_t integer2 = rlm_int_val(988);
+
+                write([&]() {
+                    bool inserted = false;
+                    CHECK(checked(realm_dictionary_insert(ints.get(), key1, integer1, nullptr, &inserted)));
+                    CHECK(inserted);
+                    CHECK(checked(realm_dictionary_insert(ints.get(), key2, integer2, nullptr, &inserted)));
+                    CHECK(inserted);
+                });
+
+                SECTION("realm_dictionary_get_keys") {
+                    size_t size = 0;
+                    realm_results_t* keys = nullptr;
+                    CHECK(checked(realm_dictionary_get_keys(ints.get(), &size, &keys)));
+                    CHECK(keys);
+                    CHECK((*keys).size() == size);
+                    realm_release(keys);
+                }
+
+                SECTION("realm_dictionary_contains_key") {
+                    bool found = false;
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key1, &found)));
+                    CHECK(found);
+                    found = false;
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key2, &found)));
+                    CHECK(found);
+                    realm_value_t key_no_present = rlm_str_val("kkkk");
+                    CHECK(checked(realm_dictionary_contains_key(ints.get(), key_no_present, &found)));
+                    CHECK(!found);
+                }
+
+                SECTION("realm_dictionary_contains_value") {
+                    size_t index = -1;
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer1, &index)));
+                    CHECK(index == 0);
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer2, &index)));
+                    CHECK(index == 1);
+                    realm_value_t integer_no_present = rlm_int_val(678);
+                    CHECK(checked(realm_dictionary_contains_value(ints.get(), integer_no_present, &index)));
+                    CHECK(index == realm::npos);
                 }
             }
         }

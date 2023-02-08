@@ -54,6 +54,7 @@ enum basic_system_errors {
 };
 
 std::error_code make_error_code(basic_system_errors) noexcept;
+const std::error_category& basic_system_error_category();
 
 } // namespace error
 } // namespace util

@@ -97,7 +97,7 @@ public:
     /// websocket will call directly to the handlers provided by the observer.
     /// The WebSocketObserver guarantees that the WebSocket object will be
     /// closed/destroyed before the observer is terminated/destroyed.
-    virtual std::unique_ptr<WebSocketInterface> connect(WebSocketObserver* observer,
+    virtual std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver> observer,
                                                         WebSocketEndpoint&& endpoint) = 0;
 
     /// Submit a handler function to be executed by the event loop (thread).
@@ -139,6 +139,10 @@ public:
     /// timer. The timer will also be canceled if the Timer object returned is
     /// destroyed.
     virtual SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) = 0;
+
+    /// Temporary functions added to support the default socket provider until
+    /// it is fully integrated. Will be removed in future PRs.
+    virtual void stop(bool = false) {}
 };
 
 /// Struct that defines the endpoint to create a new websocket connection.
@@ -152,6 +156,14 @@ struct WebSocketEndpoint {
     std::string path;                   // Includes access token in query.
     std::vector<std::string> protocols; // Array of one or more websocket protocols
     bool is_ssl;                        // true if SSL should be used
+
+    /// DEPRECATED - These will be removed in a future release
+    /// These fields are deprecated and should not be used by custom socket provider implementations
+    std::map<std::string, std::string> headers; // Only includes "custom" headers.
+    bool verify_servers_ssl_certificate;
+    util::Optional<std::string> ssl_trust_certificate_path;
+    std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
+    util::Optional<SyncConfig::ProxyConfig> proxy;
 };
 
 

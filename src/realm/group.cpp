@@ -211,7 +211,7 @@ void Group::set_size() const noexcept
     int retval = 0;
     if (is_attached() && m_table_names.is_attached()) {
         size_t max_index = m_tables.size();
-        REALM_ASSERT(max_index < (1 << 16));
+        REALM_ASSERT_EX(max_index < (1 << 16), max_index);
         for (size_t j = 0; j < max_index; ++j) {
             RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {

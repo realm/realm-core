@@ -191,21 +191,6 @@ TEST(Utils_File_resolve)
     */
 }
 
-#ifndef _WIN32 // An open file cannot be deleted on Windows
-TEST(Utils_File_remove_open)
-{
-    if (test_util::test_dir_is_exfat())
-        return;
-
-    std::string file_name = File::resolve("FooBar", test_util::get_test_path_prefix());
-    File f(file_name, File::mode_Write);
-
-    CHECK_EQUAL(f.is_removed(), false);
-    std::remove(file_name.c_str());
-    CHECK_EQUAL(f.is_removed(), true);
-}
-#endif
-
 TEST(Utils_File_RemoveDirRecursive)
 {
     TEST_DIR(dir_0);
@@ -307,6 +292,20 @@ TEST(Utils_File_ForEach)
         CHECK_EQUAL(dir_2_4,  files[5].first);
         CHECK_EQUAL("file_6", files[5].second);
     }
+}
+
+TEST(Utils_File_Lock)
+{
+    TEST_DIR(dir);
+    util::try_make_dir(dir);
+    auto file = File::resolve("test", dir);
+    File f1(file, File::mode_Write);
+    File f2(file);
+    CHECK(f1.try_rw_lock_exclusive());
+    CHECK_NOT(f2.try_rw_lock_shared());
+    f1.rw_unlock();
+    CHECK(f1.try_rw_lock_shared());
+    CHECK_NOT(f2.try_rw_lock_exclusive());
 }
 
 #endif

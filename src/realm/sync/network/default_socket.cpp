@@ -1,23 +1,30 @@
 #include <realm/sync/network/default_socket.hpp>
 
+#include <realm/sync/binding_callback_thread_observer.hpp>
+
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/util/scope_exit.hpp>
 
 namespace realm::sync::websocket {
 
 namespace {
-class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
+
+///
+/// DefaultWebSocketImpl - websocket implementation for the default socket provider
+///
+class DefaultWebSocketImpl final : public DefaultWebSocket, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
-                         std::mt19937_64& random, const std::string user_agent, EZObserver& observer,
-                         EZEndpoint&& endpoint)
+                         std::mt19937_64& random, const std::string user_agent,
+                         std::unique_ptr<WebSocketObserver> observer, WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
         , m_random{random}
         , m_service{service}
         , m_user_agent{user_agent}
-        , m_observer{observer}
+        , m_observer{std::move(observer)}
         , m_endpoint{std::move(endpoint)}
         , m_websocket(*this)
     {
@@ -36,6 +43,11 @@ public:
         return m_app_services_coid;
     }
 
+    void force_handshake_response_for_testing(int status_code, std::string body = "") override
+    {
+        m_websocket.force_handshake_response_for_testing(status_code, body);
+    }
+
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
     void async_read(char*, std::size_t, ReadCompletionHandler) override;
     void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
@@ -44,9 +56,9 @@ public:
 private:
     using milliseconds_type = std::int_fast64_t;
 
-    util::Logger& websocket_get_logger() noexcept override
+    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept override
     {
-        return m_logger;
+        return m_logger_ptr;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
@@ -60,34 +72,104 @@ private:
             m_app_services_coid = it->second;
         }
         auto it = headers.find("Sec-WebSocket-Protocol");
-        m_observer.websocket_handshake_completion_handler(it == headers.end() ? empty : it->second);
+        m_observer->websocket_connected_handler(it == headers.end() ? empty : it->second);
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
         m_logger.error("Reading failed: %1", ec.message()); // Throws
-        m_observer.websocket_read_or_write_error_handler(ec);
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::ReadError, ec.message()});
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
         m_logger.error("Writing failed: %1", ec.message()); // Throws
-        m_observer.websocket_read_or_write_error_handler(ec);
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WriteError, ec.message()});
     }
     void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
                                            const std::string_view* body) override
     {
-        m_observer.websocket_handshake_error_handler(ec, body);
+        ErrorCodes::Error error;
+        bool was_clean = true;
+
+        if (ec == websocket::Error::bad_response_301_moved_permanently ||
+            ec == websocket::Error::bad_response_308_permanent_redirect) {
+            error = ErrorCodes::WebSocket_MovedPermanently;
+        }
+        else if (ec == websocket::Error::bad_response_3xx_redirection) {
+            error = ErrorCodes::WebSocket_Retry_Error;
+            was_clean = false;
+        }
+        else if (ec == websocket::Error::bad_response_401_unauthorized) {
+            error = ErrorCodes::WebSocket_Unauthorized;
+        }
+        else if (ec == websocket::Error::bad_response_403_forbidden) {
+            error = ErrorCodes::WebSocket_Forbidden;
+        }
+        else if (ec == websocket::Error::bad_response_5xx_server_error ||
+                 ec == websocket::Error::bad_response_500_internal_server_error ||
+                 ec == websocket::Error::bad_response_502_bad_gateway ||
+                 ec == websocket::Error::bad_response_503_service_unavailable ||
+                 ec == websocket::Error::bad_response_504_gateway_timeout) {
+            error = ErrorCodes::WebSocket_InternalServerError;
+            was_clean = false;
+        }
+        else {
+            error = ErrorCodes::WebSocket_Fatal_Error;
+            was_clean = false;
+            if (body) {
+                std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
+                auto i = body->find(identifier);
+                if (i != std::string_view::npos) {
+                    std::string_view rest = body->substr(i + identifier.size());
+                    // FIXME: Use std::string_view::begins_with() in C++20.
+                    auto begins_with = [](std::string_view string, std::string_view prefix) {
+                        return (string.size() >= prefix.size() &&
+                                std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
+                    };
+                    if (begins_with(rest, ":CLIENT_TOO_OLD")) {
+                        error = ErrorCodes::WebSocket_Client_Too_Old;
+                    }
+                    else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
+                        error = ErrorCodes::WebSocket_Client_Too_New;
+                    }
+                    else {
+                        // Other more complicated forms of mismatch
+                        error = ErrorCodes::WebSocket_Protocol_Mismatch;
+                    }
+                    was_clean = true;
+                }
+            }
+        }
+
+        websocket_error_and_close_handler(was_clean, Status{error, ec.message()});
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
-        m_observer.websocket_protocol_error_handler(ec);
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WebSocket_ProtocolError, ec.message()});
     }
     bool websocket_close_message_received(std::error_code ec, StringData message) override
     {
-        return m_observer.websocket_close_message_received(ec, message);
+        constexpr bool was_clean = true;
+
+        // Normal closure.
+        if (ec.value() == 1000) {
+            return websocket_error_and_close_handler(was_clean, Status::OK());
+        }
+        return websocket_error_and_close_handler(was_clean,
+                                                 Status{static_cast<ErrorCodes::Error>(ec.value()), message});
+    }
+    bool websocket_error_and_close_handler(bool was_clean, Status status)
+    {
+        if (!was_clean) {
+            m_observer->websocket_error_handler();
+        }
+        return m_observer->websocket_closed_handler(was_clean, status);
     }
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
-        return m_observer.websocket_binary_message_received(ptr, size);
+        return m_observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
     }
 
     void initiate_resolve();
@@ -95,7 +177,6 @@ private:
     void initiate_tcp_connect(network::Endpoint::List, std::size_t);
     void handle_tcp_connect(std::error_code, network::Endpoint::List, std::size_t);
     void initiate_http_tunnel();
-    void handle_http_tunnel(std::error_code);
     void initiate_websocket_or_ssl_handshake();
     void initiate_ssl_handshake();
     void handle_ssl_handshake(std::error_code);
@@ -115,9 +196,9 @@ private:
     const std::string m_user_agent;
     std::string m_app_services_coid;
 
-    EZObserver& m_observer;
+    std::unique_ptr<WebSocketObserver> m_observer;
 
-    const EZEndpoint m_endpoint;
+    const WebSocketEndpoint m_endpoint;
     util::Optional<network::Resolver> m_resolver;
     util::Optional<network::Socket> m_socket;
     util::Optional<network::ssl::Context> m_ssl_context;
@@ -191,7 +272,8 @@ void DefaultWebSocketImpl::handle_resolve(std::error_code ec, network::Endpoint:
 {
     if (ec) {
         m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
-        m_observer.websocket_connect_error_handler(ec);                                                     // Throws
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::ResolveFailed, ec.message()}); // Throws
         return;
     }
 
@@ -230,7 +312,8 @@ void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpo
         }
         // All endpoints failed
         m_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
-        m_observer.websocket_connect_error_handler(ec); // Throws
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::ConnectionFailed, ec.message()}); // Throws
         return;
     }
 
@@ -265,19 +348,21 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
     req.headers.emplace("Host", util::format("%1:%2", m_endpoint.address, m_endpoint.port));
     // TODO handle proxy authorization
 
-    m_proxy_client.emplace(*this, m_logger);
+    m_proxy_client.emplace(*this, m_logger_ptr);
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
             m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
-            m_observer.websocket_connect_error_handler(ec); // Throws
+            constexpr bool was_clean = false;
+            websocket_error_and_close_handler(was_clean,
+                                              Status{ErrorCodes::ConnectionFailed, ec.message()}); // Throws
             return;
         }
 
         if (response.status != HTTPStatus::Ok) {
             m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
-            std::error_code ec2 =
-                websocket::Error::bad_response_unexpected_status_code;       // FIXME: is this the right error?
-            m_observer.websocket_connect_error_handler(ec2);                 // Throws
+            constexpr bool was_clean = false;
+            websocket_error_and_close_handler(was_clean,
+                                              Status{ErrorCodes::ConnectionFailed, response.reason}); // Throws
             return;
         }
 
@@ -339,7 +424,9 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
-        m_observer.websocket_ssl_handshake_error_handler(ec); // Throws
+        constexpr bool was_clean = false;
+        websocket_error_and_close_handler(was_clean,
+                                          Status{ErrorCodes::WebSocket_TLSHandshakeFailed, ec.message()}); // Throws
         return;
     }
 
@@ -357,15 +444,189 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
     auto host = m_endpoint.port == default_port ? m_endpoint.address
                                                 : util::format("%1:%2", m_endpoint.address, m_endpoint.port);
 
-    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), m_endpoint.protocols,
+    // Convert the list of protocols to a string
+    std::ostringstream protocol_list;
+    protocol_list.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    protocol_list.imbue(std::locale::classic());
+    if (m_endpoint.protocols.size() > 1)
+        std::copy(m_endpoint.protocols.begin(), m_endpoint.protocols.end() - 1,
+                  std::ostream_iterator<std::string>(protocol_list, ", "));
+    protocol_list << m_endpoint.protocols.back();
+
+    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), protocol_list.str(),
                                           std::move(headers)); // Throws
 }
 } // namespace
 
-std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect_legacy(EZObserver* observer, EZEndpoint&& endpoint)
+///
+/// DefaultSocketProvider - default socket provider implementation
+///
+
+DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger,
+                                             const std::string user_agent, AutoStart auto_start)
+    : m_logger_ptr{logger}
+    , m_service{}
+    , m_random{}
+    , m_user_agent{user_agent}
+    , m_mutex{}
+    , m_state{State::Stopped}
+    , m_state_cv{}
+    , m_thread{}
 {
-    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, *m_service, m_random, m_user_agent, *observer,
-                                                  std::move(endpoint));
+    REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
+    util::seed_prng_nondeterministically(m_random); // Throws
+    if (auto_start) {
+        start();
+    }
+}
+
+DefaultSocketProvider::~DefaultSocketProvider()
+{
+    m_logger_ptr->trace("Default event loop teardown");
+    // Wait for the thread to stop
+    stop(true);
+    // Shutting down - no need to lock mutex before check
+    REALM_ASSERT(m_state == State::Stopped);
+}
+
+void DefaultSocketProvider::start()
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+    // Has the thread already been started or is running
+    if (m_state == State::Starting || m_state == State::Running)
+        return; // early return
+
+    // If the thread has been previously run, make sure it has been joined first
+    if (m_state == State::Stopping) {
+        state_wait_for(lock, State::Stopped);
+    }
+
+    m_logger_ptr->trace("Default event loop: start()");
+    REALM_ASSERT(m_state == State::Stopped);
+    do_state_update(lock, State::Starting);
+    m_thread = std::thread{&DefaultSocketProvider::event_loop, this};
+    // Wait for the thread to start before continuing
+    state_wait_for(lock, State::Running);
+}
+
+void DefaultSocketProvider::event_loop()
+{
+    m_logger_ptr->trace("Default event loop: thread running");
+    auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+        m_logger_ptr->trace("Default event loop: thread exiting");
+        if (g_binding_callback_thread_observer)
+            g_binding_callback_thread_observer->will_destroy_thread();
+
+        std::unique_lock<std::mutex> lock(m_mutex);
+        // Did we get here due to an unhandled exception?
+        if (m_state != State::Stopping) {
+            m_logger_ptr->error("Default event loop: thread exited unexpectedly");
+        }
+        m_state = State::Stopped;
+        std::notify_all_at_thread_exit(m_state_cv, std::move(lock));
+    });
+
+    if (g_binding_callback_thread_observer)
+        g_binding_callback_thread_observer->did_create_thread();
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        REALM_ASSERT(m_state == State::Starting);
+    }
+
+    // We update the state to Running from inside the event loop so that start() is blocked until
+    // the event loop is actually ready to receive work.
+    m_service.post([this, my_generation = ++m_event_loop_generation](Status status) {
+        if (status == ErrorCodes::OperationAborted) {
+            return;
+        }
+
+        REALM_ASSERT(status.is_ok());
+
+        std::unique_lock<std::mutex> lock(m_mutex);
+        // This is a callback from a previous generation
+        if (m_event_loop_generation != my_generation) {
+            return;
+        }
+        if (m_state == State::Stopping) {
+            return;
+        }
+        m_logger_ptr->trace("Default event loop: service run");
+        REALM_ASSERT(m_state == State::Starting);
+        do_state_update(lock, State::Running);
+    });
+
+    try {
+        m_service.run_until_stopped(); // Throws
+    }
+    catch (const std::exception& e) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        // Service is no longer running, event loop thread is stopping
+        do_state_update(lock, State::Stopping);
+        lock.unlock();
+        m_logger_ptr->error("Default event loop exception: ", e.what());
+        if (g_binding_callback_thread_observer)
+            g_binding_callback_thread_observer->handle_error(e);
+        else
+            throw;
+    }
+}
+
+void DefaultSocketProvider::stop(bool wait_for_stop)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    // Do nothing if the thread is not started or running or stop has already been called
+    if (m_state == State::Starting || m_state == State::Running) {
+        m_logger_ptr->trace("Default event loop: stop()");
+        do_state_update(lock, State::Stopping);
+        // Updating state to Stopping will free a start() if it is waiting for the thread to
+        // start and may cause the thread to exit early before calling service.run()
+        m_service.stop(); // Unblocks m_service.run()
+    }
+
+    // Wait until the thread is stopped (exited) if requested
+    if (wait_for_stop) {
+        m_logger_ptr->trace("Default event loop: wait for stop");
+        state_wait_for(lock, State::Stopped);
+        if (m_thread.joinable()) {
+            m_thread.join();
+        }
+    }
+}
+
+//                    +---------------------------------------+
+//                   \/                                       |
+// State Machine: Stopped -> Starting -> Running -> Stopping -+
+//                              |           |          ^
+//                              +----------------------+
+
+void DefaultSocketProvider::do_state_update(std::unique_lock<std::mutex>&, State new_state)
+{
+    // m_state_mutex should already be locked...
+    m_state = new_state;
+    m_state_cv.notify_all(); // Let any waiters check the state
+}
+
+void DefaultSocketProvider::state_wait_for(std::unique_lock<std::mutex>& lock, State expected_state)
+{
+    // Check for condition already met or superseded
+    if (m_state >= expected_state)
+        return;
+
+    m_state_cv.wait(lock, [this, expected_state]() {
+        // are we there yet?
+        if (m_state < expected_state)
+            return false;
+        return true;
+    });
+}
+
+std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(std::unique_ptr<WebSocketObserver> observer,
+                                                                   WebSocketEndpoint&& endpoint)
+{
+    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, m_service, m_random, m_user_agent,
+                                                  std::move(observer), std::move(endpoint));
 }
 
 } // namespace realm::sync::websocket

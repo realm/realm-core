@@ -30,7 +30,6 @@ set(TEST_UTIL_HEADERS
     resource_limits.hpp
     semaphore.hpp
     super_int.hpp
-    test_logger.hpp
     test_only.hpp
     test_path.hpp
     test_types.hpp

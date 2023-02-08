@@ -30,6 +30,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/sync/network/default_socket.hpp>
 
 #include "collection_fixtures.hpp"
 #include "sync_test_utils.hpp"
@@ -2008,7 +2009,7 @@ constexpr size_t minus_25_percent(size_t val)
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
-    auto logger = std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
 
@@ -2124,11 +2125,37 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
         }
         // Optional handler for the request and response before it is returned to completion
-        util::UniqueFunction<void(const Request&, const Response&)> response_hook;
+        std::function<void(const Request&, const Response&)> response_hook;
         // Optional handler for the request before it is sent to the server
-        util::UniqueFunction<void(const Request&)> request_hook;
+        std::function<void(const Request&)> request_hook;
         // Optional Response object to return immediately instead of communicating with the server
-        util::Optional<Response> simulated_response;
+        std::optional<Response> simulated_response;
+    };
+
+    struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
+        HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                             AutoStart auto_start = AutoStart{true})
+            : DefaultSocketProvider(logger, user_agent, auto_start)
+        {
+        }
+
+        std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                          sync::WebSocketEndpoint&& endpoint) override
+        {
+            int status_code = 101;
+            std::string body;
+            bool use_simulated_response = websocket_connect_func && websocket_connect_func(status_code, body);
+
+            auto websocket = DefaultSocketProvider::connect(std::move(observer), std::move(endpoint));
+            if (use_simulated_response) {
+                auto default_websocket = static_cast<sync::websocket::DefaultWebSocket*>(websocket.get());
+                if (default_websocket)
+                    default_websocket->force_handshake_response_for_testing(status_code, body);
+            }
+            return websocket;
+        }
+
+        std::function<bool(int&, std::string&)> websocket_connect_func;
     };
 
     {
@@ -2197,10 +2224,17 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
+                    // using local baas
                     if (request.url.find("127.0.0.1:9090") != std::string::npos) {
                         redirect_host = "localhost:9090";
                         original_host = "127.0.0.1:9090";
                     }
+                    // using baas docker - can't test redirect
+                    else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
+                        redirect_host = "mongodb-realm:9090";
+                        original_host = "mongodb-realm:9090";
+                    }
+
                     redirect_url = redirect_scheme + redirect_host;
                     logger->trace("redirect_url (%1): %2", request_count, redirect_url);
                     request_count++;
@@ -2219,7 +2253,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find("somehost:9090") != std::string::npos);
                     redir_transport->simulated_response = {
-                        301, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
+                        308, 0, {{"Location", redirect_url}, {"Content-Type", "application/json"}}, "Some body data"};
                     request_count++;
                 }
                 else if (request_count == 3) {
@@ -2236,7 +2270,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("request.url (%1): %2", request_count, request.url);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
                     // Let the init_app_metadata request go through
-                    redir_transport->simulated_response = util::none;
+                    redir_transport->simulated_response.reset();
                     request_count++;
                 }
                 else if (request_count == 5) {
@@ -2252,7 +2286,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     logger->trace("WS Hostname: %1", app_metadata->ws_hostname);
                     REQUIRE(app_metadata->hostname.find(original_host) != std::string::npos);
                     REQUIRE(request.url.find(redirect_scheme + original_host) != std::string::npos);
-                    redir_transport->simulated_response = util::none;
+                    redir_transport->simulated_response.reset();
                     // Validate the retry count tracked in the original message
                     REQUIRE(request.redirect_count == 3);
                     request_count++;
@@ -2271,7 +2305,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request_count <= 21);
                 redir_transport->simulated_response = {
-                    301,
+                    request_count % 2 == 1 ? 308 : 301,
                     0,
                     {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
                     "Some body data"};
@@ -2310,6 +2344,258 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 });
         }
     }
+    SECTION("Test app redirect with no metadata") {
+        std::unique_ptr<realm::AppSession> app_session;
+        std::string base_file_path = util::make_temp_dir() + random_string(10);
+        auto redir_transport = std::make_shared<HookedTransport>();
+        AutoVerifiedEmailCredentials creds, creds2;
+
+        auto app_config = get_config(redir_transport, session.app_session());
+        set_app_config_defaults(app_config, redir_transport);
+
+        util::try_make_dir(base_file_path);
+        SyncClientConfig sc_config;
+        sc_config.base_file_path = base_file_path;
+        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
+
+        // initialize app and sync client
+        auto redir_app = app::App::get_uncached_app(app_config, sc_config);
+
+        int request_count = 0;
+        // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
+        std::string original_host = "localhost:9090";
+        std::string original_scheme = "http://";
+        std::string websocket_url = "ws://some-websocket:9090";
+        std::string original_url;
+        redir_transport->request_hook = [&](const Request& request) {
+            if (request_count == 0) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                if (request.url.find("https://") != std::string::npos) {
+                    original_scheme = "https://";
+                }
+                // using local baas
+                if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                    original_host = "127.0.0.1:9090";
+                }
+                // using baas docker
+                else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
+                    original_host = "mongodb-realm:9090";
+                }
+                original_url = original_scheme + original_host;
+                logger->trace("original_url (%1): %2", request_count, original_url);
+            }
+            else if (request_count == 1) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(!request.redirect_count);
+                redir_transport->simulated_response = {
+                    308,
+                    0,
+                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
+                    "Some body data"};
+            }
+            else if (request_count == 2) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
+                REQUIRE(request.url.find("location") != std::string::npos);
+                // app hostname will be updated via the metadata info
+                redir_transport->simulated_response = {
+                    static_cast<int>(sync::HTTPStatus::Ok),
+                    0,
+                    {{"Content-Type", "application/json"}},
+                    util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
+                                 "hostname\":\"%2\"}",
+                                 original_url, websocket_url)};
+            }
+            else {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                REQUIRE(request.url.find(original_url) != std::string::npos);
+                redir_transport->simulated_response.reset();
+            }
+            request_count++;
+        };
+
+        // This will be successful after a couple of retries due to the redirect response
+        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+            });
+        REQUIRE(!redir_app->sync_manager()->app_metadata()); // no stored app metadata
+        REQUIRE(redir_app->sync_manager()->sync_route().find(websocket_url) != std::string::npos);
+
+        // Register another email address and verify location data isn't requested again
+        request_count = 0;
+        redir_transport->request_hook = [&](const Request& request) {
+            logger->trace("request.url (%1): %2", request_count, request.url);
+            redir_transport->simulated_response.reset();
+            REQUIRE(request.url.find("location") == std::string::npos);
+            request_count++;
+        };
+
+        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+            creds2.email, creds2.password, [&](util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+            });
+    }
+
+    SECTION("Test websocket redirect with existing session") {
+        std::string original_host = "localhost:9090";
+        std::string redirect_scheme = "http://";
+        std::string websocket_scheme = "ws://";
+        std::string redirect_host = "127.0.0.1:9090";
+        std::string redirect_url = "http://127.0.0.1:9090";
+
+        auto redir_transport = std::make_shared<HookedTransport>();
+        auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
+
+        // Use the transport to grab the current url so it can be converted
+        redir_transport->request_hook = [&](const Request& request) {
+            if (request.url.find("https://") != std::string::npos) {
+                redirect_scheme = "https://";
+                websocket_scheme = "wss://";
+            }
+            // using local baas
+            if (request.url.find("127.0.0.1:9090") != std::string::npos) {
+                redirect_host = "localhost:9090";
+                original_host = "127.0.0.1:9090";
+            }
+            // using baas docker - can't test redirect
+            else if (request.url.find("mongodb-realm:9090") != std::string::npos) {
+                redirect_host = "mongodb-realm:9090";
+                original_host = "mongodb-realm:9090";
+            }
+
+            redirect_url = redirect_scheme + redirect_host;
+            logger->trace("redirect_url: %1", redirect_url);
+        };
+
+        auto base_url = get_base_url();
+        auto server_app_config = minimal_app_config(base_url, "websocket_redirect", schema);
+        TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
+                                    realm::ReconnectMode::normal, redir_provider);
+        auto partition = random_string(100);
+        auto user1 = test_session.app()->current_user();
+        SyncTestFile r_config(user1, partition, schema);
+        // Overrride the default
+        r_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+            if (error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+                util::format(std::cerr, "Websocket redirect test: User logged out\n");
+                return;
+            }
+            util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
+                         error.message);
+            abort();
+        };
+
+        auto r = Realm::get_shared_realm(r_config);
+
+        REQUIRE(!wait_for_download(*r));
+
+        SECTION("Valid websocket redirect") {
+            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_session = sync_manager->get_existing_session(r->config().path);
+            sync_session->pause();
+
+            int connect_count = 0;
+            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+                if (connect_count++ > 0)
+                    return false;
+
+                status_code = static_cast<int>(sync::HTTPStatus::PermanentRedirect);
+                body = "";
+                return true;
+            };
+            int request_count = 0;
+            redir_transport->request_hook = [&](const Request& request) {
+                if (request_count++ == 0) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.redirect_count);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::PermanentRedirect),
+                        0,
+                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                }
+                else if (request.url.find("location") != std::string::npos) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::Ok),
+                        0,
+                        {{"Content-Type", "application/json"}},
+                        util::format(
+                            "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%2%1\",\"ws_"
+                            "hostname\":\"%3%1\"}",
+                            redirect_host, redirect_scheme, websocket_scheme)};
+                }
+                else {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response.reset();
+                }
+            };
+
+            sync_session->resume();
+            REQUIRE(!wait_for_download(*r));
+
+            // Verify session is using the updated server url from the redirect
+            auto server_url = sync_session->full_realm_url();
+            logger->trace("FULL_REALM_URL: %1", server_url);
+            REQUIRE((server_url && server_url->find(redirect_host) != std::string::npos));
+        }
+        SECTION("Websocket redirect logs out user") {
+            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_session = sync_manager->get_existing_session(r->config().path);
+            sync_session->pause();
+
+            int connect_count = 0;
+            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+                if (connect_count++ > 0)
+                    return false;
+
+                status_code = static_cast<int>(sync::HTTPStatus::MovedPermanently);
+                body = "";
+                return true;
+            };
+            int request_count = 0;
+            redir_transport->request_hook = [&](const Request& request) {
+                if (request_count++ == 0) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    REQUIRE(!request.redirect_count);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::MovedPermanently),
+                        0,
+                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                }
+                else if (request.url.find("location") != std::string::npos) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::Ok),
+                        0,
+                        {{"Content-Type", "application/json"}},
+                        util::format(
+                            "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%2%1\",\"ws_"
+                            "hostname\":\"%3%1\"}",
+                            redirect_host, redirect_scheme, websocket_scheme)};
+                }
+                else if (request.url.find("auth/session") != std::string::npos) {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::Unauthorized),
+                                                           0,
+                                                           {{"Content-Type", "application/json"}},
+                                                           ""};
+                }
+                else {
+                    logger->trace("request.url (%1): %2", request_count, request.url);
+                    redir_transport->simulated_response.reset();
+                }
+            };
+
+            sync_session->resume();
+            REQUIRE(wait_for_download(*r));
+            REQUIRE(!user1->is_logged_in());
+        }
+    }
+
     SECTION("Fast clock on client") {
         {
             SyncTestFile config(app, partition, schema);
@@ -2690,7 +2976,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex mutex;
         bool done = false;
         auto r = Realm::get_shared_realm(config);
-        r->sync_session()->close();
+        r->sync_session()->pause();
 
         // Create 26 MB worth of dogs in 26 transactions, which should work but
         // will result in an error from the server if the changesets are batched
@@ -2710,7 +2996,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!ec);
             done = true;
         });
-        r->sync_session()->revive_if_needed();
+        r->sync_session()->resume();
 
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
@@ -2751,6 +3037,33 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                  "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
+    }
+
+    SECTION("freezing realm does not resume session") {
+        SyncTestFile config(app, partition, schema);
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+
+        auto state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Active);
+
+        realm->sync_session()->pause();
+        state = realm->sync_session()->state();
+        REQUIRE(state == SyncSession::State::Paused);
+
+        realm->read_group();
+
+        {
+            auto frozen = realm->freeze();
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
+
+        {
+            auto frozen = Realm::get_frozen_realm(config, realm->read_transaction_version());
+            REQUIRE(realm->sync_session() == realm->sync_session());
+            REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
+        }
     }
 
     SECTION("validation") {
