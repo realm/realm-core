@@ -599,6 +599,7 @@ void Connection::initiate_reconnect_wait()
                 case ConnectionTerminationReason::closed_voluntarily:
                 case ConnectionTerminationReason::read_or_write_error:
                 case ConnectionTerminationReason::pong_timeout:
+                case ConnectionTerminationReason::auto_client_reset_failure:
                     // Minimum delay after successful connect operation
                     delay = min_delay;
                     break;
@@ -1169,8 +1170,15 @@ void Connection::read_or_write_error(std::error_code ec)
 
 void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                              // A sync protocol violation is a fatal error
+    bool is_fatal; // A sync protocol violation is a fatal error
+    if (ec == ClientError::auto_client_reset_failure) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::auto_client_reset_failure;
+        is_fatal = false;
+    }
+    else {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
+        is_fatal = true;
+    }
     close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
@@ -1397,8 +1405,9 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
     }
 
     std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
-    if (ec)
+    if (ec) {
         close_due_to_protocol_error(ec); // Throws
+    }
 }
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,

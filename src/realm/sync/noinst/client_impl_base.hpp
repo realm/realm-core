@@ -333,6 +333,7 @@ enum class ClientImpl::ConnectionTerminationReason {
     server_said_try_again_later,       ///< Client received ERROR message with try_again=yes
     server_said_do_not_reconnect,      ///< Client received ERROR message with try_again=no
     pong_timeout,                      ///< Client did not receive PONG after PING
+    auto_client_reset_failure,         ///< Auto client reset failed - reconnect to try again
 
     /// The application requested a feature that is unavailable in the
     /// negotiated protocol version.
@@ -1331,6 +1332,7 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::server_said_do_not_reconnect:
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
+        case ConnectionTerminationReason::auto_client_reset_failure:
             break;
     }
     return false;
