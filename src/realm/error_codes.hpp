@@ -255,9 +255,9 @@ public:
 
         WebSocketResolveFailed = RLM_ERR_WEBSOCKET_RESOLVE_FAILED,
         WebSocketConnectionFailed = RLM_ERR_WEBSOCKET_CONNECTION_FAILED,
-        WebSocketReadError = RLM_ERR_WEBSOCKET_RETRY_ERROR,
-        WebSocketWriteError = RLM_ERR_WEBSOCKET_READ_ERROR,
-        WebSocketRetryError = RLM_ERR_WEBSOCKET_WRITE_ERROR,
+        WebSocketReadError = RLM_ERR_WEBSOCKET_READ_ERROR,
+        WebSocketWriteError = RLM_ERR_WEBSOCKET_WRITE_ERROR,
+        WebSocketRetryError = RLM_ERR_WEBSOCKET_RETRY_ERROR,
         WebSocketFatalError = RLM_ERR_WEBSOCKET_FATAL_ERROR,
     };
 

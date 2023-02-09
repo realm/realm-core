@@ -155,8 +155,7 @@ private:
         if (ec.value() == 1000) {
             return websocket_error_and_close_handler(was_clean, Status::OK());
         }
-        return websocket_error_and_close_handler(was_clean,
-                                                 Status{static_cast<ErrorCodes::Error>(ec.value()), message});
+        return websocket_error_and_close_handler(was_clean, Status{ec, message});
     }
     bool websocket_error_and_close_handler(bool was_clean, Status status)
     {
