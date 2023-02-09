@@ -4062,30 +4062,6 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
-typedef enum status_error_code {
-    STATUS_OK = 0,
-    STATUS_UNKNOWN_ERROR = 1,
-    STATUS_RUNTIME_ERROR = 2,
-    STATUS_LOGIC_ERROR = 3,
-    STATUS_BROKEN_PROMISE = 4,
-    STATUS_OPERATION_ABORTED = 5,
-
-    /// WEBSOCKET ERRORS
-    // STATUS_WEBSOCKET_OK = 1000 IS NOT USED, JUST USE OK INSTEAD
-    STATUS_WEBSOCKET_GOING_AWAY = 1001,
-    STATUS_WEBSOCKET_PROTOCOL_ERROR = 1002,
-    STATUS_WEBSOCKET_UNSUPPORTED_DATA = 1003,
-    STATUS_WEBSOCKET_RESERVED = 1004,
-    STATUS_WEBSOCKET_NO_STATUS_RECEIVED = 1005,
-    STATUS_WEBSOCKET_ABNORMAL_CLOSURE = 1006,
-    STATUS_WEBSOCKET_INVALID_PAYLOAD_DATA = 1007,
-    STATUS_WEBSOCKET_POLICY_VIOLATION = 1008,
-    STATUS_WEBSOCKET_MESSAGE_TOO_BIG = 1009,
-    STATUS_WEBSOCKET_INAVALID_EXTENSION = 1010,
-    STATUS_WEBSOCKET_INTERNAL_SERVER_ERROR = 1011,
-    STATUS_WEBSOCKET_TLS_HANDSHAKE_FAILED = 1015, // USED BY DEFAULT WEBSOCKET
-} status_error_code_e;
-
 RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_sync_socket_post_func_t post_func,
     realm_sync_socket_create_timer_func_t create_timer_func,
