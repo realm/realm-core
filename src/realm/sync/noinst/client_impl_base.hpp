@@ -1499,6 +1499,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_unbind_message_sent_2 = false;
     m_error_message_received = false;
     m_unbound_message_received = false;
+    m_client_error = util::none;
 
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
