@@ -2,11 +2,12 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* IntegrationException's which require help from support team mention 'Please contact support' in their message ([#6283](https://github.com/realm/realm-core/pull/6283))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* App 301/308 redirection support doesn't use new location if metadata mode is set to 'NoMetadata'. ([#6280](https://github.com/realm/realm-core/issues/6280), since v12.9.0)
+* Expose ad hoc interface for querying dictionary key changes in the C-API. ([#6228](https://github.com/realm/realm-core/issues/6228), since v10.3.3)
 
 ### Breaking changes
 * None.
@@ -19,6 +20,7 @@
 ### Internals
 * The lifecycle of the sync client is now separated from the event loop/socket provider it uses for async I/O/timers. The sync client will wait for all outstanding callbacks/sockets to be closed during destruction. The SyncSocketProvider passed to the sync client must run until after the sync client is destroyed but does not need to be stopped as part of tearing down the sync client. ([PR #6276](https://github.com/realm/realm-core/pull/6276))
 * The default event loop will now keep running until it is explicitly stopped rather than until there are no more timers/IO to process. Previously there was a timer set for very far in the future to force the event loop to keep running. ([PR #6265](https://github.com/realm/realm-core/pull/6265))
+* Disable failing check in Metrics_TransactionTimings test ([PR #6206](https://github.com/realm/realm-core/pull/6206))
 * Windows improvements in util/file ([PR #6221](https://github.com/realm/realm-core/pull/6221)):
   * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
   * `File::get_unique_id` now works on Windows
