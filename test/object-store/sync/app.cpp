@@ -2487,6 +2487,16 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             abort();
         };
 
+        std::atomic<bool> trigger = false;
+        r_config.sync_config->on_sync_client_event_hook =
+            [&, triggered = false](std::weak_ptr<SyncSession>, const SyncClientHookData& data) mutable {
+                if (data.event == SyncClientHookEvent::DownloadMessageReceived && trigger.load() && !triggered) {
+                    triggered = true;
+                    return SyncClientHookAction::TriggerReconnect;
+                }
+                return SyncClientHookAction::NoAction;
+            };
+
         auto r = Realm::get_shared_realm(r_config);
 
         REQUIRE(!wait_for_download(*r));
@@ -2533,6 +2543,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
             };
 
+            trigger.store(true);
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
 
@@ -2590,6 +2601,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
             };
 
+            trigger.store(true);
             sync_session->resume();
             REQUIRE(wait_for_download(*r));
             REQUIRE(!user1->is_logged_in());
