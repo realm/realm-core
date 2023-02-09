@@ -606,12 +606,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
 }
 
 
-ClientImpl::Connection&
-ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authorization_header_name,
-                           const std::map<std::string, std::string>& custom_http_headers,
-                           bool verify_servers_ssl_certificate, Optional<std::string> ssl_trust_certificate_path,
-                           std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
-                           Optional<ProxyConfig> proxy_config, SyncServerMode sync_mode, bool& was_created)
+ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
+                                                   const std::string& authorization_header_name,
+                                                   const std::map<std::string, std::string>& custom_http_headers,
+                                                   bool verify_servers_ssl_certificate,
+                                                   Optional<std::string> ssl_trust_certificate_path,
+                                                   std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
+                                                   Optional<ProxyConfig> proxy_config, bool& was_created)
 {
     ServerSlot& server_slot = m_server_slots[endpoint]; // Throws
 
@@ -628,8 +629,7 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
     std::unique_ptr<ClientImpl::Connection> conn_2 = std::make_unique<ClientImpl::Connection>(
         *this, ident, std::move(endpoint), authorization_header_name, custom_http_headers,
         verify_servers_ssl_certificate, std::move(ssl_trust_certificate_path), std::move(ssl_verify_callback),
-        std::move(proxy_config), server_slot.reconnect_info,
-        sync_mode); // Throws
+        std::move(proxy_config), server_slot.reconnect_info); // Throws
     ClientImpl::Connection& conn = *conn_2;
     if (!m_one_connection_per_session) {
         server_slot.connection = std::move(conn_2);
@@ -1466,18 +1466,15 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     REALM_ASSERT(!m_sess);
     m_db->claim_sync_agent();
 
-    SyncServerMode sync_mode = m_flx_subscription_store ? SyncServerMode::FLX : SyncServerMode::PBS;
-
     bool was_created = false;
     ClientImpl::Connection& conn = m_client.get_connection(
         std::move(endpoint), m_authorization_header_name, m_custom_http_headers, m_verify_servers_ssl_certificate,
-        m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config, sync_mode,
+        m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config,
         was_created); // Throws
     try {
-        // FIXME: This only makes sense when each session uses a separate connection.
         conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
         std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
-        if (sync_mode == SyncServerMode::FLX) {
+        if (conn.is_flx_sync_connection()) {
             m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
 
@@ -1569,7 +1566,8 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
 void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port)
 {
     REALM_ASSERT(!m_initiated);
-    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, m_user_id};
+    auto server_mode = m_flx_subscription_store ? SyncServerMode::FLX : SyncServerMode::PBS;
+    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, m_user_id, server_mode};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_initiated = true;
 }
@@ -1770,20 +1768,19 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    bool verify_servers_ssl_certificate,
                                    Optional<std::string> ssl_trust_certificate_path,
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
-                                   Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
-                                   SyncServerMode sync_mode)
+                                   Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
     : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_client{client}
-    , m_protocol_envelope{std::get<0>(endpoint)}
-    , m_address{std::get<1>(endpoint)}
-    , m_port{std::get<2>(endpoint)}
+    , m_protocol_envelope{endpoint.envelope}
+    , m_address{endpoint.address}
+    , m_port{endpoint.port}
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)} // DEPRECATED
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
     , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
-    , m_sync_mode(sync_mode)
+    , m_sync_mode(endpoint.server_mode)
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
     , m_authorization_header_name{authorization_header_name} // DEPRECATED

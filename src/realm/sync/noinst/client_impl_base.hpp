@@ -35,8 +35,27 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type, std::string>;
+struct ServerEndpoint {
+    ProtocolEnvelope envelope;
+    std::string address;
+    network::Endpoint::port_type port;
+    std::string user_id;
+    SyncServerMode server_mode;
 
+    auto to_tuple() const
+    {
+        return std::make_tuple(envelope, address, port, user_id, server_mode);
+    }
+
+    friend inline bool operator==(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() == rhs.to_tuple();
+    }
+    friend inline bool operator<(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() < rhs.to_tuple();
+    }
+};
 class SessionWrapper;
 
 class SessionWrapperStack {
@@ -270,8 +289,7 @@ private:
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, SyncServerMode,
-                                           bool& was_created);
+                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
@@ -419,7 +437,7 @@ public:
     Connection(ClientImpl&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
                const std::map<std::string, std::string>& custom_http_headers, bool verify_servers_ssl_certificate,
                util::Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
-               util::Optional<ProxyConfig>, ReconnectInfo, SyncServerMode);
+               util::Optional<ProxyConfig>, ReconnectInfo);
 
     ~Connection();
 
