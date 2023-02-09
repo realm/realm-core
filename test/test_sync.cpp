@@ -781,15 +781,20 @@ struct ExpectChangesetError {
 
     void operator()(ConnectionState state, util::Optional<Session::ErrorInfo> error_info) const noexcept
     {
-        if (state != ConnectionState::disconnected)
+        if (state == ConnectionState::disconnected) {
+            fixture.stop();
+            return;
+        }
+        if (!error_info)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
-        CHECK_EQUAL(ec, ProtocolError::bad_changeset);
-        CHECK(ec.category() == protocol_error_category());
-        CHECK(error_info->is_fatal());
-        CHECK_EQUAL(error_info->message, expected_error);
-        fixture.stop();
+        CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
+        CHECK(ec.category() == client_error_category());
+        CHECK(!error_info->is_fatal());
+        CHECK_EQUAL(error_info->message,
+                    "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
+                        expected_error);
     }
 };
 
@@ -841,7 +846,8 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
             ColKey col_ndx = table->add_column(type_String, "column");
             table->create_object_with_primary_key(2).set(col_ndx, "Hello, World!");
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "Property 'column' in class 'foo' is of type Int on one side and type String on the other.",
+        "Property 'column' in class 'foo' is of type String on one side and type Int on the other.");
 }
 
 
@@ -861,7 +867,7 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
             table->create_object_with_primary_key(2).set<int64_t>(col_ndx, 123);
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "Property 'column' in class 'foo' is nullable on one side and not on the other.");
 }
 
 
@@ -879,7 +885,8 @@ TEST(Sync_DetectSchemaMismatch_Links)
             TableRef target = wt.get_group().add_table_with_primary_key("class_baz", type_Int, "id");
             table->add_column(*target, "column");
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "Link property 'column' in class 'foo' points to class 'bar' on one side and to 'baz' on the other.",
+        "Link property 'column' in class 'foo' points to class 'baz' on one side and to 'bar' on the other.");
 }
 
 
@@ -893,7 +900,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "b");
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "'foo' has primary key 'a' on one side, but primary key 'b' on the other.",
+        "'foo' has primary key 'b' on one side, but primary key 'a' on the other.");
 }
 
 
@@ -907,7 +915,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         [](WriteTransaction& wt) {
             wt.get_group().add_table_with_primary_key("class_foo", type_String, "a");
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "'foo' has primary key 'a', which is of type Int on one side and type String on the other.",
+        "'foo' has primary key 'a', which is of type String on one side and type Int on the other.");
 }
 
 
@@ -923,7 +932,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
             bool nullable = true;
             wt.get_group().add_table_with_primary_key("class_foo", type_Int, "a", nullable);
         },
-        realm::sync::get_protocol_error_message(static_cast<int>(ProtocolError::bad_changeset)));
+        "'foo' has primary key 'a', which is nullable on one side, but not the other.");
 }
 
 

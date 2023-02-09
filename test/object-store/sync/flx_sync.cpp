@@ -148,20 +148,6 @@ void wait_for_advance(Realm& realm)
     });
     realm.m_binding_context = nullptr;
 }
-
-void wait_for_error_to_persist(const AppSession& app_session, const std::string& err)
-{
-    timed_sleeping_wait_for(
-        [&]() -> bool {
-            auto errors = app_session.admin_api.get_errors(app_session.server_app_id);
-            auto it = std::find(errors.begin(), errors.end(), err);
-            if (it == errors.end()) {
-                millisleep(500); // don't spam the server too much
-            }
-            return it != errors.end();
-        },
-        std::chrono::minutes(1));
-}
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -2167,30 +2153,30 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
         harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
             SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
-            std::condition_variable cv;
-            std::mutex wait_mutex;
-            bool wait_flag(false);
-            std::error_code ec;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                std::unique_lock<std::mutex> lock(wait_mutex);
-                wait_flag = true;
-                ec = error.error_code;
-                cv.notify_one();
+            auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+            auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+            auto error_count = 0;
+            auto err_handler = [error_promise = std::move(shared_promise), &error_count](std::shared_ptr<SyncSession>,
+                                                                                         SyncError err) mutable {
+                ++error_count;
+                if (error_count == 1) {
+                    // Bad changeset detected by the client.
+                    CHECK(err.error_code == sync::make_error_code(sync::ClientError::bad_changeset));
+                }
+                else if (error_count == 2) {
+                    // Server asking for a client reset.
+                    CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
+                    CHECK(err.is_client_reset_requested());
+                    error_promise->emplace_value(std::move(err));
+                }
             };
 
+            config.sync_config->error_handler = err_handler;
             auto realm = Realm::get_shared_realm(config);
 
-            std::unique_lock<std::mutex> lock(wait_mutex);
-            cv.wait(lock, [&wait_flag]() {
-                return wait_flag == true;
-            });
-            CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
+            auto err = error_future.get();
+            CHECK(error_count == 2);
         });
-
-        REQUIRE_NOTHROW(wait_for_error_to_persist(
-            harness->session().app_session(),
-            "Failed to transform received changeset: Schema mismatch: 'Asymmetric' is asymmetric "
-            "on one side, but not on the other. (ProtocolErrorCode=212)"));
     }
 
     SECTION("basic embedded object construction") {
@@ -2311,7 +2297,25 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     // This results in the client sending an error message to the server.
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->simulate_integration_error = true;
-    auto&& [error_future, err_handler] = make_error_handler();
+
+    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+    auto error_count = 0;
+    auto err_handler = [error_promise = std::move(shared_promise), &error_count](std::shared_ptr<SyncSession>,
+                                                                                 SyncError err) mutable {
+        ++error_count;
+        if (error_count == 1) {
+            // Bad changeset detected by the client.
+            CHECK(err.error_code == sync::make_error_code(sync::ClientError::bad_changeset));
+        }
+        else if (error_count == 2) {
+            // Server asking for a client reset.
+            CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
+            CHECK(err.is_client_reset_requested());
+            error_promise->emplace_value(std::move(err));
+        }
+    };
+
     config.sync_config->error_handler = err_handler;
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_TopLevel");
@@ -2319,10 +2323,8 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     new_query.insert_or_assign(Query(table));
     new_query.commit();
 
-    error_future.get();
-
-    REQUIRE_NOTHROW(
-        wait_for_error_to_persist(harness.session().app_session(), "simulated failure (ProtocolErrorCode=212)"));
+    auto err = error_future.get();
+    CHECK(error_count == 2);
 }
 
 TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
