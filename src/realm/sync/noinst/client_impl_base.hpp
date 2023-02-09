@@ -44,13 +44,14 @@ struct ServerEndpoint {
 
     auto to_tuple() const
     {
-        return std::make_tuple(envelope, address, port, user_id, server_mode);
+        return std::make_tuple(envelope, std::ref(address), port, std::ref(user_id), server_mode);
     }
 
     friend inline bool operator==(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
     {
         return lhs.to_tuple() == rhs.to_tuple();
     }
+
     friend inline bool operator<(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
     {
         return lhs.to_tuple() < rhs.to_tuple();
