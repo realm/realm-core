@@ -743,8 +743,6 @@ public:
 
     util::Future<std::string> send_test_command(std::string command_body);
 
-    void trigger_reconnect();
-
 private:
     SessionWrapper* m_impl = nullptr;
 

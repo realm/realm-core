@@ -1708,15 +1708,6 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     return m_sess->send_test_command(std::move(body));
 }
 
-void SessionWrapper::trigger_reconnect()
-{
-    if (!m_sess) {
-        return;
-    }
-
-    m_sess->trigger_reconnect();
-}
-
 void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
     auto pending_reset = [&] {
@@ -2026,11 +2017,6 @@ void Session::on_new_flx_sync_subscription(int64_t new_version)
 util::Future<std::string> Session::send_test_command(std::string body)
 {
     return m_impl->send_test_command(std::move(body));
-}
-
-void Session::trigger_reconnect()
-{
-    m_impl->trigger_reconnect();
 }
 
 const std::error_category& client_error_category() noexcept

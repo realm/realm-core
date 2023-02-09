@@ -811,7 +811,6 @@ public:
     ~Session();
 
     util::Future<std::string> send_test_command(std::string body);
-    void trigger_reconnect();
 
 private:
     using SyncTransactReporter = ClientHistory::SyncTransactReporter;
