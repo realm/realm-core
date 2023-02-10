@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * App 301/308 redirection support doesn't use new location if metadata mode is set to 'NoMetadata'. ([#6280](https://github.com/realm/realm-core/issues/6280), since v12.9.0)
+* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
 
 ### Breaking changes
 * None.
