@@ -2344,6 +2344,12 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
+    if (m_client_error) {
+        return;
+    }
+
     if (is_steady_state_download_message(batch_state, query_version)) {
         batch_state = DownloadBatchState::SteadyState;
     }
