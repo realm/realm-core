@@ -774,7 +774,7 @@ task_groups:
   - long-running-core-tests
 
 - name: fuzzer-tests
-  setup_group_can_fail_task: true
+  setup_group_can_fail_task: false
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
