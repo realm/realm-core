@@ -1267,7 +1267,7 @@ inline void ClientImpl::Connection::one_less_active_unsuspended_session()
     if (--m_num_active_unsuspended_sessions != 0)
         return;
 
-    if (m_force_closed) {
+    if (m_force_closed && m_state != ConnectionState::disconnected) {
         voluntary_disconnect();
         logger.info("Connection force closed after all sessions destroyed");
         return;
