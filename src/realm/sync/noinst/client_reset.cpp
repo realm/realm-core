@@ -329,7 +329,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         }
     }
 
-    // We must re-create any missing objects that are abscent in dst before trying to copy
+    // We must re-create any missing objects that are absent in dst before trying to copy
     // their properties because creating them may re-create any dangling links which would
     // otherwise cause inconsistencies when re-creating lists of links.
     for (auto table_key : group_src.get_table_keys()) {
@@ -344,9 +344,9 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                      "primary_key_col = %3, primary_key_type = %4",
                      table_name, table_src->size(), pk_col.get_index().val, pk_col.get_type());
         for (const Obj& src : *table_src) {
-            bool updated = false;
-            table_dst->create_object_with_primary_key(src.get_primary_key(), &updated);
-            if (updated) {
+            bool created = false;
+            table_dst->create_object_with_primary_key(src.get_primary_key(), &created);
+            if (created) {
                 logger.debug("   created %1", src.get_primary_key());
             }
         }
@@ -379,7 +379,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
-            // get or create the object
+            // create the object - it should have been created above.
             auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
 
