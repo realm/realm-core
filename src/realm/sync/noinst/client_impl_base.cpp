@@ -1875,7 +1875,6 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    // Do not send upload messages if an error was detected by the client.
     if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
