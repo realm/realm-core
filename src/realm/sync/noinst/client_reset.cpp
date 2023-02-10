@@ -335,6 +335,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     for (auto table_key : group_src.get_table_keys()) {
         ConstTableRef table_src = group_src.get_table(table_key);
         auto table_name = table_src->get_name();
+        if (should_skip_table(group_src, table_key) || table_src->is_embedded())
+            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
