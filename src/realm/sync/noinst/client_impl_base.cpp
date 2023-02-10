@@ -518,7 +518,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
     }
-    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
+    else if (status_code == ErrorCodes::WebSocket_Fatal_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws

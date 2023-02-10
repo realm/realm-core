@@ -788,11 +788,30 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
             tr->commit();
         }
 
+        auto reset_schema = GENERATE(false, true);
+        if (reset_schema) {
+            config.schema.reset();
+        }
+
         for (size_t i = 0; i < 10; ++i) {
             auto& r = *realms[i];
             REQUIRE(r.schema().size() == i + 1);
-            REQUIRE(r.freeze()->schema().size() == i + 1);
-            REQUIRE(Realm::get_frozen_realm(config, r.read_transaction_version())->schema().size() == i + 1);
+            auto frozen = r.freeze();
+            REQUIRE(frozen->schema().size() == i + 1);
+            REQUIRE(frozen->schema_version() == config.schema_version);
+            frozen = Realm::get_frozen_realm(config, r.read_transaction_version());
+            REQUIRE(frozen->schema().size() == i + 1);
+            REQUIRE(frozen->schema_version() == config.schema_version);
+        }
+
+        SECTION("schema not set in config") {
+            config.schema = std::nullopt;
+            for (size_t i = 0; i < 10; ++i) {
+                auto& r = *realms[i];
+                REQUIRE(r.schema().size() == i + 1);
+                REQUIRE(r.freeze()->schema().size() == i + 1);
+                REQUIRE(Realm::get_frozen_realm(config, r.read_transaction_version())->schema().size() == i + 1);
+            }
         }
     }
 
@@ -3368,32 +3387,6 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     }
 }
 
-TEST_CASE("SharedRealm: Schema version set correctly") {
-    SECTION("Set schema versions") {
-        TestFile config;
-
-        auto schema = Schema{{"object1",
-                              {
-                                  {"value", PropertyType::Int},
-                              }},
-                             {"object2",
-                              {
-                                  {"value", PropertyType::Int},
-                              }}};
-        auto r1 = Realm::get_shared_realm(config);
-        r1->read_group();
-        auto frozen = Realm::get_frozen_realm(config, r1->read_transaction_version());
-        CHECK(r1->schema_version() == ObjectStore::NotVersioned);
-        CHECK(frozen->schema_version() == ObjectStore::NotVersioned);
-        r1->update_schema(schema);
-        frozen = Realm::get_frozen_realm(config, r1->read_transaction_version());
-        frozen->set_schema_subset(schema);
-
-        CHECK(r1->schema_version() != ObjectStore::NotVersioned);
-        CHECK(frozen->schema_version() != ObjectStore::NotVersioned);
-    }
-}
-
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;
@@ -3458,61 +3451,31 @@ TEST_CASE("SharedRealm: compact on launch") {
 }
 
 struct ModeAutomatic {
-    static SchemaMode mode()
-    {
-        return SchemaMode::Automatic;
-    }
-    static bool should_call_init_on_version_bump()
-    {
-        return false;
-    }
+    static constexpr SchemaMode mode = SchemaMode::Automatic;
+    static constexpr bool should_call_init_on_version_bump = false;
 };
 struct ModeAdditive {
-    static SchemaMode mode()
-    {
-        return SchemaMode::AdditiveExplicit;
-    }
-    static bool should_call_init_on_version_bump()
-    {
-        return false;
-    }
+    static constexpr SchemaMode mode = SchemaMode::AdditiveExplicit;
+    static constexpr bool should_call_init_on_version_bump = false;
 };
 struct ModeManual {
-    static SchemaMode mode()
-    {
-        return SchemaMode::Manual;
-    }
-    static bool should_call_init_on_version_bump()
-    {
-        return false;
-    }
+    static constexpr SchemaMode mode = SchemaMode::Manual;
+    static constexpr bool should_call_init_on_version_bump = false;
 };
 struct ModeSoftResetFile {
-    static SchemaMode mode()
-    {
-        return SchemaMode::SoftResetFile;
-    }
-    static bool should_call_init_on_version_bump()
-    {
-        return true;
-    }
+    static constexpr SchemaMode mode = SchemaMode::SoftResetFile;
+    static constexpr bool should_call_init_on_version_bump = true;
 };
 struct ModeHardResetFile {
-    static SchemaMode mode()
-    {
-        return SchemaMode::HardResetFile;
-    }
-    static bool should_call_init_on_version_bump()
-    {
-        return true;
-    }
+    static constexpr SchemaMode mode = SchemaMode::HardResetFile;
+    static constexpr bool should_call_init_on_version_bump = true;
 };
 
 TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
                    ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;
-    config.schema_mode = TestType::mode();
+    config.schema_mode = TestType::mode;
     bool initialization_function_called = false;
     uint64_t schema_version_in_callback = -1;
     Schema schema_in_callback;
@@ -3557,8 +3520,8 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
         config.schema_version = 1;
         config.initialization_function = initialization_function;
         Realm::get_shared_realm(config);
-        REQUIRE(initialization_function_called == TestType::should_call_init_on_version_bump());
-        if (TestType::should_call_init_on_version_bump()) {
+        REQUIRE(initialization_function_called == TestType::should_call_init_on_version_bump);
+        if (TestType::should_call_init_on_version_bump) {
             REQUIRE(schema_version_in_callback == 1);
             REQUIRE(schema_in_callback.compare(schema).size() == 0);
         }
@@ -3843,6 +3806,97 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         config.cache = true;
         auto r4 = Realm::get_shared_realm(config);
         REQUIRE(r4 == r2);
+    }
+}
+
+TEST_CASE("Immutable Realms") {
+    TestFile config; // can't be in-memory because we have to write a file to open in immutable mode
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object();
+        realm->commit_transaction();
+    }
+
+    config.schema_mode = SchemaMode::Immutable;
+    auto realm = Realm::get_shared_realm(config);
+    realm->read_group();
+
+    SECTION("unsupported functions") {
+        SECTION("update_schema()") {
+            REQUIRE_THROWS_AS(realm->compact(), std::logic_error);
+        }
+        SECTION("begin_transaction()") {
+            REQUIRE_THROWS_AS(realm->begin_transaction(), std::logic_error);
+        }
+        SECTION("async_begin_transaction()") {
+            REQUIRE_THROWS_AS(realm->async_begin_transaction(nullptr), std::logic_error);
+        }
+        SECTION("refresh()") {
+            REQUIRE_THROWS_AS(realm->refresh(), std::logic_error);
+        }
+        SECTION("compact()") {
+            REQUIRE_THROWS_AS(realm->compact(), std::logic_error);
+        }
+    }
+
+    SECTION("supported functions") {
+        SECTION("is_in_transaction()") {
+            REQUIRE_FALSE(realm->is_in_transaction());
+        }
+        SECTION("is_in_async_transaction()") {
+            REQUIRE_FALSE(realm->is_in_transaction());
+        }
+        SECTION("freeze()") {
+            std::shared_ptr<Realm> frozen;
+            REQUIRE_NOTHROW(frozen = realm->freeze());
+            REQUIRE(frozen->read_group().get_table("class_object")->size() == 1);
+            REQUIRE_NOTHROW(frozen = Realm::get_frozen_realm(config, realm->read_transaction_version()));
+            REQUIRE(frozen->read_group().get_table("class_object")->size() == 1);
+        }
+        SECTION("notify()") {
+            REQUIRE_NOTHROW(realm->notify());
+        }
+        SECTION("is_in_read_transaction()") {
+            REQUIRE(realm->is_in_read_transaction());
+        }
+        SECTION("last_seen_transaction_version()") {
+            REQUIRE(realm->last_seen_transaction_version() == 1);
+        }
+        SECTION("get_number_of_versions()") {
+            REQUIRE(realm->get_number_of_versions() == 1);
+        }
+        SECTION("read_transaction_version()") {
+            REQUIRE(realm->read_transaction_version() == VersionID{1, 0});
+        }
+        SECTION("current_transaction_version()") {
+            REQUIRE(realm->current_transaction_version() == VersionID{1, 0});
+        }
+        SECTION("latest_snapshot_version()") {
+            REQUIRE(realm->latest_snapshot_version() == 1);
+        }
+        SECTION("duplicate()") {
+            auto duplicate = realm->duplicate();
+            REQUIRE(duplicate->get_table("class_object")->size() == 1);
+        }
+        SECTION("invalidate()") {
+            REQUIRE_NOTHROW(realm->invalidate());
+            REQUIRE_FALSE(realm->is_in_read_transaction());
+            REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
+        }
+        SECTION("close()") {
+            REQUIRE_NOTHROW(realm->close());
+            REQUIRE(realm->is_closed());
+        }
+        SECTION("has_pending_async_work()") {
+            REQUIRE_FALSE(realm->has_pending_async_work());
+        }
+        SECTION("wait_for_change()") {
+            REQUIRE_FALSE(realm->wait_for_change());
+        }
     }
 }
 
