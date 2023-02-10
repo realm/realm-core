@@ -569,6 +569,8 @@ private:
 
     bool m_websocket_error_received = false;
 
+    bool m_force_closed = false;
+
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.
     //
@@ -1264,6 +1266,12 @@ inline void ClientImpl::Connection::one_less_active_unsuspended_session()
 {
     if (--m_num_active_unsuspended_sessions != 0)
         return;
+
+    if (m_force_closed) {
+        voluntary_disconnect();
+        logger.info("Connection force closed after all sessions destroyed");
+        return;
+    }
     // Dropped from one to zero
     if (m_state != ConnectionState::disconnected)
         initiate_disconnect_wait(); // Throws

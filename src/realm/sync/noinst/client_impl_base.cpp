@@ -379,14 +379,18 @@ void Connection::cancel_reconnect_delay()
 
 void Connection::force_close()
 {
+    m_force_closed = true;
     if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
         m_reconnect_disconnect_timer.reset();
         m_disconnect_delay_in_progress = false;
         m_reconnect_delay_in_progress = false;
     }
 
-    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
-    REALM_ASSERT(m_num_active_sessions == 0);
+    if (m_num_active_unsuspended_sessions || m_num_active_sessions) {
+        logger.detail("Connection will close when remaining sessions are destroyed");
+        return;
+    }
+
     if (m_state == ConnectionState::disconnected) {
         return;
     }
