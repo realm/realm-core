@@ -54,14 +54,12 @@ TEST(ClientReset_TransferGroupWithDanglingLinks)
     auto sg_2 = setup_realm(path_2);
 
     auto rt = sg_1->start_read();
-
-    rt->commit_and_continue_as_read();
-
     auto wt = sg_2->start_write();
-    auto target_2 = wt->get_table("class_target");
 
+    auto target_2 = wt->get_table("class_target");
     auto obj = target_2->get_object_with_primary_key(Mixed{5});
     obj.invalidate();
+
     wt->commit_and_continue_writing();
     _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger);
 }
