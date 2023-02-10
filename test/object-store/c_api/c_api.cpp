@@ -4232,15 +4232,15 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("notifications") {
                 struct State {
                     CPtr<realm_collection_changes_t> changes;
+                    CPtr<realm_dictionary_changes_t> dictionary_changes;
                     CPtr<realm_async_error_t> error;
                     bool destroyed = false;
                 };
 
                 State state;
-
-                auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
+                auto on_dictionary_change = [](void* userdata, const realm_dictionary_changes_t* changes) {
                     auto* state = static_cast<State*>(userdata);
-                    state->changes = clone_cptr(changes);
+                    state->dictionary_changes = clone_cptr(changes);
                 };
 
                 CPtr<realm_dictionary_t> strings =
@@ -4252,7 +4252,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change));
+                        strings.get(), &state, nullptr, nullptr, on_dictionary_change));
                     checked(realm_refresh(realm, nullptr));
                     return token;
                 };
@@ -4280,24 +4280,25 @@ TEST_CASE("C API", "[c_api]") {
                         checked(realm_dictionary_insert(strings.get(), rlm_str_val("c"), null, nullptr, nullptr));
                     });
                     CHECK(!state.error);
-                    CHECK(state.changes);
+                    CHECK(state.dictionary_changes);
 
-                    size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
-                    realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
-                                                            &num_insertion_ranges, &num_modification_ranges,
-                                                            &num_moves);
-                    CHECK(num_deletion_ranges == 1);
-                    CHECK(num_insertion_ranges == 1);
-                    CHECK(num_modification_ranges == 0);
-                    CHECK(num_moves == 0);
-
-                    realm_index_range_t deletion_range, insertion_range;
-                    realm_collection_changes_get_ranges(state.changes.get(), &deletion_range, 1, &insertion_range, 1,
-                                                        nullptr, 0, nullptr, 0, nullptr, 0);
-                    CHECK(deletion_range.from == 0);
-                    CHECK(deletion_range.to == 1);
-                    CHECK(insertion_range.from == 0);
-                    CHECK(insertion_range.to == 2);
+                    size_t num_deletions, num_insertions, num_modifications;
+                    realm_dictionary_get_changes(state.dictionary_changes.get(), &num_deletions, &num_insertions,
+                                                 &num_modifications);
+                    CHECK(num_deletions == 1);
+                    CHECK(num_insertions == 2);
+                    CHECK(num_modifications == 0);
+                    realm_value_t *deletions = nullptr, *insertions = nullptr, *modifications = nullptr;
+                    deletions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_deletions);
+                    insertions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_insertions);
+                    realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
+                                                      insertions, &num_insertions, modifications, &num_modifications);
+                    CHECK(deletions != nullptr);
+                    CHECK(insertions != nullptr);
+                    CHECK(modifications == nullptr);
+                    realm_free(deletions);
+                    realm_free(insertions);
+                    realm_free(modifications);
                 }
             }
 
