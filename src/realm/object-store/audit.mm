@@ -1043,8 +1043,9 @@ void AuditContext::record_query(VersionID version, TableView const& tv)
     for (size_t i = 0, count = tv.size(); i < count; ++i)
         objects.push_back(tv.get_key(i));
 
+    audit_event::Query event{now(), version, tv.get_target_table()->get_key(), std::move(objects)};
     for (auto& scope : m_current_scopes) {
-        scope->events.push_back(audit_event::Query{now(), version, tv.get_target_table()->get_key(), objects});
+        scope->events.push_back(event);
     }
 }
 
@@ -1062,9 +1063,11 @@ void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& par
         parent_table_key = parent.get_table()->get_key();
         parent_obj_key = parent.get_key();
     }
+
+    auto obj_key = obj.get_table()->get_key();
+    audit_event::Object event{now(), version, obj_key, obj.get_key(), parent_table_key, parent_obj_key, col};
     for (auto& scope : m_current_scopes) {
-        scope->events.push_back(audit_event::Object{now(), version, obj.get_table()->get_key(), obj.get_key(),
-                                                    parent_table_key, parent_obj_key, col});
+        scope->events.push_back(event);
     }
 }
 
@@ -1078,8 +1081,11 @@ void AuditContext::prepare_for_write(VersionID old_version)
 void AuditContext::record_write(VersionID old_version, VersionID new_version)
 {
     util::CheckedLockGuard lock(m_mutex);
+    if (m_current_scopes.empty())
+        return;
+    audit_event::Write event{now(), old_version, new_version};
     for (auto& scope : m_current_scopes) {
-        scope->events.push_back(audit_event::Write{now(), old_version, new_version});
+        scope->events.push_back(event);
     }
 }
 
@@ -1089,6 +1095,7 @@ void AuditContext::record_event(std::string_view activity, util::Optional<std::s
 
 {
     util::CheckedLockGuard lock(m_mutex);
+    // scope id isn't used for this scope, so it's just an arbitrary value
     auto scope = std::make_shared<Scope>(Scope{0, m_metadata, std::string(activity)});
     scope->events.push_back(audit_event::Custom{now(), std::string(activity), event_type, data});
     scope->completion = std::move(completion);
