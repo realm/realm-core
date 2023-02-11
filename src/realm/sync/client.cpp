@@ -192,6 +192,8 @@ public:
     void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
                   std::string signed_access_token);
 
+    void force_close();
+
     void nonsync_transact_notify(version_type new_version);
     void cancel_reconnect_delay();
 
@@ -278,6 +280,8 @@ private:
     // have been abandoned already, but in that case,
     // finalize_before_actualization() has already been called.
     bool m_actualized = false;
+
+    bool m_force_closed = false;
 
     bool m_suspended = false;
 
@@ -491,7 +495,6 @@ void ClientImpl::drain_connections_on_loop()
 {
     post([this](Status status) mutable {
         REALM_ASSERT(status.is_ok());
-        actualize_and_finalize_session_wrappers();
         drain_connections();
     });
 }
@@ -499,16 +502,10 @@ void ClientImpl::drain_connections_on_loop()
 void ClientImpl::drain()
 {
     stop();
-    {
-        std::lock_guard lock{m_drain_mutex};
-        if (m_drained) {
-            return;
-        }
-    }
-
-    drain_connections_on_loop();
-
     std::unique_lock lock{m_drain_mutex};
+    if (m_drained) {
+        return;
+    }
 
     logger.debug("Waiting for %1 connections to drain", m_num_connections);
     m_drain_cv.wait(lock, [&] {
@@ -520,11 +517,15 @@ void ClientImpl::drain()
 
 void ClientImpl::stop() noexcept
 {
-    std::lock_guard lock{m_mutex};
-    if (m_stopped)
-        return;
-    m_stopped = true;
-    m_wait_or_client_stopped_cond.notify_all();
+    {
+        std::lock_guard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+        m_wait_or_client_stopped_cond.notify_all();
+    }
+
+    drain_connections_on_loop();
 }
 
 
@@ -584,11 +585,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
 {
     std::map<SessionWrapper*, ServerEndpoint> unactualized_session_wrappers;
     SessionWrapperStack abandoned_session_wrappers;
+    bool stopped;
     {
         std::lock_guard lock{m_mutex};
         m_actualize_and_finalize_needed = false;
         swap(m_unactualized_session_wrappers, unactualized_session_wrappers);
         swap(m_abandoned_session_wrappers, abandoned_session_wrappers);
+        stopped = m_stopped;
     }
     // Note, we need to finalize old session wrappers before we actualize new
     // ones. This ensures that deactivation of old sessions is initiated before
@@ -596,6 +599,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     // not see two overlapping sessions for the same local Realm file.
     while (util::bind_ptr<SessionWrapper> wrapper = abandoned_session_wrappers.pop())
         wrapper->finalize(); // Throws
+    if (stopped) {
+        for (auto& p: unactualized_session_wrappers) {
+            SessionWrapper& wrapper = *p.first;
+            wrapper.finalize_before_actualization();
+        }
+        return;
+    }
     for (auto& p : unactualized_session_wrappers) {
         SessionWrapper& wrapper = *p.first;
         ServerEndpoint server_endpoint = std::move(p.second);
@@ -668,6 +678,7 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 
     {
         std::lock_guard lk(m_drain_mutex);
+        REALM_ASSERT(m_num_connections);
         --m_num_connections;
         m_drain_cv.notify_all();
     }
@@ -676,6 +687,10 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 
 // ################ SessionImpl ################
 
+void SessionImpl::force_close()
+{
+    m_wrapper.force_close();
+}
 
 void SessionImpl::on_connection_state_changed(ConnectionState state,
                                               const util::Optional<SessionErrorInfo>& error_info)
@@ -1500,12 +1515,11 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         report_progress(); // Throws
 }
 
-
-// Must be called from event loop thread
-void SessionWrapper::finalize()
+void SessionWrapper::force_close()
 {
     REALM_ASSERT(m_actualized);
     REALM_ASSERT(m_sess);
+    m_force_closed = true;
 
     ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
@@ -1513,6 +1527,23 @@ void SessionWrapper::finalize()
     // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
     m_flx_pending_bootstrap_store.reset();
     m_sess = nullptr;
+    m_connection_state_change_listener = {};
+}
+
+// Must be called from event loop thread
+void SessionWrapper::finalize()
+{
+    REALM_ASSERT(m_actualized);
+
+    if (!m_force_closed) {
+        REALM_ASSERT(m_sess);
+        ClientImpl::Connection& conn = m_sess->get_connection();
+        conn.initiate_session_deactivation(m_sess); // Throws
+
+        // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+        m_flx_pending_bootstrap_store.reset();
+        m_sess = nullptr;
+    }
 
     // The Realm file can be closed now, as no access to the Realm file is
     // supposed to happen on behalf of a session after initiation of
@@ -1548,6 +1579,7 @@ void SessionWrapper::finalize()
 inline void SessionWrapper::finalize_before_actualization() noexcept
 {
     m_actualized = true;
+    m_force_closed = true;
 }
 
 
@@ -1848,6 +1880,9 @@ std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ide
 void ClientImpl::Connection::report_connection_state_change(ConnectionState state,
                                                             util::Optional<SessionErrorInfo> error_info)
 {
+    if (m_force_closed) {
+        return;
+    }
     auto handler = [=](ClientImpl::Session& sess) {
         SessionImpl& sess_2 = static_cast<SessionImpl&>(sess);
         sess_2.on_connection_state_changed(state, error_info); // Throws

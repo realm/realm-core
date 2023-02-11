@@ -136,7 +136,6 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    /// This calls stop() on the socket provider respectively.
     void stop() noexcept;
 
     void drain();
@@ -220,7 +219,7 @@ private:
 
     std::mutex m_mutex;
 
-    bool m_stopped = false;                       // Protected by `m_mutex`
+    std::atomic<bool> m_stopped = false;
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
     bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
 
@@ -502,6 +501,7 @@ private:
     void enlist_to_send(Session*);
     void one_more_active_unsuspended_session();
     void one_less_active_unsuspended_session();
+    void finish_session_deactivation(Session* sess);
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
@@ -791,6 +791,8 @@ public:
     /// deactivation.
     Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
+
+    void force_close();
 
     util::Future<std::string> send_test_command(std::string body);
 
@@ -1264,14 +1266,10 @@ inline void ClientImpl::Connection::one_more_active_unsuspended_session()
 
 inline void ClientImpl::Connection::one_less_active_unsuspended_session()
 {
+    REALM_ASSERT(m_num_active_unsuspended_sessions);
     if (--m_num_active_unsuspended_sessions != 0)
         return;
 
-    if (m_force_closed && m_state != ConnectionState::disconnected) {
-        voluntary_disconnect();
-        logger.info("Connection force closed after all sessions destroyed");
-        return;
-    }
     // Dropped from one to zero
     if (m_state != ConnectionState::disconnected)
         initiate_disconnect_wait(); // Throws
