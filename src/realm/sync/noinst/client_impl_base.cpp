@@ -1754,8 +1754,9 @@ void Session::activate()
     }
     catch (const IntegrationException& error) {
         logger.error("Error integrating bootstrap changesets: %1", error.what());
-        on_suspended(SessionErrorInfo{error.code(), false});
+        m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(SessionErrorInfo{error.code(), false});
     }
 
     if (has_pending_client_reset) {
