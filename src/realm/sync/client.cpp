@@ -600,7 +600,7 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     while (util::bind_ptr<SessionWrapper> wrapper = abandoned_session_wrappers.pop())
         wrapper->finalize(); // Throws
     if (stopped) {
-        for (auto& p: unactualized_session_wrappers) {
+        for (auto& p : unactualized_session_wrappers) {
             SessionWrapper& wrapper = *p.first;
             wrapper.finalize_before_actualization();
         }
