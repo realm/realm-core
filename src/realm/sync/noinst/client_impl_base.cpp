@@ -472,7 +472,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
     }
     else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
-        read_or_write_error(error_code);
+        read_or_write_error(error_code, status.reason());
     }
     else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
              status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
@@ -1153,11 +1153,11 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec, std::optional<std::string_view> msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
