@@ -386,7 +386,7 @@ if [[ -n $USE_SSL ]]; then
     "$CADDY_PATH" run --config "$CADDY_FILE" --adapter caddyfile --pidfile "$CADDY_PID_FILE"> "$CADDY_LOG" 2>&1 &
     BAAS_URL="https://localhost:9443"
     BAAS_CONFIG_OVERRIDES="$BASE_PATH/config_overrides_ssl.json"
-    CURL_CACERT="--cacert $BASE_PATH/certs/root-cert.pem"
+    CURL_CACERT="--cacert $BASE_PATH/test-certs/root-cert.pem"
 fi
 
 mkdir -p tmp

@@ -640,7 +640,7 @@ tasks:
 
         if [[ -n "${run_tests_against_baas|}" ]]; then
             # wait for baas to start in the background script started above.
-            ./evergreen/wait_for_baas.sh ./baas-work-dir/stitch_server.pid
+            ./evergreen/wait_for_baas.sh ./baas-work-dir/baas_server.pid http://localhost:9090
 
             WAIT_FOR_BAAS_READY_COUNTER=0
             until [[ -f ./baas-work-dir/baas_ready ]]; do
