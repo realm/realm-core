@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * IntegrationException's which require help from support team mention 'Please contact support' in their message ([#6283](https://github.com/realm/realm-core/pull/6283))
+* Add support for nested and overlapping scopes to the Events API. If multiple scopes are active all events generated will be reported to every active scope ([#6288](https://github.com/realm/realm-core/pull/6288)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
