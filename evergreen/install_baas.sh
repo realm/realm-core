@@ -116,19 +116,27 @@ BASE_PATH="$(cd "$(dirname "$0")"; pwd)"
 
 REALPATH="$BASE_PATH/abspath.sh"
 
+export EVERGREEN_BASE_PATH="$BASE_PATH"
+
 usage()
 {
-    echo "Usage: install_baas.sh -w <path to working dir>
-                       [-b <branch or git spec of baas to checkout/build]"
+    echo "Usage: install_baas.sh -w WORKING-DIR [-b BRANCH-COMMIT] [-s]
+
+          Options:
+            w WORKING-DIR    - path to working directory
+            b BRANCH-COMMIT  - branch or git spec of baas to checkout/build
+            s                - enable SSL front end (Baas URL: https://localhost:9443)"
     exit 0
 }
 
 WORK_PATH=""
 BAAS_VERSION=""
-while getopts "w:b:" opt; do
+USE_SSL=""
+while getopts "w:b:s" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
+        s) USE_SSL="1";;
         *) echo "Unexpected option ${opt}"; usage;;
     esac
 done
@@ -139,12 +147,22 @@ if [[ -z "$WORK_PATH" ]]; then
     exit 1
 fi
 
-[[ -d $WORK_PATH ]] || mkdir -p "$WORK_PATH"
-cd "$WORK_PATH"
+MONGOD_PID_FILE="$WORK_PATH/mongod.pid"
+BAAS_PID_FILE="$WORK_PATH/baas_server.pid"
+BAAS_READY_FILE="$WORK_PATH/baas_ready"
+CADDY_PID_FILE="$WORK_PATH/caddy_server.pid"
 
-if [[ -f "$WORK_PATH/baas_ready" ]]; then
-    rm "$WORK_PATH/baas_ready"
+if [[ -d $WORK_PATH ]]; then
+    # Remove the .pid and ready files before starting
+    [[ -f "$MONGOD_PID_FILE" ]] && rm "$MONGOD_PID_FILE"
+    [[ -f "$BAAS_PID_FILE" ]] && rm "$BAAS_PID_FILE"
+    [[ -f "$BAAS_READY_FILE" ]] && rm "$BAAS_READY_FILE"
+    [[ -f "$CADDY_PID_FILE" ]] && rm "$CADDY_PID_FILE"
+else
+    mkdir -p "$WORK_PATH"
 fi
+
+pushd "$WORK_PATH" > /dev/null
 
 echo "Installing node and go to build baas and its dependencies"
 
@@ -243,7 +261,7 @@ fi
 
 if [ ! -x "$WORK_PATH/mongodb-binaries/bin/mongod" ]; then
     echo "Downloading mongodb"
-    $CURL -sLS $MONGODB_DOWNLOAD_URL --output mongodb-binaries.tgz
+    $CURL -sLS "$MONGODB_DOWNLOAD_URL" --output mongodb-binaries.tgz
 
     tar -xzf mongodb-binaries.tgz
     rm mongodb-binaries.tgz
@@ -253,7 +271,7 @@ fi
 
 if [[ -n "$MONGOSH_DOWNLOAD_URL" ]] && [[ ! -x "$WORK_PATH/mongodb-binaries/bin/mongosh" ]]; then
     echo "Downloading mongosh"
-    $CURL -sLS $MONGOSH_DOWNLOAD_URL --output mongosh-binaries.zip
+    $CURL -sLS "$MONGOSH_DOWNLOAD_URL" --output mongosh-binaries.zip
     unzip -jnqq mongosh-binaries.zip '*/bin/*' -d mongodb-binaries/bin/
     rm mongosh-binaries.zip
 fi
@@ -262,20 +280,44 @@ fi
 
 ulimit -n 32000
 
-if [[ -d mongodb-dbpath ]]; then
-    rm -rf mongodb-dbpath
+[[ -d mongodb-dbpath ]] && rm -rf mongodb-dbpath
+mkdir -p mongodb-dbpath
+
+CADDY_DIR=caddy
+CADDY_PATH="$WORK_PATH/caddy_server"
+CADDY_MAIN_GO="cmd/caddy/main.go"
+CADDY_FILE="$BASE_PATH/CaddyFile"
+CADDY_LOG="$WORK_PATH/caddy_server.log"
+
+if [[ -n $USE_SSL ]]; then
+    echo "Downloading caddy for TLS front end"
+    if [[ -d $CADDY_DIR ]]; then
+        pushd $CADDY_DIR > /dev/null
+        git checkout master
+        git pull
+        popd > /dev/null
+    else
+        git clone git@github.com:caddyserver/caddy.git
+    fi
+    pushd $CADDY_DIR > /dev/null
+    go build -o "$CADDY_PATH" "$CADDY_MAIN_GO"
+    popd > /dev/null
 fi
-mkdir mongodb-dbpath
 
 function cleanup() {
     BAAS_PID=""
     MONGOD_PID=""
-    if [[ -f $WORK_PATH/baas_server.pid ]]; then
-        BAAS_PID="$(< "$WORK_PATH/baas_server.pid")"
+    CADDY_PID=""
+    if [[ -f $BAAS_PID_FILE ]]; then
+        BAAS_PID="$(< "$BAAS_PID_FILE")"
     fi
 
-    if [[ -f $WORK_PATH/mongod.pid ]]; then
-        MONGOD_PID="$(< "$WORK_PATH/mongod.pid")"
+    if [[ -f $CADDY_PID_FILE ]]; then
+        CADDY_PID="$(< "$CADDY_PID_FILE")"
+    fi
+
+    if [[ -f $MONGOD_PID_FILE ]]; then
+        MONGOD_PID="$(< "$MONGOD_PID_FILE")"
     fi
 
     if [[ -n "$BAAS_PID" ]]; then
@@ -285,6 +327,12 @@ function cleanup() {
         wait "$BAAS_PID"
     fi
 
+    if [[ -n "$CADDY_PID" ]]; then
+        echo "Killing caddy $CADDY_PID"
+        kill "$CADDY_PID"
+        echo "Waiting for caddy to stop"
+        wait "$CADDY_PID"
+    fi
 
     if [[ -n "$MONGOD_PID" ]]; then
         echo "Killing mongod $MONGOD_PID"
@@ -304,7 +352,7 @@ echo "Starting mongodb"
     --port 26000 \
     --logpath "$WORK_PATH/mongodb-dbpath/mongod.log" \
     --dbpath "$WORK_PATH/mongodb-dbpath/" \
-    --pidfilepath "$WORK_PATH/mongod.pid" &
+    --pidfilepath "$MONGOD_PID_FILE" &
 
 echo "Initializing replica set"
 retries=0
@@ -328,17 +376,31 @@ go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH DYLD_LIBRARY_PATH=$DYLD_LIBRA
     -id "unique_user@domain.com" \
     -password "password"
 
-[[ -d tmp ]] || mkdir tmp
+BAAS_URL="http://localhost:9090"
+BAAS_CONFIG_OVERRIDES="$BASE_PATH/config_overrides.json"
+CURL_CACERT=
+
+if [[ -n $USE_SSL ]]; then
+    # Start Caddy in the background
+    echo "Starting caddy for TLS front end"
+    "$CADDY_PATH" run --config "$CADDY_FILE" --adapter caddyfile --pidfile "$CADDY_PID_FILE"> "$CADDY_LOG" 2>&1 &
+    BAAS_URL="https://localhost:9443"
+    BAAS_CONFIG_OVERRIDES="$BASE_PATH/config_overrides_ssl.json"
+    CURL_CACERT="--cacert $BASE_PATH/certs/root-cert.pem"
+fi
+
+mkdir -p tmp
 echo "Starting stitch app server"
-[[ -f $WORK_PATH/baas_server.pid ]] && rm "$WORK_PATH/baas_server.pid"
 go build -o "$WORK_PATH/baas_server" cmd/server/main.go
 "$WORK_PATH/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json > "$WORK_PATH/baas_server.log" 2>&1 &
-echo $! > "$WORK_PATH/baas_server.pid"
-"$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
+    --configFile=etc/configs/test_config.json --configFile="$BAAS_CONFIG_OVERRIDES" > "$WORK_PATH/baas_server.log" 2>&1 &
+echo $! > "$BAAS_PID_FILE"
+"$BASE_PATH"/wait_for_baas.sh "$BAAS_PID_FILE" "$BAAS_URL"
 
 echo "Adding roles to admin user"
-$CURL 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login' \
+# shellcheck disable=SC2086
+$CURL "$BAAS_URL/api/admin/v3.0/auth/providers/local-userpass/login" \
+  $CURL_CACERT \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   --silent \
@@ -348,7 +410,9 @@ $CURL 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login'
 
 "../mongodb-binaries/bin/$MONGOSH"  --quiet mongodb://localhost:26000/auth "$BASE_PATH/add_admin_roles.js"
 
-touch "$WORK_PATH/baas_ready"
+touch "$BAAS_READY_FILE"
 
 echo "Baas server ready"
+echo "Baas endpoint: $BAAS_URL"
+
 wait

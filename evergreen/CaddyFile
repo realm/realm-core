@@ -1,0 +1,4 @@
+https://localhost:9443 {
+	tls {$EVERGREEN_BASE_PATH}/certs/localhost/cert.pem {$EVERGREEN_BASE_PATH}/certs/localhost/key.pem
+	reverse_proxy localhost:9090
+}
