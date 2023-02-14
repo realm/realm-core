@@ -31,6 +31,7 @@ set(REALM_SOURCES
     dictionary.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
+    geospatial.cpp
     group.cpp
     db.cpp
     group_writer.cpp
@@ -151,6 +152,7 @@ set(REALM_INSTALL_HEADERS
     disable_sync_to_disk.hpp
     error_codes.hpp
     exceptions.hpp
+    geospatial.hpp
     global_key.hpp
     group.hpp
     group_writer.hpp

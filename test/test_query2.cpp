@@ -5818,6 +5818,34 @@ TEST(Query_TypeOfValue)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+ONLY(Query_GeoWithin)
+{
+    Group g;
+    auto table = g.add_table("Restuarnts");
+    auto geo_table = g.add_table("MyPosition", Table::Type::Embedded);
+    ColKey type_col = geo_table->add_column(type_String, "type");
+    ColKey coords_col = geo_table->add_column_list(type_Double, "coordinates");
+    auto col_int = table->add_column(type_UUID, "_id");
+    auto col_any = table->add_column(type_Mixed, "mixed");
+    auto col_link = table->add_column(*geo_table, "link");
+    auto col_links = table->add_column_list(*geo_table, "links");
+
+    auto add_data = [&](Geospatial geo) {
+        Obj top_obj = table->create_object();
+        Obj geo_obj = top_obj.create_and_set_linked_object(col_link);
+        geo.assign_to(geo_obj);
+    };
+    std::vector<Geospatial> point_data = {GeoPoint{0, 0}, GeoPoint{0.5, 0.5}, GeoPoint{1, 1}, GeoPoint{2, 2}};
+    for (auto& geo : point_data) {
+        add_data(geo);
+    }
+
+    GeoBox box{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+
+    CHECK_EQUAL(table->column<Link>(col_link).geo_within(box).count(), 1);
+}
+
+
 TEST(Query_links_to_with_bpnode_split)
 {
     // The bug here is that LinksToNode would read a LinkList as a simple Array

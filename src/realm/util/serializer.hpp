@@ -30,6 +30,7 @@ namespace realm {
 
 class BinaryData;
 struct ColKey;
+class Geospatial;
 struct null;
 class ObjectId;
 struct ObjKey;
@@ -76,6 +77,8 @@ template <>
 std::string print_value<>(realm::UUID);
 template <>
 std::string print_value<>(realm::TypeOfValue);
+template <>
+std::string print_value<>(realm::Geospatial);
 
 // General implementation for most types
 template <typename T>
