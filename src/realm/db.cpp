@@ -739,7 +739,7 @@ public:
     }
 
 private:
-    void ensure_reader_mapping(unsigned int required = -1)
+    void ensure_reader_mapping(unsigned int required = -1) override
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
