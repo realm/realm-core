@@ -111,7 +111,8 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     , size(s)
 {
     total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
-    addr = new char[size];
+    // force alignment to at least 8 bytes (required by allocator)
+    addr = reinterpret_cast<char*>(new uint64_t[(size + 7) / 8]);
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
 #endif
@@ -1327,7 +1328,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         else {
             new_translation_table[i].mapping_addr = m_mappings[i].primary_mapping.get_addr();
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
+            new_translation_table[i].encrypted_mapping = m_mappings[i].primary_mapping.get_encrypted_mapping();
 #endif
         }
         REALM_ASSERT(new_translation_table[i].mapping_addr);
