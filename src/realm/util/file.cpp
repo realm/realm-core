@@ -1544,7 +1544,7 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
 {
 #ifdef _WIN32 // Windows version
     // CreateFile2 with creationDisposition OPEN_EXISTING will return a file handle only if the file exists
-    // otherwise it will raise ERROR_FILE_NOT_FOUND
+    // otherwise it will raise ERROR_FILE_NOT_FOUND. This call will never create a new file.
     WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
                                                      FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                      OPEN_EXISTING, nullptr));
@@ -1581,7 +1581,7 @@ File::UniqueID File::get_unique_id(FileDesc file)
 
     return ret;
 #else // POSIX version
-    REALM_ASSERT(0 <= file);
+    REALM_ASSERT(file >= 0);
     struct stat statbuf;
     if (::fstat(file, &statbuf) == 0) {
         return UniqueID(statbuf.st_dev, statbuf.st_ino);

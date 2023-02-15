@@ -1354,13 +1354,9 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    if (lhs.id_info.VolumeSerialNumber < rhs.id_info.VolumeSerialNumber)
-        return true;
-    if (lhs.id_info.VolumeSerialNumber > rhs.id_info.VolumeSerialNumber)
-        return false;
-    if (memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(lhs.id_info.FileId)) < 0)
-        return true;
-    return false;
+    if (lhs.id_info.VolumeSerialNumber != rhs.id_info.VolumeSerialNumber)
+        return lhs.id_info.VolumeSerialNumber < rhs.id_info.VolumeSerialNumber;
+    return memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(lhs.id_info.FileId)) < 0;
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;
