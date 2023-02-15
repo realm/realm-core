@@ -57,13 +57,6 @@
 #include <mutex>
 #include <thread>
 
-#if REALM_PLATFORM_APPLE
-#import <CommonCrypto/CommonHMAC.h>
-#else
-#include <openssl/sha.h>
-#include <openssl/hmac.h>
-#endif
-
 using namespace realm;
 using namespace realm::app;
 using util::any_cast;
@@ -101,22 +94,7 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 
 #if REALM_ENABLE_AUTH_TESTS
 
-static std::string HMAC_SHA256(std::string_view key, std::string_view data)
-{
-#if REALM_PLATFORM_APPLE
-    std::string ret;
-    ret.resize(CC_SHA256_DIGEST_LENGTH);
-    CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), data.data(), data.size(),
-           reinterpret_cast<uint8_t*>(const_cast<char*>(ret.data())));
-    return ret;
-#else
-    std::array<unsigned char, EVP_MAX_MD_SIZE> hash;
-    unsigned int hashLen;
-    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), reinterpret_cast<unsigned char const*>(data.data()),
-         static_cast<int>(data.size()), hash.data(), &hashLen);
-    return std::string{reinterpret_cast<char const*>(hash.data()), hashLen};
-#endif
-}
+#include <realm/util/sha_crypto.hpp>
 
 static std::string create_jwt(const std::string& appId)
 {
@@ -148,11 +126,13 @@ static std::string create_jwt(const std::string& appId)
 
     std::string jwtPayload = encoded_header + "." + encoded_payload;
 
-    auto mac = HMAC_SHA256("My_very_confidential_secretttttt", jwtPayload);
+    std::array<unsigned char, 32> hmac;
+    unsigned char key[] = "My_very_confidential_secretttttt";
+    util::hmac_sha256(util::unsafe_span_cast<unsigned char>(jwtPayload), hmac, util::Span(key).first<32>());
 
     std::string signature;
-    signature.resize(util::base64_encoded_size(mac.length()));
-    util::base64_encode(mac.data(), mac.length(), signature.data(), signature.size());
+    signature.resize(util::base64_encoded_size(hmac.size()));
+    util::base64_encode(reinterpret_cast<char*>(hmac.data()), hmac.size(), signature.data(), signature.size());
     while (signature.back() == '=')
         signature.pop_back();
     std::replace(signature.begin(), signature.end(), '+', '-');

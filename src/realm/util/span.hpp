@@ -113,7 +113,7 @@ public:
     {
         REALM_ASSERT(extent == std::distance(begin, end));
     }
-#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
+#if !defined(_MSC_VER) || _MSC_VER >= 1929 // Visual Studio 16.9 incorrectly rejects this. 16.10+ supports it
     constexpr Span(element_type (&arr)[extent]) noexcept
         : m_data{arr}
     {
@@ -149,7 +149,7 @@ public:
     {
     }
 
-#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
+#if !defined(_MSC_VER) || _MSC_VER >= 1929 // Visual Studio 16.9 incorrectly rejects this. 16.10+ supports it
     template <class U, std::enable_if_t<std::is_convertible_v<U (*)[], element_type (*)[]>, int> = 0>
     constexpr explicit Span(const Span<U, dynamic_extent>& other) noexcept
         : m_data{other.data()}
@@ -457,6 +457,13 @@ auto as_writable_bytes(Span<T, extent> s) noexcept
     -> std::enable_if_t<!std::is_const_v<T>, decltype(s.as_writable_bytes())>
 {
     return s.as_writable_bytes();
+}
+
+template <typename T, typename... Args>
+constexpr auto unsafe_span_cast(Args&&... args)
+{
+    auto temp = Span(std::forward<Args>(args)...);
+    return Span<T, decltype(temp)::extent>(reinterpret_cast<T*>(temp.data()), temp.size());
 }
 
 //  Deduction guides
