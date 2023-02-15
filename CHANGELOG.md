@@ -22,6 +22,7 @@
   * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
   * `File::get_unique_id` now works on Windows
   * Replaced manual path string conversion with `std::filesystem::path`
+* Update yarn download path in install_baas.sh ([PR #6309](https://github.com/realm/realm-core/pull/6309))
 * Include the websocket close status reason when reporting errors to the sync client ([PR #6298](https://github.com/realm/realm-core/pull/6298))
 
 ----------------------------------------------
