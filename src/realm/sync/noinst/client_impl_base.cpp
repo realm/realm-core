@@ -387,14 +387,21 @@ void ClientImpl::Connection::finish_session_deactivation(Session* sess)
 
 void Connection::force_close()
 {
-    logger.debug("force close");
     if (m_force_closed) {
         return;
     }
 
     m_force_closed = true;
+
     if (m_state != ConnectionState::disconnected) {
         voluntary_disconnect();
+    }
+
+    REALM_ASSERT(m_state == ConnectionState::disconnected);
+    if (m_reconnect_delay_in_progress || m_disconnect_delay_in_progress) {
+        m_reconnect_disconnect_timer.reset();
+        m_reconnect_delay_in_progress = false;
+        m_disconnect_delay_in_progress = false;
     }
 
     std::vector<Session*> to_close;
