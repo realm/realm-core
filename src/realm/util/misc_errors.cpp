@@ -30,8 +30,6 @@ class misc_category : public std::error_category {
     std::string message(int) const override;
 };
 
-misc_category g_misc_category;
-
 const char* misc_category::name() const noexcept
 {
     return "tigthdb.misc";
@@ -56,7 +54,13 @@ namespace error {
 
 std::error_code make_error_code(misc_errors err)
 {
-    return std::error_code(err, g_misc_category);
+    return std::error_code(err, misc_error_category());
+}
+
+const std::error_category& misc_error_category()
+{
+    static misc_category misc_category;
+    return misc_category;
 }
 
 } // namespace error

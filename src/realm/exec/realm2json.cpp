@@ -1,4 +1,5 @@
 #include <realm.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <iostream>
 
 const char* legend =
@@ -89,15 +90,12 @@ int main(int argc, char const* argv[])
 
     std::string path = argv[argc - 1];
 
-    try {
-        // First we try to open in read_only mode. In this way we can also open
-        // realms with a client history
-        realm::Group g(path);
+    auto print = [&](realm::TransactionRef tr) {
         if (output_schema) {
-            g.schema_to_json(std::cout, &renames);
+            tr->schema_to_json(std::cout, &renames);
         }
         else if (table_filter.size()) {
-            realm::TableRef target = g.get_table(table_filter);
+            realm::TableRef target = tr->get_table(table_filter);
             abort_if(!target, "table not found: '%s'", table_filter.c_str());
             realm::Query q = target->query(query_filter);
             realm::TableView results = q.find_all();
@@ -106,22 +104,37 @@ int main(int argc, char const* argv[])
             results.to_json(std::cout, link_depth, renames, output_mode);
         }
         else {
-            g.to_json(std::cout, link_depth, &renames, output_mode);
+            tr->to_json(std::cout, link_depth, &renames, output_mode);
         }
-    }
-    catch (const realm::FileFormatUpgradeRequired&) {
-        // In realm history
-        // Last chance - this one must succeed
-        auto hist = realm::make_in_realm_history();
-        realm::DBOptions options;
-        options.allow_file_format_upgrade = true;
+    };
 
-        auto db = realm::DB::create(*hist, path, options);
+    auto hist = realm::make_in_realm_history();
+    realm::DBOptions options;
+    // First we try to open in read_only mode.
+    options.allow_file_format_upgrade = false;
+    options.is_immutable = true;
 
-        std::cerr << "File upgraded to latest version: " << path << std::endl;
-
-        auto tr = db->start_read();
-        tr->to_json(std::cout, link_depth, &renames, output_mode);
+    for (;;) {
+        try {
+            auto db = realm::DB::create(*hist, path, options);
+            if (options.allow_file_format_upgrade) {
+                std::cerr << "File upgraded to latest version: " << path << std::endl;
+            }
+            print(db->start_read());
+            return 0;
+        }
+        catch (const realm::FileFormatUpgradeRequired&) {
+            options.allow_file_format_upgrade = true;
+            options.is_immutable = false;
+        }
+        catch (const realm::IncompatibleHistories&) {
+            hist = realm::sync::make_client_replication();
+            options.allow_file_format_upgrade = false;
+            options.is_immutable = true;
+        }
+        catch (...) {
+            break;
+        }
     }
 
     return 0;

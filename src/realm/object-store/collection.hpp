@@ -122,7 +122,7 @@ public:
      * @return A `NotificationToken` that is used to identify this callback.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     // The object being added to the collection is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {
