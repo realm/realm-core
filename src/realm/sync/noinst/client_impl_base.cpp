@@ -439,7 +439,7 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec);
+        read_or_write_error(ec, "simulated read error");
         return bool(m_websocket);
     }
 
@@ -1153,7 +1153,7 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec, std::optional<std::string_view> msg)
+void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
