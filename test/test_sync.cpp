@@ -2980,7 +2980,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
                                   " preverify_ok = %4, depth = %5",
                                   server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
-            client.stop();
+            client.shutdown();
         return true;
     };
 
@@ -2996,7 +2996,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
-    client.drain();
+    client.shutdown_and_wait();
 }
 
 #endif // REALM_HAVE_OPENSSL
