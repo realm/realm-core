@@ -120,8 +120,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -351,8 +350,8 @@ public:
     void print() const;
 #endif
 
-    void refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
-                                    util::UniqueFunction<void(const RefRanges&)> = nullptr);
+    void mark_pages_for_refresh_for_versions(std::vector<VersionedTopRef> read_locks,
+                                             util::UniqueFunction<void(const RefRanges&)> = nullptr);
 
 protected:
     MemRef do_alloc(const size_t size) override;
@@ -381,10 +380,10 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void refresh_encrypted_pages(
+    void mark_encrypted_pages_for_refresh(
         const RefRanges& ranges,
         std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed);
-    void refresh_all_encrypted_pages();
+    void mark_all_encrypted_pages_for_refresh();
 
 private:
     enum AttachMode {

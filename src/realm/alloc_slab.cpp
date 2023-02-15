@@ -1287,8 +1287,8 @@ static inline ref_type get_ref_from_array(Array& array, size_t index)
     return ref_type(val);
 }
 
-void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_locks,
-                                           util::UniqueFunction<void(const RefRanges&)> refresh_hook)
+void SlabAlloc::mark_pages_for_refresh_for_versions(std::vector<VersionedTopRef> read_locks,
+                                                    util::UniqueFunction<void(const RefRanges&)> refresh_hook)
 {
     REALM_ASSERT_EX(read_locks.size() >= 2, read_locks.size());
 #if REALM_ENCRYPTION_VERIFICATION
@@ -1340,12 +1340,12 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     // during advance, this is likely to happen several times when fetching the freelist
     // positions and sizes as they are written consecutively
     std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>> pages_refreshed_cache;
-    auto do_refresh = [&](const RefRanges& ranges) {
+    auto do_mark_for_refresh = [&](const RefRanges& ranges) {
         if (REALM_UNLIKELY(refresh_hook)) {
             refresh_hook(ranges);
         }
         else {
-            this->refresh_encrypted_pages(ranges, &pages_refreshed_cache);
+            this->mark_encrypted_pages_for_refresh(ranges, &pages_refreshed_cache);
         }
 #if REALM_ENCRYPTION_VERIFICATION
         if (validator.is_attached()) {
@@ -1356,11 +1356,12 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #endif // REALM_ENCRYPTION_VERIFICATION
     };
 
-    auto load_array = [&do_refresh, &read_locks](Array& array, ref_type ref, const VersionedTopRef& read_version) {
+    auto load_array = [&do_mark_for_refresh, &read_locks](Array& array, ref_type ref,
+                                                          const VersionedTopRef& read_version) {
         // the begin version is known to have up to date pages since it is the current version
         const bool first_version = (read_version.version == read_locks.begin()->version);
         if (!first_version) {
-            do_refresh({{ref, ref + NodeHeader::header_size}});
+            do_mark_for_refresh({{ref, ref + NodeHeader::header_size}});
         }
         array.init_from_ref(ref);
         REALM_ASSERT_EX(array.is_attached(), ref, read_version.version, read_version.top_ref);
@@ -1368,7 +1369,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
             // Now that the array header is loaded and up to date, load the byte size
             // and mark any additional pages as needing refresh.
             size_t bytes_to_refresh = NodeHeader::get_byte_size_from_header(array.get_header());
-            do_refresh({{ref, ref + bytes_to_refresh}});
+            do_mark_for_refresh({{ref, ref + bytes_to_refresh}});
             // If this array spans multiple pages and those pages have just been marked for
             // refresh above, then we need to refetch the array into memory. This will trigger
             // the read barrier on all those pages which refetches those pages from disk if needed.
@@ -1620,7 +1621,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
     debug_allocs += "allocations: ";
 #endif // REALM_ENCRYPTION_VERIFICATION
 
-    do_refresh(allocations);
+    do_mark_for_refresh(allocations);
 
 #if REALM_ENCRYPTION_VERIFICATION
     if (validator.is_attached()) {
@@ -1774,7 +1775,7 @@ void SlabAlloc::refresh_pages_for_versions(std::vector<VersionedTopRef> read_loc
 #endif // REALM_ENCRYPTION_VERIFICATION
 }
 
-void SlabAlloc::refresh_encrypted_pages(
+void SlabAlloc::mark_encrypted_pages_for_refresh(
     const RefRanges& ranges,
     std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
 {
@@ -1799,7 +1800,7 @@ void SlabAlloc::refresh_encrypted_pages(
 #endif // REALM_ENABLE_ENCRYPTION
 }
 
-void SlabAlloc::refresh_all_encrypted_pages()
+void SlabAlloc::mark_all_encrypted_pages_for_refresh()
 {
 #if REALM_ENABLE_ENCRYPTION
     // callers must already hold m_mapping_mutex

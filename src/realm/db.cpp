@@ -876,7 +876,7 @@ std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().stri
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
-// The PageRefresher is run on a dedicated thread to ensure timely releases of versions
+// The PageRefresher is run on a dedicated thread to allow timely releases of versions
 // avoiding version pinning.
 class DB::PageRefresher {
 public:
@@ -1774,7 +1774,7 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
         version_type from;
         {
             if (!m_last_encryption_page_reader) {
-                alloc.refresh_all_encrypted_pages();
+                alloc.mark_all_encrypted_pages_for_refresh();
                 m_last_encryption_page_reader = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
                 return;
             }
@@ -1787,7 +1787,7 @@ void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
         auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
         std::vector<VersionedTopRef> read_locks = m_version_manager->get_versions_from(from, to.version);
 
-        alloc.refresh_pages_for_versions(read_locks);
+        alloc.mark_pages_for_refresh_for_versions(read_locks);
 
         m_version_manager->release_read_lock(*m_last_encryption_page_reader);
         m_last_encryption_page_reader = tmp_rl;

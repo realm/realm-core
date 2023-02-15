@@ -564,7 +564,7 @@ TEST(Alloc_EncryptionPageRefresher)
         }
         add_expected_refreshes_for_arrays(alloc, top_refs, expected_diffs);
         RefRanges actual_allocations;
-        alloc.refresh_pages_for_versions(top_refs, [&](const RefRanges& allocs) {
+        alloc.mark_pages_for_refresh_for_versions(top_refs, [&](const RefRanges& allocs) {
             actual_allocations.insert(actual_allocations.end(), allocs.begin(), allocs.end());
         });
         std::sort(actual_allocations.begin(), actual_allocations.end(), [](const RefRange& a, const RefRange& b) {
