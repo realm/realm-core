@@ -18,6 +18,10 @@
 
 ### Internals
 * Upgrade OpenSSL from 3.0.7 to 3.0.8. ([#6305](https://github.com/realm/realm-core/pull/6305))
+* Windows improvements in util/file ([PR #6221](https://github.com/realm/realm-core/pull/6221)):
+  * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
+  * `File::get_unique_id` now works on Windows
+  * Replaced manual path string conversion with `std::filesystem::path`
 
 ----------------------------------------------
 
