@@ -136,9 +136,9 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    void stop() noexcept;
+    void shutdown() noexcept;
 
-    void drain();
+    void shutdown_and_wait();
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -219,7 +219,7 @@ private:
 
     std::mutex m_mutex;
 
-    std::atomic<bool> m_stopped = false;
+    bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
     bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
 

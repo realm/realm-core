@@ -452,8 +452,8 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 
 bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
-    if (get_client().m_stopped) {
-        logger.debug("Received binary message after client stop");
+    if (m_force_closed) {
+        logger.debug("Received binary message after connection was force closed");
         return false;
     }
     std::error_code ec;
@@ -476,8 +476,8 @@ void Connection::websocket_error_handler()
 
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
-    if (get_client().m_stopped) {
-        logger.debug("Received websocket close message after client stop");
+    if (m_force_closed) {
+        logger.debug("Received websocket close message after connection was force closed");
         return false;
     }
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);

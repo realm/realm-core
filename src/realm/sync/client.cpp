@@ -400,7 +400,7 @@ ClientImpl::~ClientImpl()
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
 
-    drain();
+    shutdown_and_wait();
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
     REALM_ASSERT(m_stopped);
@@ -499,9 +499,9 @@ void ClientImpl::drain_connections_on_loop()
     });
 }
 
-void ClientImpl::drain()
+void ClientImpl::shutdown_and_wait()
 {
-    stop();
+    shutdown();
     std::unique_lock lock{m_drain_mutex};
     if (m_drained) {
         return;
@@ -515,7 +515,7 @@ void ClientImpl::drain()
     m_drained = true;
 }
 
-void ClientImpl::stop() noexcept
+void ClientImpl::shutdown() noexcept
 {
     {
         std::lock_guard lock{m_mutex};
@@ -1906,14 +1906,14 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
-void Client::stop() noexcept
+void Client::shutdown() noexcept
 {
-    m_impl->stop();
+    m_impl->shutdown();
 }
 
-void Client::drain()
+void Client::shutdown_and_wait()
 {
-    m_impl->drain();
+    m_impl->shutdown_and_wait();
 }
 
 void Client::cancel_reconnect_delay()
