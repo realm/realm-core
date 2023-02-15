@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* * Upgrade OpenSSL from 3.0.7 to 3.0.8. ([#6305](https://github.com/realm/realm-core/pull/6305)).
+* Upgrade OpenSSL from 3.0.7 to 3.0.8. ([#6305](https://github.com/realm/realm-core/pull/6305))
 
 ----------------------------------------------
 
