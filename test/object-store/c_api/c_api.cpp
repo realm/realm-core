@@ -122,17 +122,17 @@ realm_value_t rlm_decimal_val(double d)
     return val;
 }
 
-realm_value_t rlm_decimal_nan()
-{
-    realm_value_t val;
-    val.type = RLM_TYPE_DECIMAL128;
+// realm_value_t rlm_decimal_nan()
+// {
+//     realm_value_t val;
+//     val.type = RLM_TYPE_DECIMAL128;
 
-    realm::Decimal128 dec = realm::Decimal128::nan("0");
-    val.decimal128.w[0] = dec.raw()->w[0];
-    val.decimal128.w[1] = dec.raw()->w[1];
+//     realm::Decimal128 dec = realm::Decimal128::nan("0");
+//     val.decimal128.w[0] = dec.raw()->w[0];
+//     val.decimal128.w[1] = dec.raw()->w[1];
 
-    return val;
-}
+//     return val;
+// }
 
 realm_value_t rlm_uuid_val(const char* str)
 {
