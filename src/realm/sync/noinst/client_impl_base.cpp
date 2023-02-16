@@ -404,6 +404,9 @@ void Connection::force_close()
         m_disconnect_delay_in_progress = false;
     }
 
+    // We must copy any session pointers we want to close to a vector because force_closing
+    // the session may remove it from m_sessions and invalidate the iterator uses to loop
+    // through the map. By copying to a separate vector we ensure our iterators remain valid.
     std::vector<Session*> to_close;
     for (auto& session_pair : m_sessions) {
         if (session_pair.second->m_state == Session::State::Active) {
