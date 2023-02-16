@@ -387,7 +387,7 @@ struct PlacementDelete {
 };
 
 #ifdef _WIN32
-typedef HANDLE FileDesc;
+typedef void* FileDesc;
 #else
 typedef int FileDesc;
 #endif

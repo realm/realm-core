@@ -57,16 +57,6 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
-struct ErrorTryAgainBackoffInfo {
-    void update(const ProtocolErrorInfo& info);
-    void reset();
-    std::chrono::milliseconds delay_interval();
-
-    ResumptionDelayInfo delay_info;
-    util::Optional<std::chrono::milliseconds> cur_delay_interval;
-    util::Optional<sync::ProtocolError> triggering_error;
-};
-
 class ClientImpl {
 public:
     enum class ConnectionTerminationReason;
@@ -117,8 +107,6 @@ public:
         // true. See receive_pong().
         bool m_scheduled_reset = false;
 
-        ErrorTryAgainBackoffInfo m_try_again_delay_info;
-
         friend class Connection;
     };
 
@@ -136,10 +124,11 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    /// This calls stop() on the socket provider respectively.
+    // @{
+    /// These call stop() and run() on the socket provider respectively.
     void stop() noexcept;
-
-    void drain();
+    void run();
+    // @}
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -150,7 +139,7 @@ public:
     void post(SyncSocketProvider::FunctionHandler&& handler);
     SyncSocketProvider::SyncTimer create_timer(std::chrono::milliseconds delay,
                                                SyncSocketProvider::FunctionHandler&& handler);
-    using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
+    using SyncTrigger = std::unique_ptr<Trigger<SyncSocketProvider>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
     std::mt19937_64& get_random() noexcept;
@@ -178,6 +167,7 @@ private:
     const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
+    // This will be updated to the SyncSocketProvider interface once the integration is complete
     std::shared_ptr<SyncSocketProvider> m_socket_provider;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
@@ -212,17 +202,13 @@ private:
     // Must be accessed only by event loop thread
     connection_ident_type m_prev_connection_ident = 0;
 
-    std::mutex m_drain_mutex;
-    std::condition_variable m_drain_cv;
-    bool m_drained = false;
-    uint64_t m_outstanding_posts = 0;
-    uint64_t m_num_connections = 0;
-
-    std::mutex m_mutex;
+    util::Mutex m_mutex;
 
     bool m_stopped = false;                       // Protected by `m_mutex`
     bool m_sessions_terminated = false;           // Protected by `m_mutex`
     bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
+
+    std::atomic<bool> m_running{false}; // Debugging facility
 
     // The set of session wrappers that are not yet wrapping a session object,
     // and are not yet abandoned (still referenced by the application).
@@ -238,7 +224,7 @@ private:
     SessionWrapperStack m_abandoned_session_wrappers;
 
     // Protected by `m_mutex`.
-    std::condition_variable m_wait_or_client_stopped_cond;
+    util::CondVar m_wait_or_client_stopped_cond;
 
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
@@ -276,8 +262,7 @@ private:
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
 
-    void drain_connections();
-    void drain_connections_on_loop();
+    static std::string make_user_agent_string(ClientConfig&);
 
     session_ident_type get_next_session_ident() noexcept;
 
@@ -325,7 +310,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 
 // TODO: The parent will be updated to WebSocketObserver once the WebSocket integration is complete
-class ClientImpl::Connection {
+class ClientImpl::Connection final : public WebSocketObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -390,8 +375,6 @@ public:
     /// activated.
     void cancel_reconnect_delay();
 
-    void force_close();
-
     /// Returns zero until the HTTP response is received. After that point in
     /// time, it returns the negotiated protocol version, which is based on the
     /// contents of the `Sec-WebSocket-Protocol` header in the HTTP
@@ -401,10 +384,23 @@ public:
     int get_negotiated_protocol_version() noexcept;
 
     // Methods from WebSocketObserver interface for websockets from the Socket Provider
-    void websocket_connected_handler(const std::string& protocol);
-    bool websocket_binary_message_received(util::Span<const char> data);
-    void websocket_error_handler();
-    bool websocket_closed_handler(bool, Status);
+    void websocket_connected_handler(const std::string& protocol) override;
+    bool websocket_binary_message_received(util::Span<const char> data) override;
+    // Will be implemented when the functions below are removed
+    void websocket_error_handler() override {}
+    bool websocket_closed_handler(bool, Status) override
+    {
+        return false;
+    }
+
+    /// DEPRECATED - Will be removed in a future release
+    // Methods from WebsocketObserver that will be going away soon
+    void websocket_connect_error_handler(std::error_code) override;
+    void websocket_ssl_handshake_error_handler(std::error_code) override;
+    void websocket_read_or_write_error_handler(std::error_code) override;
+    void websocket_handshake_error_handler(std::error_code, const std::string_view*) override;
+    void websocket_protocol_error_handler(std::error_code) override;
+    bool websocket_close_message_received(std::error_code error_code, StringData message) override;
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -424,11 +420,6 @@ public:
     ~Connection();
 
 private:
-    struct LifecycleSentinel : public util::AtomicRefCountBase {
-        bool destroyed = false;
-    };
-    struct WebSocketObserverShim;
-
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     template <class H>
@@ -477,8 +468,9 @@ private:
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
-    void read_or_write_error(std::error_code ec, std::string_view msg);
+    void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
+    void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
@@ -515,7 +507,6 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    util::bind_ptr<LifecycleSentinel> m_websocket_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
@@ -566,8 +557,6 @@ private:
 
     // At least one PING message was sent since connection was established
     bool m_ping_sent = false;
-
-    bool m_websocket_error_received = false;
 
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.
@@ -921,8 +910,6 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
-    void handle_pending_client_reset_acknowledgement();
-
     void gather_pending_compensating_writes(util::Span<Changeset> changesets, std::vector<ProtocolErrorInfo>* out);
 
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
@@ -943,7 +930,9 @@ private:
     bool m_suspended = false;
 
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
-    ErrorTryAgainBackoffInfo m_try_again_delay_info;
+    ResumptionDelayInfo m_try_again_delay_info;
+    util::Optional<ProtocolError> m_try_again_error_code;
+    util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
 
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
@@ -1163,6 +1152,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
+
 inline std::mt19937_64& ClientImpl::get_random() noexcept
 {
     return m_random;
@@ -1179,7 +1169,6 @@ inline void ClientImpl::ReconnectInfo::reset() noexcept
     m_time_point = 0;
     m_delay = 0;
     m_scheduled_reset = false;
-    m_try_again_delay_info.reset();
 }
 
 inline ClientImpl& ClientImpl::Connection::get_client() noexcept
@@ -1211,6 +1200,8 @@ inline int ClientImpl::Connection::get_negotiated_protocol_version() noexcept
 {
     return m_negotiated_protocol_version;
 }
+
+inline ClientImpl::Connection::~Connection() {}
 
 template <class H>
 void ClientImpl::Connection::for_each_active_session(H handler)

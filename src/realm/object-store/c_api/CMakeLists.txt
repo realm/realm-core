@@ -26,7 +26,6 @@ if(REALM_ENABLE_SYNC)
         http.cpp
         logging.cpp
         sync.cpp
-        socket_provider.cpp
     )
 endif()
 

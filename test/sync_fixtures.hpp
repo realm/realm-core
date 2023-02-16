@@ -4,7 +4,6 @@
 #include <vector>
 #include <sstream>
 
-#include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
 #include <realm/string_data.hpp>
@@ -302,11 +301,10 @@ public:
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(const std::shared_ptr<util::Logger>& logger_ptr, const network::Endpoint& endpoint,
-                      const HTTPRequest& request)
-        : logger{"HTTP client: ", logger_ptr}
+    HTTPRequestClient(util::Logger& logger, const network::Endpoint& endpoint, const HTTPRequest& request)
+        : logger{"HTTP client: ", logger}
         , m_endpoint{endpoint}
-        , m_http_client{*this, logger_ptr}
+        , m_http_client{*this, logger}
         , m_request{request}
     {
     }
@@ -535,10 +533,7 @@ public:
         m_clients.resize(num_clients);
         for (int i = 0; i < num_clients; ++i) {
             Client::Config config_2;
-
-            m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
-                m_client_loggers[i], "", websocket::DefaultSocketProvider::AutoStart{false}));
-            config_2.socket_provider = m_client_socket_providers.back();
+            config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
@@ -551,6 +546,7 @@ public:
         }
 
         m_server_threads.resize(num_servers);
+        m_client_threads.resize(num_clients);
 
         m_simulated_server_error_rates.resize(num_servers);
         m_simulated_client_error_rates.resize(num_clients);
@@ -566,8 +562,10 @@ public:
     {
         unit_test::TestContext& test_context = m_test_context;
         stop();
-        m_clients.clear();
-        m_client_socket_providers.clear();
+        for (int i = 0; i < m_num_clients; ++i) {
+            if (m_client_threads[i].joinable())
+                CHECK(!m_client_threads[i].join());
+        }
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
                 CHECK(!m_server_threads[i].join());
@@ -595,26 +593,15 @@ public:
         m_connection_state_change_listeners[client_index] = std::move(handler_2);
     }
 
+    // Must be called before start().
     void set_client_side_error_rate(int client_index, int n, int m)
     {
-        REALM_ASSERT(client_index >= 0 && client_index < m_num_clients);
-        auto sim = std::make_pair(n, m);
-        // Save the simulated error rate
-        m_simulated_client_error_rates[client_index] = sim;
-
-        // Post the new simulated error rate
-        using sf = _impl::SimulatedFailure;
-        // Post it onto the event loop to update the event loop thread
-        m_client_socket_providers[client_index]->post([sim = std::move(sim)](Status) {
-            sf::prime_random(sf::sync_client__read_head, sim.first, sim.second,
-                             random_int<uint_fast64_t>()); // Seed from global generator
-        });
+        m_simulated_client_error_rates[client_index] = std::make_pair(n, m);
     }
 
     // Must be called before start().
     void set_server_side_error_rate(int server_index, int n, int m)
     {
-        REALM_ASSERT(server_index >= 0 && server_index < m_num_servers);
         m_simulated_server_error_rates[server_index] = std::make_pair(n, m);
     }
 
@@ -624,16 +611,10 @@ public:
             m_server_threads[i].start([this, i] {
                 run_server(i);
             });
-
-        for (int i = 0; i < m_num_clients; ++i) {
-            m_client_socket_providers[i]->start();
-        }
-    }
-
-    void start_client(int index)
-    {
-        REALM_ASSERT(index >= 0 && index < m_num_clients);
-        m_client_socket_providers[index]->start();
+        for (int i = 0; i < m_num_clients; ++i)
+            m_client_threads[i].start([this, i] {
+                run_client(i);
+            });
     }
 
     // Use either the methods below or `start()`.
@@ -642,6 +623,14 @@ public:
         REALM_ASSERT(index >= 0 && index < m_num_servers);
         m_server_threads[index].start([this, index] {
             run_server(index);
+        });
+    }
+
+    void start_client(int index)
+    {
+        REALM_ASSERT(index >= 0 && index < m_num_clients);
+        m_client_threads[index].start([this, index] {
+            run_client(index);
         });
     }
 
@@ -658,17 +647,10 @@ public:
     void stop_client(int index)
     {
         REALM_ASSERT(index >= 0 && index < m_num_clients);
-        auto& client = get_client(index);
-        auto sim = m_simulated_client_error_rates[index];
-        if (sim.first != 0) {
-            using sf = _impl::SimulatedFailure;
-            // If we're using a simulated failure, clear it by posting onto the event loop
-            m_client_socket_providers[index]->post([](Status) mutable {
-                sf::unprime(sf::sync_client__read_head); // Clear the sim failure set when started
-            });
-        }
-        // We can't wait for clearing the simulated failure since some tests stop the client early
-        client.drain();
+        m_clients[index]->stop();
+        unit_test::TestContext& test_context = m_test_context;
+        if (m_client_threads[index].joinable())
+            CHECK(!m_client_threads[index].join());
     }
 
     void stop()
@@ -813,7 +795,7 @@ private:
     std::vector<std::function<ConnectionStateChangeListener>> m_connection_state_change_listeners;
     std::vector<port_type> m_server_ports;
     std::vector<ThreadWrapper> m_server_threads;
-    std::vector<std::shared_ptr<websocket::DefaultSocketProvider>> m_client_socket_providers;
+    std::vector<ThreadWrapper> m_client_threads;
     std::vector<std::pair<int, int>> m_simulated_server_error_rates;
     std::vector<std::pair<int, int>> m_simulated_client_error_rates;
     std::vector<uint_least64_t> m_allow_server_errors;
@@ -851,6 +833,28 @@ private:
             return;
         stop();
         m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i + 1);
+    }
+
+    void run_client(int i)
+    {
+        auto do_run_client = [this, i] {
+            auto sim = m_simulated_client_error_rates[i];
+            if (sim.first != 0) {
+                using sf = _impl::SimulatedFailure;
+                sf::RandomPrimeGuard pg(sf::sync_client__read_head, sim.first, sim.second,
+                                        random_int<uint_fast64_t>()); // Seed from global generator
+                m_clients[i]->run();
+            }
+            else {
+                m_clients[i]->run();
+            }
+            m_clients[i]->stop();
+        };
+        unit_test::TestContext& test_context = m_test_context;
+        if (CHECK_NOTHROW(do_run_client()))
+            return;
+        stop();
+        m_server_loggers[i]->error("Exception was throw from client[%1]'s event loop", i + 1);
     }
 };
 

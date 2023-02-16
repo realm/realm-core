@@ -22,8 +22,6 @@
 
 namespace realm::util {
 
-const Logger::Level Logger::default_log_level = Level::info;
-
 const char* Logger::get_level_prefix(Level level) noexcept
 {
     switch (level) {
@@ -66,13 +64,21 @@ void ThreadSafeLogger::do_log(Level level, const std::string& message)
     Logger::do_log(*m_base_logger_ptr, level, message); // Throws
 }
 
-void PrefixLogger::do_log(Level level, const std::string& message)
+Logger::Level ThreadSafeLogger::get_level_threshold() noexcept
 {
-    Logger::do_log(m_chained_logger, level, m_prefix + message); // Throws
+    LockGuard l(m_mutex);
+    return Logger::get_level_threshold();
 }
 
-void LocalThresholdLogger::do_log(Logger::Level level, std::string const& message)
+void ThreadSafeLogger::set_level_threshold(Level level) noexcept
 {
-    Logger::do_log(*m_chained_logger, level, message); // Throws
+    LockGuard l(m_mutex);
+    Logger::set_level_threshold(level);
 }
+
+void PrefixLogger::do_log(Level level, const std::string& message)
+{
+    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+}
+
 } // namespace realm::util

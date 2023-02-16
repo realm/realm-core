@@ -875,6 +875,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
     }
 
     if (mode == SchemaMode::Manual) {
+        set_schema_keys(group, target_schema);
         if (migration_function) {
             migration_function();
         }

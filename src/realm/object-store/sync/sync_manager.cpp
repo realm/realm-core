@@ -782,7 +782,7 @@ void SyncManager::close_all_sessions()
     }
 
     for (auto& [_, session] : sessions) {
-        session->force_close();
+        session->log_out();
     }
 
     get_sync_client().wait_for_session_terminations();

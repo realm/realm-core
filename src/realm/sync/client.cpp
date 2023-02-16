@@ -8,7 +8,6 @@
 #include "realm/util/optional.hpp"
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
@@ -215,8 +214,6 @@ public:
 
     util::Future<std::string> send_test_command(std::string body);
 
-    void handle_pending_client_reset_acknowledgement();
-
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -393,13 +390,14 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
+    bool client_destroyed_while_still_running = m_running;
+    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
+
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
 
-    drain();
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
-    REALM_ASSERT(m_stopped);
     REALM_ASSERT(m_unactualized_session_wrappers.empty());
 }
 
@@ -444,7 +442,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // Thread safety required
 
     {
-        std::lock_guard lock{m_mutex};
+        util::LockGuard lock{m_mutex};
         m_sessions_terminated = false;
     }
 
@@ -471,14 +469,14 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        std::lock_guard lock{m_mutex};
+        util::LockGuard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
     }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_mutex};
+        util::LockGuard lock{m_mutex};
         while (!m_sessions_terminated && !m_stopped)
             m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_stopped;
@@ -487,44 +485,21 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 }
 
 
-void ClientImpl::drain_connections_on_loop()
-{
-    post([this](Status status) mutable {
-        REALM_ASSERT(status.is_ok());
-        actualize_and_finalize_session_wrappers();
-        drain_connections();
-    });
-}
-
-void ClientImpl::drain()
-{
-    stop();
-    {
-        std::lock_guard lock{m_drain_mutex};
-        if (m_drained) {
-            return;
-        }
-    }
-
-    drain_connections_on_loop();
-
-    std::unique_lock lock{m_drain_mutex};
-
-    logger.debug("Waiting for %1 connections to drain", m_num_connections);
-    m_drain_cv.wait(lock, [&] {
-        return m_num_connections == 0 && m_outstanding_posts == 0;
-    });
-
-    m_drained = true;
-}
-
 void ClientImpl::stop() noexcept
 {
-    std::lock_guard lock{m_mutex};
+    util::LockGuard lock{m_mutex};
     if (m_stopped)
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
+    m_socket_provider->stop();
+}
+
+
+void ClientImpl::run()
+{
+    auto ta = util::make_temp_assign(m_running, true);
+    m_socket_provider->run();
 }
 
 
@@ -532,7 +507,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
 {
     // Thread safety required.
 
-    std::lock_guard lock{m_mutex};
+    util::LockGuard lock{m_mutex};
     REALM_ASSERT(m_actualize_and_finalize);
     m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
     bool retrigger = !m_actualize_and_finalize_needed;
@@ -555,7 +530,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
 {
     // Thread safety required.
 
-    std::lock_guard lock{m_mutex};
+    util::LockGuard lock{m_mutex};
     REALM_ASSERT(m_actualize_and_finalize);
 
     // If the session wrapper has not yet been actualized (on the event loop
@@ -585,7 +560,7 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     std::map<SessionWrapper*, ServerEndpoint> unactualized_session_wrappers;
     SessionWrapperStack abandoned_session_wrappers;
     {
-        std::lock_guard lock{m_mutex};
+        util::LockGuard lock{m_mutex};
         m_actualize_and_finalize_needed = false;
         swap(m_unactualized_session_wrappers, unactualized_session_wrappers);
         swap(m_abandoned_session_wrappers, abandoned_session_wrappers);
@@ -637,10 +612,6 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
     }
     m_prev_connection_ident = ident;
     was_created = true;
-    {
-        std::lock_guard lk(m_drain_mutex);
-        ++m_num_connections;
-    }
     return conn;
 }
 
@@ -664,12 +635,6 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
         REALM_ASSERT(j != server_slot.alt_connections.end()); // Must be found
         REALM_ASSERT(&*j->second == &conn);
         server_slot.alt_connections.erase(j);
-    }
-
-    {
-        std::lock_guard lk(m_drain_mutex);
-        --m_num_connections;
-        m_drain_cv.notify_all();
     }
 }
 
@@ -766,11 +731,6 @@ void SessionImpl::on_resumed()
     m_wrapper.on_resumed(); // Throws
 }
 
-void SessionImpl::handle_pending_client_reset_acknowledgement()
-{
-    m_wrapper.handle_pending_client_reset_acknowledgement();
-}
-
 
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
@@ -786,18 +746,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     bool new_batch = false;
-    try {
-        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
-    }
-    catch (const LogicError& ex) {
-        if (ex.kind() == LogicError::binary_too_big) {
-            IntegrationException ex(ClientError::bad_changeset_size,
-                                    "bootstrap changeset too large to store in pending bootstrap store");
-            on_integration_failure(ex);
-            return true;
-        }
-        throw;
-    }
+    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
@@ -848,16 +797,11 @@ void SessionImpl::process_pending_flx_bootstrap()
     int64_t query_version = -1;
     size_t changesets_processed = 0;
 
-    // Used to commit each batch after it was transformed.
-    TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
         auto start_time = std::chrono::steady_clock::now();
         auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
-            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
-            // bootstrap store requires a write transaction itself.
-            transact->close();
             bootstrap_store->clear();
             return;
         }
@@ -874,7 +818,6 @@ void SessionImpl::process_pending_flx_bootstrap()
 
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            transact,
             [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
                 REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
                 bootstrap_store->pop_front_pending(tr, changesets_applied.size());
@@ -1337,7 +1280,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        std::lock_guard lock{m_client.m_mutex};
+        util::LockGuard lock{m_client.m_mutex};
         target_mark = ++m_target_upload_mark;
     }
 
@@ -1364,7 +1307,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_client.m_mutex};
+        util::LockGuard lock{m_client.m_mutex};
         while (m_reached_upload_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1380,7 +1323,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        std::lock_guard lock{m_client.m_mutex};
+        util::LockGuard lock{m_client.m_mutex};
         target_mark = ++m_target_download_mark;
     }
 
@@ -1407,7 +1350,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     bool completion_condition_was_satisfied;
     {
-        std::unique_lock lock{m_client.m_mutex};
+        util::LockGuard lock{m_client.m_mutex};
         while (m_reached_download_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1585,7 +1528,7 @@ void SessionWrapper::on_upload_completion()
         m_download_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
-    std::lock_guard lock{m_client.m_mutex};
+    util::LockGuard lock{m_client.m_mutex};
     if (m_staged_upload_mark > m_reached_upload_mark) {
         m_reached_upload_mark = m_staged_upload_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1616,7 +1559,7 @@ void SessionWrapper::on_download_completion()
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
-    std::lock_guard lock{m_client.m_mutex};
+    util::LockGuard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1699,49 +1642,6 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     }
 
     return m_sess->send_test_command(std::move(body));
-}
-
-void SessionWrapper::handle_pending_client_reset_acknowledgement()
-{
-    auto pending_reset = [&] {
-        auto ft = m_db->start_frozen();
-        return _impl::client_reset::has_pending_reset(ft);
-    }();
-    REALM_ASSERT(pending_reset);
-    m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
-                        pending_reset->time);
-    util::bind_ptr<SessionWrapper> self(this);
-    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](std::error_code ec) {
-        if (ec == util::error::operation_aborted) {
-            return;
-        }
-        auto& logger = self->m_sess->logger;
-        if (ec) {
-            logger.error("Error while tracking client reset acknowledgement: %1", ec.message());
-            return;
-        }
-
-        auto wt = self->m_db->start_write();
-        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
-        if (!cur_pending_reset) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
-                pending_reset.type, pending_reset.time);
-            return;
-        }
-        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
-            logger.debug(
-                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
-                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
-        }
-        else {
-            logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
-                         "Removing cycle detection tracker.",
-                         pending_reset.type, pending_reset.time);
-        }
-        _impl::client_reset::remove_pending_client_resets(wt);
-        wt->commit();
-    });
 }
 
 // ################ ClientImpl::Connection ################
@@ -1871,15 +1771,17 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
+void Client::run()
+{
+    m_impl->run(); // Throws
+}
+
+
 void Client::stop() noexcept
 {
     m_impl->stop();
 }
 
-void Client::drain()
-{
-    m_impl->drain();
-}
 
 void Client::cancel_reconnect_delay()
 {

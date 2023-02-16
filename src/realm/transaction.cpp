@@ -272,7 +272,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     }
 }
 
-VersionID Transaction::commit_and_continue_writing()
+void Transaction::commit_and_continue_writing()
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -284,7 +284,7 @@ VersionID Transaction::commit_and_continue_writing()
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();
 
-    DB::version_type version = db->do_commit(*this); // Throws
+    db->do_commit(*this); // Throws
 
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
@@ -299,7 +299,6 @@ VersionID Transaction::commit_and_continue_writing()
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
-    return VersionID{version, lock_after_commit.m_reader_idx};
 }
 
 TransactionRef Transaction::freeze()
@@ -814,9 +813,9 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 
 class NodeTree {
 public:
-    NodeTree(size_t evac_limit, size_t work_limit)
+    NodeTree(size_t evac_limit, size_t& work_limit)
         : m_evac_limit(evac_limit)
-        , m_work_limit(int64_t(work_limit))
+        , m_work_limit(work_limit)
         , m_moved(0)
     {
     }
@@ -836,15 +835,18 @@ public:
     ///                   to point to the node we have just processed
     bool trv(Array& current_node, unsigned level, std::vector<size_t>& progress)
     {
-        if (m_work_limit < 0) {
-            return false;
-        }
         if (current_node.is_read_only()) {
-            size_t byte_size = current_node.get_byte_size();
+            auto byte_size = current_node.get_byte_size();
             if ((current_node.get_ref() + byte_size) > m_evac_limit) {
                 current_node.copy_on_write();
                 m_moved++;
-                m_work_limit -= byte_size;
+                if (m_work_limit > byte_size) {
+                    m_work_limit -= byte_size;
+                }
+                else {
+                    m_work_limit = 0;
+                    return false;
+                }
             }
         }
 
@@ -876,12 +878,12 @@ public:
 
 private:
     size_t m_evac_limit;
-    int64_t m_work_limit;
+    size_t m_work_limit;
     size_t m_moved;
 };
 
 
-void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t work_limit)
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
 {
     NodeTree node_tree(evac_limit, work_limit);
     if (progress.empty()) {

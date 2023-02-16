@@ -250,7 +250,7 @@ size_t Dictionary::find_any(Mixed value) const
     return dict().find_any(value);
 }
 
-bool Dictionary::contains(StringData key) const
+bool Dictionary::contains(StringData key)
 {
     return dict().contains(key);
 }
@@ -335,10 +335,9 @@ private:
     Dictionary::CBFunc m_cb;
 };
 
-NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb,
-                                                                  std::optional<KeyPathArray> key_path_array) &
+NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array) &
 {
-    return add_notification_callback(NotificationHandler(dict(), std::move(cb)), std::move(key_path_array));
+    return add_notification_callback(NotificationHandler(dict(), std::move(cb)), key_path_array);
 }
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
