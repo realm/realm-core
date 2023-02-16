@@ -329,8 +329,30 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
         }
     }
 
-    converters::EmbeddedObjectConverter embedded_tracker;
+    // We must re-create any missing objects that are absent in dst before trying to copy
+    // their properties because creating them may re-create any dangling links which would
+    // otherwise cause inconsistencies when re-creating lists of links.
+    for (auto table_key : group_src.get_table_keys()) {
+        ConstTableRef table_src = group_src.get_table(table_key);
+        auto table_name = table_src->get_name();
+        if (should_skip_table(group_src, table_key) || table_src->is_embedded())
+            continue;
+        TableRef table_dst = group_dst.get_table(table_name);
+        auto pk_col = table_src->get_primary_key_column();
+        REALM_ASSERT(pk_col);
+        logger.debug("Creating missing objects for table '%1', number of rows = %2, "
+                     "primary_key_col = %3, primary_key_type = %4",
+                     table_name, table_src->size(), pk_col.get_index().val, pk_col.get_type());
+        for (const Obj& src : *table_src) {
+            bool created = false;
+            table_dst->create_object_with_primary_key(src.get_primary_key(), &created);
+            if (created) {
+                logger.debug("   created %1", src.get_primary_key());
+            }
+        }
+    }
 
+    converters::EmbeddedObjectConverter embedded_tracker;
     // Now src and dst have identical schemas and no extraneous objects from dst.
     // There may be missing object from src and the values of existing objects may
     // still differ. Diff all the values and create missing objects on the fly.
@@ -357,11 +379,11 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
-            bool updated = false;
-            // get or create the object
-            auto dst = table_dst->create_object_with_primary_key(src_pk, &updated);
+            // create the object - it should have been created above.
+            auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
 
+            bool updated = false;
             converter.copy(src, dst, &updated);
             if (updated) {
                 logger.debug("  updating %1", src_pk);
@@ -455,6 +477,12 @@ void track_reset(TransactionRef wt, ClientResyncMode mode)
     if (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard) {
         mode_val = 1; // Recover
     }
+
+    if (table->size() > 1) {
+        // this may happen if a future version of this code changes the format and expectations around reset metadata.
+        throw ClientResetFailed(
+            util::format("Previous client resets detected (%1) but only one is expected.", table->size()));
+    }
     table->create_object_with_primary_key(ObjectId::gen(),
                                           {{version_col, metadata_version},
                                            {timestamp_col, Timestamp(std::chrono::system_clock::now())},
@@ -470,27 +498,28 @@ static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode
         switch (previous_reset->type) {
             case ClientResyncMode::Manual:
                 REALM_UNREACHABLE();
-                break;
             case ClientResyncMode::DiscardLocal:
                 throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
                                                      "giving up on '%3' mode to prevent a cycle",
                                                      previous_reset->type, previous_reset->time, mode));
             case ClientResyncMode::Recover:
-                if (mode == ClientResyncMode::Recover) {
-                    throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
-                                                         "giving up on '%3' mode to prevent a cycle",
-                                                         previous_reset->type, previous_reset->time, mode));
-                }
-                else if (mode == ClientResyncMode::RecoverOrDiscard) {
-                    mode = ClientResyncMode::DiscardLocal;
-                    logger.info("A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
-                                previous_reset->type, previous_reset->time, mode);
-                }
-                else if (mode == ClientResyncMode::DiscardLocal) {
-                    // previous mode Recover and this mode is Discard, this is not a cycle yet
-                }
-                else {
-                    REALM_UNREACHABLE();
+                switch (mode) {
+                    case ClientResyncMode::Recover:
+                        throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                                             "giving up on '%3' mode to prevent a cycle",
+                                                             previous_reset->type, previous_reset->time, mode));
+                    case ClientResyncMode::RecoverOrDiscard:
+                        mode = ClientResyncMode::DiscardLocal;
+                        logger.info("A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
+                                    previous_reset->type, previous_reset->time, mode);
+                        remove_pending_client_resets(wt);
+                        break;
+                    case ClientResyncMode::DiscardLocal:
+                        remove_pending_client_resets(wt);
+                        // previous mode Recover and this mode is Discard, this is not a cycle yet
+                        break;
+                    case ClientResyncMode::Manual:
+                        REALM_UNREACHABLE();
                 }
                 break;
             case ClientResyncMode::RecoverOrDiscard:

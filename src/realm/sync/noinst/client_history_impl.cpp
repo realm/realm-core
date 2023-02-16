@@ -229,7 +229,7 @@ util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_wr
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
-                               SyncProgress& progress) const
+                               SyncProgress& progress, bool* has_pending_client_reset) const
 {
     TransactionRef rt = m_db->start_read(); // Throws
     version_type current_client_version_2 = rt->get_version();
@@ -262,6 +262,10 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
     REALM_ASSERT(current_client_version >= s_initial_version + 0);
     if (current_client_version == s_initial_version + 0)
         current_client_version = 0;
+
+    if (has_pending_client_reset) {
+        *has_pending_client_reset = _impl::client_reset::has_pending_reset(rt).has_value();
+    }
 }
 
 
@@ -379,14 +383,18 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 void ClientHistory::integrate_server_changesets(
     const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
     util::Span<const RemoteChangeset> incoming_changesets, VersionInfo& version_info, DownloadBatchState batch_state,
-    util::Logger& logger, util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
+    util::Logger& logger, const TransactionRef& transact,
+    util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr,
     SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(incoming_changesets.size() != 0);
+    REALM_ASSERT(
+        (transact->get_transact_stage() == DB::transact_Writing && batch_state != DownloadBatchState::SteadyState) ||
+        (transact->get_transact_stage() == DB::transact_Reading && batch_state == DownloadBatchState::SteadyState));
     std::vector<Changeset> changesets;
     changesets.resize(incoming_changesets.size()); // Throws
 
-    // Parse incoming changesets without holding the write lock.
+    // Parse incoming changesets without holding the write lock unless 'transact' is specified.
     try {
         for (std::size_t i = 0; i < incoming_changesets.size(); ++i) {
             const RemoteChangeset& changeset = incoming_changesets[i];
@@ -402,12 +410,16 @@ void ClientHistory::integrate_server_changesets(
     VersionID new_version{0, 0};
     auto num_changesets = incoming_changesets.size();
     util::Span<Changeset> changesets_to_integrate(changesets);
+    const bool allow_lock_release = batch_state == DownloadBatchState::SteadyState;
 
     // Ideally, this loop runs only once, but it can run up to `incoming_changesets.size()` times, depending on the
-    // number of times the sync client yields the write lock to allow the user to commit their changes. In each
-    // iteration, at least one changeset is transformed and committed.
+    // number of times the sync client yields the write lock to allow the user to commit their changes.
+    // In each iteration, at least one changeset is transformed and committed.
+    // In FLX, all changesets are committed at once in the bootstrap phase (i.e, in one iteration).
     while (!changesets_to_integrate.empty()) {
-        TransactionRef transact = m_db->start_write(); // Throws
+        if (transact->get_transact_stage() == DB::transact_Reading) {
+            transact->promote_to_write(); // Throws
+        }
         VersionID old_version = transact->get_version_of_current_transaction();
         version_type local_version = old_version.version;
         auto sync_file_id = transact->get_sync_file_id();
@@ -418,7 +430,7 @@ void ClientHistory::integrate_server_changesets(
 
         std::uint64_t downloaded_bytes_in_transaction = 0;
         auto changesets_transformed_count = transform_and_apply_server_changesets(
-            changesets_to_integrate, transact, logger, downloaded_bytes_in_transaction);
+            changesets_to_integrate, transact, logger, downloaded_bytes_in_transaction, allow_lock_release);
 
         // downloaded_bytes always contains the total number of downloaded bytes
         // from the Realm. downloaded_bytes must be persisted in the Realm, since
@@ -467,7 +479,14 @@ void ClientHistory::integrate_server_changesets(
         // this transaction as we already did it.
         REALM_ASSERT(!m_applying_server_changeset);
         m_applying_server_changeset = true;
-        new_version = transact->commit_and_continue_as_read(); // Throws
+        // Commit and continue to write if in bootstrap phase and there are still changes to integrate.
+        if (batch_state == DownloadBatchState::MoreToCome ||
+            (batch_state == DownloadBatchState::LastInBatch && !changesets_to_integrate.empty())) {
+            new_version = transact->commit_and_continue_writing(); // Throws
+        }
+        else {
+            new_version = transact->commit_and_continue_as_read(); // Throws
+        }
 
         if (transact_reporter) {
             transact_reporter->report_sync_transact(old_version, new_version); // Throws
@@ -477,6 +496,9 @@ void ClientHistory::integrate_server_changesets(
     }
 
     REALM_ASSERT(new_version.version > 0);
+    REALM_ASSERT(
+        (batch_state == DownloadBatchState::MoreToCome && transact->get_transact_stage() == DB::transact_Writing) ||
+        (batch_state != DownloadBatchState::MoreToCome && transact->get_transact_stage() == DB::transact_Reading));
     version_info.realm_version = new_version.version;
     version_info.sync_version = {new_version.version, 0};
 }
@@ -484,7 +506,7 @@ void ClientHistory::integrate_server_changesets(
 
 size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset> changesets_to_integrate,
                                                             TransactionRef transact, util::Logger& logger,
-                                                            std::uint64_t& downloaded_bytes)
+                                                            std::uint64_t& downloaded_bytes, bool allow_lock_release)
 {
     REALM_ASSERT(transact->get_transact_stage() == DB::transact_Writing);
 
@@ -529,7 +551,8 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 
-            return !(m_db->other_writers_waiting_for_lock() && transact->get_commit_size() >= commit_byte_size_limit);
+            return !(m_db->other_writers_waiting_for_lock() &&
+                     transact->get_commit_size() >= commit_byte_size_limit && allow_lock_release);
         };
         auto changesets_transformed_count =
             transformer.transform_remote_changesets(*this, sync_file_id, local_version, changesets_to_integrate,
@@ -763,7 +786,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 
 
 void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                         TransactionRef wt)
+                                         TransactionRef)
 {
     Array& root = m_arrays->root;
 
@@ -812,16 +835,7 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
         root.set(s_progress_upload_server_version_iip,
                  RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
     }
-    if (previous_upload_client_version < progress.upload.client_version) {
-        // This is part of the client reset cycle detection.
-        // A client reset operation will write a flag to an internal table indicating that
-        // the changes there are a result of a successful reset. However, it is not possible to
-        // know if a recovery has been successful until the changes have been acknowledged by the
-        // server. The situation we want to avoid is that a recovery itself causes another reset
-        // which creates a reset cycle. However, at this point, upload progress has been made
-        // and we can remove the cycle detection flag if there is one.
-        _impl::client_reset::remove_pending_client_resets(wt);
-    }
+
     if (downloadable_bytes) {
         root.set(s_progress_downloadable_bytes_iip,
                  RefOrTagged::make_tagged(*downloadable_bytes)); // Throws

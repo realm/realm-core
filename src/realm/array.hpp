@@ -711,7 +711,7 @@ int64_t Array::get(size_t ndx) const noexcept
 inline int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG(ndx < m_size);
+    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
     return (this->*m_getter)(ndx);
 
     // Two ideas that are not efficient but may be worth looking into again:
@@ -744,7 +744,7 @@ inline int64_t Array::back() const noexcept
 inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG(m_has_refs);
+    REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
     int64_t v = get(ndx);
     return to_ref(v);
 }

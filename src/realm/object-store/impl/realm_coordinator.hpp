@@ -60,6 +60,11 @@ public:
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
     std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+
+    // Return a frozen copy of the source Realm. May return a cached instance
+    // if the source Realm has caching enabled.
+    std::shared_ptr<Realm> freeze_realm(const Realm& source_realm) REQUIRES(!m_realm_mutex);
+
 #if REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is not already present, it will be fully downloaded before being returned.
@@ -262,7 +267,7 @@ private:
     std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config,
                                                std::shared_ptr<util::Scheduler> scheduler = nullptr)
         REQUIRES(m_realm_mutex);
-    void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
+    void do_get_realm(Realm::Config&& config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
                       util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex, m_running_notifiers_mutex);
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);

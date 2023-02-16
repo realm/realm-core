@@ -63,6 +63,13 @@ TEST(List_Mixed_do_set)
 
     set.insert_null(0);
     set.set(0, Mixed("hello world"));
+    auto val = set.get(0);
+    CHECK(val.is_type(type_String));
+    CHECK_EQUAL(val.get_string(), "hello world");
+    set.set(0, Mixed(BinaryData("hello world", 11)));
+    val = set.get(0);
+    CHECK(val.is_type(type_Binary));
+    CHECK_EQUAL(val.get_binary(), BinaryData("hello world", 11));
 }
 
 TEST(List_Mixed_do_insert)
