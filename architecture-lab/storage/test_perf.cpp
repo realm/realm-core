@@ -84,12 +84,19 @@ struct std::hash<chunk> {
     }
 };
 
-struct string_compressor {
+class string_compressor {
+public:
     std::vector<chunk> chunks;
     std::unordered_map<chunk, int> map;
+    std::vector<int> buddies;
+    string_compressor()
+    {
+        buddies.resize(65536, 0);
+    }
     int handle(const char* first, const char* past)
     {
         int size = past - first;
+        // std::cout << "\nSize " << size << " : --- " << std::flush;
         total_chars += size;
         const char* last = first + CHUNK_SIZE;
         int prefix = -1;
@@ -103,6 +110,12 @@ struct string_compressor {
             c.prefix_index = prefix;
             auto it = map.find(c);
             if (it == map.end()) {
+                for (int j = 0; j < CHUNK_SIZE; j += 2) {
+                    uint16_t p = ((c.chars[j] & 0xFF) << 8) | (c.chars[j + 1] & 0xFF);
+                    buddies[p]++;
+                    // std::cout << " " << c.chars[j] << c.chars[j + 1] << c.chars[j + 2] << " -> " << p <<
+                    // std::flush;
+                }
                 prefix = chunks.size();
                 map[c] = prefix;
                 chunks.push_back(c);
@@ -115,6 +128,13 @@ struct string_compressor {
         }
         // std::cout << "   " << tmp << " -> " << prefix << std::endl;
         return prefix;
+    }
+    int get_num_buddies()
+    {
+        int sum = 0;
+        for (auto x : buddies)
+            sum += (x != 0) ? 1 : 0;
+        return sum;
     }
     int next_id = 0;
     int next_prefix_id = -1;
@@ -432,7 +452,9 @@ int main(int argc, char* argv[])
                 to_size += compressors[i]->map.size() * sizeof(chunk);
                 std::cout << "Field " << i << " with " << compressors[i]->map.size() << " chunks ("
                           << compressors[i]->map.size() * sizeof(chunk) << " bytes) from total "
-                          << compressors[i]->total_chars << " chars" << std::endl;
+                          << compressors[i]->total_chars << " chars"
+                          << " encoded in buddies: " << compressors[i]->get_num_buddies() << std::endl;
+                compressors[i].reset();
             }
         }
         std::cout << "Total effect: from " << from_size << " to " << to_size << " bytes ("

@@ -1,4 +1,4 @@
-CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -ggdb -O3 -MMD
+CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -Og -ggdb -MMD
 
 ifeq ($(DEBUG),1)
 CXXFLAGS += -O0
@@ -31,7 +31,7 @@ run: test
 
 perf: test_perf
 	rm -f perf.core2
-	./test_perf /home/finn/Downloads/hits.tsv
+	./test_perf /home/finn/Downloads/mill.tsv
 
 lib: libstorage.a
 
