@@ -23,6 +23,7 @@
   * `File::get_unique_id` now works on Windows
   * Replaced manual path string conversion with `std::filesystem::path`
 * Update yarn download path in install_baas.sh ([PR #6309](https://github.com/realm/realm-core/pull/6309))
+* Include the websocket close status reason when reporting errors to the sync client ([PR #6298](https://github.com/realm/realm-core/pull/6298))
 
 ----------------------------------------------
 

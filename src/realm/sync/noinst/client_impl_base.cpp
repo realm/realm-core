@@ -469,7 +469,7 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec);
+        read_or_write_error(ec, "simulated read error");
         return bool(m_websocket);
     }
 
@@ -506,7 +506,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
     }
     else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
-        read_or_write_error(error_code);
+        read_or_write_error(error_code, status.reason());
     }
     else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
              status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
@@ -532,30 +532,30 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         error_code = ClientError::ssl_server_cert_rejected;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
         error_code = ClientError::client_too_old_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
         error_code = ClientError::client_too_new_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
         error_code = ClientError::protocol_mismatch;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Fatal_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
              status_code == ErrorCodes::WebSocket_MovedPermanently ||
@@ -564,7 +564,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
              status_code == ErrorCodes::WebSocket_Retry_Error) {
         constexpr bool is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
 
     return bool(m_websocket);
@@ -1188,11 +1188,11 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
