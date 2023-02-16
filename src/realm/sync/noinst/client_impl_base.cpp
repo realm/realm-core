@@ -809,9 +809,9 @@ void Connection::initiate_ping_delay(milliseconds_type now)
         else if (!status.is_ok())
             throw ExceptionForStatus(status);
 
-        handle_ping_delay();                                                             // Throws
-    });                                                                                  // Throws
-    logger.debug("Will emit a ping in %1 milliseconds", delay);                          // Throws
+        handle_ping_delay();                                    // Throws
+    });                                                         // Throws
+    logger.debug("Will emit a ping in %1 milliseconds", delay); // Throws
 }
 
 

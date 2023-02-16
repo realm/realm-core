@@ -56,7 +56,9 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
     list.insert(list.end(), list2.begin(), list2.end());
     list2.clear();
     if (list.size() > 1) {
-        std::sort(begin(list), end(list), [](T& a, T& b) { return a.start < b.start; });
+        std::sort(begin(list), end(list), [](T& a, T& b) {
+            return a.start < b.start;
+        });
 
         auto prev = list.begin();
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
@@ -79,7 +81,11 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         }
 
         // Remove all of the now zero-size chunks from the free list
-        list.erase(std::remove_if(begin(list), end(list), [](T& chunk) { return chunk.length == 0; }), end(list));
+        list.erase(std::remove_if(begin(list), end(list),
+                                  [](T& chunk) {
+                                      return chunk.length == 0;
+                                  }),
+                   end(list));
     }
 }
 
@@ -505,7 +511,9 @@ std::string human_readable(uint64_t val)
 uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
-    std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
+    std::for_each(list.begin(), list.end(), [&](const Entry& e) {
+        sz += e.length;
+    });
     return sz;
 }
 

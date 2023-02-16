@@ -276,8 +276,8 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
         if (response.status != HTTPStatus::Ok) {
             m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
-                websocket::Error::bad_response_unexpected_status_code;       // FIXME: is this the right error?
-            m_observer.websocket_connect_error_handler(ec2);                 // Throws
+                websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
+            m_observer.websocket_connect_error_handler(ec2);           // Throws
             return;
         }
 
