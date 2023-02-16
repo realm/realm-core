@@ -478,7 +478,7 @@ private:
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
-    void read_or_write_error(std::error_code);
+    void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
