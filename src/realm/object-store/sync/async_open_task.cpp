@@ -94,7 +94,7 @@ void AsyncOpenTask::cancel()
     // thus deadlocking.
     if (session) {
         // Does a better way exists for canceling the download?
-        session->force_close();
+        session->log_out();
     }
 }
 

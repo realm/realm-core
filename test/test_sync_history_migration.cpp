@@ -321,7 +321,6 @@ TEST(Sync_HistoryMigration)
 
     auto get_server_path = [&](const std::string& server_dir) {
         fixtures::ClientServerFixture fixture{server_dir, test_context};
-        fixture.start();
         return fixture.map_virtual_to_real_path(virtual_path);
     };
 

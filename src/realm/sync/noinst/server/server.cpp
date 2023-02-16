@@ -1070,15 +1070,13 @@ private:
 
 class SyncConnection : public websocket::Config {
 public:
-    const std::shared_ptr<util::Logger> logger_ptr;
-    util::Logger& logger;
+    util::PrefixLogger logger;
 
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint)
-        : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
-        , logger{*logger_ptr}
+        : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{std::move(socket)}
@@ -1130,9 +1128,9 @@ public:
         return m_remote_endpoint;
     }
 
-    const std::shared_ptr<util::Logger>& websocket_get_logger() noexcept final
+    util::Logger& websocket_get_logger() noexcept final
     {
-        return logger_ptr;
+        return logger;
     }
 
     std::mt19937_64& websocket_get_random() noexcept final override
@@ -1438,17 +1436,15 @@ std::string g_user_agent = "User-Agent";
 
 class HTTPConnection {
 public:
-    const std::shared_ptr<Logger> logger_ptr;
-    util::Logger& logger;
+    util::PrefixLogger logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : logger_ptr{std::make_shared<PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
-        , logger{*logger_ptr}
+        : logger{make_logger_prefix(id), serv.logger} // Throws
         , m_server{serv}
         , m_id{id}
         , m_socket{new network::Socket{serv.get_service()}} // Throws
         , m_read_ahead_buffer{new network::ReadAheadBuffer} // Throws
-        , m_http_server{*this, logger_ptr}
+        , m_http_server{*this, logger}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
         // expand the buffer
@@ -2052,7 +2048,7 @@ public:
     util::PrefixLogger logger;
 
     Session(SyncConnection& conn, session_ident_type session_ident)
-        : logger{make_logger_prefix(session_ident), conn.logger_ptr} // Throws
+        : logger{make_logger_prefix(session_ident), conn.logger} // Throws
         , m_connection{conn}
         , m_session_ident{session_ident}
     {
@@ -3160,7 +3156,7 @@ void SessionQueue::clear() noexcept
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
                        std::string real_path, bool disable_sync_to_disk)
-    : logger{"ServerFile[" + virt_path + "]: ", server.logger_ptr}           // Throws
+    : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
@@ -3696,7 +3692,7 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : logger{"Worker: ", server.logger_ptr} // Throws
+    : logger{"Worker: ", server.logger} // Throws
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}

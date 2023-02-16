@@ -101,7 +101,7 @@ public:
     util::Optional<Mixed> try_get_any(StringData key) const;
     std::pair<StringData, Mixed> get_pair(size_t ndx) const;
     size_t find_any(Mixed value) const final;
-    bool contains(StringData key) const;
+    bool contains(StringData key);
 
     template <typename T, typename Context>
     void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);
@@ -118,8 +118,7 @@ public:
     Results get_values() const;
 
     using CBFunc = util::UniqueFunction<void(DictionaryChangeSet)>;
-    NotificationToken
-    add_key_based_notification_callback(CBFunc cb, std::optional<KeyPathArray> key_path_array = std::nullopt) &;
+    NotificationToken add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array = {}) &;
 
     Iterator begin() const;
     Iterator end() const;

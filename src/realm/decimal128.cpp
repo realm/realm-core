@@ -1527,15 +1527,7 @@ bool Decimal128::operator==(const Decimal128& rhs) const noexcept
     BID_UINT128 l = to_BID_UINT128(*this);
     BID_UINT128 r = to_BID_UINT128(rhs);
     bid128_quiet_equal(&ret, &l, &r, &flags);
-    if (ret) {
-        return true;
-    }
-    bool lhs_is_nan = is_nan();
-    bool rhs_is_nan = rhs.is_nan();
-    if (lhs_is_nan && rhs_is_nan) {
-        return m_value.w[1] == rhs.m_value.w[1] && m_value.w[0] == rhs.m_value.w[0];
-    }
-    return 0;
+    return ret != 0;
 }
 
 bool Decimal128::operator!=(const Decimal128& rhs) const noexcept

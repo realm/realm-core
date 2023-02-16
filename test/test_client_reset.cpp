@@ -6,9 +6,6 @@
 #include <realm/list.hpp>
 #include <realm/table_view.hpp>
 
-#include <realm/object_converter.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
-
 #include "test.hpp"
 #include "sync_fixtures.hpp"
 #include "util/semaphore.hpp"
@@ -22,47 +19,6 @@ using namespace realm::fixtures;
 namespace {
 
 using ErrorInfo = Session::ErrorInfo;
-
-TEST(ClientReset_TransferGroupWithDanglingLinks)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    auto setup_realm = [](auto& path) {
-        DBRef sg = DB::create(make_client_replication(), path);
-
-        auto wt = sg->start_write();
-
-        // The ordering of creating the tables matters here. The bug this test is verifying depends
-        // on tablekeys being created such that the table that links come from is transferred before
-        // the table that links are linking to.
-        auto table = wt->add_table_with_primary_key("class_table", type_String, "_id");
-        auto target = wt->add_table_with_primary_key("class_target", type_Int, "_id");
-        table->add_column_list(*target, "list");
-        auto obj = table->create_object_with_primary_key(Mixed{"the_object"});
-        auto lst = obj.get_linklist("list");
-        for (int64_t i = 0; i < 10; ++i) {
-            target->create_object_with_primary_key(i);
-            lst.add(target->create_object_with_primary_key(i).get_key());
-        }
-        wt->commit();
-
-        return sg;
-    };
-
-    auto sg_1 = setup_realm(path_1);
-    auto sg_2 = setup_realm(path_2);
-
-    auto rt = sg_1->start_read();
-    auto wt = sg_2->start_write();
-
-    auto target_2 = wt->get_table("class_target");
-    auto obj = target_2->get_object_with_primary_key(Mixed{5});
-    obj.invalidate();
-
-    wt->commit_and_continue_writing();
-    _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger);
-}
 
 TEST(ClientReset_NoLocalChanges)
 {
