@@ -281,6 +281,10 @@ public:
     /// ready. If there are no completion handlers ready for execution, and
     /// there are no asynchronous operations in progress, run() returns.
     ///
+    /// run_until_stopped() will continue running even if there are no completion
+    /// handlers ready for execution, and no asynchronous operations in progress,
+    /// until stop() is called.
+    ///
     /// All completion handlers, including handlers submitted via post() will be
     /// executed from run(), that is, by the thread that executes run(). If no
     /// thread executes run(), then the completion handlers will not be
@@ -292,6 +296,7 @@ public:
     /// Syncronous operations (e.g., Socket::connect()) execute independently of
     /// the event loop, and do not require that any thread calls run().
     void run();
+    void run_until_stopped();
 
     /// @{ \brief Stop event loop execution.
     ///
@@ -1381,19 +1386,19 @@ enum class ResolveErrors {
     host_not_found = 1,
 
     /// Host not found (non-authoritative).
-    host_not_found_try_again,
+    host_not_found_try_again = 2,
 
     /// The query is valid but does not have associated address data.
-    no_data,
+    no_data = 3,
 
     /// A non-recoverable error occurred.
-    no_recovery,
+    no_recovery = 4,
 
     /// The service is not supported for the given socket type.
-    service_not_found,
+    service_not_found = 5,
 
     /// The socket type is not supported.
-    socket_type_not_supported
+    socket_type_not_supported = 6,
 };
 
 /// The error category associated with ResolveErrors. The name of this category is

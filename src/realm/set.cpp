@@ -320,4 +320,47 @@ void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
     }
 }
 
+template <typename Iterator>
+static bool partition_points(const Set<Mixed>& set, std::vector<size_t>& indices, Iterator& first_string,
+                             Iterator& first_binary, Iterator& end)
+{
+    first_string = std::partition_point(indices.begin(), indices.end(), [&](size_t i) {
+        return set.get(i).is_type(type_Bool, type_Int, type_Float, type_Double, type_Decimal);
+    });
+    if (first_string == indices.end() || !set.get(*first_string).is_type(type_String))
+        return false;
+    first_binary = std::partition_point(first_string + 1, indices.end(), [&](size_t i) {
+        return set.get(i).is_type(type_String);
+    });
+    if (first_binary == indices.end() || !set.get(*first_binary).is_type(type_Binary))
+        return false;
+    end = std::partition_point(first_binary + 1, indices.end(), [&](size_t i) {
+        return set.get(i).is_type(type_Binary);
+    });
+    return true;
+}
+
+template <>
+void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    set_sorted_indices(size(), indices, true);
+
+    // The on-disk order is bool -> numbers -> string -> binary -> others
+    // We want to merge the string and binary sections to match the sort order
+    // of other collections. To do this we find the three partition points
+    // where the first string occurs, the first binary occurs, and the first
+    // non-binary after binaries occurs. If there's no strings or binaries we
+    // don't have to do anything. If they're both non-empty, we perform an
+    // in-place merge on the strings and binaries.
+    std::vector<size_t>::iterator first_string, first_binary, end;
+    if (partition_points(*this, indices, first_string, first_binary, end)) {
+        std::inplace_merge(first_string, first_binary, end, [&](auto a, auto b) {
+            return get(a) < get(b);
+        });
+    }
+    if (!ascending) {
+        std::reverse(indices.begin(), indices.end());
+    }
+}
+
 } // namespace realm

@@ -267,6 +267,7 @@ public:
             m_column_attributes.init(alloc, spec.get_ref(2));
             if (spec.size() > 5) {
                 // Must be a Core-6 file.
+                m_enum_keys.init(alloc, spec.get_ref(4));
                 m_column_colkeys.init(alloc, spec.get_ref(5));
             }
             else if (spec.size() > 3) {
@@ -337,6 +338,7 @@ private:
     Array m_column_types;
     Array m_column_names;
     Array m_column_attributes;
+    Array m_enum_keys;
     Array m_column_subspecs;
     Array m_column_colkeys;
     Array m_opposite_table;
@@ -588,6 +590,9 @@ void Table::print_columns(const Group& group) const
             type_str += "?";
         if (attr & realm::col_attr_Indexed)
             type_str += " (indexed)";
+        if (m_enum_keys.valid() && m_enum_keys.get_val(i)) {
+            type_str += " (enumerated)";
+        }
         std::string star = (m_pk_col && (m_pk_col == col_key)) ? "*" : "";
         std::cout << "        " << i << ": " << star << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }
@@ -1039,6 +1044,23 @@ void RealmFile::changes() const
     }
 }
 
+unsigned int hex_char_to_bin(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    throw std::invalid_argument("Illegal key (not a hex digit)");
+}
+
+unsigned int hex_to_bin(char first, char second)
+{
+    return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
+}
+
+
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {
@@ -1052,11 +1074,22 @@ int main(int argc, const char* argv[])
             const char* key_ptr = nullptr;
             char key[64];
             for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
-                if (strcmp(argv[curr_arg], "--key") == 0) {
+                if (strcmp(argv[curr_arg], "--keyfile") == 0) {
                     std::ifstream key_file(argv[curr_arg + 1]);
                     key_file.read(key, sizeof(key));
                     key_ptr = key;
                     curr_arg++;
+                }
+                else if (strcmp(argv[curr_arg], "--hexkey") == 0) {
+                    curr_arg++;
+                    const char* chars = argv[curr_arg];
+                    if (strlen(chars) != 128) {
+                        throw std::invalid_argument("Key string must be 128 chars long");
+                    }
+                    for (int idx = 0; idx < 64; ++idx) {
+                        key[idx] = hex_to_bin(chars[idx * 2], chars[idx * 2 + 1]);
+                    }
+                    key_ptr = key;
                 }
                 else if (strcmp(argv[curr_arg], "--top") == 0) {
                     char* end;
@@ -1115,7 +1148,10 @@ int main(int argc, const char* argv[])
         }
     }
     else {
-        std::cout << "Usage: realm-trawler [-afmsw] [--key crypt_key] [--top top_ref] <realmfile>" << std::endl;
+        std::cout << "Usage: realm-trawler [-afmsw] [--keyfile file-with-binary-crypt-key] [--hexkey "
+                     "crypt-key-in-hex] [--top "
+                     "top_ref] <realmfile>"
+                  << std::endl;
         std::cout << "   f : free list analysis" << std::endl;
         std::cout << "   m : memory leak check" << std::endl;
         std::cout << "   s : schema dump" << std::endl;

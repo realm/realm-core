@@ -155,7 +155,8 @@ Object::Object(Object&&) = default;
 Object& Object::operator=(Object const&) = default;
 Object& Object::operator=(Object&&) = default;
 
-NotificationToken Object::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
+NotificationToken Object::add_notification_callback(CollectionChangeCallback callback,
+                                                    std::optional<KeyPathArray> key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();

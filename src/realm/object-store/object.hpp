@@ -127,7 +127,7 @@ public:
      * callback via `remove_callback`.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     template <typename ValueType>
     void set_column_value(StringData prop_name, ValueType&& value)
