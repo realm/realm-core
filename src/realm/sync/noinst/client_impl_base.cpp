@@ -2154,7 +2154,6 @@ void Session::send_json_error_message()
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_error_to_send);
     REALM_ASSERT(m_client_error);
-    REALM_ASSERT(!m_wait_for_error_timer);
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
@@ -2173,20 +2172,6 @@ void Session::send_json_error_message()
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;
-
-    logger.debug("Waiting for %1 milliseconds to get the ERROR message from the server", default_error_timeout);
-    m_wait_for_error_timer =
-        get_client().create_timer(std::chrono::milliseconds(default_error_timeout), [this](Status status) {
-            if (status == ErrorCodes::OperationAborted)
-                return;
-            else if (!status.is_ok())
-                throw ExceptionForStatus(status);
-
-            m_wait_for_error_timer.reset();
-            logger.debug("Timeout: Sync client did not get an ERROR message back from the server");
-            close_connection();
-        });
-
     enlist_to_send(); // Throws
 }
 
@@ -2522,11 +2507,6 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 // deactivated upon return.
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    // Reset the timer when an ERROR message is received
-    if (m_wait_for_error_timer) {
-        m_wait_for_error_timer.reset();
-    }
-
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
