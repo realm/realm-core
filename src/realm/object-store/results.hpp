@@ -304,7 +304,7 @@ public:
      * callback via `remove_callback`.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;
