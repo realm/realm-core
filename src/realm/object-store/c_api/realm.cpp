@@ -17,12 +17,10 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-#if REALM_ENABLE_SYNC
 realm_thread_observer_token::~realm_thread_observer_token()
 {
     realm::g_binding_callback_thread_observer = nullptr;
 }
-#endif // REALM_ENABLE_SYNC
 
 namespace realm::c_api {
 
@@ -314,6 +312,7 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
             *table_deleted = true;
         }
         return true;
+        ;
     });
 }
 
@@ -356,8 +355,6 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
     m_realm_changed_callbacks.invoke();
 }
 
-#if REALM_ENABLE_SYNC
-
 RLM_API
 realm_thread_observer_token_t*
 realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
@@ -385,7 +382,5 @@ realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback
     g_binding_callback_thread_observer = &instance;
     return new realm_thread_observer_token_t();
 }
-
-#endif // REALM_ENABLE_SYNC
 
 } // namespace realm::c_api

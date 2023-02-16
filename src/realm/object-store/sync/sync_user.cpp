@@ -355,7 +355,7 @@ void SyncUser::log_out()
         // logged back in, they will automatically be reactivated.
         for (auto& [path, weak_session] : m_sessions) {
             if (auto ptr = weak_session.lock()) {
-                ptr->force_close();
+                ptr->log_out();
                 m_waiting_sessions[path] = std::move(ptr);
             }
         }

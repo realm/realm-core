@@ -28,19 +28,13 @@
 namespace realm {
 namespace util {
 
-struct FileAttributes {
-    FileDesc fd;
-    std::string path;
-    File::AccessMode access;
-    const char* encryption_key = nullptr;
-};
-
-void* mmap(const FileAttributes& file, size_t size, size_t offset);
+void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key);
 void* mmap_reserve(FileDesc fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
-void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);
+void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size,
+             const char* encryption_key);
 void msync(FileDesc fd, void* addr, size_t size);
 void* mmap_anon(size_t size);
 
@@ -98,13 +92,16 @@ SharedFileInfo* get_file_info_for_file(File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
-void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
+void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
+           EncryptedFileMapping*& mapping);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key, EncryptedFileMapping* mapping);
 
-void* mmap_reserve(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
+void* mmap_reserve(FileDesc fd, size_t size, File::AccessMode am, size_t offset, const char* enc_key,
+                   EncryptedFileMapping*& mapping);
 
-EncryptedFileMapping* reserve_mapping(void* addr, const FileAttributes& file, size_t offset);
+EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
+                                      const char* encryption_key);
 
 void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
                               size_t new_size);

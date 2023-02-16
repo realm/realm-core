@@ -257,62 +257,6 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
-    TestSyncManager init_sync_manager;
-    auto app = init_sync_manager.app();
-    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
-                                              dummy_device_id);
-
-    auto session = sync_session(
-        user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
-    EventLoop::main().run_until([&] {
-        return sessions_are_active(*session);
-    });
-    REQUIRE(sessions_are_active(*session));
-
-    SECTION("making the session inactive and then pausing it should end up in the paused state") {
-        session->force_close();
-        EventLoop::main().run_until([&] {
-            return sessions_are_inactive(*session);
-        });
-        REQUIRE(sessions_are_inactive(*session));
-
-        session->pause();
-        EventLoop::main().run_until([&] {
-            return session->state() == SyncSession::State::Paused;
-        });
-        REQUIRE(session->state() == SyncSession::State::Paused);
-    }
-
-    SECTION("pausing from the active state should end up in the paused state") {
-        session->pause();
-        EventLoop::main().run_until([&] {
-            return session->state() == SyncSession::State::Paused;
-        });
-        REQUIRE(session->state() == SyncSession::State::Paused);
-
-        // Pausing it again should be a no-op
-        session->pause();
-        REQUIRE(session->state() == SyncSession::State::Paused);
-
-        // "Logging out" the session should be a no-op.
-        session->force_close();
-        REQUIRE(session->state() == SyncSession::State::Paused);
-    }
-
-    // Reviving the session via revive_if_needed() should be a no-op.
-    session->revive_if_needed();
-    REQUIRE(session->state() == SyncSession::State::Paused);
-
-    // Only resume() can revive a paused session.
-    session->resume();
-    EventLoop::main().run_until([&] {
-        return sessions_are_active(*session);
-    });
-    REQUIRE(sessions_are_active(*session));
-}
-
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
@@ -585,49 +529,6 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         session->close();
         REQUIRE(sessions_are_inactive(*session));
     }
-}
-
-TEST_CASE("session restart", "[sync]") {
-    if (!EventLoop::has_implementation())
-        return;
-
-    TestSyncManager init_sync_manager({}, {false});
-    auto& server = init_sync_manager.sync_server();
-    auto app = init_sync_manager.app();
-    Realm::Config config;
-    auto schema = Schema{
-        {"object",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-    };
-
-    auto user = app->sync_manager()->get_user("userid", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                              ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
-    auto session = sync_session(
-        user, "/test-restart", [&](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded, nullptr, schema,
-        &config);
-
-    EventLoop::main().run_until([&] {
-        return sessions_are_active(*session);
-    });
-
-    server.start();
-
-    // Add an object so there's something to upload
-    auto realm = Realm::get_shared_realm(config);
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-    realm->begin_transaction();
-    table->create_object_with_primary_key(0);
-    realm->commit_transaction();
-
-    // Close the current session and start a new one
-    // The stop policy is ignored when closing the current session
-    session->restart_session();
-
-    REQUIRE(session->state() == SyncSession::State::Active);
-    REQUIRE(!wait_for_upload(*realm));
 }
 
 TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {

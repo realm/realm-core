@@ -10,7 +10,6 @@ set(SYNC_SOURCES
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
-    binding_callback_thread_observer.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -36,7 +35,6 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
-    binding_callback_thread_observer.hpp
     config.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
