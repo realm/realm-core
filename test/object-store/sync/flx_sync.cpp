@@ -2154,10 +2154,9 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
             SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
             auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-            auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
             auto error_count = 0;
-            auto err_handler = [error_promise = std::move(shared_promise), &error_count](std::shared_ptr<SyncSession>,
-                                                                                         SyncError err) mutable {
+            auto err_handler = [promise = util::CopyablePromiseHolder(std::move(error_promise)),
+                                &error_count](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 ++error_count;
                 if (error_count == 1) {
                     // Bad changeset detected by the client.
@@ -2167,7 +2166,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                     // Server asking for a client reset.
                     CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
                     CHECK(err.is_client_reset_requested());
-                    error_promise->emplace_value(std::move(err));
+                    promise.get_promise().emplace_value(std::move(err));
                 }
             };
 
@@ -2299,10 +2298,9 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
     config.sync_config->simulate_integration_error = true;
 
     auto [error_promise, error_future] = util::make_promise_future<SyncError>();
-    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
     auto error_count = 0;
-    auto err_handler = [error_promise = std::move(shared_promise), &error_count](std::shared_ptr<SyncSession>,
-                                                                                 SyncError err) mutable {
+    auto err_handler = [promise = util::CopyablePromiseHolder(std::move(error_promise)),
+                        &error_count](std::shared_ptr<SyncSession>, SyncError err) mutable {
         ++error_count;
         if (error_count == 1) {
             // Bad changeset detected by the client.
@@ -2312,7 +2310,7 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
             // Server asking for a client reset.
             CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
             CHECK(err.is_client_reset_requested());
-            error_promise->emplace_value(std::move(err));
+            promise.get_promise().emplace_value(std::move(err));
         }
     };
 

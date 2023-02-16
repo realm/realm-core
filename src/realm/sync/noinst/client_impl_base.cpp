@@ -2160,15 +2160,16 @@ void Session::send_json_error_message()
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
     auto client_error = m_client_error->code();
-    auto protocol_error = static_cast<int>(client_error_to_protocol_error(client_error));
+    auto protocol_error = client_error_to_protocol_error(client_error);
     auto message = m_client_error->what();
 
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, protocol_error,
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = message;
-    protocol.make_json_error_message(out, session_ident, protocol_error, error_body_json.dump()); // Throws
+    protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
+                                     error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;
@@ -2182,6 +2183,7 @@ void Session::send_json_error_message()
                 throw ExceptionForStatus(status);
 
             m_wait_for_error_timer.reset();
+            logger.debug("Timeout: Sync client did not get an ERROR message back from the server");
             close_connection();
         });
 
@@ -2344,12 +2346,6 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
-    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
-    // changeset over and over again.
-    if (m_client_error) {
-        return;
-    }
-
     if (is_steady_state_download_message(batch_state, query_version)) {
         batch_state = DownloadBatchState::SteadyState;
     }
@@ -2362,6 +2358,13 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
+    if (m_client_error) {
+        logger.debug("Ignoring download message because the client detected an integration error");
+        return;
+    }
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any

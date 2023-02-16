@@ -315,7 +315,7 @@ enum class ProtocolError {
     compensating_write           = 231, // Client attempted a write that is disallowed by permissions, or modifies and
                                         // object outside the current query, and the server undid the modification
                                         // (UPLOAD)
-    bad_progress                 = 232, // Bad progress information (ERROR)
+    bad_progress                 = 233, // Bad progress information (ERROR)
 
     // clang-format on
 };
