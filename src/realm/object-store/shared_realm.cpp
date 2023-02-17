@@ -231,6 +231,7 @@ void Realm::read_schema_from_group_if_needed()
         if (m_schema.empty()) {
             m_schema_version = ObjectStore::get_schema_version(*m_transaction);
             m_schema = ObjectStore::schema_from_group(*m_transaction);
+            m_schema_transaction_version = m_transaction->get_version_of_current_transaction().version;
         }
         return;
     }
@@ -678,10 +679,10 @@ void Realm::enable_wait_for_change()
 
 bool Realm::wait_for_change()
 {
-    if (m_frozen_version) {
+    if (m_frozen_version || m_config.schema_mode == SchemaMode::Immutable) {
         return false;
     }
-    return m_transaction ? m_coordinator->wait_for_change(transaction_ref()) : false;
+    return m_transaction && m_coordinator->wait_for_change(m_transaction);
 }
 
 void Realm::wait_for_change_release()

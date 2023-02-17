@@ -65,7 +65,7 @@ public:
     /// Stops the internal event loop (provided by network::Service)
     void stop(bool wait_for_stop = false) override;
 
-    std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override;
+    std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver>, WebSocketEndpoint&&) override;
 
     void post(FunctionHandler&& handler) override
     {
@@ -90,21 +90,10 @@ private:
     /// The execution code for the event loop thread
     void event_loop();
 
-    // TODO: Revisit Service::run() so the keep running timer is no longer needed
-    void start_keep_running_timer()
-    {
-        auto handler = [this](Status status) {
-            if (status.code() != ErrorCodes::OperationAborted)
-                start_keep_running_timer();
-        };
-        m_keep_running_timer = create_timer(std::chrono::hours(1000), std::move(handler)); // Throws
-    }
-
     std::shared_ptr<util::Logger> m_logger_ptr;
     network::Service m_service;
     std::mt19937_64 m_random;
     const std::string m_user_agent;
-    SyncTimer m_keep_running_timer;
     std::mutex m_mutex;
     uint64_t m_event_loop_generation = 0;
     State m_state;                      // protected by m_mutex

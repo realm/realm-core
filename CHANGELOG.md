@@ -20,6 +20,61 @@
 
 ----------------------------------------------
 
+# 13.4.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Sync client may [have failed an assertion](https://github.com/realm/realm-core/blob/006660c8d20c4941d3838f74aec6f3561ebf6784/src/realm/sync/noinst/client_impl_base.cpp#L388) during shutdown if all sessions hadn't been ready to finalize by the time the Client destructor ran. (PR [#6293](https://github.com/realm/realm-core/pull/6293), since v13.4.1)
+* Fixed the sync client being stuck in a cycle if an integration error occurs by issuing a client reset ([#6051](https://github.com/realm/realm-core/issues/6051), since v10.2.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Upgrade OpenSSL from 3.0.7 to 3.0.8. ([#6305](https://github.com/realm/realm-core/pull/6305))
+* Windows improvements in util/file ([PR #6221](https://github.com/realm/realm-core/pull/6221)):
+  * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
+  * `File::get_unique_id` now works on Windows
+  * Replaced manual path string conversion with `std::filesystem::path`
+* Update yarn download path in install_baas.sh ([PR #6309](https://github.com/realm/realm-core/pull/6309))
+* Include the websocket close status reason when reporting errors to the sync client ([PR #6298](https://github.com/realm/realm-core/pull/6298))
+
+----------------------------------------------
+
+# 13.4.1 Release notes
+
+### Enhancements
+* IntegrationException's which require help from support team mention 'Please contact support' in their message ([#6283](https://github.com/realm/realm-core/pull/6283))
+* Add support for nested and overlapping scopes to the Events API. If multiple scopes are active all events generated will be reported to every active scope ([#6288](https://github.com/realm/realm-core/pull/6288)).
+
+### Fixed
+* App 301/308 redirection support doesn't use new location if metadata mode is set to 'NoMetadata'. ([#6280](https://github.com/realm/realm-core/issues/6280), since v12.9.0)
+* Expose ad hoc interface for querying dictionary key changes in the C-API. ([#6228](https://github.com/realm/realm-core/issues/6228), since v10.3.3)
+* Client reset with recovery or discard local could fail if there were dangling links in lists that got ressurected while the list was being transferred from the fresh realm ([#6292](https://github.com/realm/realm-core/issues/6292), since v11.5.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The lifecycle of the sync client is now separated from the event loop/socket provider it uses for async I/O/timers. The sync client will wait for all outstanding callbacks/sockets to be closed during destruction. The SyncSocketProvider passed to the sync client must run until after the sync client is destroyed but does not need to be stopped as part of tearing down the sync client. ([PR #6276](https://github.com/realm/realm-core/pull/6276))
+* The default event loop will now keep running until it is explicitly stopped rather than until there are no more timers/IO to process. Previously there was a timer set for very far in the future to force the event loop to keep running. ([PR #6265](https://github.com/realm/realm-core/pull/6265))
+* Disable failing check in Metrics_TransactionTimings test ([PR #6206](https://github.com/realm/realm-core/pull/6206))
+* Map ClientError's to ProtocolError's and use ProtocolError's when sending ERROR messages to the server ([PR #6086](https://github.com/realm/realm-core/pull/6086))
+
+----------------------------------------------
+
 # 13.4.0 Release notes
 
 ### Enhancements
@@ -28,6 +83,7 @@
 ### Fixed
 * Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
 * Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
+* Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
 ### Breaking changes
 * None.
@@ -108,11 +164,11 @@
 * Fixed possible segfault in sync client where async callback was using object after being deallocated ([#6053](https://github.com/realm/realm-core/issues/6053), since v11.7.0)
 * Fixed crash when using client reset with recovery and flexible sync with a single subscription ([#6070](https://github.com/realm/realm-core/issues/6070), since v12.3.0)
 * Fixed crash with wrong transaction state, during realm migration if realm is frozen due to schema mismatch ([#6144](https://github.com/realm/realm-core/issues/6144), since v13.0.0)
- 
+
 ### Breaking changes
 * Core no longer provides any vcpkg infrastructure (the ports submodule and overlay triplets), because it handles dependant libraries internally now.
 * Allow Realm instances to have a complete view of their schema, if mode is additive. ([PR #5784](https://github.com/realm/realm-core/pull/5784)).
-* `realm_sync_immediately_run_file_actions` (c-api) now takes a third argument `bool* did_run` that will be set to the result of `SyncManager::immediately_run_file_actions`. ((#6117)[https://github.com/realm/realm-core/pull/6117]) 
+* `realm_sync_immediately_run_file_actions` (c-api) now takes a third argument `bool* did_run` that will be set to the result of `SyncManager::immediately_run_file_actions`. ((#6117)[https://github.com/realm/realm-core/pull/6117])
 * Device information in sync connection parameters was moved into a new `device_info` structure in App::Config ([PR #6066](https://github.com/realm/realm-core/pull/6066))
 * `sdk` is now a required field in the `device_device` structure in App::Config ([PR #6066](https://github.com/realm/realm-core/pull/6066))
 
@@ -140,7 +196,7 @@
 ### Fixed
 * Fixed `realm_add_realm_refresh_callback` and notify immediately that there is not transaction snapshot to advance to. ([#6075](https://github.com/realm/realm-core/issues/6075), since v12.6.0)
 * Fix no notification for write transaction that contains only change to backlink property. ([#4994](https://github.com/realm/realm-core/issues/4994), since v11.4.1)
- 
+
 ### Breaking changes
 * FLX Subscription API reworked to better match SDK consumption patterns ([#6065](https://github.com/realm/realm-core/pull/6065)). Not all changes are breaking, but listing them all here together.
   * `Subscription` is now a plain struct with public fields rather than getter functions
@@ -166,7 +222,7 @@
 ### Fixed
 * Not possible to open an encrypted file on a device with a page size bigger than the one on which the file was produced. ([#8030](https://github.com/realm/realm-swift/issues/8030), since v12.11.0)
 * Fixed `realm_refresh` so it uses an argument value for the refresh result and returns any error conditions as return value. ([#6068](https://github.com/realm/realm-core/pull/6068), since  v10.4.0)
-* Fixed `realm_compact` to actually do the compaction even if the caller did not provide a `did_compact` argument. ([#6068](https://github.com/realm/realm-core/pull/6068), since v12.7.0) 
+* Fixed `realm_compact` to actually do the compaction even if the caller did not provide a `did_compact` argument. ([#6068](https://github.com/realm/realm-core/pull/6068), since v12.7.0)
 ### Breaking changes
 * ObjectId constructor made explicit, so no more implicit conversions from const char* or array of 12 bytes. It now accepts a StringData. ([#6059](https://github.com/realm/realm-core/pull/6059))
 
@@ -233,7 +289,7 @@
 * Restore fallback to full barrier when F_BARRIERSYNC is not available on Apple platforms. ([PR #6033](https://github.com/realm/realm-core/pull/6033), since v12.12.0)
 * Validation of Queries constructed by the Fluent QueryBuilder was missing. ([#6034](https://github.com/realm/realm-core/issues/6034), since v12.7.0)
 * Allow setting values on a Mixed property through the C API ([#5985](https://github.com/realm/realm-core/issues/5985), since v10.5.0)
- 
+
 ### Breaking changes
 * `Table::query()` overload taking `vector<vector<Mixed>>` now takes `vector<variant<Mixed, vector<Mixed>>>` in order to distinguish scalar arguments from single-element lists. ([#5973](https://github.com/realm/realm-core/pull/5973))
 * Better error handling for `realm_async_begin_write` and `realm_async_commit`. ([#PR6039](https://github.com/realm/realm-core/pull/6039))
