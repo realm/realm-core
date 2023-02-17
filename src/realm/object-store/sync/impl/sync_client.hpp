@@ -95,7 +95,7 @@ struct SyncClient {
 
     void stop()
     {
-        m_client.stop();
+        m_client.shutdown();
     }
 
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,

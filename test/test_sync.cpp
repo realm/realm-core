@@ -2273,7 +2273,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
     fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
         CHECK_EQUAL(ProtocolError::permission_denied, ec);
         did_get_permission_denied = true;
-        fixture.get_client(1).stop();
+        fixture.get_client(1).shutdown();
     });
     fixture.start();
 
@@ -2980,7 +2980,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
                                   " preverify_ok = %4, depth = %5",
                                   server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
-            client.stop();
+            client.shutdown();
         return true;
     };
 
@@ -2996,7 +2996,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
-    client.drain();
+    client.shutdown_and_wait();
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3154,7 +3154,7 @@ TEST(Sync_UploadDownloadProgress_1)
             return cond_var_signaled;
         });
 
-        client.stop();
+        client.shutdown();
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3698,7 +3698,7 @@ TEST(Sync_UploadDownloadProgress_6)
         session->bind();
     }
 
-    client.drain();
+    client.shutdown_and_wait();
     server.stop();
     server_thread.join();
 
@@ -5035,7 +5035,7 @@ TEST_IF(Sync_SSL_Certificates, false)
                     error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
-                client.stop();
+                client.shutdown();
             }
         };
 
