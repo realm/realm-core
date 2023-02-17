@@ -24,6 +24,7 @@
 #include <realm/util/features.h>
 #include <cstdint>
 #include <vector>
+#include <map>
 #include <realm/util/file.hpp>
 
 namespace realm::util {
@@ -60,6 +61,8 @@ namespace realm::util {
 struct iv_table;
 class EncryptedFileMapping;
 
+enum class IVRefreshState { UpToDate, RequiresRefresh };
+
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
@@ -70,7 +73,7 @@ public:
     size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
-    std::vector<size_t> refresh_ivs(FileDesc fd);
+    std::map<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected);
 
     void check_key(const uint8_t* key);
 

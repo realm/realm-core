@@ -123,8 +123,9 @@ private:
         Clean = 0,
         Touched = 1,  // a ref->ptr translation has taken place
         UpToDate = 2, // the page is fully up to date
-        Writable = 4, // the page is open for writing
-        Dirty = 8     // the page has been modified with respect to what's on file.
+        StaleIV = 4,  // the page needs to check the on disk IV for changes by other processes
+        Writable = 8, // the page is open for writing
+        Dirty = 16    // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -178,7 +179,8 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 
     size_t local_ndx =
         ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
-    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size(), addr, m_addr, m_page_shift);
+    REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size(), size_t(addr), size_t(m_addr),
+                    m_page_shift);
     return local_ndx;
 }
 
