@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Fixed a test failure arising from the location for flexible sync permissions in baas changing.
 
 ----------------------------------------------
 
