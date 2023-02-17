@@ -59,14 +59,13 @@ void reset_test_directory(const std::string& base_path)
     util::make_dir(base_path);
 }
 
-std::vector<char> make_test_encryption_key(const char start)
+OwnedBinaryData make_test_encryption_key(const char start)
 {
-    std::vector<char> vector;
-    vector.reserve(64);
+    auto key = std::make_unique<char[]>(64);
     for (int i = 0; i < 64; i++) {
-        vector.emplace_back((start + i) % 128);
+        key[i] = (start + i) % 128;
     }
-    return vector;
+    return {std::move(key), 64};
 }
 
 // FIXME: Catch2 limitation on old compilers (currently our android CI)

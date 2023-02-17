@@ -116,12 +116,11 @@ namespace realm {
 
 // MARK: - Sync metadata manager
 
-SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
-                                         util::Optional<std::vector<char>> encryption_key)
+SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt, OwnedBinaryData encryption_key)
 {
     constexpr uint64_t SCHEMA_VERSION = 6;
 
-    if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
+    if (!REALM_PLATFORM_APPLE && should_encrypt && encryption_key.empty())
         throw std::invalid_argument("Metadata Realm encryption was specified, but no encryption key was provided.");
 
     m_metadata_config.automatic_change_notifications = false;
@@ -130,10 +129,9 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.schema_version = SCHEMA_VERSION;
     m_metadata_config.schema_mode = SchemaMode::Automatic;
     m_metadata_config.scheduler = util::Scheduler::make_dummy();
-    if (encryption_key)
-        m_metadata_config.encryption_key = std::move(*encryption_key);
+    m_metadata_config.encryption_key = encryption_key;
 
-    auto realm = open_realm(should_encrypt, encryption_key != none);
+    auto realm = open_realm(should_encrypt, !encryption_key.empty());
 
     // Get data about the (hardcoded) schemas
     auto object_schema = realm->schema().find(c_sync_userMetadata);
@@ -391,8 +389,8 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // This works for both the case where everything is sensible and valid and
     // when we have a key but no metadata Realm.
     auto key = keychain::get_existing_metadata_realm_key();
-    if (key) {
-        m_metadata_config.encryption_key = *key;
+    if (!key.empty()) {
+        m_metadata_config.encryption_key = key;
         if (auto realm = try_get_realm())
             return realm;
     }
@@ -401,7 +399,7 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // decrypt it, then we might have an unencrypted metadata Realm resulting
     // from a previous run being unable to access the keychain.
     if (util::File::exists(m_metadata_config.path)) {
-        m_metadata_config.encryption_key.clear();
+        m_metadata_config.encryption_key = {};
         if (auto realm = try_get_realm())
             return realm;
 
@@ -413,10 +411,10 @@ std::shared_ptr<Realm> SyncMetadataManager::open_realm(bool should_encrypt, bool
     // We now have no metadata Realm. If we don't have an existing stored key,
     // try to create and store a new one. This might fail, in which case we
     // just create an unencrypted Realm file.
-    if (!key)
+    if (key.empty())
         key = keychain::create_new_metadata_realm_key();
-    if (key)
-        m_metadata_config.encryption_key = std::move(*key);
+    if (!key.empty())
+        m_metadata_config.encryption_key = std::move(key);
     return get_realm();
 #else  // REALM_PLATFORM_APPLE
     REALM_UNREACHABLE();

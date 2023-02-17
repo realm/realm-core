@@ -316,7 +316,7 @@
 * Fix database corruption and encryption issues on apple platforms, reported in several bugs listed in the PR. ([PR #5993](https://github.com/realm/realm-core/pull/5993), since v11.8.0)
 
 ### Breaking changes
-* None.
+* `RealmConfig::encryption_key` and `SyncClientConfig::custom_encryption_key` now both use `OwnedBinaryData`. They both treat empty and null keys as equivalent. (PR [#5760](https://github.com/realm/realm-core/pull/5760))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

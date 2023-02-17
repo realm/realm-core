@@ -67,7 +67,7 @@ TestFile::TestFile()
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
     if (const char* crypt_key = test_util::crypt_key()) {
-        encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
+        encryption_key = BinaryData(crypt_key, 64);
     }
     int fd = mkstemp(path.data());
     if (fd < 0) {
@@ -108,7 +108,7 @@ DBOptions TestFile::options() const
 InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
-    encryption_key = std::vector<char>();
+    encryption_key = {};
 }
 
 #if REALM_ENABLE_SYNC

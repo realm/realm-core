@@ -102,9 +102,9 @@ public:
     {
         return m_config.path;
     }
-    const std::vector<char>& get_encryption_key() const noexcept
+    BinaryData get_encryption_key() const noexcept
     {
-        return m_config.encryption_key;
+        return m_config.encryption_key.get();
     }
     bool is_in_memory() const noexcept
     {

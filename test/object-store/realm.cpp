@@ -19,6 +19,7 @@
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include "realm/binary_data.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -131,7 +132,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
     SECTION("should validate that the config is sensible") {
         SECTION("bad encryption key") {
-            config.encryption_key = std::vector<char>(2, 0);
+            config.encryption_key = BinaryData(std::array<char, 2>().data(), 2);
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
@@ -268,7 +269,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         Realm::get_shared_realm(config);
 
         {
-            Group g(config.path, config.encryption_key.data());
+            Group g(config.path, config.encryption_key_ptr());
             auto table = ObjectStore::table_for_object_type(g, "object");
             REQUIRE(table);
             REQUIRE(table->get_column_count() == 1);
@@ -971,7 +972,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         }
 
         DBOptions options;
-        options.encryption_key = config.encryption_key.data();
+        options.encryption_key = config.encryption_key_ptr();
         auto db = DB::create(sync::make_client_replication(), config.path, options);
         auto write = db->start_write(); // block sync from writing until we cancel
 
@@ -1430,7 +1431,7 @@ TEST_CASE("SharedRealm: async writes") {
             bool persisted = false;
             SECTION("before write lock is acquired") {
                 DBOptions options;
-                options.encryption_key = config.encryption_key.data();
+                options.encryption_key = config.encryption_key_ptr();
                 // Acquire the write lock with a different DB instance so that we'll
                 // be stuck in the Requesting stage
                 realm::test_util::BowlOfStonesSemaphore sema;
@@ -2075,7 +2076,7 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 20 commits
-                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                CHECK(Group(config.path, config.encryption_key_ptr()).get_table("class_object")->size() ==
                       (i / 20) * 20);
 
                 table->create_object();
@@ -2096,7 +2097,7 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 6 commits
-                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                CHECK(Group(config.path, config.encryption_key_ptr()).get_table("class_object")->size() ==
                       (i / 6) * 6);
 
                 table->create_object();
@@ -2813,7 +2814,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and path
 
         config3.path = "";
-        config3.encryption_key = {'a'};
+        config3.encryption_key = OwnedBinaryData("a", 1);
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and encryption
     }
 }

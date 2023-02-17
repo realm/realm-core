@@ -21,21 +21,26 @@ RLM_API void realm_config_set_path(realm_config_t* config, const char* path)
 
 RLM_API size_t realm_config_get_encryption_key(const realm_config_t* config, uint8_t* out_key)
 {
-    if (out_key) {
-        std::copy(config->encryption_key.begin(), config->encryption_key.end(), out_key);
+    const auto size = config->encryption_key.size();
+    if (out_key && size) {
+        memcpy(out_key, config->encryption_key.data(), size);
     }
-    return config->encryption_key.size();
+    return size;
 }
 
 RLM_API bool realm_config_set_encryption_key(realm_config_t* config, const uint8_t* key, size_t key_size)
 {
     return wrap_err([=]() {
-        if (key_size != 0 && key_size != 64) {
+        if (key_size == 0) {
+            config->encryption_key = {};
+            return true;
+        }
+
+        if (key_size != 64) {
             throw std::logic_error{"Wrong encryption key size (must be 0 or 64)"};
         }
 
-        config->encryption_key.clear();
-        std::copy(key, key + key_size, std::back_inserter(config->encryption_key));
+        config->encryption_key = BinaryData(reinterpret_cast<const char*>(key), key_size);
         return true;
     });
 }

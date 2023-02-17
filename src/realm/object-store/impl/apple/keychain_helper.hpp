@@ -29,10 +29,10 @@
 namespace realm::keychain {
 
 // Get the stored encryption key for the metadata realm if one exists.
-util::Optional<std::vector<char>> get_existing_metadata_realm_key();
+OwnedBinaryData get_existing_metadata_realm_key();
 // Create a new encryption key and store it in the keychain. Returns none if
 // the key could not be stored.
-util::Optional<std::vector<char>> create_new_metadata_realm_key();
+OwnedBinaryData create_new_metadata_realm_key();
 
 // Delete the encryption key for the metadata realm from the keychain.
 void delete_metadata_realm_encryption_key();

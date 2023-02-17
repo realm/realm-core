@@ -350,7 +350,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         SECTION("different keys") {
             {
                 // Open metadata realm, make metadata
-                std::vector<char> key0 = make_test_encryption_key(10);
+                OwnedBinaryData key0 = make_test_encryption_key(10);
                 SyncMetadataManager manager0(metadata_path, true, key0);
 
                 auto user_metadata0 = manager0.get_or_make_user_metadata(identity0, auth_url);
@@ -362,7 +362,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             }
             // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
             // Open new metadata realm at path with different key
-            std::vector<char> key1 = make_test_encryption_key(11);
+            OwnedBinaryData key1 = make_test_encryption_key(11);
             SyncMetadataManager manager1(metadata_path, true, key1);
 
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
@@ -407,7 +407,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     }
 
     SECTION("works when enabled") {
-        std::vector<char> key = make_test_encryption_key(10);
+        OwnedBinaryData key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
         SyncMetadataManager manager(metadata_path, true, key);
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_url);
@@ -428,7 +428,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     SECTION("enabled without custom encryption key") {
 #if REALM_PLATFORM_APPLE
         static bool can_access_keychain = [] {
-            bool can_acesss = keychain::create_new_metadata_realm_key() != none;
+            bool can_acesss = !keychain::create_new_metadata_realm_key().empty();
             if (!can_acesss) {
                 std::cout << "Skipping keychain tests as the keychain is not accessible\n";
             }
@@ -440,13 +440,13 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 
         SECTION("automatically generates an encryption key for new files") {
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, true);
                 manager.set_current_user_identity(identity0);
             }
 
             // Should be able to reopen and read data
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, true);
                 REQUIRE(manager.get_current_user_identity() == identity0);
             }
 
@@ -456,11 +456,11 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 
         SECTION("leaves existing unencrypted files unencrypted") {
             {
-                SyncMetadataManager manager(metadata_path, false, none);
+                SyncMetadataManager manager(metadata_path, false);
                 manager.set_current_user_identity(identity0);
             }
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, true);
                 REQUIRE(manager.get_current_user_identity() == identity0);
             }
             REQUIRE_NOTHROW(Group(metadata_path));
@@ -468,7 +468,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 
         SECTION("recreates the file if the old encryption key was lost") {
             {
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, true);
                 manager.set_current_user_identity(identity0);
             }
 
@@ -476,14 +476,14 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 
             {
                 // File should now be missing the data
-                SyncMetadataManager manager(metadata_path, true, none);
+                SyncMetadataManager manager(metadata_path, true);
                 REQUIRE(manager.get_current_user_identity() == none);
             }
             // New file should be encrypted
             REQUIRE_THROWS_AS(Group(metadata_path), InvalidDatabase);
         }
 #else
-        REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, none));
+        REQUIRE_THROWS(SyncMetadataManager(metadata_path, true));
 #endif
     }
 }
