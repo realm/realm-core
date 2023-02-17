@@ -305,7 +305,7 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    void update_reader_view(size_t file_size, DB* db = nullptr, VersionID version = {});
+    void update_reader_view(size_t file_size);
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
     void init_mapping_management(uint64_t currently_live_version);
 
@@ -350,9 +350,6 @@ public:
     void print() const;
 #endif
 
-    void mark_pages_for_refresh_for_versions(std::vector<VersionedTopRef> read_locks,
-                                             util::UniqueFunction<void(const RefRanges&)> = nullptr);
-
 protected:
     MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, char*, size_t old_size, size_t new_size) override;
@@ -380,10 +377,7 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void mark_encrypted_pages_for_refresh(
-        const RefRanges& ranges,
-        std::unordered_map<util::EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed);
-    void mark_all_encrypted_pages_for_refresh();
+    void refresh_outdated_encrypted_pages();
 
 private:
     enum AttachMode {

@@ -591,14 +591,14 @@ void Group::update_num_objects()
 #endif // REALM_METRICS
 }
 
-// Caller must hold any mutex needed for the 'mark_encrypted_pages_for_refresh' parameter
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version, DB* db)
+// Caller must hold any mutex needed for the 'refresh_encrypted_pages' parameter
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size, db, version); // Throws
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure

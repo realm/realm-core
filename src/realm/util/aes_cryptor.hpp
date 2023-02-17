@@ -70,6 +70,7 @@ public:
     size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
+    std::vector<size_t> refresh_ivs(FileDesc fd);
 
     void check_key(const uint8_t* key);
 
@@ -105,7 +106,7 @@ private:
     std::unique_ptr<char[]> m_dst_buffer;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
-    bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
+    bool check_hmac(const void* data, size_t len, const std::array<uint8_t, 28>& hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
     iv_table& get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode = IVLookupMode::UseCache) noexcept;
     void handle_error();

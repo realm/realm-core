@@ -466,8 +466,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     SlabAlloc& alloc = m_alloc;
     {
         util::CheckedLockGuard lock_guard(db->m_mutex);
-        alloc.update_reader_view(new_file_size, db.get(),
-                                 VersionID{new_read_lock.m_version, new_read_lock.m_reader_idx});
+        alloc.update_reader_view(new_file_size);
     }
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;

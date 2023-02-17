@@ -431,7 +431,6 @@ protected:
 
 private:
     class AsyncCommitHelper;
-    class PageRefresher;
     class VersionManager;
     class EncryptionMarkerObserver;
     struct PageRefresherGuard;
@@ -473,7 +472,6 @@ private:
     size_t m_locked_space GUARDED_BY(m_mutex) = 0;
     size_t m_used_space GUARDED_BY(m_mutex) = 0;
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
-    std::optional<ReadLockInfo> m_last_encryption_page_reader;
     std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
@@ -491,7 +489,6 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
-    std::unique_ptr<PageRefresher> m_page_refresher;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.
@@ -571,8 +568,6 @@ private:
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept REQUIRES(!m_mutex);
 
-    void refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept REQUIRES(m_mutex);
-    std::optional<uint64_t> get_last_refreshed_version() noexcept REQUIRES(m_mutex);
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write() REQUIRES(!m_mutex);
     void do_begin_write() REQUIRES(!m_mutex);

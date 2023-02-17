@@ -33,8 +33,9 @@
 #include <cstdio>
 #endif
 
-#include <iostream>
+#include <array>
 #include <cstring>
+#include <iostream>
 
 #if defined(_WIN32)
 #include <Windows.h>
@@ -84,35 +85,13 @@ SharedFileInfo::SharedFileInfo(const uint8_t* key)
 // the ciphertext's hash will match the old ciphertext.
 
 struct iv_table {
-    uint32_t iv1;
-    uint8_t hmac1[28];
-    uint32_t iv2;
-    uint8_t hmac2[28];
-    iv_table()
-    {
-        iv1 = 0;
-        iv2 = 0;
-        memset(&hmac1, 0, 28);
-        memset(&hmac2, 0, 28);
-    }
-    iv_table(const iv_table& other)
-    {
-        iv1 = other.iv1;
-        iv2 = other.iv2;
-        memmove(&hmac1, &other.hmac1, 28);
-        memmove(&hmac2, &other.hmac2, 28);
-    }
-    void operator=(const iv_table& other)
-    {
-        iv1 = other.iv1;
-        iv2 = other.iv2;
-        memmove(&hmac1, &other.hmac1, 28);
-        memmove(&hmac2, &other.hmac2, 28);
-    }
+    uint32_t iv1 = 0;
+    std::array<uint8_t, 28> hmac1 = {};
+    uint32_t iv2 = 0;
+    std::array<uint8_t, 28> hmac2 = {};
     bool operator==(const iv_table& other) const
     {
-        return iv1 == other.iv1 && iv2 == other.iv2 && memcmp(hmac1, other.hmac1, 28) == 0 &&
-               memcmp(hmac2, other.hmac2, 28) == 0;
+        return iv1 == other.iv1 && iv2 == other.iv2 && hmac1 == other.hmac1 && hmac2 == other.hmac2;
     }
     bool operator!=(const iv_table& other) const
     {
@@ -267,7 +246,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mod
     return m_iv_buffer[idx];
 }
 
-bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
+bool AESCryptor::check_hmac(const void* src, size_t len, const std::array<uint8_t, 28>& hmac) const
 {
     uint8_t buffer[224 / 8];
     calc_hmac(src, len, buffer, m_hmacKey);
@@ -279,6 +258,23 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
+std::vector<size_t> AESCryptor::refresh_ivs(FileDesc fd)
+{
+    std::vector<size_t> pages_changed;
+    std::vector<iv_table> ivs_before = m_iv_buffer;
+
+    for (size_t i = 0; i < m_iv_buffer.size(); i += blocks_per_metadata_block) {
+        get_iv_table(fd, i * block_size, IVLookupMode::Refetch);
+    }
+    REALM_ASSERT_3(ivs_before.size(), ==, m_iv_buffer.size());
+    for (size_t i = 0; i < ivs_before.size(); ++i) {
+        if (ivs_before[i] != m_iv_buffer[i]) {
+            pages_changed.push_back(i); // FIXME: double check that this index is correct
+        }
+    }
+    return pages_changed;
+}
+
 size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer)
 {
     REALM_ASSERT_EX(size % block_size == 0, size, block_size);
@@ -287,7 +283,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
     // them. We also want to optimize for a single process writer since in that case all the cached ivs are correct.
     // To do this, we first attempt to use the cached IV, and if it is invalid, read from disk again. During reader
     // starvation, the just read IV could already be out of date with the data page, so continue trying to read until
-    // a match is found (for up to 20 seconds before giving up entirely).
+    // a match is found (for up to 5 seconds before giving up entirely).
     size_t retry_count = 0;
     std::pair<iv_table, size_t> last_iv_and_data_hash;
     auto retry_start_time = std::chrono::steady_clock::now();
@@ -463,11 +459,11 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size, Wri
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
+            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1.data(), m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
-        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 28) == 0));
+        } while (REALM_UNLIKELY(iv.hmac1 == iv.hmac2));
 
         if (marker)
             marker->mark(pos);
@@ -687,47 +683,17 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
     set(m_page_state[local_page_ndx], UpToDate);
 }
 
-void EncryptedFileMapping::mark_for_refresh(
-    size_t ref_start, size_t ref_end,
-    std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed)
+void EncryptedFileMapping::refresh_outdated_pages()
 {
-    size_t first_page_ndx = ref_start >> m_page_shift;
-    size_t last_page_ndx = (ref_end - 1) >> m_page_shift;
-    for (size_t page_ndx = first_page_ndx; page_ndx <= last_page_ndx; ++page_ndx) {
-        for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-            EncryptedFileMapping* m = m_file.mappings[i];
-            if (m->contains_page(page_ndx)) {
-                size_t local_page_ndx = page_ndx - m->m_first_page;
-                if (is(m->m_page_state[local_page_ndx], UpToDate)) {
-                    // If we collide with a concurrent write (state Writable) we cannot mark
-                    // the page for refresh. If we did, it might be refreshed and any partial
-                    // write would be lost.
-                    // Same goes for an already written page (state Dirty).
-                    // However: The reader triggering the mark for refresh is doing so before
-                    // the write has completed (or the page would have been flushed and in UpToDate state),
-                    // so the reader cannot be meant to see the write. The write may be to the same
-                    // page, but it cannot be to the part of the page that the reader requests.
-                    // - the real problem: we may need to refresh this page due to an earlier
-                    //   write which the reader *must* see, but collide with a later writer which
-                    // we must not overwrite.
-                    //
-                    // Does the following argument save the day?
-                    // Every writer to a page must have refreshed that page as part of executing
-                    // a read barrier. The writer must have done this while holding the write
-                    // lock. Consequently the page must already have been refreshed up to the version
-                    // which a reader is requesting. The reader may have deferred mark for request,
-                    // but it actually does not need it.
-                    // a) there must be a read_barrier for every write_barrier
-                    // b) the writer mush have marked pages for refresh up until the latest version,
-                    // c) it must have done so while holding the write lock
-                    if (is_not(m->m_page_state[local_page_ndx], Dirty | Writable) &&
-                        (!pages_refreshed || (*pages_refreshed)[m].count(page_ndx) == 0)) {
-                        if (pages_refreshed) {
-                            (*pages_refreshed)[m].insert(page_ndx);
-                        }
-                        clear(m->m_page_state[local_page_ndx], UpToDate);
-                    }
-                }
+    std::vector<size_t> changes = m_file.cryptor.refresh_ivs(m_file.fd);
+    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
+        EncryptedFileMapping* m = m_file.mappings[i];
+        for (size_t change_page_ndx : changes) {
+            if (m->contains_page(change_page_ndx)) {
+                size_t local_page_ndx = change_page_ndx - m->m_first_page;
+                REALM_ASSERT(!is(m->m_page_state[local_page_ndx], Writable));
+                REALM_ASSERT(!is(m->m_page_state[local_page_ndx], Dirty));
+                clear(m->m_page_state[local_page_ndx], UpToDate);
             }
         }
     }

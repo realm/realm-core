@@ -876,86 +876,6 @@ std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().stri
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
-// The PageRefresher is run on a dedicated thread to allow timely releases of versions
-// avoiding version pinning.
-class DB::PageRefresher {
-public:
-    PageRefresher(DB& db)
-        : m_db(db)
-    {
-        REALM_ASSERT(m_db.m_marker_observer.get());
-        REALM_ASSERT(m_db.m_alloc.m_write_observer);
-        start();
-    }
-    ~PageRefresher()
-    {
-        stop();
-    }
-    void main()
-    {
-        auto& alloc = m_db.m_alloc;
-        std::optional<uint64_t> change_from;
-        while (m_should_run) {
-            REALM_ASSERT(m_db.m_marker_observer.get());
-            REALM_ASSERT(m_db.m_alloc.m_write_observer);
-            // wait for change
-            bool changed = true;
-            if (change_from) {
-                changed = m_db.wait_for_change_internal(*change_from);
-            }
-            if (!m_should_run)
-                break;
-            REALM_ASSERT(changed);
-            auto readlock = m_db.grab_read_lock(ReadLockInfo::Full, VersionID());
-            ReadLockGuard rlg(m_db, readlock);
-            CheckedLockGuard lock_guard(m_db.m_mutex);
-            alloc.update_reader_view(readlock.m_file_size, &m_db,
-                                     VersionID{readlock.m_version, readlock.m_reader_idx});
-            change_from = m_db.get_last_refreshed_version();
-        }
-    }
-    void start()
-    {
-        m_should_run = true;
-        m_db.enable_wait_for_change_internal();
-        m_thread = std::thread([this]() {
-            main();
-        });
-    }
-    void stop()
-    {
-        if (!m_should_run)
-            return;
-        m_should_run = false;
-        m_db.wait_for_change_internal_release();
-        m_thread.join();
-    }
-
-private:
-    DB& m_db;
-    std::thread m_thread;
-    std::atomic<bool> m_should_run = false;
-};
-
-struct DB::PageRefresherGuard {
-    PageRefresherGuard(DB* db)
-        : m_db(db)
-    {
-        if (m_db->m_page_refresher) {
-            m_db->m_page_refresher->stop();
-        }
-    }
-    ~PageRefresherGuard()
-    {
-        if (m_db->m_page_refresher) {
-            m_db->m_page_refresher->start();
-        }
-    }
-
-private:
-    DB* m_db;
-};
-
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
@@ -1506,9 +1426,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
-    if (options.encryption_key && !m_fake_read_lock_if_immutable) {
-        m_page_refresher = std::make_unique<PageRefresher>(*this);
-    }
     m_alloc.set_read_only(true);
 }
 
@@ -1603,8 +1520,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     Durability dura = Durability(info->durability);
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
-        DB::PageRefresherGuard temporarily_disable_refresher(this); // must be done before locking m_controlmutex
-
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
         // We must be the ONLY DB object attached if we're to do compaction
@@ -1682,12 +1597,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             top.init_from_ref(top_ref);
             logical_file_size = Group::get_logical_file_size(top);
         }
-        if (m_last_encryption_page_reader) {
-            m_version_manager->release_read_lock(*m_last_encryption_page_reader);
-        }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
-        m_last_encryption_page_reader =
-            m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, get_version_id_of_latest_snapshot());
     }
     return true;
 }
@@ -1754,53 +1664,6 @@ void DB::release_all_read_locks() noexcept
     REALM_ASSERT(m_transaction_count == 0);
 }
 
-// caller must hold DB::m_mutex
-void DB::refresh_encrypted_mappings(VersionID to, SlabAlloc& alloc) noexcept
-{
-    // Early out if called with an installed fake readlock.
-    // If called from update_reader_view from attach_shared for an immutable realm,
-    // there is no version manager so we cannot grab a read_lock. Fortunately, we also
-    // do not need one because we do not need to refresh any mappings.
-    if (m_fake_read_lock_if_immutable)
-        return;
-
-    if (get_encryption_key()) {
-        version_type from;
-        {
-            if (!m_last_encryption_page_reader) {
-                alloc.mark_all_encrypted_pages_for_refresh();
-                m_last_encryption_page_reader = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
-                return;
-            }
-            if (m_last_encryption_page_reader->m_version >= to.version) {
-                return;
-            }
-            from = m_last_encryption_page_reader->m_version;
-        }
-
-        auto tmp_rl = m_version_manager->grab_read_lock(ReadLockInfo::Type::Full, to);
-        std::vector<VersionedTopRef> read_locks = m_version_manager->get_versions_from(from, to.version);
-
-        alloc.mark_pages_for_refresh_for_versions(read_locks);
-
-        m_version_manager->release_read_lock(*m_last_encryption_page_reader);
-        m_last_encryption_page_reader = tmp_rl;
-    }
-}
-
-// caller must hold DB::m_mutex
-std::optional<uint64_t> DB::get_last_refreshed_version() noexcept
-{
-    if (get_encryption_key()) {
-        if (!m_last_encryption_page_reader)
-            return {};
-        return m_last_encryption_page_reader->m_version;
-    }
-    else {
-        return {};
-    }
-}
-
 // Note: close() and close_internal() may be called from the DB::~DB().
 // in that case, they will not throw. Throwing can only happen if called
 // directly.
@@ -1808,7 +1671,6 @@ void DB::close(bool allow_open_read_transactions)
 {
     // make helper thread(s) terminate
     m_commit_helper.reset();
-    m_page_refresher.reset();
 
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())

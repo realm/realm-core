@@ -114,7 +114,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     // to avoid deadlock we must take DB::m_mutex here.... this is not an ideal design
     util::CheckedLockGuard lock(db->m_mutex);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
-                  VersionID{rli.m_version, rli.m_reader_idx}, db.get());
+                  VersionID{rli.m_version, rli.m_reader_idx});
 }
 
 Transaction::~Transaction()
@@ -265,8 +265,6 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         }
 
         // Remap file if it has grown, and update refs in underlying node structure.
-        // A writer already has the latest encrypted pages (assumes serialized commits)
-        // so no need to refresh_encrypted_mappings here.
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
@@ -303,8 +301,6 @@ VersionID Transaction::commit_and_continue_writing()
     }
 
     bool writable = true;
-    // A writer already has the latest pages in memory (assumes serialized commits)
-    // so no need to refresh_encrypted_mappings here.
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
     return VersionID{version, lock_after_commit.m_reader_idx};
 }

@@ -55,7 +55,7 @@ public:
     void sync() noexcept;
 
     // Make sure that memory in the specified range is synchronized with any
-    // changes made globally visible through call to write_barrier or mark_for_refresh.
+    // changes made globally visible through call to write_barrier or refresh_outdated_pages().
     // Optionally mark the pages for later modification
     void read_barrier(const void* addr, size_t size, Header_to_size header_to_size, bool to_modify);
 
@@ -64,14 +64,12 @@ public:
     // Pages selected must have been marked for modification at an earlier read barrier
     void write_barrier(const void* addr, size_t size) noexcept;
 
-    // Marks pages in the given range as having been changed on disk (by another process)
-    // this applies to ALL mappings for the same file. The range is specified as offsets
-    // into the file and is not constrained by the specific mapping on which the method is
-    // invoked.
-    // The pages specified can not be in the Dirty state.
-    // The pages specified will be refetched and re-decrypted by calls to read_barrier.
-    void mark_for_refresh(size_t ref_start, size_t ref_end,
-                          std::unordered_map<EncryptedFileMapping*, std::unordered_set<size_t>>* pages_refreshed);
+    // Checks if the ivs on disk have changed compared to the in memory versions and
+    // marks those pages for refresh if any have changed. This is the process by which
+    // a reader in a multiprocess scenario detects if its mapping should be refreshed
+    // while advancing versions. The pages marked for refresh will be refetched and
+    // re-decrypted by later calls to read_barrier.
+    void refresh_outdated_pages();
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
