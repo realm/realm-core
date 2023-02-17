@@ -6,6 +6,7 @@
 
 ### Fixed
 * Sync client may [have failed an assertion](https://github.com/realm/realm-core/blob/006660c8d20c4941d3838f74aec6f3561ebf6784/src/realm/sync/noinst/client_impl_base.cpp#L388) during shutdown if all sessions hadn't been ready to finalize by the time the Client destructor ran. (PR [#6293](https://github.com/realm/realm-core/pull/6293), since v13.4.1)
+* Fixed the sync client being stuck in a cycle if an integration error occurs by issuing a client reset ([#6051](https://github.com/realm/realm-core/issues/6051), since v10.2.0)
 
 ### Breaking changes
 * None.
@@ -36,7 +37,6 @@
 * App 301/308 redirection support doesn't use new location if metadata mode is set to 'NoMetadata'. ([#6280](https://github.com/realm/realm-core/issues/6280), since v12.9.0)
 * Expose ad hoc interface for querying dictionary key changes in the C-API. ([#6228](https://github.com/realm/realm-core/issues/6228), since v10.3.3)
 * Client reset with recovery or discard local could fail if there were dangling links in lists that got ressurected while the list was being transferred from the fresh realm ([#6292](https://github.com/realm/realm-core/issues/6292), since v11.5.0)
-* Fixed the sync client being stuck in a cycle if an integration error occurs by issuing a client reset ([#6051](https://github.com/realm/realm-core/issues/6051), since v10.2.0)
 
 ### Breaking changes
 * None.
