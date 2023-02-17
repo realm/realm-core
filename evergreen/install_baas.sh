@@ -124,7 +124,7 @@ usage()
 }
 
 WORK_PATH=""
-BAAS_VERSION=""
+BAAS_VERSION="9cc6c137728c0f1f8e26f0a517a828a1154744f1"
 while getopts "w:b:" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
