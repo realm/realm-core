@@ -782,7 +782,6 @@ struct ExpectChangesetError {
     void operator()(ConnectionState state, util::Optional<Session::ErrorInfo> error_info) const noexcept
     {
         if (state == ConnectionState::disconnected) {
-            fixture.stop();
             return;
         }
         if (!error_info)
@@ -795,6 +794,7 @@ struct ExpectChangesetError {
         CHECK_EQUAL(error_info->message,
                     "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
                         expected_error);
+        fixture.stop();
     }
 };
 
