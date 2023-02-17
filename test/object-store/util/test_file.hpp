@@ -169,6 +169,9 @@ struct SyncTestFile : TestFile {
                  std::string user_name = "test");
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
                  realm::util::Optional<realm::Schema> schema = realm::util::none);
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
+                 realm::util::Optional<realm::Schema> schema,
+                 std::function<realm::SyncSessionErrorHandler>&& error_handler);
     SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
@@ -179,7 +182,8 @@ class TestAppSession {
 public:
     TestAppSession();
     TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal);
+                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
+                   std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr);
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept

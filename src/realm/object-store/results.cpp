@@ -1005,7 +1005,8 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
+NotificationToken Results::add_notification_callback(CollectionChangeCallback callback,
+                                                     std::optional<KeyPathArray> key_path_array) &
 {
     prepare_async(ForCallback{true});
     return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};

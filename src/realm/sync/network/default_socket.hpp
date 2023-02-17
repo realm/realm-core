@@ -8,7 +8,9 @@
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/random.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 namespace realm::sync::network {
 class Service;
@@ -43,64 +45,71 @@ public:
         network::DeadlineTimer m_timer;
     };
 
-    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent)
-        : m_logger_ptr{logger}
-        , m_service{std::make_shared<network::Service>()}
-        , m_random{}
-        , m_user_agent{user_agent}
-    {
-        REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
-        REALM_ASSERT(m_service);                        // Make sure the service is valid
-        util::seed_prng_nondeterministically(m_random); // Throws
-        start_keep_running_timer();
-    }
+    struct AutoStartTag {
+    };
+
+    using AutoStart = util::TaggedBool<AutoStartTag>;
+    DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
+                          AutoStart auto_start = AutoStart{true});
 
     // Don't allow move or copy constructor
     DefaultSocketProvider(DefaultSocketProvider&&) = delete;
 
-    // Temporary workaround until event loop is completely moved here
-    void run() override
-    {
-        m_service->run();
-    }
+    ~DefaultSocketProvider();
 
-    void stop() override
-    {
-        m_service->stop();
-    }
+    // Start the event loop if it is not started already. Otherwise, do nothing.
+    void start();
 
-    std::unique_ptr<WebSocketInterface> connect(WebSocketObserver*, WebSocketEndpoint&&) override;
+    /// Temporary workaround until client shutdown has been updated in a separate PR - these functions
+    /// will be handled internally when this happens.
+    /// Stops the internal event loop (provided by network::Service)
+    void stop(bool wait_for_stop = false) override;
+
+    std::unique_ptr<WebSocketInterface> connect(std::unique_ptr<WebSocketObserver>, WebSocketEndpoint&&) override;
 
     void post(FunctionHandler&& handler) override
     {
-        REALM_ASSERT(m_service);
         // Don't post empty handlers onto the event loop
         if (!handler)
             return;
-        m_service->post(std::move(handler));
+        m_service.post(std::move(handler));
     }
 
     SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) override
     {
-        return std::unique_ptr<Timer>(new DefaultSocketProvider::Timer(*m_service, delay, std::move(handler)));
+        return std::unique_ptr<Timer>(new DefaultSocketProvider::Timer(m_service, delay, std::move(handler)));
     }
 
 private:
-    // TODO: Revisit Service::run() so the keep running timer is no longer needed
-    void start_keep_running_timer()
-    {
-        auto handler = [this](Status status) {
-            if (status.code() != ErrorCodes::OperationAborted)
-                start_keep_running_timer();
-        };
-        m_keep_running_timer = create_timer(std::chrono::hours(1000), std::move(handler)); // Throws
-    }
+    enum class State { Starting, Running, Stopping, Stopped };
+
+    /// Block until the state reaches the expected or later state - return true if state matches expected state
+    void state_wait_for(std::unique_lock<std::mutex>& lock, State expected_state);
+    /// Internal function for updating the state and signaling the wait_for_state condvar
+    void do_state_update(std::unique_lock<std::mutex>&, State new_state);
+    /// The execution code for the event loop thread
+    void event_loop();
 
     std::shared_ptr<util::Logger> m_logger_ptr;
-    std::shared_ptr<network::Service> m_service;
+    network::Service m_service;
     std::mt19937_64 m_random;
     const std::string m_user_agent;
-    SyncTimer m_keep_running_timer;
+    std::mutex m_mutex;
+    uint64_t m_event_loop_generation = 0;
+    State m_state;                      // protected by m_mutex
+    std::condition_variable m_state_cv; // uses m_mutex
+    std::thread m_thread;               // protected by m_mutex
+};
+
+/// Class for the Default Socket Provider websockets that allows a simulated
+/// http response to be specified for testing.
+class DefaultWebSocket : public WebSocketInterface {
+public:
+    virtual ~DefaultWebSocket() = default;
+
+    virtual void force_handshake_response_for_testing(int status_code, std::string body = "") = 0;
+
+protected:
 };
 
 } // namespace realm::sync::websocket
