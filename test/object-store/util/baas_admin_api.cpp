@@ -208,7 +208,7 @@ nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& schema_name
                                           {"document_filters", {
                                               {"read", true},
                                               {"write", true},
-                                          }}
+                                          }},
                                           {"read", true},
                                           {"write", true},
                                           {"insert", true},
@@ -1089,7 +1089,7 @@ AppSession create_app(const AppCreateConfig& config)
                     {"document_filters", {
                         {"read", true},
                         {"write", true},
-                    }}
+                    }},
                     {"read", true},
                     {"write", true},
                     {"insert", true},
