@@ -228,6 +228,7 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -266,6 +267,7 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -301,6 +303,7 @@ void Connection::activate()
 void Connection::activate_session(std::unique_ptr<Session> sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(!m_force_closed);
     Session& sess_2 = *sess;
     session_ident_type ident = sess->m_ident;
     auto p = m_sessions.emplace(ident, std::move(sess)); // Throws
@@ -318,15 +321,14 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(m_num_active_sessions);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -376,23 +378,47 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
+void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+{
+    REALM_ASSERT(sess->m_state == Session::Deactivated);
+    auto ident = sess->m_ident;
+    m_sessions.erase(ident);
+}
 
 void Connection::force_close()
 {
-    if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer.reset();
-        m_disconnect_delay_in_progress = false;
-        m_reconnect_delay_in_progress = false;
-    }
-
-    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
-    REALM_ASSERT(m_num_active_sessions == 0);
-    if (m_state == ConnectionState::disconnected) {
+    if (m_force_closed) {
         return;
     }
 
-    voluntary_disconnect();
-    logger.info("Force disconnected");
+    m_force_closed = true;
+
+    if (m_state != ConnectionState::disconnected) {
+        voluntary_disconnect();
+    }
+
+    REALM_ASSERT(m_state == ConnectionState::disconnected);
+    if (m_reconnect_delay_in_progress || m_disconnect_delay_in_progress) {
+        m_reconnect_disconnect_timer.reset();
+        m_reconnect_delay_in_progress = false;
+        m_disconnect_delay_in_progress = false;
+    }
+
+    // We must copy any session pointers we want to close to a vector because force_closing
+    // the session may remove it from m_sessions and invalidate the iterator uses to loop
+    // through the map. By copying to a separate vector we ensure our iterators remain valid.
+    std::vector<Session*> to_close;
+    for (auto& session_pair : m_sessions) {
+        if (session_pair.second->m_state == Session::State::Active) {
+            to_close.push_back(session_pair.second.get());
+        }
+    }
+
+    for (auto& sess : to_close) {
+        sess->force_close();
+    }
+
+    logger.debug("Force closed idle connection");
 }
 
 
@@ -436,6 +462,10 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 
 bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
+    if (m_force_closed) {
+        logger.debug("Received binary message after connection was force closed");
+        return false;
+    }
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
@@ -456,6 +486,10 @@ void Connection::websocket_error_handler()
 
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
+    if (m_force_closed) {
+        logger.debug("Received websocket close message after connection was force closed");
+        return false;
+    }
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
     // Return early.
     if (status.is_ok()) {
@@ -543,6 +577,11 @@ void Connection::initiate_reconnect_wait()
     REALM_ASSERT(m_activated);
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     REALM_ASSERT(!m_disconnect_delay_in_progress);
+
+    // If we've been force closed then we don't need/want to reconnect. Just return early here.
+    if (m_force_closed) {
+        return;
+    }
 
     using milliseconds_lim = ReconnectInfo::milliseconds_lim;
 
@@ -1014,9 +1053,7 @@ void Connection::handle_write_message()
 {
     m_sending_session->message_sent(); // Throws
     if (m_sending_session->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = m_sending_session->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(m_sending_session);
     }
     m_sending_session = nullptr;
     m_sending = false;
@@ -1044,9 +1081,7 @@ void Connection::send_next_message()
         sess.send_message(); // Throws
 
         if (sess.m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess.m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(&sess);
         }
 
         // An enlisted session may choose to not send a message. In that case,
@@ -1328,9 +1363,7 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         }
 
         if (sess->m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess->m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(sess);
         }
         return;
     }
@@ -1444,9 +1477,7 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
     }
 
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -1739,8 +1770,9 @@ void Session::activate()
     }
     catch (const IntegrationException& error) {
         logger.error("Error integrating bootstrap changesets: %1", error.what());
-        on_suspended(SessionErrorInfo{error.code(), false});
+        m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(SessionErrorInfo{error.code(), false});
     }
 
     if (has_pending_client_reset) {
