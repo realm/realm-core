@@ -1650,6 +1650,12 @@ void Session::on_integration_failure(const IntegrationException& error)
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
 
+    constexpr bool try_again = true;
+    std::error_code error_code = error.code();
+    auto msg = error_code.message() + ": " + error.what();
+    // Surface the error to the user otherwise is lost.
+    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.code(), std::move(msg), try_again});
+
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
@@ -1868,8 +1874,10 @@ void Session::send_message()
     if (m_error_to_send)
         return send_json_error_message(); // Throws
 
-    if (m_connection_to_close)
-        return close_connection(); // Throws
+    // Stop sending upload, mark and query messages when the client detects an error.
+    if (m_client_error) {
+        return;
+    }
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -2182,22 +2190,20 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    std::error_code ec = m_client_error->code();
+    auto client_error = m_client_error->code();
+    auto protocol_error = client_error_to_protocol_error(client_error);
     auto message = m_client_error->what();
 
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = message;
-    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
-
+    protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
+                                     error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;
-    m_connection_to_close = true;
-
-    // Connection is waiting to be closed
     enlist_to_send(); // Throws
 }
 
@@ -2231,11 +2237,9 @@ void Session::close_connection()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_connection_to_close);
     REALM_ASSERT(m_client_error);
 
     m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
-    m_connection_to_close = false;
     m_client_error = util::none;
 }
 
@@ -2371,6 +2375,13 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
+    if (m_client_error) {
+        logger.debug("Ignoring download message because the client detected an integration error");
+        return;
+    }
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2535,10 +2546,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (debug_action == SyncClientHookAction::EarlyReturn) {
         return {};
     }
-
-    // Ignore the error because the connection is going to be closed.
-    if (m_connection_to_close)
-        return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {

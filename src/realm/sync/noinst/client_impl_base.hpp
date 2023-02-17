@@ -978,7 +978,6 @@ private:
     std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
-    bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1496,13 +1495,13 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
-    m_connection_to_close                 = false;
     m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
     m_error_message_received = false;
     m_unbound_message_received = false;
+    m_client_error = util::none;
 
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;

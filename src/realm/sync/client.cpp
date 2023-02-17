@@ -2053,10 +2053,81 @@ const std::error_category& client_error_category() noexcept
     return g_error_category;
 }
 
-
 std::error_code make_error_code(ClientError error_code) noexcept
 {
     return std::error_code{int(error_code), g_error_category};
+}
+
+ProtocolError client_error_to_protocol_error(ClientError error_code)
+{
+    switch (error_code) {
+        case ClientError::bad_changeset:
+            return ProtocolError::bad_changeset;
+        case ClientError::bad_progress:
+            return ProtocolError::bad_progress;
+        case ClientError::bad_changeset_size:
+            return ProtocolError::bad_changeset_size;
+        case ClientError::connection_closed:
+            return ProtocolError::connection_closed;
+        case ClientError::unknown_message:
+            return ProtocolError::unknown_message;
+        case ClientError::bad_syntax:
+            return ProtocolError::bad_syntax;
+        case ClientError::limits_exceeded:
+            return ProtocolError::limits_exceeded;
+        case ClientError::bad_session_ident:
+            return ProtocolError::bad_session_ident;
+        case ClientError::bad_message_order:
+            return ProtocolError::bad_message_order;
+        case ClientError::bad_client_file_ident:
+            return ProtocolError::bad_client_file_ident;
+        case ClientError::bad_changeset_header_syntax:
+            return ProtocolError::bad_changeset_header_syntax;
+        case ClientError::bad_origin_file_ident:
+            return ProtocolError::bad_origin_file_ident;
+        case ClientError::bad_server_version:
+            return ProtocolError::bad_server_version;
+        case ClientError::bad_client_version:
+            return ProtocolError::bad_client_version;
+
+        case ClientError::bad_error_code:
+            [[fallthrough]];
+        case ClientError::bad_request_ident:
+            [[fallthrough]];
+        case ClientError::bad_compression:
+            [[fallthrough]];
+        case ClientError::ssl_server_cert_rejected:
+            [[fallthrough]];
+        case ClientError::bad_client_file_ident_salt:
+            [[fallthrough]];
+        case ClientError::bad_file_ident:
+            [[fallthrough]];
+        case ClientError::connect_timeout:
+            [[fallthrough]];
+        case ClientError::bad_timestamp:
+            [[fallthrough]];
+        case ClientError::bad_protocol_from_server:
+            [[fallthrough]];
+        case ClientError::client_too_old_for_server:
+            [[fallthrough]];
+        case ClientError::client_too_new_for_server:
+            [[fallthrough]];
+        case ClientError::protocol_mismatch:
+            [[fallthrough]];
+        case ClientError::missing_protocol_feature:
+            [[fallthrough]];
+        case ClientError::http_tunnel_failed:
+            return ProtocolError::other_error;
+
+        case ClientError::auto_client_reset_failure:
+            [[fallthrough]];
+        case ClientError::pong_timeout:
+            [[fallthrough]];
+        case ClientError::bad_state_message:
+            return ProtocolError::other_session_error;
+    }
+
+    return ProtocolError::other_error;
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)
