@@ -568,8 +568,9 @@ class WebSocket {
 public:
     WebSocket(websocket::Config& config)
         : m_config(config)
-        , m_logger(config.websocket_get_logger())
-        , m_frame_reader(config.websocket_get_logger(), m_is_client)
+        , m_logger_ptr(config.websocket_get_logger())
+        , m_logger{*m_logger_ptr}
+        , m_frame_reader(m_logger, m_is_client)
     {
         m_logger.debug("WebSocket::Websocket()");
     }
@@ -584,7 +585,7 @@ public:
 
         m_sec_websocket_key = make_random_sec_websocket_key(m_config.websocket_get_random());
 
-        m_http_client.reset(new HTTPClient<websocket::Config>(m_config, m_logger));
+        m_http_client.reset(new HTTPClient<websocket::Config>(m_config, m_logger_ptr));
         m_frame_reader.reset();
         HTTPRequest req;
         req.method = HTTPMethod::Get;
@@ -637,7 +638,7 @@ public:
 
         m_stopped = false;
         m_is_client = false;
-        m_http_server.reset(new HTTPServer<websocket::Config>(m_config, m_logger));
+        m_http_server.reset(new HTTPServer<websocket::Config>(m_config, m_logger_ptr));
         m_frame_reader.reset();
 
         auto handler = [this](HTTPRequest request, std::error_code ec) {
@@ -723,9 +724,15 @@ public:
         m_frame_reader.reset();
     }
 
+    void force_handshake_response_for_testing(int status_code, std::string body)
+    {
+        m_test_handshake_response.emplace(status_code);
+        m_test_handshake_response_body = body;
+    }
+
 private:
     websocket::Config& m_config;
-    // websocket is owned by the server or websocket factory, so a shared_ptr isn't needed
+    const std::shared_ptr<util::Logger> m_logger_ptr;
     util::Logger& m_logger;
     FrameReader m_frame_reader;
 
@@ -743,6 +750,9 @@ private:
     static const size_t s_write_buffer_stable_size = 2048;
 
     util::UniqueFunction<void()> m_write_completion_handler;
+
+    std::optional<int> m_test_handshake_response;
+    std::string m_test_handshake_response_body;
 
     void error_client_malformed_response()
     {
@@ -763,12 +773,17 @@ private:
         int status_code = int(response.status);
         std::error_code ec;
 
+        if (m_test_handshake_response)
+            status_code = *m_test_handshake_response;
+
         if (status_code == 200)
             ec = Error::bad_response_200_ok;
         else if (status_code >= 200 && status_code < 300)
             ec = Error::bad_response_2xx_successful;
         else if (status_code == 301)
             ec = Error::bad_response_301_moved_permanently;
+        else if (status_code == 308)
+            ec = Error::bad_response_308_permanent_redirect;
         else if (status_code >= 300 && status_code < 400)
             ec = Error::bad_response_3xx_redirection;
         else if (status_code == 401)
@@ -796,7 +811,11 @@ private:
 
         std::string_view body;
         std::string_view* body_ptr = nullptr;
-        if (response.body) {
+        if (m_test_handshake_response) {
+            body = m_test_handshake_response_body;
+            body_ptr = &body;
+        }
+        else if (response.body) {
             body = *response.body;
             body_ptr = &body;
         }
@@ -850,7 +869,8 @@ private:
         m_logger.debug("WebSocket::handle_http_response_received()");
         m_logger.trace("HTTP response = %1", response);
 
-        if (response.status != HTTPStatus::SwitchingProtocols) {
+        if (response.status != HTTPStatus::SwitchingProtocols ||
+            (m_test_handshake_response && *m_test_handshake_response != 101)) {
             error_client_response_not_101(response);
             return;
         }
@@ -1046,6 +1066,8 @@ const char* get_error_message(Error error_code)
             return "Bad WebSocket response 3xx redirection";
         case Error::bad_response_301_moved_permanently:
             return "Bad WebSocket response 301 moved permanently";
+        case Error::bad_response_308_permanent_redirect:
+            return "Bad WebSocket response 308 permanent redirect";
         case Error::bad_response_4xx_client_errors:
             return "Bad WebSocket response 4xx client errors";
         case Error::bad_response_401_unauthorized:
@@ -1104,36 +1126,10 @@ class CloseStatusErrorCategory : public std::error_category {
     {
         // Converts an error_code to one of the pre-defined status codes in
         // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        switch (error_code) {
-            case 1000:
-                return "normal closure";
-            case 1001:
-                return "endpoint going away";
-            case 1002:
-                return "protocol error";
-            case 1003:
-                return "invalid data type";
-            case 1004:
-                return "reserved";
-            case 1005:
-                return "no status code present";
-            case 1006:
-                return "no close control frame sent";
-            case 1007:
-                return "message data type mis-match";
-            case 1008:
-                return "policy violation";
-            case 1009:
-                return "message too big";
-            case 1010:
-                return "missing extension";
-            case 1011:
-                return "unexpected error";
-            case 1015:
-                return "TLS handshake failure";
-            default:
-                return "unknown error";
-        };
+        if (error_code == 1000 || error_code == 0) {
+            return ErrorCodes::error_string(ErrorCodes::OK);
+        }
+        return ErrorCodes::error_string(static_cast<ErrorCodes::Error>(error_code));
     }
 };
 
@@ -1238,6 +1234,11 @@ void websocket::Socket::stop() noexcept
     m_impl->stop();
 }
 
+void websocket::Socket::force_handshake_response_for_testing(int status_code, std::string body)
+{
+    m_impl->force_handshake_response_for_testing(status_code, body);
+}
+
 util::Optional<std::string> websocket::read_sec_websocket_protocol(const HTTPRequest& request)
 {
     const HTTPHeaders& headers = request.headers;
@@ -1253,15 +1254,20 @@ util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& re
     return do_make_http_response(request, sec_websocket_protocol, ec);
 }
 
-const std::error_category& websocket::error_category() noexcept
-{
-    return g_error_category;
-}
-
 const std::error_category& websocket::websocket_close_status_category() noexcept
 {
     static const CloseStatusErrorCategory category = {};
     return category;
+}
+
+std::error_code websocket::make_error_code(ErrorCodes::Error error) noexcept
+{
+    return std::error_code{error, realm::sync::websocket::websocket_close_status_category()};
+}
+
+const std::error_category& websocket::error_category() noexcept
+{
+    return g_error_category;
 }
 
 std::error_code websocket::make_error_code(Error error_code) noexcept

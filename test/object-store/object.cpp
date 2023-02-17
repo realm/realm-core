@@ -164,6 +164,7 @@ TEST_CASE("object") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
         {"table",
          {
@@ -330,7 +331,7 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c) {
                     change = c;
@@ -340,7 +341,7 @@ TEST_CASE("object") {
             return token;
         };
 
-        auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_no_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             bool first = true;
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet) {
@@ -722,6 +723,79 @@ TEST_CASE("object") {
                             object_target.set_column_value("value 2", 205);
                         });
                     }
+                }
+            }
+
+            SECTION("callback with empty keypatharray") {
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
+            }
+
+            SECTION("callback with empty keypatharray, backlinks") {
+                SECTION("modifying backlinked table 'table2', property 'value' "
+                        "with empty KeyPathArray "
+                        "-> DOES not send a notification") {
+                    auto token_with_shallow_subscribtion = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+                SECTION("modifying backlinked table 'table2', property 'link' "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                        Object object_target2(r, obj_target2);
+                        object_origin.set_property_value(d, "link", std::any(object_target2));
+                    });
+                }
+                SECTION("adding a new origin pointing to the target "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", std::any(object_target));
+                    });
+                }
+                SECTION("adding a new origin pointing to the target "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", std::any(object_target));
+                    });
                 }
             }
 
@@ -1699,6 +1773,24 @@ TEST_CASE("object") {
         create(AnyDict{{"_id", std::any()}}, "nullable object id pk");
         create(AnyDict{{"_id", ObjectId::gen()}}, "nullable object id pk");
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
+    }
+
+    SECTION("create only requires properties explicitly in the schema") {
+        config.schema = Schema{{"all types", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}}};
+        auto subset_realm = Realm::get_shared_realm(config);
+        subset_realm->begin_transaction();
+        REQUIRE_NOTHROW(Object::create(d, subset_realm, "all types", std::any(AnyDict{{"_id", INT64_C(123)}})));
+        subset_realm->commit_transaction();
+
+        r->refresh();
+        auto obj = *r->read_group().get_table("class_all types")->begin();
+        REQUIRE(obj.get<int64_t>("_id") == 123);
+
+        // Other columns should have the default unset values
+        REQUIRE(obj.get<bool>("bool") == false);
+        REQUIRE(obj.get<int64_t>("int") == 0);
+        REQUIRE(obj.get<float>("float") == 0);
+        REQUIRE(obj.get<StringData>("string") == "");
     }
 
     SECTION("getters and setters") {

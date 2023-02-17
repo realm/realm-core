@@ -1,12 +1,14 @@
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-#include <cerrno>
-#include <limits>
 #include <algorithm>
-#include <vector>
+#include <cerrno>
+#include <condition_variable>
+#include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 #include <fcntl.h>
 
@@ -20,7 +22,6 @@
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/misc_errors.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
 #include <realm/sync/network/network.hpp>
 
@@ -317,7 +318,7 @@ public:
     // Thread-safe.
     void signal() noexcept
     {
-        LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         if (!m_signaled) {
             char c = 0;
             ssize_t ret = ::write(m_write_fd, &c, 1);
@@ -331,7 +332,7 @@ public:
     // Thread-safe.
     void acknowledge_signal() noexcept
     {
-        LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         if (m_signaled) {
             char c;
             ssize_t ret = ::read(m_read_fd, &c, 1);
@@ -342,7 +343,7 @@ public:
 
 private:
     CloseGuard m_read_fd, m_write_fd;
-    Mutex m_mutex;
+    std::mutex m_mutex;
     bool m_signaled = false; // Protected by `m_mutex`.
 };
 
@@ -1337,7 +1338,7 @@ public:
         bool resolver_thread_started = m_resolver_thread.joinable();
         if (resolver_thread_started) {
             {
-                LockGuard lock{m_mutex};
+                std::lock_guard lock{m_mutex};
                 m_stop_resolver_thread = true;
                 m_resolver_cond.notify_all();
             }
@@ -1376,74 +1377,18 @@ public:
 
     void run()
     {
-        bool no_incomplete_resolve_operations;
-
-    on_handlers_executed_or_interrupted : {
-        LockGuard lock{m_mutex};
-        if (m_stopped)
-            return;
-        // Note: Order of post operations must be preserved.
-        m_completed_operations.push_back(m_completed_operations_2);
-        no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
-
-        if (m_completed_operations.empty())
-            goto on_time_progressed;
+        run_impl(true);
     }
 
-    on_operations_completed : {
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-        m_handler_exec_start_time = clock::now();
-#endif
-        while (LendersOperPtr op = m_completed_operations.pop_front())
-            execute(op); // Throws
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-        m_handler_exec_time += clock::now() - m_handler_exec_start_time;
-#endif
-        goto on_handlers_executed_or_interrupted;
-    }
-
-    on_time_progressed : {
-        clock::time_point now = clock::now();
-        if (process_timers(now))
-            goto on_operations_completed;
-
-        bool no_incomplete_operations =
-            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
-        if (no_incomplete_operations) {
-            // We can only get to this point when there are no completion
-            // handlers ready to execute. It happens either because of a
-            // fall-through from on_operations_completed, or because of a
-            // jump to on_time_progressed, but that only happens if no
-            // completions handlers became ready during
-            // wait_and_process_io().
-            //
-            // We can also only get to this point when there are no
-            // asynchronous operations in progress (due to the preceeding
-            // if-condition.
-            //
-            // It is possible that an other thread has added new post
-            // operations since we checked, but there is really no point in
-            // rechecking that, as it is always possible, even after a
-            // recheck, that new post handlers get added after we decide to
-            // return, but before we actually do return. Also, if would
-            // offer no additional guarantees to the application.
-            return; // Out of work
-        }
-
-        // Blocking wait for I/O
-        bool interrupted = false;
-        if (wait_and_process_io(now, interrupted)) // Throws
-            goto on_operations_completed;
-        if (interrupted)
-            goto on_handlers_executed_or_interrupted;
-        goto on_time_progressed;
-    }
+    void run_until_stopped()
+    {
+        run_impl(false);
     }
 
     void stop() noexcept
     {
         {
-            LockGuard lock{m_mutex};
+            std::lock_guard lock{m_mutex};
             if (m_stopped)
                 return;
             m_stopped = true;
@@ -1453,7 +1398,7 @@ public:
 
     void reset() noexcept
     {
-        LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_stopped = false;
     }
 
@@ -1462,7 +1407,7 @@ public:
     void add_resolve_oper(LendersResolveOperPtr op)
     {
         {
-            LockGuard lock{m_mutex};
+            std::lock_guard lock{m_mutex};
             m_resolve_operations.push_back(std::move(op)); // Throws
             m_resolver_cond.notify_all();
         }
@@ -1483,7 +1428,7 @@ public:
     void post(PostOperConstr constr, std::size_t size, void* cookie)
     {
         {
-            LockGuard lock{m_mutex};
+            std::lock_guard lock{m_mutex};
             std::unique_ptr<char[]> mem;
             if (m_post_oper && m_post_oper->m_size >= size) {
                 // Reuse old memory
@@ -1513,7 +1458,7 @@ public:
 
         // Keep the larger memory chunk (`op_2` or m_post_oper)
         {
-            LockGuard lock{m_mutex};
+            std::lock_guard lock{m_mutex};
             if (!m_post_oper || m_post_oper->m_size < size)
                 swap(op_2, m_post_oper);
         }
@@ -1522,7 +1467,7 @@ public:
     void trigger_exec(TriggerExecOperBase& op) noexcept
     {
         {
-            LockGuard lock{m_mutex};
+            std::lock_guard lock{m_mutex};
             if (op.m_in_use)
                 return;
             op.m_in_use = true;
@@ -1535,7 +1480,7 @@ public:
 
     void reset_trigger_exec(TriggerExecOperBase& op) noexcept
     {
-        LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         op.m_in_use = false;
     }
 
@@ -1551,7 +1496,7 @@ public:
 
     void cancel_resolve_oper(ResolveOperBase& op) noexcept
     {
-        LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         op.cancel();
     }
 
@@ -1588,14 +1533,14 @@ private:
     using WaitQueue = util::PriorityQueue<LendersWaitOperPtr, std::vector<LendersWaitOperPtr>, WaitOperCompare>;
     WaitQueue m_wait_operations;
 
-    Mutex m_mutex;
+    std::mutex m_mutex;
     OwnersOperPtr m_post_oper;                       // Protected by `m_mutex`
     OperQueue<ResolveOperBase> m_resolve_operations; // Protected by `m_mutex`
     OperQueue<AsyncOper> m_completed_operations_2;   // Protected by `m_mutex`
     bool m_stopped = false;                          // Protected by `m_mutex`
     bool m_stop_resolver_thread = false;             // Protected by `m_mutex`
     bool m_resolve_in_progress = false;              // Protected by `m_mutex`
-    CondVar m_resolver_cond;                         // Protected by `m_mutex`
+    std::condition_variable m_resolver_cond;         // Protected by `m_mutex`
 
     std::thread m_resolver_thread;
 
@@ -1605,7 +1550,71 @@ private:
     clock::time_point m_handler_exec_start_time;
     clock::duration m_handler_exec_time = clock::duration::zero();
 #endif
+    void run_impl(bool return_when_idle)
+    {
+        bool no_incomplete_resolve_operations;
 
+    on_handlers_executed_or_interrupted : {
+        std::lock_guard lock{m_mutex};
+        if (m_stopped)
+            return;
+        // Note: Order of post operations must be preserved.
+        m_completed_operations.push_back(m_completed_operations_2);
+        no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
+
+        if (m_completed_operations.empty())
+            goto on_time_progressed;
+    }
+
+    on_operations_completed : {
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_start_time = clock::now();
+#endif
+        while (LendersOperPtr op = m_completed_operations.pop_front())
+            execute(op); // Throws
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_time += clock::now() - m_handler_exec_start_time;
+#endif
+        goto on_handlers_executed_or_interrupted;
+    }
+
+    on_time_progressed : {
+        clock::time_point now = clock::now();
+        if (process_timers(now))
+            goto on_operations_completed;
+
+        bool no_incomplete_operations =
+            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
+        if (no_incomplete_operations && return_when_idle) {
+            // We can only get to this point when there are no completion
+            // handlers ready to execute. It happens either because of a
+            // fall-through from on_operations_completed, or because of a
+            // jump to on_time_progressed, but that only happens if no
+            // completions handlers became ready during
+            // wait_and_process_io().
+            //
+            // We can also only get to this point when there are no
+            // asynchronous operations in progress (due to the preceeding
+            // if-condition.
+            //
+            // It is possible that an other thread has added new post
+            // operations since we checked, but there is really no point in
+            // rechecking that, as it is always possible, even after a
+            // recheck, that new post handlers get added after we decide to
+            // return, but before we actually do return. Also, if would
+            // offer no additional guarantees to the application.
+            return; // Out of work
+        }
+
+        // Blocking wait for I/O
+        bool interrupted = false;
+        if (wait_and_process_io(now, interrupted)) // Throws
+            goto on_operations_completed;
+        if (interrupted)
+            goto on_handlers_executed_or_interrupted;
+        goto on_time_progressed;
+    }
+    }
     bool process_timers(clock::time_point now)
     {
         bool any_operations_completed = false;
@@ -1642,7 +1651,7 @@ private:
         LendersResolveOperPtr op;
         for (;;) {
             {
-                LockGuard lock{m_mutex};
+                std::unique_lock lock{m_mutex};
                 if (op) {
                     m_completed_operations_2.push_back(std::move(op));
                     io_reactor.interrupt();
@@ -1759,6 +1768,12 @@ Service::~Service() noexcept {}
 void Service::run()
 {
     m_impl->run(); // Throws
+}
+
+
+void Service::run_until_stopped()
+{
+    m_impl->run_until_stopped();
 }
 
 

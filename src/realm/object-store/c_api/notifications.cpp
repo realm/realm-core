@@ -43,10 +43,30 @@ struct CollectionNotificationsCallback {
     }
 };
 
-KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
+struct DictionaryNotificationsCallback {
+    UserdataPtr m_userdata;
+    realm_on_dictionary_change_func_t m_on_change = nullptr;
+
+    DictionaryNotificationsCallback() = default;
+    DictionaryNotificationsCallback(DictionaryNotificationsCallback&& other)
+        : m_userdata(std::exchange(other.m_userdata, nullptr))
+        , m_on_change(std::exchange(other.m_on_change, nullptr))
+    {
+    }
+
+    void operator()(const DictionaryChangeSet& changes)
+    {
+        if (m_on_change) {
+            realm_dictionary_changes_t c{changes};
+            m_on_change(m_userdata.get(), &c);
+        }
+    }
+};
+
+std::optional<KeyPathArray> build_key_path_array(realm_key_path_array_t* key_path_array)
 {
-    KeyPathArray ret;
     if (key_path_array) {
+        KeyPathArray ret;
         for (size_t i = 0; i < key_path_array->nb_elements; i++) {
             realm_key_path_t* key_path = key_path_array->paths + i;
             ret.emplace_back();
@@ -56,8 +76,9 @@ KeyPathArray build_key_path_array(realm_key_path_array_t* key_path_array)
                 kp.emplace_back(TableKey(path_elem->object), ColKey(path_elem->property));
             }
         }
+        return ret;
     }
-    return ret;
+    return std::nullopt;
 }
 
 } // namespace
@@ -136,13 +157,13 @@ RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_se
 RLM_API realm_notification_token_t*
 realm_dictionary_add_notification_callback(realm_dictionary_t* dict, realm_userdata_t userdata,
                                            realm_free_userdata_func_t free, realm_key_path_array_t* key_path_array,
-                                           realm_on_collection_change_func_t on_change)
+                                           realm_on_dictionary_change_func_t on_change)
 {
     return wrap_err([&]() {
-        CollectionNotificationsCallback cb;
+        DictionaryNotificationsCallback cb;
         cb.m_userdata = UserdataPtr{userdata, free};
         cb.m_on_change = on_change;
-        auto token = dict->add_notification_callback(std::move(cb), build_key_path_array(key_path_array));
+        auto token = dict->add_key_based_notification_callback(std::move(cb), build_key_path_array(key_path_array));
         return new realm_notification_token_t{std::move(token)};
     });
 }
@@ -180,7 +201,8 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
 
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t* changes,
                                                       size_t* out_num_deletions, size_t* out_num_insertions,
-                                                      size_t* out_num_modifications, size_t* out_num_moves)
+                                                      size_t* out_num_modifications, size_t* out_num_moves,
+                                                      bool* out_collection_was_cleared)
 {
     // FIXME: This has O(n) performance, which seems ridiculous.
 
@@ -192,6 +214,8 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
         *out_num_modifications = changes->modifications.count();
     if (out_num_moves)
         *out_num_moves = changes->moves.size();
+    if (out_collection_was_cleared)
+        *out_collection_was_cleared = changes->collection_was_cleared;
 }
 
 static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)
@@ -232,6 +256,40 @@ RLM_API void realm_collection_changes_get_ranges(
             ++i;
         }
     }
+}
+
+RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
+                                          size_t* out_insertion_size, size_t* out_modification_size)
+{
+    if (out_deletions_size)
+        *out_deletions_size = changes->deletions.size();
+    if (out_insertion_size)
+        *out_insertion_size = changes->insertions.size();
+    if (out_modification_size)
+        *out_modification_size = changes->modifications.size();
+}
+
+RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes,
+                                               realm_value_t* deletion_keys, size_t* deletions_size,
+                                               realm_value_t* insertion_keys, size_t* insertions_size,
+                                               realm_value_t* modification_keys, size_t* modifications_size)
+{
+    auto fill = [](const auto& collection, realm_value_t* out, size_t* n) {
+        if (!out || !n)
+            return;
+        if (collection.size() == 0 || *n < collection.size()) {
+            *n = 0;
+            return;
+        }
+        size_t i = 0;
+        for (auto val : collection)
+            out[i++] = to_capi(val);
+        *n = i;
+    };
+
+    fill(changes->deletions, deletion_keys, deletions_size);
+    fill(changes->insertions, insertion_keys, insertions_size);
+    fill(changes->modifications, modification_keys, modifications_size);
 }
 
 static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, size_t max)

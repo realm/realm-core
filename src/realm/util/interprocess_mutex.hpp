@@ -242,7 +242,8 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     std::lock_guard<Mutex> guard(*s_mutex);
 
     // Try to get the file uid if the file exists
-    if (File::get_unique_id(m_filename, m_fileuid)) {
+    if (auto uid = File::get_unique_id(m_filename)) {
+        m_fileuid = std::move(*uid);
         auto result = s_info_map->find(m_fileuid);
         if (result != s_info_map->end()) {
             // File exists and the lock info has been created in the map.
@@ -326,7 +327,7 @@ inline void InterprocessMutex::lock()
 {
 #if REALM_ROBUST_MUTEX_EMULATION
     std::unique_lock mutex_lock(m_lock_info->m_local_mutex);
-    m_lock_info->m_file.lock_exclusive();
+    m_lock_info->m_file.lock();
     mutex_lock.release();
 #else
 
@@ -347,7 +348,7 @@ inline bool InterprocessMutex::try_lock()
     if (!mutex_lock.owns_lock()) {
         return false;
     }
-    bool success = m_lock_info->m_file.try_lock_exclusive();
+    bool success = m_lock_info->m_file.try_lock();
     if (success) {
         mutex_lock.release();
         return true;

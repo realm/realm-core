@@ -82,12 +82,18 @@ public:
     virtual void update_metadata(std::vector<std::pair<std::string, std::string>> new_metadata) = 0;
 
     // Begin an audit scope. The given `name` is stored in the activity field
-    // of each generated event.
-    virtual void begin_scope(std::string_view name) = 0;
-    // End the current scope and asynchronously save it to disk. The optional
-    // completion function is called once it has been committed (or an error
-    // ocurred while trying to do so).
-    virtual void end_scope(util::UniqueFunction<void(std::exception_ptr)>&& completion = nullptr) = 0;
+    // of each generated event. Returns an id which must be used to either
+    // commit or cancel the scope.
+    virtual uint64_t begin_scope(std::string_view name) = 0;
+    // End the scope with the given id and asynchronously save it to disk. The
+    // optional completion function is called once it has been committed (or an
+    // error ocurred while trying to do so).
+    virtual void end_scope(uint64_t, util::UniqueFunction<void(std::exception_ptr)>&& completion = nullptr) = 0;
+    // Cancel the scope with the given id, discarding all events generated.
+    virtual void cancel_scope(uint64_t) = 0;
+    // Check if the scope with the given id is currently active and can be
+    // committed or cancelled.
+    virtual bool is_scope_valid(uint64_t) = 0;
     // Record a custom audit event. Does not use the scope (and does not need to be inside a scope).
     virtual void record_event(std::string_view activity, util::Optional<std::string> event_type,
                               util::Optional<std::string> data,
