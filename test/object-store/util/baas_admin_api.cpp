@@ -967,6 +967,11 @@ AppSession create_app(const AppCreateConfig& config)
                {{"required", true}, {"name", "my_metadata.name"}, {"field_name", "anotherName"}}}}});
     }
 
+    // Since we're running against a local testing server, we don't need to exponentially backoff our retry
+    // timeouts, we can just retry once/second until it succeeds.
+    auto private_settings = session.apps(AdminAPISession::APIFamily::Private)[app_id]["settings"];
+    private_settings.patch_json({{"sync", {{"disable_client_error_backoff", true}}}});
+
     auto services = app["services"];
     static const std::string mongo_service_name = "BackingDB";
 
