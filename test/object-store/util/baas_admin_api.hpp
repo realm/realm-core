@@ -49,8 +49,9 @@ public:
 
 protected:
     friend class AdminAPISession;
-    AdminAPIEndpoint(std::string url, std::string access_token)
-        : m_url(std::move(url))
+    AdminAPIEndpoint(util::Logger& logger, std::string url, std::string access_token)
+        : m_logger(logger)
+        , m_url(std::move(url))
         , m_access_token(std::move(access_token))
     {
     }
@@ -58,14 +59,15 @@ protected:
     app::Response do_request(app::Request request) const;
 
 private:
+    util::Logger& m_logger;
     std::string m_url;
     std::string m_access_token;
 };
 
 class AdminAPISession {
 public:
-    static AdminAPISession login(const std::string& base_url, const std::string& username,
-                                 const std::string& password);
+    static AdminAPISession login(std::shared_ptr<util::Logger> logger, const std::string& base_url,
+                                 const std::string& username, const std::string& password);
 
     enum class APIFamily { Admin, Private };
     AdminAPIEndpoint apps(APIFamily family = APIFamily::Admin) const;
@@ -125,8 +127,10 @@ public:
     }
 
 private:
-    AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
-        : m_base_url(std::move(base_url))
+    AdminAPISession(std::shared_ptr<util::Logger> logger, std::string base_url, std::string access_token,
+                    std::string group_id)
+        : m_logger(std::move(logger))
+        , m_base_url(std::move(base_url))
         , m_access_token(std::move(access_token))
         , m_group_id(std::move(group_id))
     {
@@ -134,6 +138,7 @@ private:
 
     AdminAPIEndpoint service_config_endpoint(const std::string& app_id, const std::string& service_id) const;
 
+    std::shared_ptr<util::Logger> m_logger;
     std::string m_base_url;
     std::string m_access_token;
     std::string m_group_id;
@@ -190,6 +195,8 @@ struct AppCreateConfig {
     bool enable_api_key_auth = false;
     bool enable_anonymous_auth = false;
     bool enable_custom_token_auth = false;
+
+    std::shared_ptr<util::Logger> logger;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);

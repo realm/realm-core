@@ -273,6 +273,16 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
     return nitems * size;
 }
 
+auto make_logger()
+{
+#if TEST_ENABLE_SYNC_LOGGING
+    return std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+#else
+    // Logging is disabled, use a NullLogger to prevent printing anything
+    return std::make_shared<util::NullLogger>();
+#endif
+}
+
 } // namespace
 
 app::Response do_http_request(const app::Request& request)
@@ -348,11 +358,13 @@ app::Response do_http_request(const app::Request& request)
 
 AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 {
-    return AdminAPIEndpoint(util::format("%1/%2", m_url, name), m_access_token);
+    return AdminAPIEndpoint(m_logger, util::format("%1/%2", m_url, name), m_access_token);
 }
 
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
+    m_logger.debug("%1'ing to \"%2\" with body '%3'", app::httpmethod_to_string(request.method), request.url,
+                   request.body);
     if (request.url.find('?') == std::string::npos) {
         request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
     }
@@ -456,8 +468,8 @@ nlohmann::json AdminAPIEndpoint::patch_json(nlohmann::json body) const
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
-AdminAPISession AdminAPISession::login(const std::string& base_url, const std::string& username,
-                                       const std::string& password)
+AdminAPISession AdminAPISession::login(std::shared_ptr<util::Logger> logger, const std::string& base_url,
+                                       const std::string& username, const std::string& password)
 {
     nlohmann::json login_req_body{
         {"provider", "userpass"},
@@ -480,12 +492,12 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
 
     std::string access_token = login_resp_body["access_token"];
 
-    AdminAPIEndpoint user_profile(util::format("%1/api/admin/v3.0/auth/profile", base_url), access_token);
+    AdminAPIEndpoint user_profile(*logger, util::format("%1/api/admin/v3.0/auth/profile", base_url), access_token);
     auto profile_resp = user_profile.get_json();
 
     std::string group_id = profile_resp["roles"][0]["group_id"];
 
-    return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
+    return AdminAPISession(logger, std::move(base_url), std::move(access_token), std::move(group_id));
 }
 
 void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string& app_id) const
@@ -617,6 +629,7 @@ AdminAPIEndpoint AdminAPISession::service_config_endpoint(const std::string& app
 AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& app_id, const std::string& service_id,
                                                              AdminAPISession::ServiceConfig sync_config) const
 {
+    m_logger->info("Disabling sync on baas");
     auto endpoint = service_config_endpoint(app_id, service_id);
     if (sync_config.state != "") {
         sync_config.state = "";
@@ -628,6 +641,7 @@ AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& 
 AdminAPISession::ServiceConfig AdminAPISession::pause_sync(const std::string& app_id, const std::string& service_id,
                                                            AdminAPISession::ServiceConfig sync_config) const
 {
+    m_logger->info("Pausing sync on baas");
     auto endpoint = service_config_endpoint(app_id, service_id);
     if (sync_config.state != "disabled") {
         sync_config.state = "disabled";
@@ -639,6 +653,7 @@ AdminAPISession::ServiceConfig AdminAPISession::pause_sync(const std::string& ap
 AdminAPISession::ServiceConfig AdminAPISession::enable_sync(const std::string& app_id, const std::string& service_id,
                                                             AdminAPISession::ServiceConfig sync_config) const
 {
+    m_logger->info("Enabling sync on baas");
     auto endpoint = service_config_endpoint(app_id, service_id);
     sync_config.state = "enabled";
     endpoint.patch_json({{sync_config.sync_service_name(), convert_config(sync_config)}});
@@ -726,10 +741,11 @@ AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
 {
     switch (family) {
         case APIFamily::Admin:
-            return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id),
-                                    m_access_token);
+            return AdminAPIEndpoint(
+                *m_logger, util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
         case APIFamily::Private:
-            return AdminAPIEndpoint(util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
+            return AdminAPIEndpoint(*m_logger,
+                                    util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
                                     m_access_token);
     }
     REALM_UNREACHABLE();
@@ -879,11 +895,13 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
 
 AppSession create_app(const AppCreateConfig& config)
 {
-    auto session = AdminAPISession::login(config.base_url, config.admin_username, config.admin_password);
+    auto logger = config.logger ? config.logger : make_logger();
+    auto session = AdminAPISession::login(logger, config.base_url, config.admin_username, config.admin_password);
     auto create_app_resp = session.apps().post_json(nlohmann::json{{"name", config.app_name}});
     std::string app_id = create_app_resp["_id"];
     std::string client_app_id = create_app_resp["client_app_id"];
 
+    logger->info("Creating app %1", config.app_name);
     auto app = session.apps()[app_id];
 
     auto functions = app["functions"];
