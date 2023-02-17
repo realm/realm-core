@@ -205,9 +205,14 @@ nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& schema_name
         {"collection", schema_name},
         {"roles", nlohmann::json::array({{{"name", "default"},
                                           {"apply_when", nlohmann::json::object()},
+                                          {"document_filters", {
+                                              {"read", true},
+                                              {"write", true},
+                                          }}
+                                          {"read", true},
+                                          {"write", true},
                                           {"insert", true},
-                                          {"delete", true},
-                                          {"additional_fields", nlohmann::json::object()}}})},
+                                          {"delete", true}}})},
     };
 }
 
@@ -1079,14 +1084,16 @@ AppSession create_app(const AppCreateConfig& config)
     rules.post_json({
         {"database", config.mongo_dbname},
         {"collection", "UserData"},
-        {"roles",
-         {{
-             {"name", "default"},
-             {"apply_when", nlohmann::json::object()},
-             {"insert", true},
-             {"delete", true},
-             {"additional_fields", nlohmann::json::object()},
-         }}},
+        {"roles", {{{"name", "default"},
+                    {"apply_when", nlohmann::json::object()},
+                    {"document_filters", {
+                        {"read", true},
+                        {"write", true},
+                    }}
+                    {"read", true},
+                    {"write", true},
+                    {"insert", true},
+                    {"delete", true}}}},
     });
 
     app["custom_user_data"].patch_json({
