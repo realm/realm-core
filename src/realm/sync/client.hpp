@@ -202,6 +202,11 @@ public:
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
 
+        /// The user id of the logged in user for this sync session. This will be used
+        /// along with the server_address/server_port/protocol_envelope to determine
+        /// which connection to the server this session will use.
+        std::string user_id;
+
         /// The protocol used for communicating with the server. See
         /// ProtocolEnvelope.
         ProtocolEnvelope protocol_envelope = ProtocolEnvelope::realm;
@@ -553,23 +558,7 @@ public:
     ///
     /// The two other forms of bind() are convenience functions.
     void bind();
-    /// \brief parses parameters and replaces the parameters in the Session::Config object
-    /// before the session is bound.
-    /// \param server_url For example "realm://sync.realm.io/test". See
-    /// server_address, server_path, and server_port in Session::Config for
-    /// information about the individual components of the URL. See
-    /// ProtocolEnvelope for the list of available URL schemes and the
-    /// associated default ports.
-    ///
-    /// \throw BadServerUrl if the specified server URL is malformed.
-    void bind(std::string server_url, std::string signed_user_token);
-    /// void bind(std::string server_address, std::string server_path,
-    ///           std::string signed_user_token, port_type server_port = 0,
-    ///           ProtocolEnvelope protocol = ProtocolEnvelope::realm);
-    /// replaces the corresponding parameters from the Session::Config object
-    /// before the session is bound.
-    void bind(std::string server_address, std::string server_path, std::string signed_user_token,
-              port_type server_port = 0, ProtocolEnvelope protocol = ProtocolEnvelope::realm);
+
     /// @}
 
     /// \brief Refresh the access token associated with this session.
@@ -738,6 +727,12 @@ public:
     void on_new_flx_sync_subscription(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string command_body);
+
+    /// Returns the app services connection id if the session is connected, otherwise
+    /// returns an empty string. This function blocks until the value is set from
+    /// the event loop thread. If an error occurs, this will throw an ExceptionForStatus
+    /// with the error.
+    std::string get_appservices_connection_id();
 
 private:
     SessionWrapper* m_impl = nullptr;

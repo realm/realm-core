@@ -35,7 +35,32 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type>;
+
+struct ServerEndpoint {
+    ProtocolEnvelope envelope;
+    std::string address;
+    network::Endpoint::port_type port;
+    std::string user_id;
+    SyncServerMode server_mode = SyncServerMode::PBS;
+
+private:
+    auto to_tuple() const
+    {
+        return std::make_tuple(server_mode, envelope, std::ref(address), port, std::ref(user_id));
+    }
+
+public:
+    friend inline bool operator==(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() == rhs.to_tuple();
+    }
+
+
+    friend inline bool operator<(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() < rhs.to_tuple();
+    }
+};
 
 class SessionWrapper;
 
@@ -269,8 +294,7 @@ private:
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, SyncServerMode,
-                                           bool& was_created);
+                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
@@ -415,10 +439,12 @@ public:
 
     void resume_active_sessions();
 
+    std::string get_active_appservices_connection_id();
+
     Connection(ClientImpl&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
                const std::map<std::string, std::string>& custom_http_headers, bool verify_servers_ssl_certificate,
                util::Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
-               util::Optional<ProxyConfig>, ReconnectInfo, SyncServerMode);
+               util::Optional<ProxyConfig>, ReconnectInfo);
 
     ~Connection();
 
@@ -517,9 +543,6 @@ private:
     ClientImpl& m_client;
     util::bind_ptr<LifecycleSentinel> m_websocket_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
-    const ProtocolEnvelope m_protocol_envelope;
-    const std::string m_address;
-    const port_type m_port;
 
     /// DEPRECATED - These will be removed in a future release
     const bool m_verify_servers_ssl_certificate;
@@ -529,8 +552,6 @@ private:
 
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
-    SyncServerMode m_sync_mode = SyncServerMode::PBS;
-    bool m_is_flx_sync_connection = false;
 
     ConnectionState m_state = ConnectionState::disconnected;
 
@@ -1197,7 +1218,7 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {
-    return m_sync_mode;
+    return m_server_endpoint.server_mode;
 }
 
 inline auto ClientImpl::Connection::get_reconnect_info() const noexcept -> ReconnectInfo

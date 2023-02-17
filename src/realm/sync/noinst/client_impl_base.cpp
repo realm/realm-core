@@ -841,11 +841,11 @@ void Connection::initiate_reconnect()
     m_websocket =
         m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverShim>(this),
                                             WebSocketEndpoint{
-                                                m_address,
-                                                m_port,
+                                                m_server_endpoint.address,
+                                                m_server_endpoint.port,
                                                 get_http_request_path(),
                                                 std::move(sec_websocket_protocol),
-                                                is_ssl(m_protocol_envelope),
+                                                is_ssl(m_server_endpoint.envelope),
                                                 /// DEPRECATED - The following will be removed in a future release
                                                 {m_custom_http_headers.begin(), m_custom_http_headers.end()},
                                                 m_verify_servers_ssl_certificate,
@@ -1299,7 +1299,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
 
 bool Connection::is_flx_sync_connection() const noexcept
 {
-    return m_sync_mode != SyncServerMode::PBS;
+    return m_server_endpoint.server_mode != SyncServerMode::PBS;
 }
 
 void Connection::receive_pong(milliseconds_type timestamp)
@@ -1546,6 +1546,15 @@ void Connection::enlist_to_send(Session* sess)
         send_next_message(); // Throws
 }
 
+
+std::string Connection::get_active_appservices_connection_id()
+{
+    if (!m_websocket) {
+        return {};
+    }
+
+    return std::string{m_websocket->get_appservices_request_id()};
+}
 
 void Session::cancel_resumption_delay()
 {
