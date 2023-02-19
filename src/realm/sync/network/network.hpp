@@ -2360,6 +2360,7 @@ public:
             Want want = Want::nothing;
             std::size_t n = s.m_stream->do_read_some_async(buffer, size, s.m_error_code, want);
             REALM_ASSERT(n > 0 || s.m_error_code || want != Want::nothing); // No busy loop, please
+            // Any errors reported by do_read_some_async() should always return 0
             bool got_nothing = (n == 0);
             if (got_nothing) {
                 if (REALM_UNLIKELY(s.m_error_code)) {
@@ -3580,6 +3581,7 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     std::size_t size = s_size;
     static_assert(noexcept(stream.do_read_some_async(buffer, size, ec, want)), "");
     std::size_t n = stream.do_read_some_async(buffer, size, ec, want);
+    // Any errors reported by do_read_some_async() should always return 0
     if (n == 0)
         return false;
     REALM_ASSERT(!ec);
