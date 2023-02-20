@@ -107,6 +107,7 @@
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 * Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
 * Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
+* Adds upport for in-memory Realms. If a Realm is opened without a path it will be in memory only.
 
 ### Fixed
 * "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)
