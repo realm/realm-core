@@ -1372,7 +1372,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     if (result == errSSLClosedGraceful) {
         ec = util::MiscExtErrors::end_of_input;
         want = Want::nothing;
-        return 0;
+        return n;
     }
 
     if (result == errSSLClosedAbort || result == errSSLClosedNoNotify) {

@@ -2530,8 +2530,8 @@ public:
             }
             // Transfer buffered data to callers buffer
             bool complete = s.m_read_ahead_buffer.read(s.m_curr, s.m_end, s.m_delim, s.m_error_code);
-            if (complete) {
-                s.set_is_complete(true); // Success or failure (delim_not_found)
+            if (complete || s.m_error_code == util::MiscExtErrors::end_of_input) {
+                s.set_is_complete(true); // Success or failure (delim_not_found or end_of_input)
                 return Want::nothing;
             }
             if (want != Want::nothing)
@@ -3584,7 +3584,7 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     // Any errors reported by do_read_some_async() should always return 0
     if (n == 0)
         return false;
-    REALM_ASSERT(!ec);
+    REALM_ASSERT(!ec || ec == util::MiscExtErrors::end_of_input);
     REALM_ASSERT(n <= size);
     m_begin = m_buffer.get();
     m_end = m_begin + n;
