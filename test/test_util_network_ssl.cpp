@@ -787,7 +787,7 @@ TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
             write_completed = true;
         };
         ssl_stream_1.async_write(message, std::strlen(message), std::move(write_handler));
-        while (!shutdown_completed)
+        while (!write_completed)
             service_1.run();
     });
     ssl_stream_2.async_read(buffer, 50, rab, std::move(read_handler));
@@ -800,9 +800,7 @@ TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
         shutdown_completed = true;
     };
     ssl_stream_1.async_shutdown(std::move(shutdown_handler));
-    while (!shutdown_completed) {
-        service_2.run();
-    }
+    service_1.run();
 
     // Thread is done after shutdown_completed is true
     if (write_thread.joinable()) {
