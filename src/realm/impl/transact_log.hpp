@@ -75,6 +75,10 @@ enum Instruction {
     // the number of backlink columns to change. This can happen
     // when a TypedLink is created for the first time to a Table.
     instr_TypedLinkChange = 43,
+
+    // dictionary clear should be moved up with the other instructions once we
+    // release the next file format breaking change
+    instr_DictionaryClear = 44,
 };
 
 class TransactLogStream {
@@ -184,6 +188,10 @@ public:
     {
         return true;
     }
+    bool dictionary_clear(size_t)
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
     bool insert_column(ColKey)
@@ -289,6 +297,7 @@ public:
     bool dictionary_insert(size_t dict_ndx, Mixed key);
     bool dictionary_set(size_t dict_ndx, Mixed key);
     bool dictionary_erase(size_t dict_ndx, Mixed key);
+    bool dictionary_clear(size_t dict_size);
 
     bool typed_link_change(ColKey col, TableKey dest);
 
@@ -872,6 +881,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_DictionaryClear: {
+            size_t dict_size = read_int<size_t>(); // Throws
+            if (!handler.dictionary_clear(dict_size))
+                parser_error();
+            return;
+        }
         case instr_SetInsert: {
             size_t set_ndx = read_int<size_t>(); // Throws
             if (!handler.set_insert(set_ndx))    // Throws
@@ -1130,6 +1145,16 @@ public:
     bool dictionary_erase(size_t dict_ndx, Mixed key)
     {
         m_encoder.dictionary_insert(dict_ndx, key);
+        return true;
+    }
+
+    bool dictionary_clear(size_t old_dict_size)
+    {
+        // https://github.com/realm/realm-core/pull/6254#discussion_r1106256256
+        if (old_dict_size > 0) {
+            m_encoder.dictionary_insert(0, Mixed{"key"});
+            append_instruction();
+        }
         return true;
     }
 

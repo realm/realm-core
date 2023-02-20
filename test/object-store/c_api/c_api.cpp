@@ -4252,6 +4252,7 @@ TEST_CASE("C API", "[c_api]") {
                 auto str2 = rlm_str_val("b");
                 auto null = rlm_null();
 
+
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
                         strings.get(), &state, nullptr, nullptr, on_dictionary_change));
@@ -4291,16 +4292,26 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 0);
                     realm_value_t *deletions = nullptr, *insertions = nullptr, *modifications = nullptr;
+                    bool collection_cleared = false;
                     deletions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_deletions);
                     insertions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_insertions);
                     realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
-                                                      insertions, &num_insertions, modifications, &num_modifications);
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
                     CHECK(deletions != nullptr);
                     CHECK(insertions != nullptr);
                     CHECK(modifications == nullptr);
                     realm_free(deletions);
                     realm_free(insertions);
                     realm_free(modifications);
+
+                    write([&]() {
+                        checked(realm_dictionary_clear(strings.get()));
+                    });
+                    realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
 

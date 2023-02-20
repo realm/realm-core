@@ -1963,6 +1963,10 @@ public:
     {
         return false;
     }
+    bool dictionary_clear(size_t)
+    {
+        return false;
+    }
     bool set_insert(size_t)
     {
         return false;

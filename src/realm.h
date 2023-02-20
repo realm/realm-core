@@ -1995,11 +1995,12 @@ RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* chan
  * @param insertions_size size of the list of inserted keys
  * @param modifications list of modified keys
  * @param modification_size size of the list of modified keys
+ * @param collection_was_cleared whether or not the collection was cleared
  */
 RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes, realm_value_t* deletions,
                                                size_t* deletions_size, realm_value_t* insertions,
                                                size_t* insertions_size, realm_value_t* modifications,
-                                               size_t* modification_size);
+                                               size_t* modification_size, bool* collection_was_cleared);
 
 /**
  * Get a set instance for the property of an object.

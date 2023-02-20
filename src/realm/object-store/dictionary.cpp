@@ -138,6 +138,7 @@ DictionaryChangeSet::DictionaryChangeSet(const DictionaryChangeSet& other)
     }
 
     collection_root_was_deleted = other.collection_root_was_deleted;
+    collection_was_cleared = other.collection_was_cleared;
 }
 
 DictionaryChangeSet& DictionaryChangeSet::operator=(const DictionaryChangeSet& other)
@@ -160,7 +161,7 @@ DictionaryChangeSet& DictionaryChangeSet::operator=(const DictionaryChangeSet& o
     }
 
     collection_root_was_deleted = other.collection_root_was_deleted;
-
+    collection_was_cleared = other.collection_was_cleared;
     return *this;
 }
 
@@ -324,6 +325,7 @@ public:
             auto current_tr = static_cast<Transaction*>(m_dict.get_table()->get_parent_group());
             m_prev_rt->advance_read(current_tr->get_version_of_current_transaction());
         }
+        changes.collection_was_cleared = c.collection_was_cleared;
 
         m_cb(std::move(changes));
     }

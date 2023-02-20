@@ -656,6 +656,10 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
 
         SECTION("clear list") {
+            DictionaryChangeSet key_change;
+            auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
+                key_change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -665,6 +669,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(change.deletions.count() == values.size());
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
+            REQUIRE(key_change.collection_was_cleared);
         }
 
         SECTION("delete containing row") {

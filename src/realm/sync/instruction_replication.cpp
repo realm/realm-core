@@ -674,6 +674,17 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, M
     }
 }
 
+void SyncReplication::dictionary_clear(const CollectionBase& dict)
+{
+    Replication::dictionary_clear(dict);
+
+    if (select_collection(dict)) {
+        Instruction::Clear instr;
+        populate_path_instr(instr, dict);
+        emit(instr);
+    }
+}
+
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {
     Replication::nullify_link(table, col_ndx, ndx);

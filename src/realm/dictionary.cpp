@@ -718,19 +718,16 @@ void Dictionary::remove_backlinks(CascadeState& state) const
 void Dictionary::clear()
 {
     if (size() > 0) {
-        // TODO: Should we have a "dictionary_clear" instruction?
         Replication* repl = m_obj.get_replication();
         bool recurse = false;
         CascadeState cascade_state(CascadeState::Mode::Strong);
+        if (repl) {
+            repl->dictionary_clear(*this);
+        }
         for (auto&& elem : *this) {
             if (clear_backlink(elem.second, cascade_state))
                 recurse = true;
-            if (repl) {
-                // Logically we always erase the first element
-                repl->dictionary_erase(*this, 0, elem.first);
-            }
         }
-
         // Just destroy the whole cluster
         m_dictionary_top->destroy_deep();
         m_dictionary_top.reset();

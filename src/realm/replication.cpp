@@ -114,3 +114,9 @@ void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed
     select_collection(dict);
     m_encoder.dictionary_erase(ndx, key);
 }
+
+void Replication::dictionary_clear(const CollectionBase& dict)
+{
+    select_collection(dict);
+    m_encoder.dictionary_clear(dict.size());
+}
