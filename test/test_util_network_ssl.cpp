@@ -699,11 +699,12 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
 
     bool shutdown_completed = false;
     bool read_completed = false;
-    auto && [r_promise, read_future] = util::make_promise_future<void>();
-    auto read_handler = [this, &read_completed, read_promise = std::move(r_promise)](std::error_code ec, std::size_t n) mutable {
+    auto&& [r_promise, read_future] = util::make_promise_future<void>();
+    auto read_handler = [this, &read_completed, read_promise = std::move(r_promise)](std::error_code ec,
+                                                                                     std::size_t n) mutable {
         test_context.logger->debug(">>>> TEST RESULTS: n: %1 - ec: %2", n, ec.message());
         REALM_ASSERT(util::MiscExtErrors::premature_end_of_input == ec);
-        read_promise.emplace_value(); 
+        read_promise.emplace_value();
         read_completed = true;
     };
 
@@ -730,7 +731,7 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
                 write_completed = true;
             };
             ssl_stream_1.async_write(message, std::strlen(message), std::move(write_handler));
-            while(!write_completed)
+            while (!write_completed)
                 service_1.run();
         }
         while (!shutdown_completed)

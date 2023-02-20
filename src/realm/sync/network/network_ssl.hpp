@@ -544,7 +544,7 @@ private:
 
     friend class Service::BasicStreamOps<Stream>;
     friend class network::ReadAheadBuffer;
-    friend struct MockSSLError;  // for access to Service::Want
+    friend struct MockSSLError; // for access to Service::Want
 };
 
 
@@ -1294,7 +1294,8 @@ struct Stream::MockSSLError {
     {
     }
 
-    explicit MockSSLError(Operation op, int ssl_error, int sys_error, int bytes_processed, bool clear_after_access = true)
+    explicit MockSSLError(Operation op, int ssl_error, int sys_error, int bytes_processed,
+                          bool clear_after_access = true)
         : operation{op}
         , ssl_error{ssl_error}
         , sys_error{sys_error}

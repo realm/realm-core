@@ -6,6 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix crash if secure transport returns an error with a non-zero length. ([](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
 * None.
 
 ### Breaking changes
