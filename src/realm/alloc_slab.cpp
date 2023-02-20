@@ -110,9 +110,12 @@ inline SlabAlloc::Slab::Slab(ref_type r, size_t s)
     : ref_end(r)
     , size(s)
 {
+    // Ensure that allocation is aligned to at least 8 bytes
+    static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 8);
+
     total_slab_allocated.fetch_add(s, std::memory_order_relaxed);
-    // force alignment to at least 8 bytes (required by allocator)
-    addr = reinterpret_cast<char*>(new uint64_t[(size + 7) / 8]);
+    addr = new char[size];
+    REALM_ASSERT((reinterpret_cast<size_t>(addr) & 0x7ULL) == 0);
 #if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(addr, addr + size, 0);
 #endif
