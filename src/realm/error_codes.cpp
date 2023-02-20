@@ -414,67 +414,6 @@ std::string_view ErrorCodes::error_string(Error code)
     return error_codes_map[code];
 }
 
-std::string ErrorCodes::error_string(WebSocketError code)
-{
-    /// WebSocket error codes
-    switch (code) {
-        case WebSocketOK:
-            return "WebSocket: OK";
-        case WebSocketGoingAway:
-            return "WebSocket: Going Away";
-        case WebSocketProtocolError:
-            return "WebSocket: Protocol Error";
-        case WebSocketUnsupportedData:
-            return "WebSocket: Unsupported Data";
-        case WebSocketReserved:
-            return "WebSocket: Reserved";
-        case WebSocketNoStatusReceived:
-            return "WebSocket: No Status Received";
-        case WebSocketAbnormalClosure:
-            return "WebSocket: Abnormal Closure";
-        case WebSocketInvalidPayloadData:
-            return "WebSocket: Invalid Payload Data";
-        case WebSocketPolicyViolation:
-            return "WebSocket: Policy Violation";
-        case WebSocketMessageTooBig:
-            return "WebSocket: Message Too Big";
-        case WebSocketInavalidExtension:
-            return "WebSocket: Invalid Extension";
-        case WebSocketInternalServerError:
-            return "WebSocket: Internal Server Error";
-        case WebSocketTLSHandshakeFailed:
-            return "WebSocket: TLS Handshake Failed";
-
-        /// WebSocket Errors - reported by server
-        case WebSocketUnauthorized:
-            return "WebSocket: Unauthorized";
-        case WebSocketForbidden:
-            return "WebSocket: Forbidden";
-        case WebSocketMovedPermanently:
-            return "WebSocket: Moved Permanently";
-        case WebSocketClient_Too_Old:
-            return "WebSocket: Client Too Old";
-        case WebSocketClient_Too_New:
-            return "WebSocket: Client Too New";
-        case WebSocketProtocol_Mismatch:
-            return "WebSocket: Protocol Mismatch";
-
-        case WebSocketResolveFailed:
-            return "WebSocket: Resolve Failed";
-        case WebSocketConnectionFailed:
-            return "WebSocket: Connection Failed";
-        case WebSocketReadError:
-            return "WebSocket: Read Error";
-        case WebSocketWriteError:
-            return "WebSocket: Write Error";
-        case WebSocketRetryError:
-            return "WebSocket: Retry Error";
-        case WebSocketFatalError:
-            return "WebSocket: Fatal Error";
-    }
-    return "";
-}
-
 ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
 {
     return error_codes_map[name];

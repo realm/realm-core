@@ -213,9 +213,41 @@ enum class Error {
     bad_message
 };
 
+enum WebSocketError : int32_t {
+    WebSocketOK = RLM_ERR_WEBSOCKET_OK,
+    WebSocketGoingAway = RLM_ERR_WEBSOCKET_GOINGAWAY,
+    WebSocketProtocolError = RLM_ERR_WEBSOCKET_PROTOCOLERROR,
+    WebSocketUnsupportedData = RLM_ERR_WEBSOCKET_UNSUPPORTEDDATA,
+    WebSocketReserved = RLM_ERR_WEBSOCKET_RESERVED,
+    WebSocketNoStatusReceived = RLM_ERR_WEBSOCKET_NOSTATUSRECEIVED,
+    WebSocketAbnormalClosure = RLM_ERR_WEBSOCKET_ABNORMALCLOSURE,
+    WebSocketInvalidPayloadData = RLM_ERR_WEBSOCKET_INVALIDPAYLOADDATA,
+    WebSocketPolicyViolation = RLM_ERR_WEBSOCKET_POLICYVIOLATION,
+    WebSocketMessageTooBig = RLM_ERR_WEBSOCKET_MESSAGETOOBIG,
+    WebSocketInavalidExtension = RLM_ERR_WEBSOCKET_INAVALIDEXTENSION,
+    WebSocketInternalServerError = RLM_ERR_WEBSOCKET_INTERNALSERVERERROR,
+    WebSocketTLSHandshakeFailed = RLM_ERR_WEBSOCKET_TLSHANDSHAKEFAILED, // Used by default WebSocket
+
+    // WebSocket Errors - reported by server
+    WebSocketUnauthorized = RLM_ERR_WEBSOCKET_UNAUTHORIZED,
+    WebSocketForbidden = RLM_ERR_WEBSOCKET_FORBIDDEN,
+    WebSocketMovedPermanently = RLM_ERR_WEBSOCKET_MOVEDPERMANENTLY,
+    WebSocketClient_Too_Old = RLM_ERR_WEBSOCKET_CLIENT_TOO_OLD,
+    WebSocketClient_Too_New = RLM_ERR_WEBSOCKET_CLIENT_TOO_NEW,
+    WebSocketProtocol_Mismatch = RLM_ERR_WEBSOCKET_PROTOCOL_MISMATCH,
+
+    WebSocketResolveFailed = RLM_ERR_WEBSOCKET_RESOLVE_FAILED,
+    WebSocketConnectionFailed = RLM_ERR_WEBSOCKET_CONNECTION_FAILED,
+    WebSocketReadError = RLM_ERR_WEBSOCKET_READ_ERROR,
+    WebSocketWriteError = RLM_ERR_WEBSOCKET_WRITE_ERROR,
+    WebSocketRetryError = RLM_ERR_WEBSOCKET_RETRY_ERROR,
+    WebSocketFatalError = RLM_ERR_WEBSOCKET_FATAL_ERROR,
+};
+
 const std::error_category& websocket_close_status_category() noexcept;
 
-std::error_code make_error_code(ErrorCodes::WebSocketError error) noexcept;
+std::error_code make_error_code(WebSocketError error) noexcept;
+std::string error_string(WebSocketError code) noexcept;
 
 const std::error_category& error_category() noexcept;
 

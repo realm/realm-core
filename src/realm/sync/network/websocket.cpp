@@ -1109,7 +1109,7 @@ class CloseStatusErrorCategory : public std::error_category {
     {
         // Converts an error_code to one of the pre-defined status codes in
         // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        return ErrorCodes::error_string(static_cast<ErrorCodes::WebSocketError>(error_code));
+        return error_string(static_cast<websocket::WebSocketError>(error_code));
     }
 };
 
@@ -1235,7 +1235,7 @@ const std::error_category& websocket::websocket_close_status_category() noexcept
     return category;
 }
 
-std::error_code websocket::make_error_code(ErrorCodes::WebSocketError error) noexcept
+std::error_code websocket::make_error_code(WebSocketError error) noexcept
 {
     return std::error_code{error, realm::sync::websocket::websocket_close_status_category()};
 }
@@ -1248,4 +1248,65 @@ const std::error_category& websocket::error_category() noexcept
 std::error_code websocket::make_error_code(Error error_code) noexcept
 {
     return std::error_code{int(error_code), g_error_category};
+}
+
+std::string websocket::error_string(WebSocketError code) noexcept
+{
+    /// WebSocket error codes
+    switch (code) {
+        case WebSocketOK:
+            return "WebSocket: OK";
+        case WebSocketGoingAway:
+            return "WebSocket: Going Away";
+        case WebSocketProtocolError:
+            return "WebSocket: Protocol Error";
+        case WebSocketUnsupportedData:
+            return "WebSocket: Unsupported Data";
+        case WebSocketReserved:
+            return "WebSocket: Reserved";
+        case WebSocketNoStatusReceived:
+            return "WebSocket: No Status Received";
+        case WebSocketAbnormalClosure:
+            return "WebSocket: Abnormal Closure";
+        case WebSocketInvalidPayloadData:
+            return "WebSocket: Invalid Payload Data";
+        case WebSocketPolicyViolation:
+            return "WebSocket: Policy Violation";
+        case WebSocketMessageTooBig:
+            return "WebSocket: Message Too Big";
+        case WebSocketInavalidExtension:
+            return "WebSocket: Invalid Extension";
+        case WebSocketInternalServerError:
+            return "WebSocket: Internal Server Error";
+        case WebSocketTLSHandshakeFailed:
+            return "WebSocket: TLS Handshake Failed";
+
+        /// WebSocket Errors - reported by server
+        case WebSocketUnauthorized:
+            return "WebSocket: Unauthorized";
+        case WebSocketForbidden:
+            return "WebSocket: Forbidden";
+        case WebSocketMovedPermanently:
+            return "WebSocket: Moved Permanently";
+        case WebSocketClient_Too_Old:
+            return "WebSocket: Client Too Old";
+        case WebSocketClient_Too_New:
+            return "WebSocket: Client Too New";
+        case WebSocketProtocol_Mismatch:
+            return "WebSocket: Protocol Mismatch";
+
+        case WebSocketResolveFailed:
+            return "WebSocket: Resolve Failed";
+        case WebSocketConnectionFailed:
+            return "WebSocket: Connection Failed";
+        case WebSocketReadError:
+            return "WebSocket: Read Error";
+        case WebSocketWriteError:
+            return "WebSocket: Write Error";
+        case WebSocketRetryError:
+            return "WebSocket: Retry Error";
+        case WebSocketFatalError:
+            return "WebSocket: Fatal Error";
+    }
+    return "";
 }
