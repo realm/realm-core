@@ -35,7 +35,7 @@ uint8_t min_width(const Decimal128& value, bool zero_width_is_zero)
 
     value.unpack(coefficient, exponent, sign);
     if (coefficient.w[1] == 0) {
-        if (coefficient.w[0] == 0) {
+        if (coefficient.w[0] == 0 && exponent == 0) {
             return zero_width_is_zero ? 0 : 4;
         }
         if (coefficient.w[0] < (1ull << 23) && exponent > -91 && exponent < 91) {
