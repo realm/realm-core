@@ -386,8 +386,10 @@ public:
     /// Returns a reference to the underlying socket.
     Socket& lowest_layer() noexcept;
 
+#if REALM_HAVE_SECURE_TRANSPORT
     /// Mock the error value returned by ssl_perform() - currently only used by Apple Secure Transport
     void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error);
+#endif
 
 private:
     using Want = Service::Want;
@@ -996,11 +998,6 @@ inline Socket& Stream::lowest_layer() noexcept
     return m_tcp_socket;
 }
 
-inline void Stream::set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error)
-{
-    m_mock_ssl_perform_error = std::move(error);
-}
-
 #if REALM_HAVE_OPENSSL
 
 inline void Stream::ssl_handshake(std::error_code& ec, Want& want) noexcept
@@ -1147,19 +1144,6 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     int ssl_error = SSL_get_error(m_ssl, ret);
     int sys_error = int(ERR_get_error());
 
-    // Use caution with MockSSLError, since errSSLWouldBlock will potentially perform
-    // another read that may block
-    if (REALM_UNLIKELY(m_mock_ssl_perform_error && m_mock_ssl_perform_error->operation == m_last_operation)) {
-        ssl_error = m_mock_ssl_perform_error->ssl_error;
-        sys_error = m_mock_ssl_perform_error->sys_error;
-        ret = m_mock_ssl_perform_error->bytes_processed;
-        if (m_mock_ssl_perform_error->clear_after_access)
-            m_mock_ssl_perform_error.reset();
-    }
-
-    // m_last_operation is only used for the mock_ssl_perform_error
-    m_last_operation = {};
-
     // Guaranteed by the documentation of SSL_get_error()
     REALM_ASSERT((ret > 0) == (ssl_error == SSL_ERROR_NONE));
 
@@ -1290,6 +1274,11 @@ inline int Stream::do_ssl_shutdown() noexcept
 
 #elif REALM_HAVE_SECURE_TRANSPORT
 
+inline void Stream::set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error)
+{
+    m_mock_ssl_perform_error = std::move(error);
+}
+
 // Structure for mocking the error returned by Oper called by ssl_perform()
 // By default, this is a one-shot error that will be cleared after it is read,
 // unless clear_after_access is set to false.
@@ -1360,6 +1349,10 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
             m_mock_ssl_perform_error.reset();
     }
 
+    Want blocking_want =
+        m_last_operation ? (*m_last_operation == BlockingOperation::read ? Want::read : Want::write) : Want::nothing;
+    m_last_operation.reset();
+
     if (result == noErr) {
         ec = std::error_code();
         want = Want::nothing;
@@ -1368,10 +1361,9 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
 
     // Don't return an error, but keep reading if more data is needed
     if (result == errSSLWouldBlock) {
-        REALM_ASSERT(m_last_operation);
+        REALM_ASSERT(blocking_want != Want::nothing);
         ec = std::error_code();
-        want = m_last_operation == BlockingOperation::read ? Want::read : Want::write;
-        m_last_operation = {};
+        want = blocking_want;
         return n;
     }
 

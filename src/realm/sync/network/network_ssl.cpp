@@ -786,8 +786,6 @@ int Stream::bio_write(BIO* bio, const char* data, int size) noexcept
     std::error_code ec;
     std::size_t n = desc.write_some(data, std::size_t(size), ec);
 
-    m_last_operation = BlockingOperation::write;
-
     BIO_clear_retry_flags(bio);
     if (ec) {
         if (REALM_UNLIKELY(ec != error::resource_unavailable_try_again)) {
@@ -811,8 +809,6 @@ int Stream::bio_read(BIO* bio, char* buffer, int size) noexcept
     Service::Descriptor& desc = stream.m_tcp_socket.m_desc;
     std::error_code ec;
     std::size_t n = desc.read_some(buffer, std::size_t(size), ec);
-
-    m_last_operation = BlockingOperation::read;
 
     BIO_clear_retry_flags(bio);
     if (ec) {

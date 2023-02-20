@@ -692,14 +692,13 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
     ssl_stream_1.set_logger(test_context.logger.get());
     ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
-    network::ReadAheadBuffer read_ahead;
+    network::ReadAheadBuffer rab;
 
     const char* message = "hello";
     char buffer[50];
 
     bool shutdown_completed = false;
     bool read_completed = false;
-    bool error_occurred = false;
     auto && [r_promise, read_future] = util::make_promise_future<void>();
     auto read_handler = [this, &read_completed, read_promise = std::move(r_promise)](std::error_code ec, std::size_t n) mutable {
         test_context.logger->debug(">>>> TEST RESULTS: n: %1 - ec: %2", n, ec.message());
@@ -711,16 +710,17 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
     auto write_thread = std::thread([&]() {
         using MockSSLError = network::ssl::Stream::MockSSLError;
         size_t total = 0;
-        while (total < sizeof buffer) {
+        while (total < 50) {
             bool write_completed = false;
-            auto write_handler = [&total, &ssl_stream_1, &ssl_stream_2, &write_completed, &shutdown_completed, &error_occurred](std::error_code ec, std::size_t n) {
+            auto write_handler = [&total, &ssl_stream_1, &ssl_stream_2, &write_completed,
+                                  &shutdown_completed](std::error_code ec, std::size_t n) {
                 total += n;
                 REALM_ASSERT(std::error_code() == ec);
                 if (total == 20) {
-                    ssl_stream_2.set_mock_ssl_perform_error(std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedAbort), 5));
-                    error_occurred = true;
+                    ssl_stream_2.set_mock_ssl_perform_error(std::make_unique<MockSSLError>(
+                        MockSSLError::Operation::read, static_cast<int>(errSSLClosedAbort), 5));
                 }
-                else if (total >= sizeof buffer) {
+                else if (total >= 50) {
                     auto shutdown_handler = [&shutdown_completed](std::error_code ec) {
                         REALM_ASSERT(std::error_code() == ec);
                         shutdown_completed = true;
@@ -737,8 +737,8 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
             service_1.run();
     });
 
-    ssl_stream_2.async_read(buffer, sizeof buffer, read_ahead, std::move(read_handler));
-    while (!shutdown_completed)
+    ssl_stream_2.async_read(buffer, 50, rab, std::move(read_handler));
+    while (!read_completed)
         service_2.run();
     read_future.get();
     if (write_thread.joinable()) {
