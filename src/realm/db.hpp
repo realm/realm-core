@@ -443,6 +443,7 @@ private:
             auto res = std::make_unique<ReadLockInfo>();
             res->m_top_ref = top_ref;
             res->m_file_size = file_size;
+            res->m_version = 1;
             return res;
         }
         void check() const noexcept

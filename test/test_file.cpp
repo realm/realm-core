@@ -531,7 +531,6 @@ TEST(File_parent_dir)
     }
 }
 
-#ifndef _WIN32
 TEST(File_GetUniqueID)
 {
     TEST_PATH(path_1);
@@ -552,16 +551,15 @@ TEST(File_GetUniqueID)
     File::UniqueID uid1_1 = file1_1.get_unique_id();
     File::UniqueID uid1_2 = file1_2.get_unique_id();
     File::UniqueID uid2_1 = file2_1.get_unique_id();
-    File::UniqueID uid2_2;
-    CHECK(File::get_unique_id(path_2, uid2_2));
+    std::optional<File::UniqueID> uid2_2;
+    CHECK(uid2_2 = File::get_unique_id(path_2));
 
     CHECK(uid1_1 == uid1_2);
-    CHECK(uid2_1 == uid2_2);
+    CHECK(uid2_1 == *uid2_2);
     CHECK(uid1_1 != uid2_1);
 
     // Path doesn't exist
-    File::UniqueID uid3_1;
-    CHECK_NOT(File::get_unique_id(path_3, uid3_1));
+    CHECK_NOT(File::get_unique_id(path_3));
 
     // Test operator<
     File::UniqueID uid4_1{0, 5};
@@ -578,7 +576,6 @@ TEST(File_GetUniqueID)
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
 }
-#endif
 
 TEST(File_Temp)
 {

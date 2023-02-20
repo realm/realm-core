@@ -183,7 +183,8 @@ class TestAppSession {
 public:
     TestAppSession();
     TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
-                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal);
+                   DeleteApp = true, realm::ReconnectMode reconnect_mode = realm::ReconnectMode::normal,
+                   std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr);
     ~TestAppSession();
 
     std::shared_ptr<realm::app::App> app() const noexcept

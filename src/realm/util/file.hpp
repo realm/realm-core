@@ -28,7 +28,9 @@
 #include <streambuf>
 #include <string>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <dirent.h> // POSIX.1-2001
 #endif
 
@@ -39,14 +41,9 @@
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
-#if defined(_MSVC_LANG) && _MSVC_LANG >= 201703L // compiling with MSVC and C++ 17
+#if defined(_MSVC_LANG) // compiling with MSVC
 #include <filesystem>
 #define REALM_HAVE_STD_FILESYSTEM 1
-#if REALM_UWP
-// workaround for linker issue described in https://github.com/microsoft/STL/issues/322
-// remove once the Windows SDK or STL fixes this.
-#pragma comment(lib, "onecoreuap.lib")
-#endif
 #else
 #define REALM_HAVE_STD_FILESYSTEM 0
 #endif
@@ -594,7 +591,7 @@ public:
 
     struct UniqueID {
 #ifdef _WIN32 // Windows version
-// FIXME: This is not implemented for Windows
+        FILE_ID_INFO id_info;
 #else
         UniqueID()
             : device(0)
@@ -620,8 +617,12 @@ public:
     // Return the path of the open file, or an empty string if
     // this file has never been opened.
     std::string get_path() const;
-    // Return false if the file doesn't exist. Otherwise uid will be set.
-    static bool get_unique_id(const std::string& path, UniqueID& uid);
+
+    // Return none if the file doesn't exist. Throws on other errors.
+    static std::optional<UniqueID> get_unique_id(const std::string& path);
+
+    // Return the unique id for the file descriptor. Throws if the underlying stat operation fails.
+    static UniqueID get_unique_id(FileDesc file);
 
     template <class>
     class Map;
@@ -640,7 +641,7 @@ public:
 
 private:
 #ifdef _WIN32
-    void* m_fd = nullptr;
+    HANDLE m_fd = nullptr;
     bool m_have_lock = false; // Only valid when m_fd is not null
 #else
     int m_fd = -1;
@@ -1341,7 +1342,8 @@ inline File::Exists::Exists(const std::string& msg, const std::string& path)
 inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
+    return lhs.id_info.VolumeSerialNumber == rhs.id_info.VolumeSerialNumber &&
+           memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(lhs.id_info.FileId)) == 0;
 #else // POSIX version
     return lhs.device == rhs.device && lhs.inode == rhs.inode;
 #endif
@@ -1355,7 +1357,9 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
+    if (lhs.id_info.VolumeSerialNumber != rhs.id_info.VolumeSerialNumber)
+        return lhs.id_info.VolumeSerialNumber < rhs.id_info.VolumeSerialNumber;
+    return memcmp(&lhs.id_info.FileId, &rhs.id_info.FileId, sizeof(lhs.id_info.FileId)) < 0;
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;
