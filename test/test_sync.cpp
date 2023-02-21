@@ -3761,6 +3761,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
         std::unique_lock<std::mutex> lock(thread_mutex);
         error_message = e.what();
         error_cv.notify_all();
+        return true;
     };
 
     // Since the event loop thread has been moved into the DefaultSocketProvider, use the

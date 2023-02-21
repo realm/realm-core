@@ -19,9 +19,6 @@
 #include <realm/sync/binding_callback_thread_observer.hpp>
 
 namespace realm {
-// Initialization of BindingCallbackThreadObserver static members
-std::unique_ptr<BindingCallbackThreadObserver> BindingCallbackThreadObserver::m_instance;
-std::mutex BindingCallbackThreadObserver::m_mutex;
 
 void BindingCallbackThreadObserver::call_did_create_thread(
     const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr)
@@ -29,12 +26,6 @@ void BindingCallbackThreadObserver::call_did_create_thread(
     // Call into the observer ptr if not null, otherwise, use the global thread observer
     if (observer_ptr)
         observer_ptr->did_create_thread();
-    else {
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        if (BindingCallbackThreadObserver::m_instance) {
-            BindingCallbackThreadObserver::m_instance->did_create_thread();
-        }
-    }
 }
 
 void BindingCallbackThreadObserver::call_will_destroy_thread(
@@ -43,12 +34,6 @@ void BindingCallbackThreadObserver::call_will_destroy_thread(
     // Call into the observer ptr if not null, otherwise, use the global thread observer
     if (observer_ptr)
         observer_ptr->will_destroy_thread();
-    else {
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        if (BindingCallbackThreadObserver::m_instance) {
-            BindingCallbackThreadObserver::m_instance->will_destroy_thread();
-        }
-    }
 }
 
 bool BindingCallbackThreadObserver::call_handle_error(
@@ -57,12 +42,6 @@ bool BindingCallbackThreadObserver::call_handle_error(
     // Call into the observer ptr if not null, otherwise, use the global thread observer
     if (observer_ptr)
         return observer_ptr->handle_error(e);
-    else {
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        if (BindingCallbackThreadObserver::m_instance) {
-            return BindingCallbackThreadObserver::m_instance->handle_error(e);
-        }
-    }
     return false;
 }
 
@@ -85,7 +64,6 @@ bool BindingCallbackThreadObserver::handle_error(const std::exception& e)
     if (!m_handle_error_callback)
         return false;
 
-    (*m_handle_error_callback)(e);
-    return true;
+    return (*m_handle_error_callback)(e);
 }
-}
+} // namespace realm

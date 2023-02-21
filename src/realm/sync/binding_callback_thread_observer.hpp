@@ -32,7 +32,7 @@ namespace realm {
 // This is for example helpful to attach/detach the pthread to the JavaVM in order to be able to perform JNI calls.
 struct BindingCallbackThreadObserver {
     using NotificationCallback = std::function<void()>;
-    using ErrorCallback = std::function<void(const std::exception&)>;
+    using ErrorCallback = std::function<bool(const std::exception&)>;
 
     // Create a BindingCallbackThreadObserver that can be used in SyncClientConfig
     BindingCallbackThreadObserver(std::optional<NotificationCallback>&& did_create_thread,
@@ -45,32 +45,6 @@ struct BindingCallbackThreadObserver {
     }
 
     virtual ~BindingCallbackThreadObserver() = default;
-
-    // Set the global thread observer with the provided (optional) callback functions
-    static void set_global_thread_observer(std::unique_ptr<BindingCallbackThreadObserver>&& observer_ptr)
-    {
-        if (!observer_ptr) {
-            BindingCallbackThreadObserver::reset_global_thread_observer();
-            return; // early return
-        }
-
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        BindingCallbackThreadObserver::m_instance.reset(observer_ptr.release());
-    }
-
-    // Returns true if the global binding callback thread observer is set, otherwise false
-    static bool has_global_thread_observer()
-    {
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        return bool(BindingCallbackThreadObserver::m_instance);
-    }
-
-    // Resets the global thread observer so no more callback functions will be called
-    static void reset_global_thread_observer()
-    {
-        std::lock_guard<std::mutex> lock{BindingCallbackThreadObserver::m_mutex};
-        BindingCallbackThreadObserver::m_instance.reset();
-    }
 
     ///
     /// Execution Functions - check for a valid instance and if the function was set
@@ -98,20 +72,19 @@ struct BindingCallbackThreadObserver {
     // This method is called just before the thread is started
     // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
     // global thread observer will be used.
-    static void call_did_create_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
+    static void call_did_create_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
 
     // This method is called just before the thread is being destroyed
     // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
     // global thread observer will be used.
-    static void
-    call_will_destroy_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
+    static void call_will_destroy_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
 
     // This method is called with any exception thrown by client.run().
     // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
     // global thread observer will be used.
     // Return true if the exception was handled by this function, otherwise false
     static bool call_handle_error(const std::exception& e,
-                                  const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr = nullptr);
+                                  const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
 
 protected:
     // Default constructor
@@ -129,10 +102,6 @@ protected:
     // Can be overridden to provide a custom implementation
     // Return true if the exception was handled by this function, otherwise false
     virtual bool handle_error(const std::exception& e);
-
-    // Global instances of the BindingCallbackThreadObserver
-    static std::unique_ptr<BindingCallbackThreadObserver> m_instance;
-    static std::mutex m_mutex;
 
     std::optional<NotificationCallback> m_create_thread_callback;
     std::optional<NotificationCallback> m_destroy_thread_callback;

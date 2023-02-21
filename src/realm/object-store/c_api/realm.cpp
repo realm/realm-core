@@ -17,12 +17,6 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-#if REALM_ENABLE_SYNC
-realm_thread_observer_token::~realm_thread_observer_token()
-{
-    realm::BindingCallbackThreadObserver::reset_global_thread_observer();
-}
-#endif // REALM_ENABLE_SYNC
 
 namespace realm::c_api {
 
@@ -357,18 +351,6 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
 }
 
 #if REALM_ENABLE_SYNC
-
-RLM_API
-realm_thread_observer_token_t*
-realm_set_global_binding_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
-                                         realm_on_object_store_thread_callback_t on_thread_destroy,
-                                         realm_on_object_store_error_callback_t on_error, realm_userdata_t user_data,
-                                         realm_free_userdata_func_t free_userdata)
-{
-    BindingCallbackThreadObserver::set_global_thread_observer(std::make_unique<realm::c_api::CBindingThreadObserver>(
-        on_thread_create, on_thread_destroy, on_error, user_data, free_userdata));
-    return new realm_thread_observer_token_t();
-}
 
 RLM_API
 void realm_sync_client_config_set_default_binding_thread_observer(

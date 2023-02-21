@@ -125,8 +125,7 @@ protected:
         if (!m_error_callback_func)
             return false;
 
-        m_error_callback_func(m_user_data.get(), e.what());
-        return true;
+        return m_error_callback_func(m_user_data.get(), e.what());
     }
 
     realm_on_object_store_thread_callback_t m_create_callback_func = nullptr;
