@@ -894,10 +894,14 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                            {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
                        }}};
 
-        AppCreateConfig::FLXSyncRole role;
+        AppCreateConfig::ServiceRole role;
         role.name = "compensating_write_perms";
-        role.read = true;
-        role.write = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+        role.docFiltersRead = true;
+        role.docFiltersWrite = {{"queryable_str_field", {{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+        role.insertFilter = true;
+        role.deleteFilter = true;
+        role.readAllFields = true;
+        role.writeAllFields = true;
         FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}, {role}};
         harness.emplace("flx_bad_query", server_schema);
     }
@@ -2704,11 +2708,15 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync]") {
 }
 
 TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app]") {
-    AppCreateConfig::FLXSyncRole role;
+    AppCreateConfig::ServiceRole role;
     role.name = "compensating_write_perms";
-    role.read = true;
-    role.write =
+    role.docFiltersRead = true;
+    role.docFiltersWrite =
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
+    role.insertFilter = true;
+    role.deleteFilter = true;
+    role.readAllFields = true;
+    role.writeAllFields = true;
     FLXSyncTestHarness::ServerSchema server_schema{
         g_simple_embedded_obj_schema, {"queryable_str_field", "queryable_int_field"}, {role}};
     FLXSyncTestHarness::Config harness_config("flx_bad_query", server_schema);

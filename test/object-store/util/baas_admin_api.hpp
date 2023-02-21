@@ -158,16 +158,19 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
-    struct FLXSyncRole {
+    struct ServiceRole {
         std::string name;
         nlohmann::json apply_when = nlohmann::json::object();
-        nlohmann::json read;
-        nlohmann::json write;
+        nlohmann::json docFiltersRead;
+        nlohmann::json docFiltersWrite;
+        nlohmann::json insertFilter;
+        nlohmann::json deleteFilter;
+        nlohmann::json readAllFields;
+        nlohmann::json writeAllFields;
     };
 
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
-        std::vector<FLXSyncRole> default_roles;
     };
 
     std::string app_name;
@@ -190,6 +193,8 @@ struct AppCreateConfig {
     bool enable_api_key_auth = false;
     bool enable_anonymous_auth = false;
     bool enable_custom_token_auth = false;
+
+    util::Optional<std::vector<ServiceRole>> service_roles;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);

@@ -85,8 +85,6 @@ public:
                                                bool clear_path = false);
     nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema, IncludePropCond include_prop);
 
-    nlohmann::json generic_baas_rule(const std::string& schema_name);
-
 private:
     const Schema& m_schema;
     const Property& m_partition_key;
@@ -195,24 +193,6 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
                                              {"collection", obj_schema.name},
                                              {"data_source", m_mongo_service_name}})},
         {"relationships", m_relationships},
-    };
-}
-
-nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& schema_name)
-{
-    return {
-        {"database", m_mongo_db_name},
-        {"collection", schema_name},
-        {"roles", nlohmann::json::array({{{"name", "default"},
-                                          {"apply_when", nlohmann::json::object()},
-                                          {"document_filters", {
-                                              {"read", true},
-                                              {"write", true},
-                                          }},
-                                          {"read", true},
-                                          {"write", true},
-                                          {"insert", true},
-                                          {"delete", true}}})},
     };
 }
 
@@ -879,6 +859,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::none,                  // disable custom auth
         true,                        // enable api key auth
         true,                        // enable anonymous auth
+        util::none,                  // no service roles on the default rule
     };
 }
 
@@ -991,30 +972,10 @@ AppSession create_app(const AppCreateConfig& config)
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
-        auto default_roles = nlohmann::json::array();
-        if (config.flx_sync_config->default_roles.empty()) {
-            default_roles = nlohmann::json::array(
-                {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}});
-        }
-        else {
-            std::transform(config.flx_sync_config->default_roles.begin(), config.flx_sync_config->default_roles.end(),
-                           std::back_inserter(default_roles), [](const AppCreateConfig::FLXSyncRole& role_def) {
-                               nlohmann::json ret{{"name", role_def.name}, {"applyWhen", role_def.apply_when}};
-                               ret["read"] = role_def.read;
-                               ret["write"] = role_def.write;
-                               return ret;
-                           });
-        }
         mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
                                                         {"database_name", config.mongo_dbname},
                                                         {"queryable_fields_names", queryable_fields},
-                                                        {"asymmetric_tables", asymmetric_tables},
-                                                        {"permissions",
-                                                         {{"rules", nlohmann::json::object()},
-                                                          {
-                                                              "defaultRoles",
-                                                              default_roles,
-                                                          }}}};
+                                                        {"asymmetric_tables", asymmetric_tables}};
     }
     else {
         sync_config = nlohmann::json{
@@ -1036,7 +997,6 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
-    auto rules = services[mongo_service_id]["rules"];
     auto schemas = app["schemas"];
 
     auto pk_and_queryable_only = [&](const Property& prop) {
@@ -1050,7 +1010,7 @@ AppSession create_app(const AppCreateConfig& config)
         return prop.name == "_id" || prop.name == config.partition_key.name;
     };
 
-    // Create the rules in two passes: first populate just the primary key and
+    // Create the schemas in two passes: first populate just the primary key and
     // partition key, then add the rest of the properties. This ensures that the
     // targest of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
@@ -1060,8 +1020,27 @@ AppSession create_app(const AppCreateConfig& config)
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);
         object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
+    }
 
-        rules.post_json(rule_builder.generic_baas_rule(obj_schema.name));
+    auto default_rule = services[mongo_service_id]["default_rule"]
+    if (config.service_roles) {
+        default_rule.post_json({
+            {"roles", config.service_roles}
+        })
+    }
+    else {
+        default_rule.post_json({
+            {"roles", {{{"name", "default"},
+                    {"apply_when", nlohmann::json::object()},
+                    {"document_filters", {
+                        {"read", true},
+                        {"write", true},
+                    }},
+                    {"read", true},
+                    {"write", true},
+                    {"insert", true},
+                    {"delete", true}}}},
+        })
     }
 
     for (const auto& [id, obj_schema] : object_schema_to_create) {
@@ -1081,6 +1060,7 @@ AppSession create_app(const AppCreateConfig& config)
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
 
+    auto rules = services[mongo_service_id]["rules"];
     rules.post_json({
         {"database", config.mongo_dbname},
         {"collection", "UserData"},
