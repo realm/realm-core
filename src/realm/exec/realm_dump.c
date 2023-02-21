@@ -276,7 +276,7 @@ int main(int argc, const char* argv[])
     int64_t ref = 0;
     int64_t find_ref = 0;
     const char* array_str = NULL;
-    for (size_t arg = 2; arg < argc; arg++) {
+    for (int arg = 2; arg < argc; arg++) {
         if (*argv[arg] == '[') {
             array_str = argv[arg] + 1;
         }
@@ -303,14 +303,15 @@ int main(int argc, const char* argv[])
             ref = get_top_ref(fp);
         dump_index(fp, ref, array_str);
     }
+    else if (find_ref) {
+        int stack[128];
+        if (!ref)
+            ref = get_top_ref(fp);
+        search_ref(fp, ref, find_ref, 0, stack);
+    }
     else if (ref) {
         size_t sz = dump_header(fp, ref);
         dump(fp, ref + 8, sz);
-    }
-    else if (find_ref) {
-        int stack[128];
-        ref = get_top_ref(fp);
-        search_ref(fp, ref, find_ref, 0, stack);
     }
     else {
         dump_file_header(fp);
