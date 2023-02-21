@@ -299,6 +299,10 @@ public:
     {
         return true;
     }
+    bool dictionary_clear(size_t)
+    {
+        return true;
+    }
     bool set_insert(size_t)
     {
         return true;
@@ -475,6 +479,12 @@ public:
     {
         if (m_active_collection)
             m_active_collection->erase(index);
+        return true;
+    }
+    bool dictionary_clear(size_t size)
+    {
+        if (m_active_collection)
+            m_active_collection->clear(size);
         return true;
     }
 

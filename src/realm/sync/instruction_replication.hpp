@@ -74,6 +74,7 @@ public:
     void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
     void dictionary_set(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
     void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) final;
+    void dictionary_clear(const CollectionBase& dict) final;
 
     void remove_object(const Table*, ObjKey) final;
 

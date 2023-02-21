@@ -63,6 +63,13 @@ bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
     return true;
 }
 
+bool TransactLogEncoder::dictionary_clear(size_t dict_size)
+{
+    append_simple_instr(instr_DictionaryClear, dict_size); // Throws
+    return true;
+}
+
+
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {

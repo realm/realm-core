@@ -956,6 +956,12 @@ public:
         return true;
     }
 
+    bool dictionary_clear(size_t)
+    {
+        std::cout << "Dictionary clear " << std::endl;
+        return true;
+    }
+
     bool set_link_type(realm::ColKey)
     {
         return true;

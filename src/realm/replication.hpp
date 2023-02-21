@@ -73,6 +73,7 @@ public:
     virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
     virtual void dictionary_set(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
     virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
+    virtual void dictionary_clear(const CollectionBase& dict);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);

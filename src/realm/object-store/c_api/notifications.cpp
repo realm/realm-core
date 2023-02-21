@@ -272,7 +272,8 @@ RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* chan
 RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes,
                                                realm_value_t* deletion_keys, size_t* deletions_size,
                                                realm_value_t* insertion_keys, size_t* insertions_size,
-                                               realm_value_t* modification_keys, size_t* modifications_size)
+                                               realm_value_t* modification_keys, size_t* modifications_size,
+                                               bool* collection_was_cleared)
 {
     auto fill = [](const auto& collection, realm_value_t* out, size_t* n) {
         if (!out || !n)
@@ -290,6 +291,8 @@ RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t*
     fill(changes->deletions, deletion_keys, deletions_size);
     fill(changes->insertions, insertion_keys, insertions_size);
     fill(changes->modifications, modification_keys, modifications_size);
+    if (collection_was_cleared)
+        *collection_was_cleared = changes->collection_was_cleared;
 }
 
 static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, size_t max)
