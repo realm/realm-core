@@ -52,6 +52,9 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         auto embedded_table = elem.second;
         auto cols_2 = get_col_info(embedded_table);
         auto update_embedded = [&](Mixed val) {
+            if (val.is_null()) {
+                return;
+            }
             REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
             Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
             generate_properties_for_obj(repl, embedded_obj, cols_2);

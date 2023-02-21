@@ -236,8 +236,12 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     static_cast<void>(shared_part);
 
     free_lock_info();
-
-    m_filename = path + "." + mutex_name + ".mx";
+    if (path.size() == 0) {
+        m_filename = make_temp_file(mutex_name.c_str());
+    }
+    else {
+        m_filename = path + "." + mutex_name + ".mx";
+    }
 
     std::lock_guard<Mutex> guard(*s_mutex);
 
