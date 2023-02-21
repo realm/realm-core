@@ -14,7 +14,7 @@ using InternStrings = std::vector<StringBufferRange>;
 
 struct BadChangesetError : ExceptionWithBacktrace<std::runtime_error> {
     BadChangesetError(const std::string& msg)
-        : ExceptionWithBacktrace<std::runtime_error>(util::format("%1. Please contact support", msg))
+        : ExceptionWithBacktrace<std::runtime_error>(util::format("%1. Please contact support.", msg))
     {
     }
 };

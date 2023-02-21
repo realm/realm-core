@@ -136,10 +136,9 @@ public:
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
-    /// This calls stop() on the socket provider respectively.
-    void stop() noexcept;
+    void shutdown() noexcept;
 
-    void drain();
+    void shutdown_and_wait();
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
@@ -477,7 +476,7 @@ private:
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
-    void read_or_write_error(std::error_code);
+    void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
@@ -502,6 +501,7 @@ private:
     void enlist_to_send(Session*);
     void one_more_active_unsuspended_session();
     void one_less_active_unsuspended_session();
+    void finish_session_deactivation(Session* sess);
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
@@ -568,6 +568,8 @@ private:
     bool m_ping_sent = false;
 
     bool m_websocket_error_received = false;
+
+    bool m_force_closed = false;
 
     // The timer will be constructed on demand, and will only be destroyed when
     // canceling a reconnect or disconnect delay.
@@ -790,6 +792,8 @@ public:
     Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
+    void force_close();
+
     util::Future<std::string> send_test_command(std::string body);
 
 private:
@@ -974,7 +978,6 @@ private:
     std::deque<ProtocolErrorInfo> m_pending_compensating_write_errors;
 
     util::Optional<IntegrationException> m_client_error;
-    bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1262,8 +1265,10 @@ inline void ClientImpl::Connection::one_more_active_unsuspended_session()
 
 inline void ClientImpl::Connection::one_less_active_unsuspended_session()
 {
+    REALM_ASSERT(m_num_active_unsuspended_sessions);
     if (--m_num_active_unsuspended_sessions != 0)
         return;
+
     // Dropped from one to zero
     if (m_state != ConnectionState::disconnected)
         initiate_disconnect_wait(); // Throws
@@ -1490,13 +1495,13 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
-    m_connection_to_close                 = false;
     m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
     m_error_message_received = false;
     m_unbound_message_received = false;
+    m_client_error = util::none;
 
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;

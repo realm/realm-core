@@ -12,7 +12,8 @@ public:
               realm_sync_socket_create_timer_func_t create_timer_func,
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
-        : m_timer_create(create_timer_func)
+        : m_handler(handler)
+        , m_timer_create(create_timer_func)
         , m_timer_cancel(cancel_timer_func)
         , m_timer_free(free_timer_func)
     {
@@ -24,6 +25,7 @@ public:
     {
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
+        realm_release(m_handler);
     }
 
     /// Cancel the timer immediately.
@@ -36,6 +38,7 @@ private:
     realm_sync_socket_timer_t m_timer = nullptr;
 
     realm_userdata_t m_userdata = nullptr;
+    realm_sync_socket_callback_t* m_handler = nullptr;
     realm_sync_socket_create_timer_func_t m_timer_create = nullptr;
     realm_sync_socket_timer_canceled_func_t m_timer_cancel = nullptr;
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
