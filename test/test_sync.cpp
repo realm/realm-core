@@ -781,13 +781,16 @@ struct ExpectChangesetError {
 
     void operator()(ConnectionState state, util::Optional<Session::ErrorInfo> error_info) const noexcept
     {
-        if (state != ConnectionState::disconnected)
+        if (state == ConnectionState::disconnected) {
+            return;
+        }
+        if (!error_info)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
         CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
         CHECK(ec.category() == client_error_category());
-        CHECK(error_info->is_fatal());
+        CHECK(!error_info->is_fatal());
         CHECK_EQUAL(error_info->message,
                     "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
                         expected_error);
@@ -2273,7 +2276,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
     fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
         CHECK_EQUAL(ProtocolError::permission_denied, ec);
         did_get_permission_denied = true;
-        fixture.get_client(1).stop();
+        fixture.get_client(1).shutdown();
     });
     fixture.start();
 
@@ -2980,7 +2983,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
                                   " preverify_ok = %4, depth = %5",
                                   server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
-            client.stop();
+            client.shutdown();
         return true;
     };
 
@@ -2996,7 +2999,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
-    client.drain();
+    client.shutdown_and_wait();
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3154,7 +3157,7 @@ TEST(Sync_UploadDownloadProgress_1)
             return cond_var_signaled;
         });
 
-        client.stop();
+        client.shutdown();
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3698,7 +3701,7 @@ TEST(Sync_UploadDownloadProgress_6)
         session->bind();
     }
 
-    client.drain();
+    client.shutdown_and_wait();
     server.stop();
     server_thread.join();
 
@@ -5035,7 +5038,7 @@ TEST_IF(Sync_SSL_Certificates, false)
                     error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
-                client.stop();
+                client.shutdown();
             }
         };
 
@@ -5645,67 +5648,6 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
     });
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
-}
-
-
-TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    TEST_CLIENT_DB(db_2);
-
-    // Verify that if a client fails to integrate a downloaded changeset, then
-    // it will keep failing during future attempts. This test once failed due to
-    // https://jira.mongodb.org/browse/RSYNC-48.
-
-    TEST_DIR(dir);
-    fixtures::ClientServerFixture fixture{dir, test_context};
-    fixture.start();
-
-    // Introduce a changeset into the server-side Realm
-    {
-        fixtures::RealmFixture realm{fixture, path_1, "/test"};
-        realm.nonempty_transact();
-        realm.wait_for_upload_complete_or_client_stopped();
-    }
-
-    // Launch a client with `simulate_integration_error` set to true, and make
-    // it download that changeset. Then check that it fails at least two times.
-    bool failed_once = false;
-    bool failed_twice = false;
-    using ConnectionState = ConnectionState;
-    using ErrorInfo = Session::ErrorInfo;
-    std::mutex mx;
-    std::condition_variable cv;
-    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-        if (state != ConnectionState::disconnected)
-            return;
-        REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        CHECK_EQUAL(Client::Error::bad_changeset, ec);
-        CHECK(is_fatal);
-        if (!failed_once) {
-            failed_once = true;
-            fixture.cancel_reconnect_delay();
-        }
-        else {
-            std::unique_lock<std::mutex> lk(mx);
-            failed_twice = true;
-            fixture.stop();
-            cv.notify_one();
-        }
-    };
-    Session::Config config;
-    config.simulate_integration_error = true;
-    Session session = fixture.make_session(db_2, std::move(config));
-    session.set_connection_state_change_listener(listener);
-    fixture.bind_session(session, "/test");
-    using namespace std::chrono_literals;
-    std::unique_lock<std::mutex> lk(mx);
-    bool completed_within_time_limit = cv.wait_for(lk, 1s, [&] {
-        return failed_twice;
-    });
-    CHECK(completed_within_time_limit);
 }
 
 template <typename T>

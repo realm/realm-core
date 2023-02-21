@@ -6,7 +6,29 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
+
+### Breaking changes
 * None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.4.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Sync client may [have failed an assertion](https://github.com/realm/realm-core/blob/006660c8d20c4941d3838f74aec6f3561ebf6784/src/realm/sync/noinst/client_impl_base.cpp#L388) during shutdown if all sessions hadn't been ready to finalize by the time the Client destructor ran. (PR [#6293](https://github.com/realm/realm-core/pull/6293), since v13.4.1)
+* Fixed the sync client being stuck in a cycle if an integration error occurs by issuing a client reset ([#6051](https://github.com/realm/realm-core/issues/6051), since v10.2.0)
 
 ### Breaking changes
 * None.
@@ -22,6 +44,8 @@
   * The following APIs are now implemented using std::filesystem: `try_make_dir`/`make_dir`, `make_dir_recursive`, `try_remove_dir`/`remove_dir`, `try_remove_dir_recursive`/`remove_dir_recursive`, `File::exists`, `File::is_dir`, `File::try_remove`/`File::remove`, `File::move`, `File::copy`, `File::last_write_time`, `File::get_free_space`
   * `File::get_unique_id` now works on Windows
   * Replaced manual path string conversion with `std::filesystem::path`
+* Update yarn download path in install_baas.sh ([PR #6309](https://github.com/realm/realm-core/pull/6309))
+* Include the websocket close status reason when reporting errors to the sync client ([PR #6298](https://github.com/realm/realm-core/pull/6298))
 
 ----------------------------------------------
 
@@ -48,6 +72,7 @@
 * The lifecycle of the sync client is now separated from the event loop/socket provider it uses for async I/O/timers. The sync client will wait for all outstanding callbacks/sockets to be closed during destruction. The SyncSocketProvider passed to the sync client must run until after the sync client is destroyed but does not need to be stopped as part of tearing down the sync client. ([PR #6276](https://github.com/realm/realm-core/pull/6276))
 * The default event loop will now keep running until it is explicitly stopped rather than until there are no more timers/IO to process. Previously there was a timer set for very far in the future to force the event loop to keep running. ([PR #6265](https://github.com/realm/realm-core/pull/6265))
 * Disable failing check in Metrics_TransactionTimings test ([PR #6206](https://github.com/realm/realm-core/pull/6206))
+* Map ClientError's to ProtocolError's and use ProtocolError's when sending ERROR messages to the server ([PR #6086](https://github.com/realm/realm-core/pull/6086))
 
 ----------------------------------------------
 
@@ -82,6 +107,7 @@
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 * Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
 * Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
+* Adds upport for in-memory Realms. If a Realm is opened without a path it will be in memory only.
 
 ### Fixed
 * "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)

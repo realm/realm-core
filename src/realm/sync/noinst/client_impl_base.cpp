@@ -228,6 +228,7 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -266,6 +267,7 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -301,6 +303,7 @@ void Connection::activate()
 void Connection::activate_session(std::unique_ptr<Session> sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(!m_force_closed);
     Session& sess_2 = *sess;
     session_ident_type ident = sess->m_ident;
     auto p = m_sessions.emplace(ident, std::move(sess)); // Throws
@@ -318,15 +321,14 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(m_num_active_sessions);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -376,23 +378,47 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
+void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+{
+    REALM_ASSERT(sess->m_state == Session::Deactivated);
+    auto ident = sess->m_ident;
+    m_sessions.erase(ident);
+}
 
 void Connection::force_close()
 {
-    if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer.reset();
-        m_disconnect_delay_in_progress = false;
-        m_reconnect_delay_in_progress = false;
-    }
-
-    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
-    REALM_ASSERT(m_num_active_sessions == 0);
-    if (m_state == ConnectionState::disconnected) {
+    if (m_force_closed) {
         return;
     }
 
-    voluntary_disconnect();
-    logger.info("Force disconnected");
+    m_force_closed = true;
+
+    if (m_state != ConnectionState::disconnected) {
+        voluntary_disconnect();
+    }
+
+    REALM_ASSERT(m_state == ConnectionState::disconnected);
+    if (m_reconnect_delay_in_progress || m_disconnect_delay_in_progress) {
+        m_reconnect_disconnect_timer.reset();
+        m_reconnect_delay_in_progress = false;
+        m_disconnect_delay_in_progress = false;
+    }
+
+    // We must copy any session pointers we want to close to a vector because force_closing
+    // the session may remove it from m_sessions and invalidate the iterator uses to loop
+    // through the map. By copying to a separate vector we ensure our iterators remain valid.
+    std::vector<Session*> to_close;
+    for (auto& session_pair : m_sessions) {
+        if (session_pair.second->m_state == Session::State::Active) {
+            to_close.push_back(session_pair.second.get());
+        }
+    }
+
+    for (auto& sess : to_close) {
+        sess->force_close();
+    }
+
+    logger.debug("Force closed idle connection");
 }
 
 
@@ -436,10 +462,14 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 
 bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
+    if (m_force_closed) {
+        logger.debug("Received binary message after connection was force closed");
+        return false;
+    }
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec);
+        read_or_write_error(ec, "simulated read error");
         return bool(m_websocket);
     }
 
@@ -456,6 +486,10 @@ void Connection::websocket_error_handler()
 
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
+    if (m_force_closed) {
+        logger.debug("Received websocket close message after connection was force closed");
+        return false;
+    }
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
     // Return early.
     if (status.is_ok()) {
@@ -472,7 +506,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
     }
     else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
-        read_or_write_error(error_code);
+        read_or_write_error(error_code, status.reason());
     }
     else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
              status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
@@ -498,30 +532,30 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         error_code = ClientError::ssl_server_cert_rejected;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
         error_code = ClientError::client_too_old_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
         error_code = ClientError::client_too_new_for_server;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
         error_code = ClientError::protocol_mismatch;
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Fatal_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
         constexpr bool is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
     else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
              status_code == ErrorCodes::WebSocket_MovedPermanently ||
@@ -530,7 +564,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
              status_code == ErrorCodes::WebSocket_Retry_Error) {
         constexpr bool is_fatal = false;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+        close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
     }
 
     return bool(m_websocket);
@@ -543,6 +577,11 @@ void Connection::initiate_reconnect_wait()
     REALM_ASSERT(m_activated);
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     REALM_ASSERT(!m_disconnect_delay_in_progress);
+
+    // If we've been force closed then we don't need/want to reconnect. Just return early here.
+    if (m_force_closed) {
+        return;
+    }
 
     using milliseconds_lim = ReconnectInfo::milliseconds_lim;
 
@@ -1014,9 +1053,7 @@ void Connection::handle_write_message()
 {
     m_sending_session->message_sent(); // Throws
     if (m_sending_session->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = m_sending_session->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(m_sending_session);
     }
     m_sending_session = nullptr;
     m_sending = false;
@@ -1044,9 +1081,7 @@ void Connection::send_next_message()
         sess.send_message(); // Throws
 
         if (sess.m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess.m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(&sess);
         }
 
         // An enlisted session may choose to not send a message. In that case,
@@ -1153,11 +1188,11 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
@@ -1328,9 +1363,7 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         }
 
         if (sess->m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess->m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(sess);
         }
         return;
     }
@@ -1444,9 +1477,7 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
     }
 
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -1619,6 +1650,12 @@ void Session::on_integration_failure(const IntegrationException& error)
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
 
+    constexpr bool try_again = true;
+    std::error_code error_code = error.code();
+    auto msg = error_code.message() + ": " + error.what();
+    // Surface the error to the user otherwise is lost.
+    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.code(), std::move(msg), try_again});
+
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
@@ -1733,8 +1770,9 @@ void Session::activate()
     }
     catch (const IntegrationException& error) {
         logger.error("Error integrating bootstrap changesets: %1", error.what());
-        on_suspended(SessionErrorInfo{error.code(), false});
+        m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(SessionErrorInfo{error.code(), false});
     }
 
     if (has_pending_client_reset) {
@@ -1836,8 +1874,10 @@ void Session::send_message()
     if (m_error_to_send)
         return send_json_error_message(); // Throws
 
-    if (m_connection_to_close)
-        return close_connection(); // Throws
+    // Stop sending upload, mark and query messages when the client detects an error.
+    if (m_client_error) {
+        return;
+    }
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -2150,22 +2190,20 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    std::error_code ec = m_client_error->code();
+    auto client_error = m_client_error->code();
+    auto protocol_error = client_error_to_protocol_error(client_error);
     auto message = m_client_error->what();
 
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = message;
-    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
-
+    protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
+                                     error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;
-    m_connection_to_close = true;
-
-    // Connection is waiting to be closed
     enlist_to_send(); // Throws
 }
 
@@ -2199,11 +2237,9 @@ void Session::close_connection()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_connection_to_close);
     REALM_ASSERT(m_client_error);
 
     m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
-    m_connection_to_close = false;
     m_client_error = util::none;
 }
 
@@ -2339,6 +2375,13 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
+    if (m_client_error) {
+        logger.debug("Ignoring download message because the client detected an integration error");
+        return;
+    }
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2503,10 +2546,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (debug_action == SyncClientHookAction::EarlyReturn) {
         return {};
     }
-
-    // Ignore the error because the connection is going to be closed.
-    if (m_connection_to_close)
-        return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
