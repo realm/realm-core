@@ -63,7 +63,7 @@ struct InvalidDatabase;
 /// of slabs.
 class SlabAlloc : public Allocator {
 public:
-    ~SlabAlloc() noexcept override;
+    virtual ~SlabAlloc() noexcept override;
     SlabAlloc();
 
     // Disable copying. Copying an allocator can produce double frees.
@@ -310,7 +310,7 @@ public:
     /// of an existing mapping is changed. Such a change requires all refs to be
     /// retranslated to new pointers. This will happen whenever the reader view
     /// is extended unless the old size was aligned to a section boundary.
-    uint64_t get_mapping_version()
+    inline uint64_t get_mapping_version()
     {
         return m_mapping_version;
     }
@@ -321,7 +321,7 @@ public:
     bool is_free_space_clean() const noexcept;
 
     /// Returns the amount of memory requested by calls to SlabAlloc::alloc().
-    size_t get_commit_size() const
+    inline size_t get_commit_size() const
     {
         return m_commit_size;
     }

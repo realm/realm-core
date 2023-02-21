@@ -83,9 +83,7 @@ public:
         m_baseline = 8;
     }
 
-    ~FooAlloc() noexcept
-    {
-    }
+    virtual ~FooAlloc() noexcept {}
 
     MemRef do_alloc(const size_t size) override
     {

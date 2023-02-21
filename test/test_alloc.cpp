@@ -87,7 +87,6 @@ size_t get_capacity(const char* header)
 
 } // anonymous namespace
 
-
 TEST(Alloc_1)
 {
     SlabAlloc alloc;
@@ -122,6 +121,10 @@ TEST(Alloc_1)
     CHECK_EQUAL(static_cast<void*>(mr2.get_addr()), alloc.translate(mr2.get_ref()));
     CHECK_EQUAL(static_cast<void*>(mr3.get_addr()), alloc.translate(mr3.get_ref()));
     CHECK_EQUAL(static_cast<void*>(mr4.get_addr()), alloc.translate(mr4.get_ref()));
+
+    auto size = alloc.get_baseline();
+    CHECK(size);
+
 
     alloc.free_(mr3.get_ref(), mr3.get_addr());
     alloc.free_(mr4.get_ref(), mr4.get_addr());
