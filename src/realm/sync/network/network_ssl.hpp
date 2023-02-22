@@ -1320,7 +1320,8 @@ struct Stream::MockSSLError {
 // `want` to something other than `Want::nothing`, and return zero.
 //
 // If an error occurred, ssl_perform() will set `ec` to something other than
-// `std::system_error()`, `want` to `Want::nothing`, and return 0.
+// `std::system_error()`, `want` to `Want::nothing`, and return 0. If the error
+// is end_of_input, it is possible that the value returned is non-zero.
 //
 // If no error occurred, and the operation completed (`!ec && want ==
 // Want::nothing`), then the return value indicates the outcome of the
@@ -1350,8 +1351,16 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
             m_mock_ssl_perform_error.reset();
     }
 
-    Want blocking_want =
-        m_last_operation ? (*m_last_operation == BlockingOperation::read ? Want::read : Want::write) : Want::nothing;
+    Want blocking_want = [&m_last_operation]() {
+        if (!m_last_operation)
+            return Want::nothing;
+        switch (*m_last_operation) {
+            case BlockingOperation::read:
+                return Want::read;
+            case BlockingOperation::write:
+                return Want::write;
+        };
+    }();
     m_last_operation.reset();
 
     if (result == noErr) {
@@ -1368,13 +1377,13 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
         return n;
     }
 
-    // Always return 0 if an error occurs
     if (result == errSSLClosedGraceful) {
         ec = util::MiscExtErrors::end_of_input;
         want = Want::nothing;
         return n;
     }
 
+    // Always return 0 if an error (other than end_of_input) occurs
     if (result == errSSLClosedAbort || result == errSSLClosedNoNotify) {
         ec = util::MiscExtErrors::premature_end_of_input;
         want = Want::nothing;

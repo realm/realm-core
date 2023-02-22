@@ -750,10 +750,10 @@ TEST(Util_Network_SSL_Nonzero_Length_Error)
 
 TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
 {
-    network::Service service_1;
-    network::Service service_2;
-    network::Socket socket_1{service_1};
-    network::Socket socket_2{service_2};
+    network::Service service;
+    network::DeadlineTimer run_timer{service};
+    network::Socket socket_1{service};
+    network::Socket socket_2{service};
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
     configure_server_ssl_context_for_test(ssl_context_1);
@@ -767,48 +767,50 @@ TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
     const char* message = "hello";
     char buffer[50];
 
-    bool shutdown_completed = false;
-    bool read_completed = false;
-    auto read_handler = [this, &read_completed](std::error_code ec, std::size_t n) mutable {
+    std::error_code shutdown_error = std::error_code();
+    auto [r_promise, read_future] = util::make_promise_future<void>();
+    auto read_handler = [this, read_promise = std::move(r_promise)](std::error_code ec, std::size_t n) mutable {
         CHECK_EQUAL(util::MiscExtErrors::end_of_input, ec);
         // read will be either 6 or 11 depending on when the error is received
         CHECK_GREATER(n, 5);
-        read_completed = true;
+        read_promise.emplace_value();
+    };
+    auto write_handler = [this, &message, &ssl_stream_2](std::error_code ec, std::size_t n) {
+        using MockSSLError = network::ssl::Stream::MockSSLError;
+        CHECK_EQUAL(std::error_code(), ec);
+        CHECK_EQUAL(std::strlen(message), n);
+        ssl_stream_2.set_mock_ssl_perform_error(
+            std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedGraceful), 6));
     };
 
-    auto write_thread = std::thread([&]() {
-        using MockSSLError = network::ssl::Stream::MockSSLError;
-        bool write_completed = false;
-        auto write_handler = [this, &message, &ssl_stream_2, &write_completed](std::error_code ec, std::size_t n) {
-            CHECK_EQUAL(std::error_code(), ec);
-            CHECK_EQUAL(std::strlen(message), n);
-            ssl_stream_2.set_mock_ssl_perform_error(std::make_unique<MockSSLError>(
-                MockSSLError::Operation::read, static_cast<int>(errSSLClosedGraceful), 6));
-            write_completed = true;
-        };
-        ssl_stream_1.async_write(message, std::strlen(message), std::move(write_handler));
-        while (!write_completed)
-            service_1.run();
+    auto service_thread = std::thread([&service, &run_timer]() {
+        run_timer.async_wait(std::chrono::seconds(10), [&](Status& status) {
+            if (!status.is_ok())
+                return;
+            abort(); // fail the test if the timer expires
+        });
+        service.run();
     });
+
+    ssl_stream_1.async_write(message, std::strlen(message), std::move(write_handler));
     ssl_stream_2.async_read(buffer, 50, rab, std::move(read_handler));
-    while (!read_completed)
-        service_2.run();
+    read_future.get();
 
     // Shut down stream
-    auto shutdown_handler = [this, &shutdown_completed](std::error_code ec) {
+    auto [s_promise, shutdown_future] = util::make_promise_future<void>();
+    auto shutdown_handler = [this, shutdown_promise = std::move(s_promise)](std::error_code ec) mutable {
         CHECK_EQUAL(std::error_code(), ec);
-        shutdown_completed = true;
+        shutdown_promise.emplace_value();
     };
     ssl_stream_1.async_shutdown(std::move(shutdown_handler));
-    service_1.run();
+    shutdown_future.get();
 
-    // Thread is done after shutdown_completed is true
-    if (write_thread.joinable()) {
-        write_thread.join();
-    }
-
-    CHECK(shutdown_completed);
-    CHECK(read_completed);
+    // Stop the service thread after shutdown is complete
+    service.post([&run_timer](Status&) {
+        run_timer.cancel();
+    });
+    service.stop();
+    service_thread.join();
 }
 #endif
 
