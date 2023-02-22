@@ -12,7 +12,8 @@ public:
               realm_sync_socket_create_timer_func_t create_timer_func,
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
-        : m_timer_create(create_timer_func)
+        : m_handler(handler)
+        , m_timer_create(create_timer_func)
         , m_timer_cancel(cancel_timer_func)
         , m_timer_free(free_timer_func)
     {
@@ -24,6 +25,7 @@ public:
     {
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
+        realm_release(m_handler);
     }
 
     /// Cancel the timer immediately.
@@ -36,6 +38,7 @@ private:
     realm_sync_socket_timer_t m_timer = nullptr;
 
     realm_userdata_t m_userdata = nullptr;
+    realm_sync_socket_callback_t* m_handler = nullptr;
     realm_sync_socket_create_timer_func_t m_timer_create = nullptr;
     realm_sync_socket_timer_canceled_func_t m_timer_cancel = nullptr;
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
@@ -96,8 +99,8 @@ private:
 
 struct CAPIWebSocketObserver : sync::WebSocketObserver {
 public:
-    CAPIWebSocketObserver(sync::WebSocketObserver& observer)
-        : m_observer(observer)
+    CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
+        : m_observer(std::move(observer))
     {
     }
 
@@ -105,26 +108,26 @@ public:
 
     void websocket_connected_handler(const std::string& protocol) final
     {
-        m_observer.websocket_connected_handler(protocol);
+        m_observer->websocket_connected_handler(protocol);
     }
 
     void websocket_error_handler() final
     {
-        m_observer.websocket_error_handler();
+        m_observer->websocket_error_handler();
     }
 
     bool websocket_binary_message_received(util::Span<const char> data) final
     {
-        return m_observer.websocket_binary_message_received(data);
+        return m_observer->websocket_binary_message_received(data);
     }
 
     bool websocket_closed_handler(bool was_clean, Status status) final
     {
-        return m_observer.websocket_closed_handler(was_clean, status);
+        return m_observer->websocket_closed_handler(was_clean, status);
     }
 
 private:
-    sync::WebSocketObserver& m_observer;
+    std::unique_ptr<sync::WebSocketObserver> m_observer;
 };
 
 struct CAPISyncSocketProvider : sync::SyncSocketProvider {
@@ -165,10 +168,10 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         m_free(m_userdata);
     }
 
-    std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
-        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(*observer);
+        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(std::move(observer));
         return std::make_unique<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
                                                m_websocket_free, new realm_websocket_observer_t(capi_observer),
                                                std::move(endpoint));

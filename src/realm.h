@@ -372,8 +372,10 @@ typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_refresh_callback_token realm_refresh_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
+typedef struct realm_dictionary_changes realm_dictionary_changes_t;
 typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
+typedef void (*realm_on_dictionary_change_func_t)(realm_userdata_t userdata, const realm_dictionary_changes_t*);
 typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
 typedef void (*realm_on_realm_refresh_func_t)(realm_userdata_t userdata);
 typedef void (*realm_async_begin_write_func_t)(realm_userdata_t userdata);
@@ -1914,7 +1916,6 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
                                                      size_t* out_num_deletion_ranges,
                                                      size_t* out_num_insertion_ranges,
                                                      size_t* out_num_modification_ranges, size_t* out_num_moves);
-
 typedef struct realm_collection_move {
     size_t from;
     size_t to;
@@ -1970,6 +1971,35 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_index_range_t* out_modification_ranges, size_t max_modification_ranges,
     realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
     realm_collection_move_t* out_moves, size_t max_moves);
+
+/**
+ * Returns the number of changes occured to the dictionary passed as argument
+ *
+ * @param changes valid ptr to the dictionary changes structure
+ * @param out_deletions_size number of deletions
+ * @param out_insertion_size number of insertions
+ * @param out_modification_size number of modifications
+ */
+RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
+                                          size_t* out_insertion_size, size_t* out_modification_size);
+
+/**
+ * Returns the list of keys changed for the dictionary passed as argument.
+ * The user must assure that there is enough memory to accomodate all the keys
+ * calling `realm_dictionary_get_changes` before.
+ *
+ * @param changes valid ptr to the dictionary changes structure
+ * @param deletions list of deleted keys
+ * @param deletions_size size of the list of deleted keys
+ * @param insertions list of inserted keys
+ * @param insertions_size size of the list of inserted keys
+ * @param modifications list of modified keys
+ * @param modification_size size of the list of modified keys
+ */
+RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes, realm_value_t* deletions,
+                                               size_t* deletions_size, realm_value_t* insertions,
+                                               size_t* insertions_size, realm_value_t* modifications,
+                                               size_t* modification_size);
 
 /**
  * Get a set instance for the property of an object.
@@ -2296,7 +2326,7 @@ RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
 RLM_API realm_notification_token_t*
 realm_dictionary_add_notification_callback(realm_dictionary_t*, realm_userdata_t userdata,
                                            realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
-                                           realm_on_collection_change_func_t on_change);
+                                           realm_on_dictionary_change_func_t on_change);
 
 /**
  * Get an dictionary from a thread-safe reference, potentially originating in a
