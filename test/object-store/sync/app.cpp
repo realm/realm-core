@@ -1703,7 +1703,8 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     Schema schema{
         {"origin",
          {{valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
-          {"link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "target"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "embedded"}}},
         {"target",
          {{valid_pk_name, PropertyType::String, Property::IsPrimary{true}},
           {"value", PropertyType::Int},
@@ -1713,6 +1714,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
           {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
         {"other_target",
          {{valid_pk_name, PropertyType::UUID, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
+        {"embedded", ObjectSchema::ObjectType::Embedded, {{"name", PropertyType::String | PropertyType::Nullable}}},
     };
 
     /*             Create local realm             */
@@ -1727,7 +1729,12 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
         local_realm->begin_transaction();
         auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
+        // 'embedded_link' property is null.
         origin->create_object_with_primary_key(47).set("link", o.get_key());
+        // 'embedded_link' property is not null.
+        auto obj = origin->create_object_with_primary_key(42);
+        auto col_key = origin->get_column_key("embedded_link");
+        obj.create_and_set_linked_object(col_key);
         other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
         other_origin->create_object_with_primary_key(ObjectId::gen());
         local_realm->commit_transaction();
@@ -1779,7 +1786,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     advance_and_notify(*r2);
     Group& g = r2->read_group();
     // g.to_json(std::cout);
-    REQUIRE(g.get_table("class_origin")->size() == 1);
+    REQUIRE(g.get_table("class_origin")->size() == 2);
     REQUIRE(g.get_table("class_target")->size() == 2);
     REQUIRE(g.get_table("class_other_origin")->size() == 2);
     REQUIRE(g.get_table("class_other_target")->size() == 2);
