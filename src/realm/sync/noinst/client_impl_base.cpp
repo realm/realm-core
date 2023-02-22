@@ -225,11 +225,14 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         m_drained = false;
     }
     m_socket_provider->post([handler = std::move(handler), this](Status status) {
-        handler(status);
-
-        std::lock_guard lock(m_drain_mutex);
+        std::unique_lock lock(m_drain_mutex);
         REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
+        lock.unlock();
+
+        handler(status);
+
+        lock.lock();
         m_drain_cv.notify_all();
     });
 }

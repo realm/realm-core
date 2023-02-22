@@ -1533,10 +1533,10 @@ void SessionWrapper::force_close()
 // Must be called from event loop thread
 void SessionWrapper::finalize()
 {
-    REALM_ASSERT(m_actualized);
+    // It is possible to get here before actualize finished (m_actualize == false),
+    // so clean up anything that is needed.
 
-    if (!m_force_closed) {
-        REALM_ASSERT(m_sess);
+    if (!m_force_closed && m_sess) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         conn.initiate_session_deactivation(m_sess); // Throws
 
@@ -1548,8 +1548,10 @@ void SessionWrapper::finalize()
     // The Realm file can be closed now, as no access to the Realm file is
     // supposed to happen on behalf of a session after initiation of
     // deactivation.
-    m_db->release_sync_agent();
-    m_db = nullptr;
+    if (m_db) {
+        m_db->release_sync_agent();
+        m_db = nullptr;
+    }
 
     // All outstanding wait operations must be canceled
     while (!m_upload_completion_handlers.empty()) {

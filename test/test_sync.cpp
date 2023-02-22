@@ -3772,21 +3772,20 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
                 CHECK(error_cv.wait_for(lock, 10s, [&error_message]() {
                     return !error_message.empty();
                 }));
-                CHECK_STRING_CONTAINS(error_message, "Multiple sync agents attempted to join the same session");
             }
+            CHECK_STRING_CONTAINS(error_message, "Multiple sync agents attempted to join the same session");
         }
     }
-
-    socket_provider->start(); // restart the socket_provider event loop thread after the exception
-    // Now stop and wait for the client to shutdown
-    client.shutdown();
     socket_provider->stop(true);
-
     {
         std::unique_lock<std::mutex> lock(thread_mutex);
         CHECK(create_thread_called);
         CHECK(destroy_thread_called);
     }
+    // restart the socket_provider event loop thread after the exception so we can clean up and resume
+    socket_provider->start();
+    // Now start the client shutdown
+    client.shutdown();
 }
 
 TEST(Sync_CancelReconnectDelay)
