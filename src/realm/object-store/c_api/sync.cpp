@@ -19,7 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -117,17 +117,6 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found) ==
-              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found_try_again) ==
-              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_data) == RLM_SYNC_ERROR_RESOLVE_NO_DATA);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_recovery) == RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::service_not_found) ==
-              RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::socket_type_not_supported) ==
-              RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
-
 } // namespace
 
 realm_sync_error_code_t to_capi(const Status& status, std::string& message)
@@ -150,8 +139,8 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
     else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
     }
-    else if (category == realm::sync::network::resolve_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_RESOLVE;
+    else if (category == realm::sync::websocket::websocket_error_category()) {
+        ret.category = RLM_SYNC_ERROR_CATEGORY_WEBSOCKET;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
@@ -179,8 +168,8 @@ void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, st
         else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
             error_code_out->assign(sync_error_code.value, std::system_category());
         }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
-            error_code_out->assign(sync_error_code.value, realm::sync::network::resolve_error_category());
+        else if (category == RLM_SYNC_ERROR_CATEGORY_WEBSOCKET) {
+            error_code_out->assign(sync_error_code.value, realm::sync::websocket::websocket_error_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
             error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
