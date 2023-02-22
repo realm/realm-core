@@ -162,6 +162,7 @@ struct AppCreateConfig {
         nlohmann::json read;
         nlohmann::json write;
     };
+
     struct ServiceRole {
         std::string name;
         nlohmann::json apply_when = nlohmann::json::object();
@@ -171,6 +172,7 @@ struct AppCreateConfig {
         nlohmann::json read;
         nlohmann::json write;
     };
+
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
     };
