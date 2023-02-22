@@ -73,44 +73,46 @@ private:
     {
         m_logger.error("Reading failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{make_error_code(WebSocketReadError), ec.message()});
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(WebSocketError::websocket_read_error), ec.message()});
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
         m_logger.error("Writing failed: %1", ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{make_error_code(WebSocketWriteError), ec.message()});
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(WebSocketError::websocket_write_error), ec.message()});
     }
     void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
                                            const std::string_view* body) override
     {
-        WebSocketError error = WebSocketOK;
+        WebSocketError error = WebSocketError::websocket_ok;
         bool was_clean = true;
 
-        if (ec == websocket::Error::bad_response_301_moved_permanently ||
-            ec == websocket::Error::bad_response_308_permanent_redirect) {
-            error = WebSocketMovedPermanently;
+        if (ec == websocket::HttpError::bad_response_301_moved_permanently ||
+            ec == websocket::HttpError::bad_response_308_permanent_redirect) {
+            error = WebSocketError::websocket_moved_permanently;
         }
-        else if (ec == websocket::Error::bad_response_3xx_redirection) {
-            error = WebSocketRetryError;
+        else if (ec == websocket::HttpError::bad_response_3xx_redirection) {
+            error = WebSocketError::websocket_retry_error;
             was_clean = false;
         }
-        else if (ec == websocket::Error::bad_response_401_unauthorized) {
-            error = WebSocketUnauthorized;
+        else if (ec == websocket::HttpError::bad_response_401_unauthorized) {
+            error = WebSocketError::websocket_unauthorized;
         }
-        else if (ec == websocket::Error::bad_response_403_forbidden) {
-            error = WebSocketForbidden;
+        else if (ec == websocket::HttpError::bad_response_403_forbidden) {
+            error = WebSocketError::websocket_forbidden;
         }
-        else if (ec == websocket::Error::bad_response_5xx_server_error ||
-                 ec == websocket::Error::bad_response_500_internal_server_error ||
-                 ec == websocket::Error::bad_response_502_bad_gateway ||
-                 ec == websocket::Error::bad_response_503_service_unavailable ||
-                 ec == websocket::Error::bad_response_504_gateway_timeout) {
-            error = WebSocketInternalServerError;
+        else if (ec == websocket::HttpError::bad_response_5xx_server_error ||
+                 ec == websocket::HttpError::bad_response_500_internal_server_error ||
+                 ec == websocket::HttpError::bad_response_502_bad_gateway ||
+                 ec == websocket::HttpError::bad_response_503_service_unavailable ||
+                 ec == websocket::HttpError::bad_response_504_gateway_timeout) {
+            error = WebSocketError::websocket_internal_server_error;
             was_clean = false;
         }
         else {
-            error = WebSocketFatalError;
+            error = WebSocketError::websocket_fatal_error;
             was_clean = false;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
@@ -123,14 +125,14 @@ private:
                                 std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
                     };
                     if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                        error = WebSocketClient_Too_Old;
+                        error = WebSocketError::websocket_client_too_old;
                     }
                     else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                        error = WebSocketClient_Too_New;
+                        error = WebSocketError::websocket_client_too_new;
                     }
                     else {
                         // Other more complicated forms of mismatch
-                        error = WebSocketProtocol_Mismatch;
+                        error = WebSocketError::websocket_protocol_mismatch;
                     }
                     was_clean = true;
                 }
@@ -142,7 +144,8 @@ private:
     void websocket_protocol_error_handler(std::error_code ec) override
     {
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{make_error_code(WebSocketProtocolError), ec.message()});
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(WebSocketError::websocket_protocol_error), ec.message()});
     }
     bool websocket_close_message_received(std::error_code ec, StringData message) override
     {
@@ -267,8 +270,8 @@ void DefaultWebSocketImpl::handle_resolve(std::error_code ec, network::Endpoint:
     if (ec) {
         m_logger.error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean,
-                                          Status{make_error_code(WebSocketResolveFailed), ec.message()}); // Throws
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(WebSocketError::websocket_resolve_failed), ec.message()}); // Throws
         return;
     }
 
@@ -308,8 +311,8 @@ void DefaultWebSocketImpl::handle_tcp_connect(std::error_code ec, network::Endpo
         // All endpoints failed
         m_logger.error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean,
-                                          Status{make_error_code(WebSocketConnectionFailed), ec.message()}); // Throws
+        websocket_error_and_close_handler(
+            was_clean, Status{make_error_code(WebSocketError::websocket_connection_failed), ec.message()}); // Throws
         return;
     }
 
@@ -350,7 +353,8 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
             m_logger.error("Failed to establish HTTP tunnel: %1", ec.message());
             constexpr bool was_clean = false;
             websocket_error_and_close_handler(
-                was_clean, Status{make_error_code(WebSocketConnectionFailed), ec.message()}); // Throws
+                was_clean,
+                Status{make_error_code(WebSocketError::websocket_connection_failed), ec.message()}); // Throws
             return;
         }
 
@@ -358,7 +362,8 @@ void DefaultWebSocketImpl::initiate_http_tunnel()
             m_logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             constexpr bool was_clean = false;
             websocket_error_and_close_handler(
-                was_clean, Status{make_error_code(WebSocketConnectionFailed), response.reason}); // Throws
+                was_clean,
+                Status{make_error_code(WebSocketError::websocket_connection_failed), response.reason}); // Throws
             return;
         }
 
@@ -422,7 +427,8 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(
-            was_clean, Status{make_error_code(WebSocketTLSHandshakeFailed), ec.message()}); // Throws
+            was_clean,
+            Status{make_error_code(WebSocketError::websocket_tls_handshake_failed), ec.message()}); // Throws
         return;
     }
 

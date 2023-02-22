@@ -227,7 +227,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == sync::websocket::make_error_code(ErrorCodes::WebSocketReadError)) {
+        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
             return;
         }
 

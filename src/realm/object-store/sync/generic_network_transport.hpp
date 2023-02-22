@@ -63,6 +63,11 @@ struct AppError : public RuntimeError {
     {
         return ErrorCodes::error_categories(code()).test(ErrorCategory::client_error);
     }
+
+    bool is_websocket_error() const
+    {
+        return ErrorCodes::error_categories(code()).test(ErrorCategory::websocket_error);
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, AppError error);
