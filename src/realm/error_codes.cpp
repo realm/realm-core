@@ -207,6 +207,11 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
 
+        case WebSocketResolveFailedError:
+        case WebSocketConnectionClosedClientError:
+        case WebSocketConnectionClosedServerError:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
+
         case UnknownError:
             break;
     }
@@ -360,6 +365,9 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
+    {"WebSocketConnectionClosedClientError", ErrorCodes::WebSocketConnectionClosedClientError},
+    {"WebSocketConnectionClosedServerError", ErrorCodes::WebSocketConnectionClosedServerError},
+    {"WebSocketResolveFailedError", ErrorCodes::WebSocketResolveFailedError},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
