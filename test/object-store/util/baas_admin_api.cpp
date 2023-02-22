@@ -1025,43 +1025,39 @@ AppSession create_app(const AppCreateConfig& config)
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
     if (config.service_roles.empty()) {
-        service_roles = nlohmann::json::array(
-            {{{"name", "default"},
-              {"apply_when", nlohmann::json::object()},
-              {"document_filters", {
-                  {"read", true},
-                  {"write", true},
-              }},
-              {"read", true},
-              {"write", true},
-              {"insert", true},
-              {"delete", true}}}
-        );
+        service_roles = nlohmann::json::array({{{"name", "default"},
+                                                {"apply_when", nlohmann::json::object()},
+                                                {"document_filters",
+                                                 {
+                                                     {"read", true},
+                                                     {"write", true},
+                                                 }},
+                                                {"read", true},
+                                                {"write", true},
+                                                {"insert", true},
+                                                {"delete", true}}});
     }
     else {
-        std::transform(
-            config.service_roles.begin(), config.service_roles.end(),
-            std::back_inserter(service_roles), [](const AppCreateConfig::ServiceRole& role_def) {
-                nlohmann::json ret{
-                    {"name", role_def.name},
-                    {"apply_when", role_def.apply_when},
-                    {"document_filters", {
-                        {"read", role_def.document_filters.read},
-                        {"write", role_def.document_filters.write},
-                    }},
-                    {"insert", role_def.insert_filter},
-                    {"delete", role_def.delete_filter},
-                    {"read", role_def.read},
-                    {"write", role_def.write},
-                };
-                return ret;
-            }
-        );
+        std::transform(config.service_roles.begin(), config.service_roles.end(), std::back_inserter(service_roles),
+                       [](const AppCreateConfig::ServiceRole& role_def) {
+                           nlohmann::json ret{
+                               {"name", role_def.name},
+                               {"apply_when", role_def.apply_when},
+                               {"document_filters",
+                                {
+                                    {"read", role_def.document_filters.read},
+                                    {"write", role_def.document_filters.write},
+                                }},
+                               {"insert", role_def.insert_filter},
+                               {"delete", role_def.delete_filter},
+                               {"read", role_def.read},
+                               {"write", role_def.write},
+                           };
+                           return ret;
+                       });
     }
 
-    default_rule.post_json({
-        {"roles", service_roles}
-    });
+    default_rule.post_json({{"roles", service_roles}});
 
     for (const auto& [id, obj_schema] : object_schema_to_create) {
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
@@ -1084,16 +1080,18 @@ AppSession create_app(const AppCreateConfig& config)
     rules.post_json({
         {"database", config.mongo_dbname},
         {"collection", "UserData"},
-        {"roles", {{{"name", "default"},
-                    {"apply_when", nlohmann::json::object()},
-                    {"document_filters", {
-                        {"read", true},
-                        {"write", true},
-                    }},
-                    {"read", true},
-                    {"write", true},
-                    {"insert", true},
-                    {"delete", true}}}},
+        {"roles",
+         {{{"name", "default"},
+           {"apply_when", nlohmann::json::object()},
+           {"document_filters",
+            {
+                {"read", true},
+                {"write", true},
+            }},
+           {"read", true},
+           {"write", true},
+           {"insert", true},
+           {"delete", true}}}},
     });
 
     app["custom_user_data"].patch_json({
