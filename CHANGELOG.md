@@ -6,8 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
 * Fix crash if secure transport returns an error with a non-zero length. ([](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
-* None.
 
 ### Breaking changes
 * None.
