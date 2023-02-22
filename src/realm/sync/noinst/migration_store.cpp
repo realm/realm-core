@@ -3,8 +3,6 @@
 #include <realm/transaction.hpp>
 #include <realm/sync/noinst/sync_metadata_schema.hpp>
 
-#include <external/json/json.hpp>
-
 namespace realm::sync {
 namespace {
 constexpr static int c_schema_version = 1;
@@ -92,21 +90,13 @@ void MigrationStore::migrate_to_flx(std::string rql_query_string)
 {
     std::unique_lock lock{m_mutex};
     m_query_string = rql_query_string;
-
-    auto queries = nlohmann::json::parse(m_query_string);
-    m_table_to_query.clear();
-
-    for (auto&& [k, v] : queries.items()) {
-        m_table_to_query[k] = v;
-    }
-
     m_state = MigrationState::Completed;
     lock.unlock();
 
     auto tr = m_db->start_write();
     auto migration_table = tr->get_table(m_migration_table);
     auto migration_table_obj = migration_table->get_object(0);
-    migration_table_obj.set(c_flx_migration_query_string, rql_query_string);
+    migration_table_obj.set(c_flx_migration_query_string, m_query_string);
     migration_table_obj.set(c_flx_migration_state, m_state);
     migration_table_obj.set(c_flx_migration_completed_at, Timestamp{std::chrono::system_clock::now()});
     tr->commit();
@@ -129,13 +119,8 @@ std::optional<Subscription> MigrationStore::make_subscription(const std::string&
         return std::nullopt;
     }
 
-    auto it = m_table_to_query.find(object_class_name);
-    if (it == m_table_to_query.end()) {
-        return std::nullopt;
-    }
-
     std::string subscription_name = c_flx_subscription_name_prefix.data() + object_class_name;
-    return Subscription{subscription_name, object_class_name, it->second};
+    return Subscription{subscription_name, object_class_name, m_query_string};
 }
 
 } // namespace realm::sync

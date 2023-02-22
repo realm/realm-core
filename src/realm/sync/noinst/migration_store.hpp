@@ -83,8 +83,6 @@ protected:
     MigrationState m_state;
     // RQL query string received from the server
     std::string m_query_string;
-    // Table names and queries extracted from m_query_string
-    std::unordered_map<std::string, std::string> m_table_to_query;
 };
 
 } // namespace realm::sync
