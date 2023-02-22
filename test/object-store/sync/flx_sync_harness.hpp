@@ -31,8 +31,8 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
-        bool dev_mode_enabled = false;
         std::vector<AppCreateConfig::ServiceRole> service_roles;
+        bool dev_mode_enabled = false;
     };
 
     static ServerSchema default_server_schema()
