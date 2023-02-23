@@ -644,6 +644,7 @@ None.
 
 ### Enhancements
 * Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
+* Added `realm_object_create_or_update`to the C API whereby you can create an object and assign properties at the same time. ([#5477](https://github.com/realm/realm-core/pull/5477))
 
 ### Fixed
 * Fixed an exception "key not found" during client reset recovery if a list had local moves or deletes and the base object was also deleted. ([#5593](https://github.com/realm/realm-core/issues/5593) since the introduction of recovery in v11.16.0)
@@ -655,6 +656,7 @@ None.
 
 ### Breaking changes
 * `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
+* Parameters to `realm_set_values` from the C API are changed.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
