@@ -1351,7 +1351,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
             m_mock_ssl_perform_error.reset();
     }
 
-    Want blocking_want = [&m_last_operation]() {
+    Want blocking_want = [this]() {
         if (!m_last_operation)
             return Want::nothing;
         switch (*m_last_operation) {
