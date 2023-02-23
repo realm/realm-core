@@ -24,8 +24,9 @@
 #include <realm/util/features.h>
 #include <cstdint>
 #include <vector>
-#include <map>
+
 #include <realm/util/file.hpp>
+#include <realm/util/flat_map.hpp>
 
 namespace realm::util {
 class WriteObserver {
@@ -73,7 +74,7 @@ public:
     size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
-    std::map<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected);
+    util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected);
 
     void check_key(const uint8_t* key);
 
@@ -107,6 +108,7 @@ private:
     std::vector<iv_table> m_iv_buffer;
     std::unique_ptr<char[]> m_rw_buffer;
     std::unique_ptr<char[]> m_dst_buffer;
+    std::vector<iv_table> m_iv_buffer_cache;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void* data, size_t len, const std::array<uint8_t, 28>& hmac) const;

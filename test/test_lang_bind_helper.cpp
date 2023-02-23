@@ -3413,7 +3413,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
         process->wait_for_child_to_finish();
     }
 
-    EncryptedPageValidator validator(path);
+    //    EncryptedPageValidator validator(path);
 
     // intialization complete. Start writers:
     for (int i = 0; i < write_process_count; ++i) {

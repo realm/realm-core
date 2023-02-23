@@ -28,8 +28,6 @@
 
 typedef size_t (*Header_to_size)(const char* addr);
 
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace realm::util {
