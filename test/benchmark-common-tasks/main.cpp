@@ -338,31 +338,23 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
 };
 
 struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
-    ColKey link_col_ndx;
-    ColKey id_col_ndx;
+    ColKey link_col;
+    ColKey id_col;
     void before_all(DBRef group)
     {
         BenchmarkWithStringsFewDup::before_all(group);
         WrtTrans tr(group);
         TableRef t = tr.add_table("Links");
-        id_col_ndx = t->add_column(type_Int, "id");
+        id_col = t->add_column(type_Int, "id");
         TableRef strings = tr.get_table(name());
-        link_col_ndx = t->add_column(*strings, "myLink");
+        link_col = t->add_column(*strings, "myLink");
         const size_t num_links = strings->size();
 
-#ifdef REALM_CLUSTER_IF
         auto target = strings->begin();
         for (size_t i = 0; i < num_links; ++i) {
             t->create_object().set_all(int64_t(i), target->get_key());
             ++target;
         }
-#else
-        for (size_t i = 0; i < num_links; ++i) {
-            auto ndx = t->add_empty_row();
-            t->set_int(id_col_ndx, ndx, i);
-            t->set_link(link_col_ndx, ndx, i);
-        }
-#endif
         tr.commit();
     }
     const char* name() const
@@ -371,20 +363,12 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
     }
     virtual void before_each(DBRef group)
     {
-#ifdef REALM_CLUSTER_IF
         m_tr.reset(new WrtTrans(group));
-#else
-        m_tr.reset(new WrtTrans(group));
-#endif
         m_table = m_tr->get_table("Links");
     }
     virtual void after_each(DBRef)
     {
-#ifdef REALM_CLUSTER_IF
         m_table = nullptr;
-#else
-        m_table.reset();
-#endif
         m_tr = nullptr;
     }
     void operator()(DBRef)
@@ -395,7 +379,7 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
         };
 
         for (auto s : strs) {
-            Query query = table->link(link_col_ndx).column<String>(m_col) == StringData(s);
+            Query query = table->link(link_col).column<String>(m_col) == StringData(s);
             TableView results = query.find_all();
         }
     }
@@ -409,6 +393,18 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
     }
 };
 
+struct BenchmarkSubQuery : BenchmarkQueryStringOverLinks {
+    const char* name() const
+    {
+        return "SubqueryStrings";
+    }
+    void operator()(DBRef)
+    {
+        Query subquery = m_table->get_link_target(link_col)->column<String>(m_col) == "20";
+        Query query = m_table->column<Link>(link_col, subquery).count() >= 1;
+        TableView results = query.find_all();
+    }
+};
 
 struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
     const char* name() const
@@ -2143,6 +2139,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryIntEqualityIndexed);
     BENCH(BenchmarkIntVsDoubleColumns);
     BENCH(BenchmarkQueryStringOverLinks);
+    BENCH(BenchmarkSubQuery);
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);
     BENCH(BenchmarkQueryTimestampGreaterEqual);
