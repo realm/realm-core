@@ -45,7 +45,8 @@ public:
         network::DeadlineTimer m_timer;
     };
 
-    struct AutoStartTag {};
+    struct AutoStartTag {
+    };
 
     using AutoStart = util::TaggedBool<AutoStartTag>;
     DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
