@@ -229,7 +229,9 @@ private:
 } // namespace
 
 TEST_CASE("Transaction log parsing: schema change validation") {
-    InMemoryTestFile config;
+    TestFile config;
+    config.in_memory = true;
+    config.encryption_key = std::vector<char>();
     config.automatic_change_notifications = false;
     config.schema_mode = SchemaMode::AdditiveExplicit;
     auto r = Realm::get_shared_realm(config);
@@ -1603,18 +1605,16 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = make_in_realm_history();
-        auto db = DB::create(*history, config.path, config.options());
-        auto rt = db->start_read();
+        auto tr = r->duplicate();
 
         r->begin_transaction();
         f();
         r->commit_transaction();
 
         _impl::TransactionChangeInfo info{};
-        for (auto key : rt->get_table_keys())
+        for (auto key : tr->get_table_keys())
             info.tables[key];
-        _impl::transaction::advance(*rt, info);
+        _impl::transaction::advance(*tr, info);
         return info;
     };
 
@@ -1849,18 +1849,16 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = make_in_realm_history();
-        auto db = DB::create(*history, config.path, config.options());
-        auto rt = db->start_read();
+        auto tr = r->duplicate();
 
         r->begin_transaction();
         f();
         r->commit_transaction();
 
         _impl::TransactionChangeInfo info{};
-        for (auto key : rt->get_table_keys())
+        for (auto key : tr->get_table_keys())
             info.tables[key];
-        _impl::transaction::advance(*rt, info);
+        _impl::transaction::advance(*tr, info);
         return info;
     };
 

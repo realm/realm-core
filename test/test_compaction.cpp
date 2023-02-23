@@ -122,12 +122,19 @@ TEST(Compaction_WhileGrowing)
     CHECK_LESS(free_space, 0x10000);
 }
 
-TEST(Compaction_Large)
+TEST_TYPES(Compaction_Large, std::true_type, std::false_type)
 {
+    using type = typename TEST_TYPE::type;
     SHARED_GROUP_TEST_PATH(path);
     int64_t total;
     {
-        DBRef db = DB::create(make_in_realm_history(), path);
+        DBRef db;
+        if constexpr (type::value) {
+            db = DB::create(make_in_realm_history(), path);
+        }
+        else {
+            db = DB::create(make_in_realm_history());
+        }
         {
             auto tr = db->start_write();
             auto t = tr->add_table("the_table");
@@ -185,13 +192,15 @@ TEST(Compaction_Large)
         db->get_stats(free_space, used_space);
         total = free_space + used_space;
     }
-    File f(path);
-    // std::cout << "Size : " << f.get_size() << std::endl;
-    {
-        DB::create(make_in_realm_history(), path);
+    if constexpr (type::value) {
+        File f(path);
+        // std::cout << "Size : " << f.get_size() << std::endl;
+        {
+            DB::create(make_in_realm_history(), path);
+        }
+        // std::cout << "Size : " << f.get_size() << std::endl;
+        CHECK(f.get_size() == total);
     }
-    // std::cout << "Size : " << f.get_size() << std::endl;
-    CHECK(f.get_size() == total);
 }
 
 NONCONCURRENT_TEST(Compaction_Performance)
