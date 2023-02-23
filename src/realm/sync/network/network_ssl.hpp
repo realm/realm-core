@@ -188,7 +188,9 @@ private:
 /// until its completion handler starts executing.
 class Stream {
 public:
+#if REALM_HAVE_SECURE_TRANSPORT
     struct MockSSLError;
+#endif
 
     using port_type = network::Endpoint::port_type;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
