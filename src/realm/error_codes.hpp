@@ -239,6 +239,21 @@ public:
         WebSocketInternalServerError = RLM_ERR_WEBSOCKET_INTERNALSERVERERROR,
         WebSocketTLSHandshakeFailed = RLM_ERR_WEBSOCKET_TLSHANDSHAKEFAILED, // Used by default WebSocket
 
+        // HACK
+        ReadError,
+        WriteError,
+        ResolveFailed,
+        ConnectionFailed,
+        WebSocketRetryError,
+        WebSocketFatalError,
+        WebSocketUnauthorized,
+        WebSocketForbidden,
+        WebSocketMovedPermanently,
+        WebSocketClient_Too_Old,
+        WebSocketClient_Too_New,
+        WebSocketProtocol_Mismatch,
+        // HACK
+
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
     };

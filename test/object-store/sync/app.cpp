@@ -2485,12 +2485,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SyncTestFile r_config(user1, partition, schema);
         // Overrride the default
         r_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                         error.message);
+                         error.what());
             abort();
         };
 

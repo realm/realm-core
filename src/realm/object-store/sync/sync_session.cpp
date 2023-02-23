@@ -687,9 +687,9 @@ void SyncSession::handle_error(SyncError error)
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
         if (error_code.category() == sync::websocket::websocket_close_status_category()) {
-            bool restart_session = error_code.value() == ErrorCodes::WebSocket_MovedPermanently;
-            if (restart_session || error_code.value() == ErrorCodes::WebSocket_Unauthorized ||
-                error_code.value() == ErrorCodes::WebSocket_AbnormalClosure) {
+            bool restart_session = error_code.value() == ErrorCodes::WebSocketMovedPermanently;
+            if (restart_session || error_code.value() == ErrorCodes::WebSocketUnauthorized ||
+                error_code.value() == ErrorCodes::WebSocketAbnormalClosure) {
                 if (auto u = user()) {
                     u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
                     return;

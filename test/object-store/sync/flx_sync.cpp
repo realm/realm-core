@@ -2165,11 +2165,11 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                 ++error_count;
                 if (error_count == 1) {
                     // Bad changeset detected by the client.
-                    CHECK(err.error_code == sync::make_error_code(sync::ClientError::bad_changeset));
+                    CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
                 }
                 else if (error_count == 2) {
                     // Server asking for a client reset.
-                    CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
+                    CHECK(err.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_client_file));
                     CHECK(err.is_client_reset_requested());
                     promise.get_promise().emplace_value(std::move(err));
                 }
@@ -2311,11 +2311,11 @@ TEST_CASE("flx: send client error", "[sync][flx][app]") {
         ++error_count;
         if (error_count == 1) {
             // Bad changeset detected by the client.
-            CHECK(err.error_code == sync::make_error_code(sync::ClientError::bad_changeset));
+            CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
         }
         else if (error_count == 2) {
             // Server asking for a client reset.
-            CHECK(err.error_code == sync::make_error_code(sync::ProtocolError::bad_client_file));
+            CHECK(err.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_client_file));
             CHECK(err.is_client_reset_requested());
             promise.get_promise().emplace_value(std::move(err));
         }

@@ -94,28 +94,28 @@ private:
 
         if (ec == websocket::Error::bad_response_301_moved_permanently ||
             ec == websocket::Error::bad_response_308_permanent_redirect) {
-            error = ErrorCodes::WebSocket_MovedPermanently;
+            error = ErrorCodes::WebSocketMovedPermanently;
         }
         else if (ec == websocket::Error::bad_response_3xx_redirection) {
-            error = ErrorCodes::WebSocket_Retry_Error;
+            error = ErrorCodes::WebSocketRetryError;
             was_clean = false;
         }
         else if (ec == websocket::Error::bad_response_401_unauthorized) {
-            error = ErrorCodes::WebSocket_Unauthorized;
+            error = ErrorCodes::WebSocketUnauthorized;
         }
         else if (ec == websocket::Error::bad_response_403_forbidden) {
-            error = ErrorCodes::WebSocket_Forbidden;
+            error = ErrorCodes::WebSocketForbidden;
         }
         else if (ec == websocket::Error::bad_response_5xx_server_error ||
                  ec == websocket::Error::bad_response_500_internal_server_error ||
                  ec == websocket::Error::bad_response_502_bad_gateway ||
                  ec == websocket::Error::bad_response_503_service_unavailable ||
                  ec == websocket::Error::bad_response_504_gateway_timeout) {
-            error = ErrorCodes::WebSocket_InternalServerError;
+            error = ErrorCodes::WebSocketInternalServerError;
             was_clean = false;
         }
         else {
-            error = ErrorCodes::WebSocket_Fatal_Error;
+            error = ErrorCodes::WebSocketFatalError;
             was_clean = false;
             if (body) {
                 std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
@@ -128,14 +128,14 @@ private:
                                 std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
                     };
                     if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                        error = ErrorCodes::WebSocket_Client_Too_Old;
+                        error = ErrorCodes::WebSocketClient_Too_Old;
                     }
                     else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                        error = ErrorCodes::WebSocket_Client_Too_New;
+                        error = ErrorCodes::WebSocketClient_Too_New;
                     }
                     else {
                         // Other more complicated forms of mismatch
-                        error = ErrorCodes::WebSocket_Protocol_Mismatch;
+                        error = ErrorCodes::WebSocketProtocol_Mismatch;
                     }
                     was_clean = true;
                 }
@@ -147,7 +147,7 @@ private:
     void websocket_protocol_error_handler(std::error_code ec) override
     {
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WebSocket_ProtocolError, ec.message()});
+        websocket_error_and_close_handler(was_clean, Status{ErrorCodes::WebSocketProtocolError, ec.message()});
     }
     bool websocket_close_message_received(std::error_code ec, StringData message) override
     {
@@ -426,7 +426,7 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
         websocket_error_and_close_handler(was_clean,
-                                          Status{ErrorCodes::WebSocket_TLSHandshakeFailed, ec.message()}); // Throws
+                                          Status{ErrorCodes::WebSocketTLSHandshakeFailed, ec.message()}); // Throws
         return;
     }
 
