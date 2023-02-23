@@ -14,17 +14,17 @@ namespace {
 ///
 /// DefaultWebSocketImpl - websocket implementation for the default socket provider
 ///
-class DefaultWebSocketImpl final : public WebSocketInterface, public Config {
+class DefaultWebSocketImpl final : public DefaultWebSocket, public Config {
 public:
     DefaultWebSocketImpl(const std::shared_ptr<util::Logger>& logger_ptr, network::Service& service,
-                         std::mt19937_64& random, const std::string user_agent, WebSocketObserver& observer,
-                         WebSocketEndpoint&& endpoint)
+                         std::mt19937_64& random, const std::string user_agent,
+                         std::unique_ptr<WebSocketObserver> observer, WebSocketEndpoint&& endpoint)
         : m_logger_ptr{logger_ptr}
         , m_logger{*m_logger_ptr}
         , m_random{random}
         , m_service{service}
         , m_user_agent{user_agent}
-        , m_observer{observer}
+        , m_observer{std::move(observer)}
         , m_endpoint{std::move(endpoint)}
         , m_websocket(*this)
     {
@@ -41,6 +41,11 @@ public:
     std::string_view get_appservices_request_id() const noexcept override
     {
         return m_app_services_coid;
+    }
+
+    void force_handshake_response_for_testing(int status_code, std::string body = "") override
+    {
+        m_websocket.force_handshake_response_for_testing(status_code, body);
     }
 
     // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
@@ -67,7 +72,7 @@ private:
             m_app_services_coid = it->second;
         }
         auto it = headers.find("Sec-WebSocket-Protocol");
-        m_observer.websocket_connected_handler(it == headers.end() ? empty : it->second);
+        m_observer->websocket_connected_handler(it == headers.end() ? empty : it->second);
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
@@ -158,13 +163,13 @@ private:
     bool websocket_error_and_close_handler(bool was_clean, Status status)
     {
         if (!was_clean) {
-            m_observer.websocket_error_handler();
+            m_observer->websocket_error_handler();
         }
-        return m_observer.websocket_closed_handler(was_clean, status);
+        return m_observer->websocket_closed_handler(was_clean, status);
     }
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
-        return m_observer.websocket_binary_message_received(util::Span<const char>(ptr, size));
+        return m_observer->websocket_binary_message_received(util::Span<const char>(ptr, size));
     }
 
     void initiate_resolve();
@@ -191,7 +196,7 @@ private:
     const std::string m_user_agent;
     std::string m_app_services_coid;
 
-    WebSocketObserver& m_observer;
+    std::unique_ptr<WebSocketObserver> m_observer;
 
     const WebSocketEndpoint m_endpoint;
     util::Optional<network::Resolver> m_resolver;
@@ -470,7 +475,6 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 {
     REALM_ASSERT(m_logger_ptr);                     // Make sure the logger is valid
     util::seed_prng_nondeterministically(m_random); // Throws
-    start_keep_running_timer();                     // TODO: Update service so this timer is not needed
     if (auto_start) {
         start();
     }
@@ -479,9 +483,6 @@ DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>
 DefaultSocketProvider::~DefaultSocketProvider()
 {
     m_logger_ptr->trace("Default event loop teardown");
-    if (m_keep_running_timer)
-        m_keep_running_timer->cancel();
-
     // Wait for the thread to stop
     stop(true);
     // Shutting down - no need to lock mutex before check
@@ -556,7 +557,7 @@ void DefaultSocketProvider::event_loop()
     });
 
     try {
-        m_service.run(); // Throws
+        m_service.run_until_stopped(); // Throws
     }
     catch (const std::exception& e) {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -621,11 +622,11 @@ void DefaultSocketProvider::state_wait_for(std::unique_lock<std::mutex>& lock, S
     });
 }
 
-std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(WebSocketObserver* observer,
+std::unique_ptr<WebSocketInterface> DefaultSocketProvider::connect(std::unique_ptr<WebSocketObserver> observer,
                                                                    WebSocketEndpoint&& endpoint)
 {
-    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, m_service, m_random, m_user_agent, *observer,
-                                                  std::move(endpoint));
+    return std::make_unique<DefaultWebSocketImpl>(m_logger_ptr, m_service, m_random, m_user_agent,
+                                                  std::move(observer), std::move(endpoint));
 }
 
 } // namespace realm::sync::websocket

@@ -108,7 +108,15 @@ DBOptions TestFile::options() const
 InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
+    schema_version = 0;
     encryption_key = std::vector<char>();
+}
+
+DBOptions InMemoryTestFile::options() const
+{
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    return options;
 }
 
 #if REALM_ENABLE_SYNC
@@ -138,6 +146,19 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
                      error.what());
         abort();
     };
+    schema_version = 1;
+    this->schema = std::move(schema);
+    schema_mode = SchemaMode::AdditiveExplicit;
+}
+
+SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
+                           realm::util::Optional<realm::Schema> schema,
+                           std::function<SyncSessionErrorHandler>&& error_handler)
+{
+    REALM_ASSERT(user);
+    sync_config = std::make_shared<realm::SyncConfig>(user, partition);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = std::move(error_handler);
     schema_version = 1;
     this->schema = std::move(schema);
     schema_mode = SchemaMode::AdditiveExplicit;
@@ -300,7 +321,8 @@ TestAppSession::TestAppSession()
 
 TestAppSession::TestAppSession(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
-                               DeleteApp delete_app, ReconnectMode reconnect_mode)
+                               DeleteApp delete_app, ReconnectMode reconnect_mode,
+                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider)
     : m_app_session(std::make_unique<AppSession>(session))
     , m_base_file_path(util::make_temp_dir() + random_string(10))
     , m_delete_app(delete_app)
@@ -317,6 +339,7 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
+    sc_config.socket_provider = custom_socket_provider;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 

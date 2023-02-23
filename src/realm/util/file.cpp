@@ -29,11 +29,7 @@
 #include <iostream>
 #include <fcntl.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <io.h>
-#include <direct.h>
-#else
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -52,45 +48,6 @@
 using namespace realm::util;
 
 namespace {
-#ifdef _WIN32 // Windows - GetLastError()
-
-#undef max
-
-std::string get_last_error_msg(const char* prefix, DWORD err)
-{
-    std::string buffer;
-    buffer.append(prefix);
-    size_t offset = buffer.size();
-    size_t max_msg_size = 1024;
-    buffer.resize(offset + max_msg_size);
-    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
-    DWORD size =
-        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
-    if (0 < size)
-        return buffer;
-    buffer.resize(offset);
-    buffer.append("Unknown error");
-    return buffer;
-}
-
-std::wstring string_to_wstring(const std::string& str)
-{
-    if (str.empty())
-        return std::wstring();
-    int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-    std::wstring wstr;
-    if (wstr_size) {
-        wstr.resize(wstr_size);
-        if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wstr_size)) {
-            return wstr;
-        }
-    }
-    return std::wstring();
-}
-
-#endif
-
 size_t get_page_size()
 {
 #ifdef _WIN32
@@ -133,23 +90,22 @@ bool for_each_helper(const std::string& path, const std::string& dir, realm::uti
 
 #ifdef _WIN32
 
-std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
+std::string get_last_error_msg(const char* prefix, DWORD err)
 {
-    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
-    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
-
-    // Construct a 64 bit value that is the number of nanoseconds from the
-    // Windows epoch which is 1601-01-01 00:00:00 UTC
-    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
-    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
-
-    // FILETIME is 100's of nanoseconds since Windows epoch
-    totalMicros /= 10;
-    // Move it from micros since the Windows epoch to micros since the Unix epoch
-    totalMicros -= kEpochDifferenceMicros;
-
-    std::chrono::duration<uint64_t, std::micro> totalMicrosDur(totalMicros);
-    return std::chrono::system_clock::time_point(totalMicrosDur);
+    std::string buffer;
+    buffer.append(prefix);
+    size_t offset = buffer.size();
+    size_t max_msg_size = 1024;
+    buffer.resize(offset + max_msg_size);
+    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+    DWORD size =
+        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
+    if (0 < size)
+        return buffer;
+    buffer.resize(offset);
+    buffer.append("Unknown error");
+    return buffer;
 }
 
 struct WindowsFileHandleHolder {
@@ -181,6 +137,39 @@ struct WindowsFileHandleHolder {
 
 #endif
 
+#if REALM_HAVE_STD_FILESYSTEM
+void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
+{
+    if (!error)
+        return;
+
+    // create_directory doesn't raise an error if the path already exists
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
+}
+
+void throwIfFileError(std::error_code error, const std::string& path)
+{
+    if (!error)
+        return;
+
+    using std::errc;
+    if (error == errc::permission_denied || error == errc::read_only_file_system ||
+        error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
+        error == errc::file_exists || error == errc::directory_not_empty) {
+        throw File::PermissionDenied(error.message(), path);
+    }
+    else {
+        throw File::AccessError(error.message(), path);
+    }
+}
+#endif
+
 } // anonymous namespace
 
 
@@ -202,19 +191,21 @@ public:
 
 bool try_make_dir(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wmkdir(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::create_directory(path, error);
+    throwIfCreateDirectoryError(error, path);
+    return result;
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     if (err == EEXIST)
         return false;
 
     auto msg = format_errno("Failed to create directory at '%2': %1", err, path);
+
     switch (err) {
         case EACCES:
         case EROFS:
@@ -222,6 +213,7 @@ bool try_make_dir(const std::string& path)
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err); // LCOV_EXCL_LINE
     }
+#endif
 }
 
 
@@ -235,6 +227,11 @@ void make_dir(const std::string& path)
 
 void make_dir_recursive(std::string path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    std::filesystem::create_directories(path, error);
+    throwIfCreateDirectoryError(error, path);
+#else
     // Skip the first separator as we're assuming an absolute path
     size_t pos = path.find_first_of("/\\");
     if (pos == std::string::npos)
@@ -253,6 +250,7 @@ void make_dir_recursive(std::string path)
             path[sep] = c;
         pos = sep + 1;
     }
+#endif
 }
 
 
@@ -268,14 +266,15 @@ void remove_dir(const std::string& path)
 
 bool try_remove_dir(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wrmdir(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::remove(path, error);
+    throwIfFileError(error, path);
+    return result;
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     if (err == ENOENT)
         return false;
@@ -292,11 +291,18 @@ bool try_remove_dir(const std::string& path)
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err); // LCOV_EXCL_LINE
     }
+#endif
 }
 
 
 bool try_remove_dir_recursive(const std::string& path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    auto removed_count = std::filesystem::remove_all(path, error);
+    throwIfFileError(error, path);
+    return removed_count > 0;
+#else
     {
         bool allow_missing = true;
         DirScanner ds{path, allow_missing}; // Throws
@@ -312,6 +318,7 @@ bool try_remove_dir_recursive(const std::string& path)
         }
     }
     return try_remove_dir(path); // Throws
+#endif
 }
 
 
@@ -360,6 +367,42 @@ std::string make_temp_dir()
 #endif
 }
 
+std::string make_temp_file(const char* prefix)
+{
+#ifdef _WIN32 // Windows version
+    std::filesystem::path temp = std::filesystem::temp_directory_path();
+
+    wchar_t buffer[MAX_PATH];
+    std::filesystem::path path;
+    if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
+        throw std::system_error(GetLastError(), std::system_category(), "GetTempFileName() failed");
+    path = buffer;
+    return path.string();
+
+#else // POSIX.1-2008 version
+
+#if REALM_ANDROID
+    std::string base_dir = "/data/local/tmp/";
+#else
+    char* tmp_dir_env = getenv("TMPDIR");
+    std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
+    if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
+        base_dir = base_dir + "/";
+    }
+#endif
+    std::string tmp = base_dir + prefix + std::string("_XXXXXX") + std::string("\0", 1);
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
+    memcpy(buffer.get(), tmp.c_str(), tmp.size());
+    char* filename = buffer.get();
+    auto fd = mkstemp(filename);
+    if (fd == -1) {
+        throw std::system_error(errno, std::system_category(), "mkstemp() failed"); // LCOV_EXCL_LINE
+    }
+    close(fd);
+    return std::string(filename);
+#endif
+}
+
 size_t page_size()
 {
     return cached_page_size;
@@ -402,8 +445,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    std::wstring ws = string_to_wstring(path);
-    HANDLE handle = CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    HANDLE handle =
+        CreateFile2(std::filesystem::path(path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_fd = handle;
         m_have_lock = false;
@@ -980,11 +1023,7 @@ bool File::is_prealloc_supported()
 void File::seek(SizeType position)
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32
     seek_static(m_fd, position);
-#else
-    seek_static(m_fd, position);
-#endif
 }
 
 void File::seek_static(FileDesc fd, SizeType position)
@@ -1063,12 +1102,109 @@ static void _unlock(int m_fd)
 }
 #endif
 
+bool File::rw_lock(bool exclusive, bool non_blocking)
+{
+    // exclusive blocking rw locks not implemented for emulation
+    REALM_ASSERT(!exclusive || non_blocking);
+
+#ifndef REALM_FILELOCK_EMULATION
+    return lock(exclusive, non_blocking);
+#else
+    REALM_ASSERT(!m_has_exclusive_lock && !has_shared_lock());
+
+    // First obtain an exclusive lock on the file proper
+    int operation = LOCK_EX;
+    if (non_blocking)
+        operation |= LOCK_NB;
+    int status;
+    do {
+        status = flock(m_fd, operation);
+    } while (status != 0 && errno == EINTR);
+    if (status != 0 && errno == EWOULDBLOCK)
+        return false;
+    if (status != 0)
+        throw SystemError(errno, "flock() failed");
+    m_has_exclusive_lock = true;
+
+    // Every path through this function except for successfully acquiring an
+    // exclusive lock needs to release the flock() before returning.
+    UnlockGuard ulg(*this);
+
+    // now use a named pipe to emulate locking in conjunction with using exclusive lock
+    // on the file proper.
+    // exclusively locked: we can't sucessfully write to the pipe.
+    //                     AND we continue to hold the exclusive lock.
+    //                     (unlock must lift the exclusive lock).
+    // shared locked: we CAN succesfully write to the pipe. We open the pipe for reading
+    //                before releasing the exclusive lock.
+    //                (unlock must close the pipe for reading)
+    REALM_ASSERT_RELEASE(m_pipe_fd == -1);
+    if (m_fifo_path.empty())
+        m_fifo_path = m_path + ".fifo";
+
+    // Due to a bug in iOS 10-12 we need to open in read-write mode for shared
+    // or the OS will deadlock when un-suspending the app.
+    int mode = exclusive ? O_WRONLY | O_NONBLOCK : O_RDWR | O_NONBLOCK;
+
+    // Optimistically try to open the fifo. This may fail due to the fifo not
+    // existing, but since it usually exists this is faster than trying to create
+    // it first.
+    int fd = ::open(m_fifo_path.c_str(), mode);
+    if (fd == -1) {
+        int err = errno;
+        if (exclusive) {
+            if (err == ENOENT || err == ENXIO) {
+                // If the fifo either doesn't exist or there's no readers with the
+                // other end of the pipe open (ENXIO) then we have an exclusive lock
+                // and are done.
+                ulg.release();
+                return true;
+            }
+
+            // Otherwise we got an unexpected error
+            throw std::system_error(err, std::system_category(), "opening lock fifo for writing failed");
+        }
+
+        if (err == ENOENT) {
+            // The fifo doesn't exist and we're opening in shared mode, so we
+            // need to create it.
+            if (!m_fifo_dir_path.empty())
+                try_make_dir(m_fifo_dir_path);
+            status = mkfifo(m_fifo_path.c_str(), 0666);
+            if (status != 0)
+                throw std::system_error(errno, std::system_category(), "creating lock fifo for reading failed");
+
+            // Try again to open the fifo now that it exists
+            fd = ::open(m_fifo_path.c_str(), mode);
+            err = errno;
+        }
+
+        if (fd == -1)
+            throw std::system_error(err, std::system_category(), "opening lock fifo for reading failed");
+    }
+
+    // We successfully opened the pipe. If we're trying to acquire an exclusive
+    // lock that means there's a reader (aka a shared lock) and we've failed.
+    // Release the exclusive lock and back out.
+    if (exclusive) {
+        ::close(fd);
+        return false;
+    }
+
+    // We're in shared mode, so opening the fifo means we've successfully acquired
+    // a shared lock and are done.
+    ulg.release();
+    rw_unlock();
+    m_pipe_fd = fd;
+    return true;
+#endif // REALM_FILELOCK_EMULATION
+}
+
 bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
-
     REALM_ASSERT_RELEASE(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
@@ -1091,105 +1227,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     if (err == ERROR_LOCK_VIOLATION)
         return false;
-    throw SystemError(err, "LockFileEx() failed");
-
-#else
-#ifdef REALM_FILELOCK_EMULATION
-    // If we already have any form of lock, release it before trying to acquire a new
-    if (m_has_exclusive_lock || has_shared_lock())
-        unlock();
-
-    // First obtain an exclusive lock on the file proper
-    int operation = LOCK_EX;
-    if (non_blocking)
-        operation |= LOCK_NB;
-    int status;
-    do {
-        status = flock(m_fd, operation);
-    } while (status != 0 && errno == EINTR);
-    if (status != 0 && errno == EWOULDBLOCK)
-        return false;
-    if (status != 0)
-        throw SystemError(errno, "flock() failed");
-    m_has_exclusive_lock = true;
-
-    // now use a named pipe to emulate locking in conjunction with using exclusive lock
-    // on the file proper.
-    // exclusively locked: we can't sucessfully write to the pipe.
-    //                     AND we continue to hold the exclusive lock.
-    //                     (unlock must lift the exclusive lock).
-    // shared locked: we CAN succesfully write to the pipe. We open the pipe for reading
-    //                before releasing the exclusive lock.
-    //                (unlock must close the pipe for reading)
-    REALM_ASSERT_RELEASE(m_pipe_fd == -1);
-    if (m_fifo_path.empty())
-        m_fifo_path = m_path + ".fifo";
-    status = mkfifo(m_fifo_path.c_str(), 0666);
-    if (status) {
-        int err = errno;
-        REALM_ASSERT_EX(status == -1, status);
-        if (err == ENOENT) {
-            // The management directory doesn't exist, so there's clearly no
-            // readers. This can happen when calling DB::call_with_lock() or
-            // if the management directory has been removed by DB::call_with_lock()
-            if (exclusive) {
-                return true;
-            }
-            // open shared:
-            // We need the fifo in order to make a shared lock. If we have it
-            // in a management directory, we may need to create that first:
-            if (!m_fifo_dir_path.empty())
-                try_make_dir(m_fifo_dir_path);
-            // now we can try creating the FIFO again
-            status = mkfifo(m_fifo_path.c_str(), 0666);
-            if (status) {
-                // If we fail it must be because it already exists
-                err = errno;
-                REALM_ASSERT_EX(err == EEXIST, err);
-            }
-        }
-        else {
-            // if we failed to create the fifo and not because dir is missing,
-            // it must be because the fifo already exists!
-            REALM_ASSERT_EX(err == EEXIST, err);
-        }
-    }
-    if (exclusive) {
-        // check if any shared locks are already taken by trying to open the pipe for writing
-        // shared locks are indicated by one or more readers already having opened the pipe
-        int fd;
-        do {
-            fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
-        } while (fd == -1 && errno == EINTR);
-        if (fd == -1 && errno != ENXIO)
-            throw SystemError(errno, "opening lock fifo for writing failed");
-        if (fd == -1) {
-            // No reader was present so we have the exclusive lock!
-            return true;
-        }
-        else {
-            ::close(fd);
-            // shared locks exist. Back out. Release exclusive lock on file
-            unlock();
-            return false;
-        }
-    }
-    else {
-        // lock shared. We need to release the real exclusive lock on the file,
-        // but first we must mark the lock as shared by opening the pipe for reading
-        // Open pipe for reading!
-        // Due to a bug in iOS 10-12 we need to open in read-write mode or the OS
-        // will deadlock when un-suspending the app.
-        int fd = ::open(m_fifo_path.c_str(), O_RDWR | O_NONBLOCK);
-        if (fd == -1)
-            throw SystemError(errno, "opening lock fifo for reading failed");
-        unlock();
-        m_pipe_fd = fd;
-        return true;
-    }
-
-
-#else // BSD / Linux flock()
+    throw std::system_error(err, std::system_category(), "LockFileEx() failed");
+#else // _WIN32
     // NOTE: It would probably have been more portable to use fcntl()
     // based POSIX locks, however these locks are not recursive within
     // a single process, and since a second attempt to acquire such a
@@ -1207,7 +1246,6 @@ bool File::lock(bool exclusive, bool non_blocking)
     //
     // Fortunately, on both Linux and Darwin, flock() does not suffer
     // from this 'spurious unlocking issue'.
-
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |= LOCK_NB;
@@ -1219,16 +1257,12 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == EWOULDBLOCK)
         return false;
     throw SystemError(err, "flock() failed");
-
-#endif
 #endif
 }
-
 
 void File::unlock() noexcept
 {
 #ifdef _WIN32 // Windows version
-
     if (!m_have_lock)
         return;
 
@@ -1241,10 +1275,20 @@ void File::unlock() noexcept
 
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
-
 #else
-#ifdef REALM_FILELOCK_EMULATION
+    // The Linux man page for flock() does not state explicitely that
+    // unlocking is idempotent, however, we will assume it since there
+    // is no mention of the error that would be reported if a
+    // non-locked file were unlocked.
+    _unlock(m_fd);
+#endif
+}
 
+void File::rw_unlock() noexcept
+{
+#ifndef REALM_FILELOCK_EMULATION
+    unlock();
+#else
     // Coming here with an exclusive lock, we must release that lock.
     // Coming here with a shared lock, we must close the pipe that we have opened for reading.
     //   - we have to do that under the protection of a proper exclusive lock to serialize
@@ -1260,21 +1304,13 @@ void File::unlock() noexcept
         ::close(m_pipe_fd);
         m_pipe_fd = -1;
     }
+    else {
+        REALM_ASSERT(m_has_exclusive_lock);
+    }
     _unlock(m_fd);
     m_has_exclusive_lock = false;
-
-#else // BSD / Linux flock()
-
-    // The Linux man page for flock() does not state explicitely that
-    // unlocking is idempotent, however, we will assume it since there
-    // is no mention of the error that would be reported if a
-    // non-locked file were unlocked.
-    _unlock(m_fd);
-
-#endif
-#endif
+#endif // REALM_FILELOCK_EMULATION
 }
-
 
 void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
 {
@@ -1365,14 +1401,11 @@ void File::sync_map(FileDesc fd, void* addr, size_t size)
 
 bool File::exists(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_waccess(w_path.c_str(), 0) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::exists(path);
 #else // POSIX
     if (::access(path.c_str(), F_OK) == 0)
         return true;
-#endif
     int err = errno; // Eliminate any risk of clobbering
     switch (err) {
         case EACCES:
@@ -1381,12 +1414,15 @@ bool File::exists(const std::string& path)
             return false;
     }
     throw SystemError(err, "access() failed");
+#endif
 }
 
 
 bool File::is_dir(const std::string& path)
 {
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::is_directory(path);
+#elif !defined(_WIN32)
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0)
         return S_ISDIR(statbuf.st_mode);
@@ -1398,9 +1434,6 @@ bool File::is_dir(const std::string& path)
             return false;
     }
     throw SystemError(err, "stat() failed");
-#elif REALM_HAVE_STD_FILESYSTEM
-    std::wstring w_path = string_to_wstring(path);
-    return std::filesystem::is_directory(w_path);
 #else
     static_cast<void>(path);
     throw NotImplemented();
@@ -1420,14 +1453,15 @@ void File::remove(const std::string& path)
 
 bool File::try_remove(const std::string& path)
 {
-#ifdef _WIN32
-    std::wstring w_path = string_to_wstring(path);
-    if (_wunlink(w_path.c_str()) == 0)
-        return true;
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    bool result = std::filesystem::remove(path, error);
+    throwIfFileError(error, path);
+    return result;
 #else // POSIX
     if (::unlink(path.c_str()) == 0)
         return true;
-#endif
+
     int err = errno; // Eliminate any risk of clobbering
     if (err == ENOENT)
         return false;
@@ -1445,15 +1479,21 @@ bool File::try_remove(const std::string& path)
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, err);
     }
+#endif
 }
 
 
 void File::move(const std::string& old_path, const std::string& new_path)
 {
-#ifdef _WIN32
-    // Can't rename to existing file on Windows
-    try_remove(new_path);
-#endif
+#if REALM_HAVE_STD_FILESYSTEM
+    std::error_code error;
+    std::filesystem::rename(old_path, new_path, error);
+
+    if (error == std::errc::no_such_file_or_directory) {
+        throw NotFound(error.message(), old_path);
+    }
+    throwIfFileError(error, old_path);
+#else
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
@@ -1473,11 +1513,15 @@ void File::move(const std::string& old_path, const std::string& new_path)
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, old_path, err);
     }
+#endif
 }
 
 
 void File::copy(const std::string& origin_path, const std::string& target_path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::copy_file(origin_path, target_path, std::filesystem::copy_options::overwrite_existing); // Throws
+#else
     File origin_file{origin_path, mode_Read};  // Throws
     File target_file{target_path, mode_Write}; // Throws
     size_t buffer_size = 4096;
@@ -1488,6 +1532,7 @@ void File::copy(const std::string& origin_path, const std::string& target_path)
         if (n < buffer_size)
             break;
     }
+#endif
 }
 
 
@@ -1513,30 +1558,7 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
 
 bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 {
-#if defined(_WIN32) // Windows version
-    FILE_ID_INFO fi1;
-    FILE_ID_INFO fi2;
-    if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
-        if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
-            return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 &&
-                   fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
-        }
-    }
-    throw SystemError(GetLastError(), "GetFileInformationByHandleEx() failed");
-
-#else // POSIX version
-
-    struct stat statbuf;
-    if (::fstat(f1, &statbuf) == 0) {
-        dev_t device_id = statbuf.st_dev;
-        ino_t inode_num = statbuf.st_ino;
-        if (::fstat(f2, &statbuf) == 0)
-            return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
-    }
-    int err = errno;
-    throw SystemError(err, format_errno("fstat() failed: %1", err));
-
-#endif
+    return get_unique_id(f1) == get_unique_id(f2);
 }
 
 bool File::is_same_file(const File& f) const
@@ -1549,16 +1571,7 @@ bool File::is_same_file(const File& f) const
 File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32 // Windows version
-    throw NotImplemented();
-#else // POSIX version
-    struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) {
-        return UniqueID(statbuf.st_dev, statbuf.st_ino);
-    }
-    int err = errno;
-    throw SystemError(err, format_errno("fstat() failed: %1", err));
-#endif
+    return File::get_unique_id(m_fd);
 }
 
 FileDesc File::get_descriptor() const
@@ -1566,22 +1579,53 @@ FileDesc File::get_descriptor() const
     return m_fd;
 }
 
-bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
+std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
 {
 #ifdef _WIN32 // Windows version
-    throw NotImplemented();
+    // CreateFile2 with creationDisposition OPEN_EXISTING will return a file handle only if the file exists
+    // otherwise it will raise ERROR_FILE_NOT_FOUND. This call will never create a new file.
+    WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                     OPEN_EXISTING, nullptr));
+
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+            return none;
+        }
+        throw SystemError(GetLastError(), "CreateFileW failed");
+    }
+
+    return get_unique_id(fileHandle);
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
-        uid.device = statbuf.st_dev;
-        uid.inode = statbuf.st_ino;
-        return true;
+        return File::UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     int err = errno; // Eliminate any risk of clobbering
     // File doesn't exist
     if (err == ENOENT)
-        return false;
+        return none;
     throw SystemError(err, format_errno("fstat() failed: %1", err));
+#endif
+}
+
+File::UniqueID File::get_unique_id(FileDesc file)
+{
+#ifdef _WIN32 // Windows version
+    REALM_ASSERT(file != nullptr);
+    File::UniqueID ret;
+    if (GetFileInformationByHandleEx(file, FileIdInfo, &ret.id_info, sizeof(ret.id_info)) == 0) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileInformationByHandleEx() failed");
+    }
+
+    return ret;
+#else // POSIX version
+    REALM_ASSERT(file >= 0);
+    struct stat statbuf;
+    if (::fstat(file, &statbuf) == 0) {
+        return UniqueID(statbuf.st_dev, statbuf.st_ino);
+    }
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
 }
 
@@ -1592,7 +1636,10 @@ std::string File::get_path() const
 
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::path path_(path.empty() ? "." : path);
+    return (std::filesystem::path(base_dir) / path_).string();
+#else
     char dir_sep = '/';
     std::string path_2 = path;
     std::string base_dir_2 = base_dir;
@@ -1627,16 +1674,6 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
-#elif REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::path path_(path.empty() ? "." : path);
-    if (path_.is_absolute())
-        return path;
-
-    return (std::filesystem::path(base_dir) / path_).string();
-#else
-    static_cast<void>(path);
-    static_cast<void>(base_dir);
-    throw NotImplemented();
 #endif
 }
 
@@ -1805,23 +1842,17 @@ void File::MapBase::flush()
 
 std::time_t File::last_write_time(const std::string& path)
 {
-#ifdef _WIN32
-    auto wpath = string_to_wstring(path);
-    WindowsFileHandleHolder fileHandle(::CreateFile2(wpath.c_str(), FILE_READ_ATTRIBUTES,
-                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                     OPEN_EXISTING, nullptr));
+#if REALM_HAVE_STD_FILESYSTEM
+    auto time = std::filesystem::last_write_time(path);
 
-    if (fileHandle == INVALID_HANDLE_VALUE) {
-        throw SystemError(int(GetLastError()), "CreateFileW failed");
-    }
-
-    FILETIME mtime = {0};
-    if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
-        throw SystemError(int(GetLastError()), "GetFileTime failed");
-    }
-
-    auto tp = file_time_to_system_clock(mtime);
-    return std::chrono::system_clock::to_time_t(tp);
+    using namespace std::chrono;
+#if __cplusplus >= 202002L
+    auto system_time = clock_cast<system_clock>(time);
+#else
+    auto system_time =
+        time_point_cast<system_clock::duration>(time - decltype(time)::clock::now() + system_clock::now());
+#endif
+    return system_clock::to_time_t(system_time);
 #else
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) != 0) {
@@ -1833,20 +1864,8 @@ std::time_t File::last_write_time(const std::string& path)
 
 File::SizeType File::get_free_space(const std::string& path)
 {
-#ifdef _WIN32
-    auto pos = path.find_last_of("/\\");
-    std::string dir_path;
-    if (pos != std::string::npos) {
-        dir_path = path.substr(0, pos);
-    }
-    else {
-        dir_path = path;
-    }
-    ULARGE_INTEGER available;
-    if (!GetDiskFreeSpaceExA(dir_path.c_str(), &available, NULL, NULL)) {
-        throw SystemError(errno, "GetDiskFreeSpaceExA failed");
-    }
-    return available.QuadPart;
+#if REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::space(path).available;
 #else
     struct statvfs stat;
     if (statvfs(path.c_str(), &stat) != 0) {
@@ -1856,7 +1875,32 @@ File::SizeType File::get_free_space(const std::string& path)
 #endif
 }
 
-#ifndef _WIN32
+#if REALM_HAVE_STD_FILESYSTEM
+
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
+{
+    try {
+        m_iterator = std::filesystem::directory_iterator(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
+            throw;
+    }
+}
+
+DirScanner::~DirScanner() = default;
+
+bool DirScanner::next(std::string& name)
+{
+    const std::filesystem::directory_iterator end;
+    if (m_iterator == end)
+        return false;
+    name = m_iterator->path().filename().string();
+    m_iterator++;
+    return true;
+}
+
+#elif !defined(_WIN32)
 
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
@@ -1928,33 +1972,6 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
-}
-
-#elif REALM_HAVE_STD_FILESYSTEM
-
-DirScanner::DirScanner(const std::string& path, bool allow_missing)
-{
-    try {
-        m_iterator = std::filesystem::directory_iterator(path);
-    }
-    catch (const std::filesystem::filesystem_error& ex) {
-        if (ex.code() != std::errc::no_such_file_or_directory || !allow_missing) {
-            throw;
-        }
-    }
-}
-
-DirScanner::~DirScanner() = default;
-
-bool DirScanner::next(std::string& name)
-{
-    const std::filesystem::directory_iterator end;
-    if (m_iterator != end) {
-        name = m_iterator->path().filename().string();
-        m_iterator++;
-        return true;
-    }
-    return false;
 }
 
 #else

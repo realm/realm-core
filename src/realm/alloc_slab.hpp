@@ -175,6 +175,14 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(const char* data, size_t size);
 
+    void init_in_memory_buffer();
+    char* translate_memory_pos(ref_type ref) const noexcept;
+
+    bool is_in_memory() const
+    {
+        return m_attach_mode == attach_Heap;
+    }
+
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
     int get_committed_file_format_version() const noexcept;
@@ -326,6 +334,11 @@ public:
         return m_commit_size;
     }
 
+    size_t get_file_size() const
+    {
+        return (m_attach_mode == attach_SharedFile) ? size_t(m_file.get_size()) : m_virtual_file_size;
+    }
+
     /// Returns the total amount of memory currently allocated in slab area
     size_t get_allocated_size() const noexcept;
 
@@ -376,11 +389,12 @@ protected:
 
 private:
     enum AttachMode {
-        attach_None,        // Nothing is attached
-        attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
-        attach_UsersBuffer, // We do not own the buffer
-        attach_SharedFile,  // On behalf of DB
-        attach_UnsharedFile // Not on behalf of DB
+        attach_None,         // Nothing is attached
+        attach_OwnedBuffer,  // We own the buffer (m_data = nullptr for empty buffer)
+        attach_UsersBuffer,  // We do not own the buffer
+        attach_SharedFile,   // On behalf of DB
+        attach_UnsharedFile, // Not on behalf of DB
+        attach_Heap          // Memory only DB
     };
 
     // A slab is a dynamically allocated contiguous chunk of memory used to
@@ -410,6 +424,39 @@ private:
 
         Slab& operator=(const Slab&) = delete;
         Slab& operator=(Slab&&) = delete;
+    };
+
+    struct MemBuffer {
+        char* addr;
+        size_t size;
+        ref_type start_ref;
+
+        MemBuffer()
+            : addr(nullptr)
+            , size(0)
+            , start_ref(0)
+        {
+        }
+        MemBuffer(size_t s, ref_type ref)
+            : addr(new char[s])
+            , size(s)
+            , start_ref(ref)
+        {
+        }
+        ~MemBuffer()
+        {
+            if (addr)
+                delete[] addr;
+        }
+
+        MemBuffer(MemBuffer&& other) noexcept
+            : addr(other.addr)
+            , size(other.size)
+            , start_ref(other.start_ref)
+        {
+            other.addr = nullptr;
+            other.size = 0;
+        }
     };
 
     // free blocks that are in the slab area are managed using the following structures:
@@ -624,8 +671,10 @@ private:
     typedef std::vector<Slab> Slabs;
     using Chunks = std::map<ref_type, size_t>;
     Slabs m_slabs;
+    std::vector<MemBuffer> m_virtual_file_buffer;
     Chunks m_free_read_only;
     size_t m_commit_size = 0;
+    size_t m_virtual_file_size = 0;
 
     bool m_debug_out = false;
 

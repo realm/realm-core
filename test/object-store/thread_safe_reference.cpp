@@ -40,6 +40,7 @@
 
 using namespace realm;
 
+
 static TableRef get_table(Realm& realm, StringData object_name)
 {
     return ObjectStore::table_for_object_type(realm.read_group(), object_name);
@@ -67,9 +68,11 @@ TEST_CASE("thread safe reference") {
         {"int array", {{"value", PropertyType::Array | PropertyType::Int}}},
     };
 
-    InMemoryTestFile config;
+    TestFile config;
     config.automatic_change_notifications = false;
     config.cache = false;
+    config.in_memory = true;
+    config.encryption_key = std::vector<char>();
     config.schema = schema;
     auto r = Realm::get_shared_realm(config);
 

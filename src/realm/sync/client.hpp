@@ -46,7 +46,11 @@ public:
     /// See run().
     ///
     /// Thread-safe.
-    void stop() noexcept;
+    void shutdown() noexcept;
+
+    /// Forces all connections to close and waits for any pending work on the event
+    /// loop to complete. All sessions must be destroyed before calling shutdown_and_wait.
+    void shutdown_and_wait();
 
     /// \brief Cancel current or next reconnect delay for all servers.
     ///

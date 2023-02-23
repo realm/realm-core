@@ -724,6 +724,12 @@ public:
         m_frame_reader.reset();
     }
 
+    void force_handshake_response_for_testing(int status_code, std::string body)
+    {
+        m_test_handshake_response.emplace(status_code);
+        m_test_handshake_response_body = body;
+    }
+
 private:
     websocket::Config& m_config;
     const std::shared_ptr<util::Logger> m_logger_ptr;
@@ -745,6 +751,9 @@ private:
 
     util::UniqueFunction<void()> m_write_completion_handler;
 
+    std::optional<int> m_test_handshake_response;
+    std::string m_test_handshake_response_body;
+
     void error_client_malformed_response()
     {
         m_stopped = true;
@@ -763,6 +772,9 @@ private:
 
         int status_code = int(response.status);
         std::error_code ec;
+
+        if (m_test_handshake_response)
+            status_code = *m_test_handshake_response;
 
         if (status_code == 200)
             ec = Error::bad_response_200_ok;
@@ -799,7 +811,11 @@ private:
 
         std::string_view body;
         std::string_view* body_ptr = nullptr;
-        if (response.body) {
+        if (m_test_handshake_response) {
+            body = m_test_handshake_response_body;
+            body_ptr = &body;
+        }
+        else if (response.body) {
             body = *response.body;
             body_ptr = &body;
         }
@@ -853,7 +869,8 @@ private:
         m_logger.debug("WebSocket::handle_http_response_received()");
         m_logger.trace("HTTP response = %1", response);
 
-        if (response.status != HTTPStatus::SwitchingProtocols) {
+        if (response.status != HTTPStatus::SwitchingProtocols ||
+            (m_test_handshake_response && *m_test_handshake_response != 101)) {
             error_client_response_not_101(response);
             return;
         }
@@ -1215,6 +1232,11 @@ void websocket::Socket::async_write_pong(const char* data, size_t size, util::Un
 void websocket::Socket::stop() noexcept
 {
     m_impl->stop();
+}
+
+void websocket::Socket::force_handshake_response_for_testing(int status_code, std::string body)
+{
+    m_impl->force_handshake_response_for_testing(status_code, body);
 }
 
 util::Optional<std::string> websocket::read_sec_websocket_protocol(const HTTPRequest& request)

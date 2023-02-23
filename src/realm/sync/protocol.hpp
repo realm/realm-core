@@ -292,7 +292,7 @@ enum class ProtocolError {
     bad_server_version           = RLM_SYNC_ERR_SESSION_BAD_SERVER_VERSION,         // Bad server version (IDENT, UPLOAD, TRANSACT)
     bad_client_version           = RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION,         // Bad client version (IDENT, UPLOAD)
     diverging_histories          = RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES,        // Diverging histories (IDENT)
-    bad_changeset                = RLM_SYNC_ERR_SESSION_BAD_CHANGESET,              // Bad changeset (UPLOAD)
+    bad_changeset                = RLM_SYNC_ERR_SESSION_BAD_CHANGESET,              // Bad changeset (UPLOAD, ERROR)
     partial_sync_disabled        = RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED,      // Partial sync disabled (BIND)
     unsupported_session_feature  = RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE, // Unsupported session-level feature
     bad_origin_file_ident        = RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT,      // Bad origin file identifier (UPLOAD)
@@ -314,6 +314,7 @@ enum class ProtocolError {
     compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies and
                                                                                     // object outside the current query, and the server undid the modification
                                                                                     // (UPLOAD)
+    bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
 
     // clang-format on
 };
