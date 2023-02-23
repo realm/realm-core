@@ -3272,46 +3272,12 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
 
 } // anonymous namespace
 
-struct EncryptedPageValidator {
-    EncryptedPageValidator(const std::string& path)
-    {
-#if REALM_ENCRYPTION_VERIFICATION
-        if (!SpawnedProcess::is_parent())
-            return;
-        std::string validate_path = path + ".validate";
-        if (util::File::exists(validate_path)) {
-            util::File::remove(validate_path);
-        }
-        // std::cout << "encryption validator path: " << validate_path << std::endl;
-        m_file.open(validate_path, util::File::Mode::mode_Write);
-        auto msg = util::format("Begin validation at %1\n", Timestamp(std::chrono::system_clock::now()));
-        m_file.write(msg.data(), msg.size());
-        m_file.sync();
-#else
-        static_cast<void>(path);
-#endif // REALM_ENCRYPTION_VERIFICATION
-    }
-    ~EncryptedPageValidator()
-    {
-        if (m_file.is_attached()) {
-            m_file.close();
-            util::File::remove(m_file.get_path());
-        }
-    }
-
-private:
-    util::File m_file;
-};
-
-
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
     const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
-
-    EncryptedPageValidator validator(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
@@ -3412,8 +3378,6 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
     else {
         process->wait_for_child_to_finish();
     }
-
-    //    EncryptedPageValidator validator(path);
 
     // intialization complete. Start writers:
     for (int i = 0; i < write_process_count; ++i) {

@@ -26,7 +26,7 @@
 #include <set>
 #include <atomic>
 
-#if REALM_ENCRYPTION_VERIFICATION || REALM_DEBUG
+#if REALM_DEBUG
 #include <iostream>
 #endif
 

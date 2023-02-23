@@ -589,15 +589,6 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     ALLOC_DBG_COUT("  Allocating file space for data:" << std::endl);
-#if REALM_ENCRYPTION_VERIFICATION
-    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
-    if (File::exists(validator_path)) {
-        File validator(validator_path, File::Mode::mode_Append);
-        validator.seek(validator.get_size());
-        auto msg = util::format("commit start version %1\n", m_current_version);
-        validator.write(msg.data(), msg.size());
-    }
-#endif // REALM_ENCRYPTION_VERIFICATION
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
     // as they are going to change along the way.) If free space is available in
@@ -1336,25 +1327,6 @@ void GroupWriter::commit(ref_type new_top_ref)
         sync_all_mappings();
         m_alloc.get_file().barrier();
     }
-
-#if REALM_ENCRYPTION_VERIFICATION
-    std::string validator_path = m_alloc.get_file().get_path() + ".validate";
-    if (File::exists(validator_path)) {
-        File validator(validator_path, File::Mode::mode_Append);
-        validator.seek(validator.get_size());
-        std::string msg =
-            util::format("commit end version %1, top_ref %2, file size: %3 has freelist: ", m_current_version,
-                         new_top_ref, m_logical_size);
-        for (size_t i = 0; i < m_free_positions.size(); ++i) {
-            ref_type pos = ref_type(m_free_positions.get(i));
-            ref_type size = ref_type(m_free_lengths.get(i));
-            msg += util::format("{%1 + %2 = %3}[%4], ", pos, size, pos + size, m_free_versions.get(i));
-        }
-        msg += "\n";
-        validator.write(msg.data(), msg.size());
-        validator.sync();
-    }
-#endif // REALM_ENCRYPTION_VERIFICATION
 
     // Flip the slot selector bit.
     window->encryption_read_barrier(&file_header, sizeof file_header);

@@ -944,10 +944,6 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 void EncryptedFileMapping::flush() noexcept
 {
     const size_t num_dirty_pages = m_page_state.size();
-#if REALM_ENCRYPTION_VERIFICATION
-    std::string debug_msg;
-    std::vector<uint64_t> pages_written;
-#endif
     for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
         if (is_not(m_page_state[local_page_ndx], Dirty)) {
             validate_page(local_page_ndx);
@@ -958,21 +954,7 @@ void EncryptedFileMapping::flush() noexcept
         m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
                              static_cast<size_t>(1ULL << m_page_shift), m_marker);
         clear(m_page_state[local_page_ndx], Dirty);
-#if REALM_ENCRYPTION_VERIFICATION
-        pages_written.push_back(page_ndx_in_file);
-#endif
     }
-#if REALM_ENCRYPTION_VERIFICATION
-    if (pages_written.size() > 0 && m_file.validator.is_attached()) {
-        m_file.validator.seek(m_file.validator.get_size());
-        debug_msg += "wrote pages: ";
-        for (auto page : pages_written) {
-            debug_msg += util::format("%1, ", page);
-        }
-        debug_msg += std::string("\n");
-        m_file.validator.write(debug_msg.data(), debug_msg.size());
-    }
-#endif // REALM_ENCRYPTION_VERIFICATION
 
     validate();
 }
