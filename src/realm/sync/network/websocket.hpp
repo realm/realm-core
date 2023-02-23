@@ -168,6 +168,10 @@ public:
     /// initiate_server_handshake().
     void stop() noexcept;
 
+    /// Specifies an alternate status code for the handshake response to simulate
+    /// failures returned from the server.
+    void force_handshake_response_for_testing(int status_code, std::string body = "");
+
 private:
     class Impl;
     std::unique_ptr<Impl> m_impl;

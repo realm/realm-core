@@ -834,7 +834,7 @@ RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection,
     return wrap_err([&] {
         collection->find_bson(convert_to_bson<bson::BsonDocument>(filter_ejson),
                               to_mongodb_collection_find_options(options),
-                              [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                              [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                                   handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                               });
         return true;
@@ -851,7 +851,7 @@ RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collect
     return wrap_err([&] {
         collection->find_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson), to_mongodb_collection_find_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -866,7 +866,7 @@ RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collec
     return wrap_err([&] {
         collection->aggregate_bson(
             convert_to_bson<bson::BsonArray>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -880,7 +880,7 @@ RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection
     REALM_ASSERT(collection);
     return wrap_err([&] {
         collection->count_bson(convert_to_bson<bson::BsonDocument>(filter_ejson), limit,
-                               [&](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
+                               [=](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
                                    handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                });
         return true;
@@ -895,7 +895,7 @@ RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* colle
     return wrap_err([&] {
         collection->insert_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -910,7 +910,7 @@ RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* coll
     return wrap_err([&] {
         collection->insert_many_bson(
             convert_to_bson<bson::BsonArray>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -925,7 +925,7 @@ RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* colle
     return wrap_err([&] {
         collection->delete_one_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -940,7 +940,7 @@ RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* coll
     return wrap_err([&] {
         collection->delete_many_bson(
             convert_to_bson<bson::BsonDocument>(filter_ejson),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -958,7 +958,7 @@ RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* colle
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->update_one_bson(
             bson_filter, bson_update, upsert,
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -976,7 +976,7 @@ RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* coll
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->update_many_bson(
             bson_filter, bson_update, upsert,
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -995,7 +995,7 @@ RLM_API bool realm_mongo_collection_find_one_and_update(realm_mongodb_collection
         const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
         collection->find_one_and_update_bson(
             bson_filter, bson_update, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1013,7 +1013,7 @@ RLM_API bool realm_mongo_collection_find_one_and_replace(
         const auto& replacement_bson = convert_to_bson<bson::BsonDocument>(replacement_ejson);
         collection->find_one_and_replace_bson(
             filter_bson, replacement_bson, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;
@@ -1031,7 +1031,7 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
         const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
         collection->find_one_and_delete_bson(
             bson_filter, to_mongodb_collection_find_one_and_modify_options(options),
-            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            [=](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
                 handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
             });
         return true;

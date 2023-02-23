@@ -272,6 +272,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
         return realm;
     }
     do_get_realm(std::move(config), realm, version, lock);
+    if (version) {
+        realm->read_group();
+    }
     return realm;
 }
 
@@ -438,7 +441,12 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-            m_db = DB::create(std::move(history), m_config.path, options);
+            if (m_config.path.size()) {
+                m_db = DB::create(std::move(history), m_config.path, options);
+            }
+            else {
+                m_db = DB::create(std::move(history), options);
+            }
         }
         else {
             m_db = DB::create(m_config.path, true, options);

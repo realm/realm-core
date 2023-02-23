@@ -349,10 +349,10 @@ public:
 
     bool operator()(audit_event::Query& query)
     {
-        m_logger.trace("Audit: Query on %1 at version %2", query.table, query.version);
+        m_logger.trace("Events: Query on %1 at version %2", query.table, query.version);
         if (m_previous_query && m_previous_query->table == query.table &&
             m_previous_query->version == query.version) {
-            m_logger.trace("Audit: merging query into previous query");
+            m_logger.trace("Events: merging query into previous query");
             m_previous_query->objects.insert(m_previous_query->objects.end(), query.objects.begin(),
                                              query.objects.end());
             return true;
@@ -364,15 +364,15 @@ public:
 
     bool operator()(audit_event::Object const& obj)
     {
-        m_logger.trace("Audit: Object read on %1 %2 at version %3", obj.table, obj.obj, obj.version);
+        m_logger.trace("Events: Object read on %1 %2 at version %3", obj.table, obj.obj, obj.version);
         if (m_previous_query && m_previous_query->table == obj.table && m_previous_query->version == obj.version) {
-            m_logger.trace("Audit: merging read into previous query");
+            m_logger.trace("Events: merging read into previous query");
             m_previous_query->objects.push_back(obj.obj);
             return true;
         }
         if (m_previous_obj && m_previous_obj->table == obj.table && m_previous_obj->obj == obj.obj &&
             m_previous_obj->version == obj.version) {
-            m_logger.trace("Audit: discarding duplicate read");
+            m_logger.trace("Events: discarding duplicate read");
             return true;
         }
         m_previous_obj = &obj;
@@ -415,7 +415,7 @@ public:
                                            }),
                             query.objects.end());
         if (query.objects.empty())
-            m_logger.trace("Audit: discarding empty query on %1", query.table);
+            m_logger.trace("Events: discarding empty query on %1", query.table);
         return query.objects.empty();
     }
 
@@ -423,7 +423,7 @@ public:
     {
         bool exists = object_exists(obj.version, obj.table, obj.obj);
         if (!exists)
-            m_logger.trace("Audit: discarding read on newly created object %1 %2", obj.table, obj.obj);
+            m_logger.trace("Events: discarding read on newly created object %1 %2", obj.table, obj.obj);
         return !exists;
     }
 
@@ -731,7 +731,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
     if (m_current_realm) {
         auto size = util::File::get_size_static(m_current_realm->config().path);
         if (size > g_max_partition_size) {
-            m_logger->info("Audit: Closing Realm at '%1': size %2 > max size %3", m_current_realm->config().path,
+            m_logger->info("Events: Closing Realm at '%1': size %2 > max size %3", m_current_realm->config().path,
                            size, g_max_partition_size.load());
             auto sync_session = m_current_realm->sync_session();
             {
@@ -752,7 +752,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
             m_current_realm = nullptr;
         }
         else {
-            m_logger->detail("Audit: Reusing existing Realm at '%1'", m_current_realm->config().path);
+            m_logger->detail("Events: Reusing existing Realm at '%1'", m_current_realm->config().path);
         }
     }
 
@@ -774,7 +774,7 @@ void AuditRealmPool::write(util::FunctionRef<void(Transaction&)> func)
 
 void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
 {
-    m_logger->info("Audit: Uploading '%1'", session->path());
+    m_logger->info("Events: Uploading '%1'", session->path());
     m_upload_sessions.push_back(session);
     session->wait_for_upload_completion([this, weak_self = weak_from_this(), session](Status status) {
         auto self = weak_self.lock();
@@ -790,13 +790,13 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             session->close();
             m_open_paths.erase(path);
             if (status.get_std_error_code()) {
-                m_logger->error("Audit: Upload on '%1' failed with error '%2'.", path, status.reason());
+                m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status.reason());
                 if (m_error_handler) {
                     m_error_handler(SyncError(status.get_std_error_code(), status.reason(), false));
                 }
             }
             else {
-                m_logger->info("Audit: Upload on '%1' completed.", path);
+                m_logger->info("Events: Upload on '%1' completed.", path);
                 util::File::remove(path);
             }
             if (!m_upload_sessions.empty())
@@ -818,7 +818,7 @@ std::string AuditRealmPool::prefixed_partition(std::string const& partition)
 void AuditRealmPool::scan_for_realms_to_upload()
 {
     util::CheckedLockGuard lock(m_mutex);
-    m_logger->trace("Audit: Scanning for Realms in '%1' to upload", m_path_root);
+    m_logger->trace("Events: Scanning for Realms in '%1' to upload", m_path_root);
     util::DirScanner dir(m_path_root);
     std::string file_name;
     while (dir.next(file_name)) {
@@ -827,15 +827,15 @@ void AuditRealmPool::scan_for_realms_to_upload()
 
         std::string path = m_path_root + file_name;
         if (m_open_paths.count(path)) {
-            m_logger->trace("Audit: Skipping '%1': file is already open", path);
+            m_logger->trace("Events: Skipping '%1': file is already open", path);
             continue;
         }
 
-        m_logger->trace("Audit: Checking file '%1'", path);
+        m_logger->trace("Events: Checking file '%1'", path);
         auto db = DB::create(std::make_unique<sync::ClientReplication>(false), path);
         auto tr = db->start_read();
         if (tr->get_history()->no_pending_local_changes(tr->get_version())) {
-            m_logger->info("Audit: Realm at '%1' is fully uploaded", path);
+            m_logger->info("Events: Realm at '%1' is fully uploaded", path);
             tr = nullptr;
             db->close();
             util::File::remove(path);
@@ -879,8 +879,12 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
+<<<<<<< HEAD
             self->m_logger->error("Audit: Received sync error: %1 (ec=%2)", error.what(),
                                   error.get_system_error().value());
+=======
+            self->m_logger->error("Events: Received sync error: %1 (ec=%2)", error.message, error.error_code.value());
+>>>>>>> master
         }
         if (error_handler) {
             error_handler(error);
@@ -900,7 +904,7 @@ void AuditRealmPool::open_new_realm()
     config.schema_version = 0;
     config.sync_config = sync_config;
 
-    m_logger->info("Audit: Opening new Realm at '%1'", config.path);
+    m_logger->info("Events: Opening new Realm at '%1'", config.path);
     m_current_realm = Realm::get_shared_realm(std::move(config));
     util::CheckedLockGuard lock(m_mutex);
     m_open_paths.insert(m_current_realm->config().path);
@@ -921,8 +925,10 @@ public:
 
     void update_metadata(std::vector<std::pair<std::string, std::string>> new_metadata) override REQUIRES(!m_mutex);
 
-    void begin_scope(std::string_view name) override REQUIRES(!m_mutex);
-    void end_scope(util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
+    uint64_t begin_scope(std::string_view name) override REQUIRES(!m_mutex);
+    void end_scope(uint64_t, util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
+    void cancel_scope(uint64_t) override REQUIRES(!m_mutex);
+    bool is_scope_valid(uint64_t) override REQUIRES(!m_mutex);
     void record_event(std::string_view activity, util::Optional<std::string> event_type,
                       util::Optional<std::string> data,
                       util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
@@ -939,6 +945,7 @@ public:
 
 private:
     struct Scope {
+        uint64_t id;
         std::shared_ptr<MetadataSchema> metadata;
         std::string activity_name;
         std::vector<Event> events;
@@ -953,12 +960,14 @@ private:
     std::shared_ptr<util::Logger> m_logger;
 
     util::CheckedMutex m_mutex;
-    std::shared_ptr<Scope> m_current_scope GUARDED_BY(m_mutex);
+    std::vector<std::shared_ptr<Scope>> m_current_scopes GUARDED_BY(m_mutex);
+    uint64_t m_scope_counter GUARDED_BY(m_mutex) = 0;
     dispatch_queue_t m_queue;
 
     void pin_version(VersionID) REQUIRES(m_mutex);
     void trigger_write(std::shared_ptr<Scope>) REQUIRES(m_mutex);
     void process_scope(AuditContext::Scope& scope) const;
+    std::vector<std::shared_ptr<Scope>>::iterator find_scope(uint64_t id) REQUIRES(m_mutex);
 
     friend class AuditEventWriter;
 };
@@ -1032,7 +1041,7 @@ AuditContext::~AuditContext() = default;
 void AuditContext::record_query(VersionID version, TableView const& tv)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (!m_current_scope)
+    if (m_current_scopes.empty())
         return;
     if (tv.size() == 0)
         return; // Query didn't match any objects so there wasn't actually a read
@@ -1042,14 +1051,16 @@ void AuditContext::record_query(VersionID version, TableView const& tv)
     for (size_t i = 0, count = tv.size(); i < count; ++i)
         objects.push_back(tv.get_key(i));
 
-    m_current_scope->events.push_back(
-        audit_event::Query{now(), version, tv.get_target_table()->get_key(), std::move(objects)});
+    audit_event::Query event{now(), version, tv.get_target_table()->get_key(), std::move(objects)};
+    for (auto& scope : m_current_scopes) {
+        scope->events.push_back(event);
+    }
 }
 
 void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& parent, ColKey col)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (!m_current_scope)
+    if (m_current_scopes.empty())
         return;
     if (obj.get_table()->is_embedded())
         return;
@@ -1060,23 +1071,30 @@ void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& par
         parent_table_key = parent.get_table()->get_key();
         parent_obj_key = parent.get_key();
     }
-    m_current_scope->events.push_back(audit_event::Object{now(), version, obj.get_table()->get_key(), obj.get_key(),
-                                                          parent_table_key, parent_obj_key, col});
+
+    auto obj_key = obj.get_table()->get_key();
+    audit_event::Object event{now(), version, obj_key, obj.get_key(), parent_table_key, parent_obj_key, col};
+    for (auto& scope : m_current_scopes) {
+        scope->events.push_back(event);
+    }
 }
 
 void AuditContext::prepare_for_write(VersionID old_version)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (m_current_scope)
+    if (!m_current_scopes.empty())
         pin_version(old_version);
 }
 
 void AuditContext::record_write(VersionID old_version, VersionID new_version)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (!m_current_scope)
+    if (m_current_scopes.empty())
         return;
-    m_current_scope->events.push_back(audit_event::Write{now(), old_version, new_version});
+    audit_event::Write event{now(), old_version, new_version};
+    for (auto& scope : m_current_scopes) {
+        scope->events.push_back(event);
+    }
 }
 
 void AuditContext::record_event(std::string_view activity, util::Optional<std::string> event_type,
@@ -1085,7 +1103,8 @@ void AuditContext::record_event(std::string_view activity, util::Optional<std::s
 
 {
     util::CheckedLockGuard lock(m_mutex);
-    auto scope = std::make_shared<Scope>(Scope{m_metadata, std::string(activity)});
+    // scope id isn't used for this scope, so it's just an arbitrary value
+    auto scope = std::make_shared<Scope>(Scope{0, m_metadata, std::string(activity)});
     scope->events.push_back(audit_event::Custom{now(), std::string(activity), event_type, data});
     scope->completion = std::move(completion);
     trigger_write(std::move(scope));
@@ -1093,25 +1112,48 @@ void AuditContext::record_event(std::string_view activity, util::Optional<std::s
 
 void AuditContext::pin_version(VersionID version)
 {
-    for (auto& transaction : m_current_scope->source_transactions) {
-        if (transaction->get_version() == version.version)
-            return;
+    TransactionRef pin;
+    for (auto& scope : m_current_scopes) {
+        bool has_version =
+            std::any_of(scope->source_transactions.begin(), scope->source_transactions.end(), [&](auto& tr) {
+                return tr->get_version() == version.version;
+            });
+        if (!has_version) {
+            if (!pin) {
+                pin = m_source_db->start_read(version);
+            }
+            scope->source_transactions.push_back(pin);
+        }
     }
-    m_current_scope->source_transactions.push_back(m_source_db->start_read(version));
 }
 
-void AuditContext::begin_scope(std::string_view name)
+uint64_t AuditContext::begin_scope(std::string_view name)
 {
     util::CheckedLockGuard lock(m_mutex);
+<<<<<<< HEAD
     if (m_current_scope)
         throw WrongTransactionState("Cannot begin audit scope: audit already in progress");
     m_logger->trace("Audit: Beginning audit scope on '%1' named '%2'", m_source_db->get_path(), name);
     m_current_scope = std::make_shared<Scope>(Scope{m_metadata, std::string(name)});
+=======
+    auto id = ++m_scope_counter;
+    m_logger->trace("Events: Beginning event scope '%1' on '%2' named '%3'", id, m_source_db->get_path(), name);
+    m_current_scopes.push_back(std::make_shared<Scope>(Scope{id, m_metadata, std::string(name)}));
+    return id;
+>>>>>>> master
 }
 
-void AuditContext::end_scope(util::UniqueFunction<void(std::exception_ptr)>&& completion)
+std::vector<std::shared_ptr<AuditContext::Scope>>::iterator AuditContext::find_scope(uint64_t id)
+{
+    return std::find_if(m_current_scopes.begin(), m_current_scopes.end(), [&](auto& scope) {
+        return scope->id == id;
+    });
+}
+
+void AuditContext::end_scope(uint64_t id, util::UniqueFunction<void(std::exception_ptr)>&& completion)
 {
     util::CheckedLockGuard lock(m_mutex);
+<<<<<<< HEAD
     if (!m_current_scope)
         throw WrongTransactionState("Cannot end audit scope: no audit in progress");
     m_logger->trace("Audit: Comitting audit scope on '%1' with %2 events", m_source_db->get_path(),
@@ -1119,11 +1161,42 @@ void AuditContext::end_scope(util::UniqueFunction<void(std::exception_ptr)>&& co
     m_current_scope->completion = std::move(completion);
     trigger_write(std::move(m_current_scope));
     m_current_scope = nullptr;
+=======
+    auto it = find_scope(id);
+    if (it == m_current_scopes.end()) {
+        throw std::logic_error(util::format(
+            "Cannot end event scope: scope '%1' not in progress. Scope may have already been ended?", id));
+    }
+    m_logger->trace("Events: Comitting event scope '%1' on '%2' with %3 events", id, m_source_db->get_path(),
+                    (*it)->events.size());
+    (*it)->completion = std::move(completion);
+    trigger_write(std::move(*it));
+    m_current_scopes.erase(it);
+}
+
+void AuditContext::cancel_scope(uint64_t id)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    auto it = find_scope(id);
+    if (it == m_current_scopes.end()) {
+        throw std::logic_error(util::format(
+            "Cannot end event scope: scope '%1' not in progress. Scope may have already been ended?", id));
+    }
+    m_logger->trace("Events: Cancelling event scope '%1' on '%2' with %3 events", id, m_source_db->get_path(),
+                    (*it)->events.size());
+    m_current_scopes.erase(it);
+}
+
+bool AuditContext::is_scope_valid(uint64_t id)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    return find_scope(id) != m_current_scopes.end();
+>>>>>>> master
 }
 
 void AuditContext::process_scope(AuditContext::Scope& scope) const
 {
-    m_logger->info("Audit: Processing scope for '%1'", m_source_db->get_path());
+    m_logger->info("Events: Processing scope for '%1'", m_source_db->get_path());
     try {
         // Merge single object reads following a query into that query and discard
         // duplicate reads on objects.
@@ -1178,14 +1251,14 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
                     else {
                         constexpr bool nullable = true;
                         scope.metadata->metadata_cols.push_back(table->add_column(type_String, key, nullable));
-                        m_logger->trace("Audit: Adding column for metadata field '%1'", key);
+                        m_logger->trace("Events: Adding column for metadata field '%1'", key);
                     }
                 }
             }
 
             AuditEventWriter writer{*m_source_db, *scope.metadata, scope.activity_name, *table, *m_serializer};
 
-            m_logger->trace("Audit: Total event count: %1", scope.events.size());
+            m_logger->trace("Events: Total event count: %1", scope.events.size());
 
             // We write directly to the replication log and don't want
             // the automatic replication to happen
@@ -1196,7 +1269,7 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
                 if (mpark::visit(writer, scope.events[i])) {
                     // This event didn't fit in the current transaction
                     // so commit and try it again after that.
-                    m_logger->detail("Audit: Incrementally comitting transaction after %1 events", i);
+                    m_logger->detail("Events: Incrementally comitting transaction after %1 events", i);
                     tr.commit_and_continue_writing();
                     --i;
                 }
@@ -1206,15 +1279,15 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
 
         if (scope.completion)
             scope.completion(nullptr);
-        m_logger->detail("Audit: Scope completed");
+        m_logger->detail("Events: Scope completed");
     }
     catch (std::exception const& e) {
-        m_logger->error("Audit: Error when writing scope: %1", e.what());
+        m_logger->error("Events: Error when writing scope: %1", e.what());
         if (scope.completion)
             scope.completion(std::current_exception());
     }
     catch (...) {
-        m_logger->error("Audit: Unknown error when writing scope");
+        m_logger->error("Events: Unknown error when writing scope");
         if (scope.completion)
             scope.completion(std::current_exception());
     }

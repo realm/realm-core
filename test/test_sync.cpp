@@ -781,13 +781,16 @@ struct ExpectChangesetError {
 
     void operator()(ConnectionState state, util::Optional<Session::ErrorInfo> error_info) const noexcept
     {
-        if (state != ConnectionState::disconnected)
+        if (state == ConnectionState::disconnected) {
+            return;
+        }
+        if (!error_info)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
         CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
         CHECK(ec.category() == client_error_category());
-        CHECK(error_info->is_fatal());
+        CHECK(!error_info->is_fatal());
         CHECK_EQUAL(error_info->message,
                     "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
                         expected_error);
@@ -2273,7 +2276,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
     fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
         CHECK_EQUAL(ProtocolError::permission_denied, ec);
         did_get_permission_denied = true;
-        fixture.get_client(1).stop();
+        fixture.get_client(1).shutdown();
     });
     fixture.start();
 
@@ -2980,7 +2983,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
                                   " preverify_ok = %4, depth = %5",
                                   server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
-            client.stop();
+            client.shutdown();
         return true;
     };
 
@@ -2996,8 +2999,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
-    client.stop();
-    socket_provider->stop(true);
+    client.shutdown_and_wait();
 }
 
 #endif // REALM_HAVE_OPENSSL
@@ -3155,8 +3157,7 @@ TEST(Sync_UploadDownloadProgress_1)
             return cond_var_signaled;
         });
 
-        client.stop();
-        socket_provider->stop(true);
+        client.shutdown();
         CHECK_EQUAL(number_of_handler_calls, 1);
     }
 }
@@ -3402,12 +3403,9 @@ TEST(Sync_UploadDownloadProgress_3)
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
     // not running, and it is started by progress_handler().
-    int entry = 0;
 
     bool should_signal_cond_var = false;
-    bool cond_var_signaled = false;
-    std::mutex mutex;
-    std::condition_variable cond_var;
+    auto signal_pf = util::make_promise_future<void>();
 
     uint_fast64_t downloaded_bytes_1 = 123; // Not zero
     uint_fast64_t downloadable_bytes_1 = 123;
@@ -3416,9 +3414,10 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&, entry = int(0), promise = util::CopyablePromiseHolder(std::move(signal_pf.promise))](
+                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -3441,10 +3440,7 @@ TEST(Sync_UploadDownloadProgress_3)
         }
 
         if (should_signal_cond_var) {
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            promise.get_promise().emplace_value();
         }
 
         entry++;
@@ -3481,12 +3477,7 @@ TEST(Sync_UploadDownloadProgress_3)
         session.nonsync_transact_notify(commited_version);
     }
 
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        cond_var.wait(lock, [&] {
-            return cond_var_signaled;
-        });
-    }
+    signal_pf.future.get();
 
     CHECK_EQUAL(downloaded_bytes_1, 0);
     CHECK_EQUAL(downloadable_bytes_1, 0);
@@ -3494,10 +3485,7 @@ TEST(Sync_UploadDownloadProgress_3)
     CHECK_NOT_EQUAL(uploadable_bytes_1, 0);
     CHECK_EQUAL(snapshot_version_1, commited_version);
 
-    client.stop();
-
     server_thread.join();
-    socket_provider->stop(true);
 }
 
 
@@ -3621,18 +3609,17 @@ TEST(Sync_UploadDownloadProgress_5)
     TEST_DIR(server_dir);
     TEST_CLIENT_DB(db);
 
-    bool cond_var_signaled = false;
-    std::mutex mutex;
-    std::condition_variable cond_var;
+    auto [progress_handled_promise, progress_handled] = util::make_promise_future<void>();
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
     Session session = fixture.make_session(db);
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+    auto progress_handler = [&, promise = util::CopyablePromiseHolder(std::move(progress_handled_promise))](
+                                uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) mutable {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -3640,20 +3627,14 @@ TEST(Sync_UploadDownloadProgress_5)
 
         if (progress_version > 0) {
             CHECK_EQUAL(snapshot_version, 3);
-            std::unique_lock<std::mutex> lock(mutex);
-            cond_var_signaled = true;
-            lock.unlock();
-            cond_var.notify_one();
+            promise.get_promise().emplace_value();
         }
     };
 
     session.set_progress_handler(progress_handler);
 
-    std::unique_lock<std::mutex> lock(mutex);
     fixture.bind_session(session, "/test");
-    cond_var.wait(lock, [&] {
-        return cond_var_signaled;
-    });
+    progress_handled.get();
 
     // The check is that we reach this point.
 }
@@ -3720,9 +3701,8 @@ TEST(Sync_UploadDownloadProgress_6)
         session->bind();
     }
 
-    client.stop();
+    client.shutdown_and_wait();
     server.stop();
-    socket_provider->stop(true);
     server_thread.join();
 
     // The check is that we reach this point without deadlocking.
@@ -4340,6 +4320,7 @@ TEST(Sync_MergeMultipleChangesets)
         fixture.start_client(0);
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
+        session_1.detach();
         // Stop first client.
         fixture.stop_client(0);
 
@@ -5058,7 +5039,7 @@ TEST_IF(Sync_SSL_Certificates, false)
                     error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
-                client.stop();
+                client.shutdown();
             }
         };
 
@@ -5066,7 +5047,6 @@ TEST_IF(Sync_SSL_Certificates, false)
         session.bind();
 
         session.wait_for_download_complete_or_client_stopped();
-        client.stop();
     }
 }
 
@@ -5669,67 +5649,6 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
     });
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
-}
-
-
-TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    TEST_CLIENT_DB(db_2);
-
-    // Verify that if a client fails to integrate a downloaded changeset, then
-    // it will keep failing during future attempts. This test once failed due to
-    // https://jira.mongodb.org/browse/RSYNC-48.
-
-    TEST_DIR(dir);
-    fixtures::ClientServerFixture fixture{dir, test_context};
-    fixture.start();
-
-    // Introduce a changeset into the server-side Realm
-    {
-        fixtures::RealmFixture realm{fixture, path_1, "/test"};
-        realm.nonempty_transact();
-        realm.wait_for_upload_complete_or_client_stopped();
-    }
-
-    // Launch a client with `simulate_integration_error` set to true, and make
-    // it download that changeset. Then check that it fails at least two times.
-    bool failed_once = false;
-    bool failed_twice = false;
-    using ConnectionState = ConnectionState;
-    using ErrorInfo = Session::ErrorInfo;
-    std::mutex mx;
-    std::condition_variable cv;
-    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-        if (state != ConnectionState::disconnected)
-            return;
-        REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        CHECK_EQUAL(Client::Error::bad_changeset, ec);
-        CHECK(is_fatal);
-        if (!failed_once) {
-            failed_once = true;
-            fixture.cancel_reconnect_delay();
-        }
-        else {
-            std::unique_lock<std::mutex> lk(mx);
-            failed_twice = true;
-            fixture.stop();
-            cv.notify_one();
-        }
-    };
-    Session::Config config;
-    config.simulate_integration_error = true;
-    Session session = fixture.make_session(db_2, std::move(config));
-    session.set_connection_state_change_listener(listener);
-    fixture.bind_session(session, "/test");
-    using namespace std::chrono_literals;
-    std::unique_lock<std::mutex> lk(mx);
-    bool completed_within_time_limit = cv.wait_for(lk, 1s, [&] {
-        return failed_twice;
-    });
-    CHECK(completed_within_time_limit);
 }
 
 template <typename T>

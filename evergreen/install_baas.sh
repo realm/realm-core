@@ -227,7 +227,7 @@ YARN="$WORK_PATH/yarn/bin/yarn"
 if [[ ! -x "$YARN" ]]; then
     echo "Getting yarn"
     mkdir yarn && cd yarn
-    $CURL -LsS https://s3.amazonaws.com/stitch-artifacts/yarn/latest.tar.gz | tar -xz --strip-components=1
+    $CURL -LsS https://yarnpkg.com/latest.tar.gz | tar -xz --strip-components=1
     cd -
     mkdir "$WORK_PATH/yarn_cache"
 fi

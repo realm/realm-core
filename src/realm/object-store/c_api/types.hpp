@@ -415,6 +415,18 @@ struct realm_collection_changes : realm::c_api::WrapC, realm::CollectionChangeSe
     }
 };
 
+struct realm_dictionary_changes : realm::c_api::WrapC, realm::DictionaryChangeSet {
+    explicit realm_dictionary_changes(realm::DictionaryChangeSet changes)
+        : realm::DictionaryChangeSet(std::move(changes))
+    {
+    }
+
+    realm_dictionary_changes* clone() const override
+    {
+        return new realm_dictionary_changes{static_cast<const realm::DictionaryChangeSet&>(*this)};
+    }
+};
+
 struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken {
     explicit realm_notification_token(realm::NotificationToken token)
         : realm::NotificationToken(std::move(token))
