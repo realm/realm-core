@@ -18,7 +18,8 @@
 -----------
 
 ### Internals
-* None.
+* Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
+([#6319](https://github.com/realm/realm-core/pull/6319))
 
 ----------------------------------------------
 
