@@ -682,15 +682,12 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
 static void run_ssl_nonzero_length_test(
     test_util::unit_test::TestContext& test_context,
     std::function<void(test_util::unit_test::TestContext&, std::error_code, std::size_t)>&& read_handler,
-    std::function<void(test_util::unit_test::TestContext&, network::ssl::Stream&, const char*, std::error_code,
-                       std::size_t)>&& write_handler)
+    std::function<void(test_util::unit_test::TestContext&, network::ssl::Stream&)>&& read_error_callback)
 {
-    network::Service service_1;
-    network::Service service_2;
-    network::DeadlineTimer run_timer_1{service_1};
-    network::DeadlineTimer run_timer_2{service_2};
-    network::Socket socket_1{service_1};
-    network::Socket socket_2{service_2};
+    network::Service service;
+    network::DeadlineTimer run_timer{service};
+    network::Socket socket_1{service};
+    network::Socket socket_2{service};
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
     configure_server_ssl_context_for_test(ssl_context_1);
@@ -701,11 +698,18 @@ static void run_ssl_nonzero_length_test(
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
     network::ReadAheadBuffer rab;
 
-    const char* message = "hello";
     char buffer[50];
-    size_t total = 0;
 
-    std::error_code shutdown_error = std::error_code();
+    auto service_thread = std::thread([&test_context, &service, &run_timer]() {
+        run_timer.async_wait(std::chrono::seconds(10), [&test_context](Status status) {
+            if (!status.is_ok())
+                return;
+            test_context.logger->info("run_ssl_nonzero_length_test: service timed out");
+            abort(); // fail the test if the timer expires
+        });
+        service.run();
+    });
+
     auto [r_promise, read_future] = util::make_promise_future<void>();
     auto async_read_handler = [&test_context, read_promise = std::move(r_promise),
                                handler = std::move(read_handler)](std::error_code ec, std::size_t n) mutable {
@@ -714,37 +718,9 @@ static void run_ssl_nonzero_length_test(
         read_promise.emplace_value();
     };
 
-    auto service_1_thread = std::thread([&service_1, &run_timer_1]() {
-        run_timer_1.async_wait(std::chrono::seconds(10), [](Status status) {
-            if (!status.is_ok())
-                return;
-            abort(); // fail the test if the timer expires
-        });
-        service_1.run();
-    });
-
-    auto service_2_thread = std::thread([&service_2, &run_timer_2]() {
-        run_timer_2.async_wait(std::chrono::seconds(10), [](Status status) {
-            if (!status.is_ok())
-                return;
-            abort(); // fail the test if the timer expires
-        });
-        service_2.run();
-    });
-
+    // Set the error before the read
+    read_error_callback(test_context, ssl_stream_2);
     ssl_stream_2.async_read(buffer, 50, rab, std::move(async_read_handler));
-    while (!read_future.is_ready() && total < 50) {
-        auto [w_promise, write_future] = util::make_promise_future<void>();
-        auto async_write_handler = [&test_context, &message, &total, &ssl_stream_2,
-                                    handler = std::move(write_handler),
-                                    write_promise = std::move(w_promise)](std::error_code ec, std::size_t n) mutable {
-            total += n;
-            handler(test_context, ssl_stream_2, message, ec, n);
-            write_promise.emplace_value();
-        };
-        ssl_stream_1.async_write(message, std::strlen(message), std::move(async_write_handler));
-        write_future.get();
-    }
     read_future.get();
 
     // Shut down stream
@@ -757,29 +733,23 @@ static void run_ssl_nonzero_length_test(
     shutdown_future.get();
 
     // Stop the service thread after shutdown is complete
-    service_1.stop();
-    service_2.stop();
-    service_1_thread.join();
-    service_2_thread.join();
+    service.stop();
+    service_thread.join();
 }
 
 TEST(Util_Network_SSL_Nonzero_Length_Error)
 {
+    using MockSSLError = network::ssl::Stream::MockSSLError;
     auto&& read_handler = [](test_util::unit_test::TestContext& test_context, std::error_code ec, std::size_t n) {
         CHECK_EQUAL(util::MiscExtErrors::premature_end_of_input, ec);
-        // read will be either 0 or 5 depending on when the error is received
-        test_context.logger->info("Nonzero_Length_Error: n: %1", n);
-        CHECK((n == 0 || n == 5));
+        test_context.logger->info("Util_Network_SSL_Nonzero_Length_Error: n: %1", n);
+        CHECK_EQUAL(0, n);
     };
-    auto&& write_handler = [](test_util::unit_test::TestContext& test_context, network::ssl::Stream& ssl_stream_2,
-                              const char* message, std::error_code ec, std::size_t n) {
-        using MockSSLError = network::ssl::Stream::MockSSLError;
-        CHECK_EQUAL(std::error_code(), ec);
-        CHECK_EQUAL(std::strlen(message), n);
+    auto&& read_error_callback = [](test_util::unit_test::TestContext&, network::ssl::Stream& ssl_stream_2) {
         ssl_stream_2.set_mock_ssl_perform_error(
             std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedAbort), 0));
     };
-    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(write_handler));
+    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(read_error_callback));
 }
 
 
@@ -787,19 +757,15 @@ TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
 {
     auto&& read_handler = [](test_util::unit_test::TestContext& test_context, std::error_code ec, std::size_t n) {
         CHECK_EQUAL(util::MiscExtErrors::end_of_input, ec);
-        // read will be either 6 or 11 depending on when the error is received
-        test_context.logger->info("Nonzero_Length_Error: n: %1", n);
-        CHECK_GREATER(n, 5);
+        test_context.logger->info("Util_Network_SSL_Nonzero_Length_EndOfInput: n: %1", n);
+        CHECK_EQUAL(6, n);
     };
-    auto&& write_handler = [](test_util::unit_test::TestContext& test_context, network::ssl::Stream& ssl_stream_2,
-                              const char* message, std::error_code ec, std::size_t n) {
+    auto&& read_error_callback = [](test_util::unit_test::TestContext&, network::ssl::Stream& ssl_stream_2) {
         using MockSSLError = network::ssl::Stream::MockSSLError;
-        CHECK_EQUAL(std::error_code(), ec);
-        CHECK_EQUAL(std::strlen(message), n);
         ssl_stream_2.set_mock_ssl_perform_error(
             std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedGraceful), 6));
     };
-    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(write_handler));
+    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(read_error_callback));
 }
 #endif
 

@@ -388,7 +388,7 @@ public:
 
 #if REALM_HAVE_SECURE_TRANSPORT
     /// Mock the error value returned by ssl_perform() - currently only used by Apple Secure Transport
-    void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error);
+    void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error = nullptr);
 #endif
 
 private:
@@ -1276,7 +1276,10 @@ inline int Stream::do_ssl_shutdown() noexcept
 
 inline void Stream::set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error)
 {
-    m_mock_ssl_perform_error = std::move(error);
+    if (!error)
+        m_mock_ssl_perform_error.reset();
+    else
+        m_mock_ssl_perform_error = std::move(error);
 }
 
 // Structure for mocking the error returned by Oper called by ssl_perform()
@@ -1340,15 +1343,18 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
 {
     OSStatus result;
     std::size_t n;
-    std::tie(result, n) = oper();
 
     // Use caution with MockSSLError, since errSSLWouldBlock will potentially perform
     // another read that may block
-    if (REALM_UNLIKELY(m_mock_ssl_perform_error && m_mock_ssl_perform_error->operation == m_last_operation)) {
+    if (REALM_UNLIKELY(m_mock_ssl_perform_error)) {
         result = static_cast<OSStatus>(m_mock_ssl_perform_error->ssl_error);
         n = static_cast<std::size_t>(m_mock_ssl_perform_error->bytes_processed);
         if (m_mock_ssl_perform_error->clear_after_access)
             m_mock_ssl_perform_error.reset();
+    }
+    else {
+        // Call the operation if there is no mock error set
+        std::tie(result, n) = oper();
     }
 
     Want blocking_want = [this]() {
