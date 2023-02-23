@@ -146,10 +146,10 @@ void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
     // create_directory doesn't raise an error if the path already exists
     using std::errc;
     if (error == errc::permission_denied || error == errc::read_only_file_system) {
-        throw File::PermissionDenied(error.message(), path);
+        throw realm::FileAccessError(realm::ErrorCodes::PermissionDenied, error.message(), path);
     }
     else {
-        throw File::AccessError(error.message(), path);
+        throw realm::FileAccessError(realm::ErrorCodes::FileOperationFailed, error.message(), path);
     }
 }
 
@@ -162,10 +162,10 @@ void throwIfFileError(std::error_code error, const std::string& path)
     if (error == errc::permission_denied || error == errc::read_only_file_system ||
         error == errc::device_or_resource_busy || error == errc::operation_not_permitted ||
         error == errc::file_exists || error == errc::directory_not_empty) {
-        throw File::PermissionDenied(error.message(), path);
+        throw realm::FileAccessError(realm::ErrorCodes::PermissionDenied, error.message(), path);
     }
     else {
-        throw File::AccessError(error.message(), path);
+        throw realm::FileAccessError(realm::ErrorCodes::FileOperationFailed, error.message(), path);
     }
 }
 #endif
@@ -1490,7 +1490,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
     std::filesystem::rename(old_path, new_path, error);
 
     if (error == std::errc::no_such_file_or_directory) {
-        throw NotFound(error.message(), old_path);
+        throw FileAccessError(ErrorCodes::FileNotFound, error.message(), old_path);
     }
     throwIfFileError(error, old_path);
 #else

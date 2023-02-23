@@ -1099,18 +1099,6 @@ TEST_CASE("audit management") {
     // but we don't actually want the realm to be synchronizing
     realm->sync_session()->close();
 
-<<<<<<< HEAD
-    SECTION("cannot nest scopes") {
-        audit->begin_scope("name");
-        REQUIRE_EXCEPTION(audit->begin_scope("name"), WrongTransactionState,
-                          "Cannot begin audit scope: audit already in progress");
-    }
-    SECTION("cannot end nonexistent scope") {
-        REQUIRE_EXCEPTION(audit->end_scope(), WrongTransactionState, "Cannot end audit scope: no audit in progress");
-    }
-
-=======
->>>>>>> master
     SECTION("config validation") {
         SyncTestFile config(test_session.app(), "parent2");
         config.audit_config = std::make_shared<AuditConfig>();

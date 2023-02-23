@@ -879,12 +879,8 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-<<<<<<< HEAD
-            self->m_logger->error("Audit: Received sync error: %1 (ec=%2)", error.what(),
+            self->m_logger->error("Events: Received sync error: %1 (ec=%2)", error.what(),
                                   error.get_system_error().value());
-=======
-            self->m_logger->error("Events: Received sync error: %1 (ec=%2)", error.message, error.error_code.value());
->>>>>>> master
         }
         if (error_handler) {
             error_handler(error);
@@ -1130,17 +1126,10 @@ void AuditContext::pin_version(VersionID version)
 uint64_t AuditContext::begin_scope(std::string_view name)
 {
     util::CheckedLockGuard lock(m_mutex);
-<<<<<<< HEAD
-    if (m_current_scope)
-        throw WrongTransactionState("Cannot begin audit scope: audit already in progress");
-    m_logger->trace("Audit: Beginning audit scope on '%1' named '%2'", m_source_db->get_path(), name);
-    m_current_scope = std::make_shared<Scope>(Scope{m_metadata, std::string(name)});
-=======
     auto id = ++m_scope_counter;
     m_logger->trace("Events: Beginning event scope '%1' on '%2' named '%3'", id, m_source_db->get_path(), name);
     m_current_scopes.push_back(std::make_shared<Scope>(Scope{id, m_metadata, std::string(name)}));
     return id;
->>>>>>> master
 }
 
 std::vector<std::shared_ptr<AuditContext::Scope>>::iterator AuditContext::find_scope(uint64_t id)
@@ -1153,18 +1142,9 @@ std::vector<std::shared_ptr<AuditContext::Scope>>::iterator AuditContext::find_s
 void AuditContext::end_scope(uint64_t id, util::UniqueFunction<void(std::exception_ptr)>&& completion)
 {
     util::CheckedLockGuard lock(m_mutex);
-<<<<<<< HEAD
-    if (!m_current_scope)
-        throw WrongTransactionState("Cannot end audit scope: no audit in progress");
-    m_logger->trace("Audit: Comitting audit scope on '%1' with %2 events", m_source_db->get_path(),
-                    m_current_scope->events.size());
-    m_current_scope->completion = std::move(completion);
-    trigger_write(std::move(m_current_scope));
-    m_current_scope = nullptr;
-=======
     auto it = find_scope(id);
     if (it == m_current_scopes.end()) {
-        throw std::logic_error(util::format(
+        throw WrongTransactionState(util::format(
             "Cannot end event scope: scope '%1' not in progress. Scope may have already been ended?", id));
     }
     m_logger->trace("Events: Comitting event scope '%1' on '%2' with %3 events", id, m_source_db->get_path(),
@@ -1179,7 +1159,7 @@ void AuditContext::cancel_scope(uint64_t id)
     util::CheckedLockGuard lock(m_mutex);
     auto it = find_scope(id);
     if (it == m_current_scopes.end()) {
-        throw std::logic_error(util::format(
+        throw WrongTransactionState(util::format(
             "Cannot end event scope: scope '%1' not in progress. Scope may have already been ended?", id));
     }
     m_logger->trace("Events: Cancelling event scope '%1' on '%2' with %3 events", id, m_source_db->get_path(),
@@ -1191,7 +1171,6 @@ bool AuditContext::is_scope_valid(uint64_t id)
 {
     util::CheckedLockGuard lock(m_mutex);
     return find_scope(id) != m_current_scopes.end();
->>>>>>> master
 }
 
 void AuditContext::process_scope(AuditContext::Scope& scope) const
