@@ -163,9 +163,9 @@ struct AppCreateConfig {
         nlohmann::json write;
     };
 
-    // ServiceRole represents the set of permissions used MongoDB-based services (Flexible Sync, DataAPI, GraphQL, etc.).
-    // In flexible sync, roles are assigned on a per-table, per-session basis by the server.
-    // NB: there are restrictions on the role configuration when used with flexible sync. See
+    // ServiceRole represents the set of permissions used MongoDB-based services (Flexible Sync, DataAPI, GraphQL,
+    // etc.). In flexible sync, roles are assigned on a per-table, per-session basis by the server. NB: there are
+    // restrictions on the role configuration when used with flexible sync. See
     // https://www.mongodb.com/docs/atlas/app-services/rules/sync-compatibility/ for more information.
     struct ServiceRole {
         std::string name;
@@ -179,8 +179,8 @@ struct AppCreateConfig {
         // access on all objects
         ServiceRoleDocumentFilters document_filters;
 
-        // insert_filter and delete_filter describe which objects can be created and erased by the client, respectively.
-        // Set both to true if all objects can be created/erased by the client
+        // insert_filter and delete_filter describe which objects can be created and erased by the client,
+        // respectively. Set both to true if all objects can be created/erased by the client
         nlohmann::json insert_filter;
         nlohmann::json delete_filter;
 
@@ -189,8 +189,9 @@ struct AppCreateConfig {
         nlohmann::json read;
         nlohmann::json write;
 
-        // NB: for more granular field-level permissions, the "fields" and "additional_fields" keys can be included in a service
-        // role to describe which fields individually can be read/written. These fields have been omitted here for simplicity
+        // NB: for more granular field-level permissions, the "fields" and "additional_fields" keys can be included in
+        // a service role to describe which fields individually can be read/written. These fields have been omitted
+        // here for simplicity
     };
 
     struct FLXSyncConfig {
