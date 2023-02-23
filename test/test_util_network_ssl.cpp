@@ -53,11 +53,11 @@ network::Endpoint bind_acceptor(network::Acceptor& acceptor)
     return ep;
 }
 
-void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
+void connect_sockets(network::Socket& server_socket, network::Socket& client_socket)
 {
-    network::Service& service_1 = socket_1.get_service();
-    network::Service& service_2 = socket_2.get_service();
-    network::Acceptor acceptor(service_1);
+    network::Service& server_service = server_socket.get_service();
+    network::Service& client_service = client_socket.get_service();
+    network::Acceptor acceptor(server_service);
     network::Endpoint ep = bind_acceptor(acceptor);
     bool accept_occurred = false, connect_occurred = false;
     auto accept_handler = [&](std::error_code ec) {
@@ -68,16 +68,24 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
         REALM_ASSERT(!ec);
         connect_occurred = true;
     };
-    acceptor.async_accept(socket_1, std::move(accept_handler));
-    socket_2.async_connect(ep, std::move(connect_handler));
-    if (&service_1 == &service_2) {
-        service_1.run();
+    server_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        acceptor.async_accept(server_socket, std::move(accept_handler));
+    });
+    client_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        client_socket.async_connect(ep, std::move(connect_handler));
+    });
+    if (&server_service == &client_service) {
+        server_service.run();
     }
     else {
         std::thread thread{[&] {
-            service_1.run();
+            server_service.run();
         }};
-        service_2.run();
+        client_service.run();
         thread.join();
     }
     REALM_ASSERT(accept_occurred);
@@ -106,8 +114,16 @@ void connect_ssl_streams(network::ssl::Stream& server_stream, network::ssl::Stre
         REALM_ASSERT(!ec);
         client_handshake_occurred = true;
     };
-    server_stream.async_handshake(std::move(server_handshake_handler));
-    client_stream.async_handshake(std::move(client_handshake_handler));
+    server_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        server_stream.async_handshake(std::move(server_handshake_handler));
+    });
+    client_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        client_stream.async_handshake(std::move(client_handshake_handler));
+    });
     if (&server_service == &client_service) {
         server_service.run();
     }
@@ -679,10 +695,9 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
 
 #if REALM_HAVE_SECURE_TRANSPORT
 
-static void run_ssl_nonzero_length_test(
-    test_util::unit_test::TestContext& test_context,
-    std::function<void(test_util::unit_test::TestContext&, std::error_code, std::size_t)>&& read_handler,
-    std::function<void(test_util::unit_test::TestContext&, network::ssl::Stream&)>&& read_error_callback)
+template <typename ReadHandler, typename ReadError>
+void run_ssl_nonzero_length_test(test_util::unit_test::TestContext& test_context, ReadHandler&& read_handler,
+                                 ReadError&& read_error_callback)
 {
     network::Service service;
     network::DeadlineTimer run_timer{service};
@@ -719,8 +734,13 @@ static void run_ssl_nonzero_length_test(
     };
 
     // Set the error before the read
-    read_error_callback(test_context, ssl_stream_2);
-    ssl_stream_2.async_read(buffer, 50, rab, std::move(async_read_handler));
+    service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+
+        read_error_callback(test_context, ssl_stream_2);
+        ssl_stream_2.async_read(buffer, 50, rab, std::move(async_read_handler));
+    });
     read_future.get();
 
     // Shut down stream
@@ -729,7 +749,12 @@ static void run_ssl_nonzero_length_test(
         CHECK_EQUAL(std::error_code(), ec);
         shutdown_promise.emplace_value();
     };
-    ssl_stream_1.async_shutdown(std::move(shutdown_handler));
+    service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+
+        ssl_stream_1.async_shutdown(std::move(shutdown_handler));
+    });
     shutdown_future.get();
 
     // Stop the service thread after shutdown is complete

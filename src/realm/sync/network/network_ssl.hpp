@@ -546,7 +546,9 @@ private:
 
     friend class Service::BasicStreamOps<Stream>;
     friend class network::ReadAheadBuffer;
+#if REALM_HAVE_SECURE_TRANSPORT
     friend struct MockSSLError; // for access to Service::Want
+#endif
 };
 
 

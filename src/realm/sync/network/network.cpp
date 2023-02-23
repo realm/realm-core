@@ -2117,8 +2117,6 @@ void Service::Descriptor::add_initiated_oper(LendersIoOperPtr op, Want want)
     if (REALM_UNLIKELY(want == Want::nothing)) {
         REALM_ASSERT(op->is_complete());
         service_impl.add_completed_oper(std::move(op));
-        // interrupt wait_and_advance() to process the completed operation
-        service_impl.io_reactor.interrupt();
         return;
     }
     REALM_ASSERT(!op->is_complete());

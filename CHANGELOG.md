@@ -21,7 +21,6 @@
 ### Internals
 * Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
 ([#6319](https://github.com/realm/realm-core/pull/6319))
-* Fix default event loop not being interrupted if a networking read/write operation completed as soon as it was submitted. ([PR #6323](https://github.com/realm/realm-core/pull/6323))
 
 ----------------------------------------------
 
