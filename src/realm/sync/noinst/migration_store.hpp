@@ -40,6 +40,7 @@ public:
     MigrationStore& operator=(const MigrationStore&) = delete;
 
     enum class MigrationState {
+        NotStarted,
         InProgress,
         Completed,
     };
@@ -61,7 +62,7 @@ public:
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
-    // followed by the class name. If not in the migrated state, nullopt will be returned.
+    // followed by the class name. If not in progress state, nullopt will be returned.
     std::optional<Subscription> make_subscription(const std::string& object_class_name);
 
 protected:
