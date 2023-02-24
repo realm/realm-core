@@ -5009,6 +5009,7 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         auto user_data = static_cast<BCTOState*>(userdata);
         REQUIRE(user_data->bcto_deleted == false);
         REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(!user_data->thread_create_called);
         user_data->thread_create_called = true;
     };
 
@@ -5017,6 +5018,7 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         auto user_data = static_cast<BCTOState*>(userdata);
         REQUIRE(user_data->bcto_deleted == false);
         REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(!user_data->thread_destroy_called);
         user_data->thread_destroy_called = true;
     };
 
@@ -5026,6 +5028,7 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         auto user_data = static_cast<BCTOState*>(userdata);
         REQUIRE(user_data->bcto_deleted == false);
         REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(user_data->thread_on_error_message.empty());
         user_data->thread_on_error_message = err_message;
         return true;
     };
@@ -5047,9 +5050,11 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
             auto bcto_ptr = std::static_pointer_cast<realm::BindingCallbackThreadObserver>(
                 config->default_socket_provider_thread_observer);
             REQUIRE(bcto_ptr);
+            auto will_destroy_thread = util::make_scope_exit([&bcto_ptr]() noexcept {
+                bcto_ptr->will_destroy_thread();
+            });
             bcto_ptr->did_create_thread();
             REQUIRE(bcto_ptr->handle_error(MultipleSyncAgents()));
-            bcto_ptr->will_destroy_thread();
         });
 
         // Wait for the thread to exit

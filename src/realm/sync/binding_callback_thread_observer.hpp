@@ -50,26 +50,6 @@ struct BindingCallbackThreadObserver {
     /// Execution Functions - check for a valid instance and if the function was set
     ///
 
-    // BindingCallbackThreadObserver class that will call will_destroy_thread() when destroyed
-    struct ThreadGuard {
-        ~ThreadGuard()
-        {
-            if (m_observer)
-                m_observer->will_destroy_thread();
-        }
-        // Constructor that only works with the global thread observer
-        ThreadGuard() = default;
-
-        // Constructor that works with either the local or global thread observer
-        ThreadGuard(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr)
-            : m_observer{observer_ptr}
-        {
-        }
-
-    private:
-        std::shared_ptr<BindingCallbackThreadObserver> m_observer;
-    };
-
     // Call the stored create thread callback function with the id of this thread
     // Can be overridden to provide a custom implementation
     virtual void did_create_thread()

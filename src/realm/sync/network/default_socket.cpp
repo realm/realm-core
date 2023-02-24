@@ -524,9 +524,11 @@ void DefaultSocketProvider::event_loop()
 {
     m_logger_ptr->trace("Default event loop: thread running");
     // Calls will_destroy_thread() when destroyed
-    auto thread_guard = BindingCallbackThreadObserver::ThreadGuard(m_observer_ptr);
     auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
         m_logger_ptr->trace("Default event loop: thread exiting");
+        if (m_observer_ptr)
+            m_observer_ptr->will_destroy_thread();
+
         std::unique_lock<std::mutex> lock(m_mutex);
         // Did we get here due to an unhandled exception?
         if (m_state != State::Stopping) {
