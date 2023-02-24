@@ -125,6 +125,11 @@ public:
     Iterator end() const;
 
 private:
+    const char* type_name() const noexcept override
+    {
+        return "Dictionary";
+    }
+
     realm::Dictionary& dict() const noexcept
     {
         REALM_ASSERT_DEBUG(dynamic_cast<realm::Dictionary*>(m_coll_base.get()));

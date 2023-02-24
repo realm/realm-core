@@ -146,7 +146,7 @@ public:
     /// This can happen if the conflicting thread (or process) terminates or
     /// crashes before the next retry.
     ///
-    /// \throw util::File::AccessError
+    /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& file_path, Config& cfg);
 
@@ -689,7 +689,7 @@ private:
     /// Returns the top_ref for the latest commit.
     ref_type validate_header(const char* data, size_t len, const std::string& path);
     ref_type validate_header(const Header* header, const StreamingFooter* footer, size_t size,
-                             const std::string& path);
+                             const std::string& path, bool is_encrypted = false);
     void throw_header_exception(std::string msg, const Header& header, const std::string& path);
 
     static bool is_file_on_streaming_form(const Header& header);
@@ -724,9 +724,12 @@ private:
 
 // Implementation:
 
-struct InvalidDatabase : util::File::AccessError {
+struct InvalidDatabase : FileAccessError {
     InvalidDatabase(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+        : FileAccessError(ErrorCodes::InvalidDatabase,
+                          path.empty() ? "Failed to memory buffer:" + msg
+                                       : util::format("Failed to open Realm file at path '%1': %2", path, msg),
+                          path)
     {
     }
 };

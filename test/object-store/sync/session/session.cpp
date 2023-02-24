@@ -357,8 +357,8 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 
     SECTION("handles reconnects while it's trying to deactivate session") {
         bool wait_called = false;
-        session->wait_for_download_completion([&](std::error_code ec) {
-            REQUIRE(ec == util::error::operation_aborted);
+        session->wait_for_download_completion([&](Status s) {
+            REQUIRE(s == ErrorCodes::OperationAborted);
             REQUIRE(session->config().client_validate_ssl);
             REQUIRE(session->state() == SyncSession::State::Inactive);
 

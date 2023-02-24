@@ -269,7 +269,8 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         table->remove_column(table->get_column_key("indexed"));
         wt->commit();
 
-        REQUIRE_THROWS(r->refresh());
+        REQUIRE_EXCEPTION(r->refresh(), InvalidSchemaChange,
+                          Catch::Matchers::ContainsSubstring("Property 'table.indexed' has been removed."));
     }
 
     SECTION("removing a table is not allowed") {
@@ -277,7 +278,8 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         wt->remove_table("class_table");
         wt->commit();
 
-        REQUIRE_THROWS(r->refresh());
+        REQUIRE_EXCEPTION(r->refresh(), InvalidSchemaChange,
+                          Catch::Matchers::ContainsSubstring("Class 'table' has been removed."));
     }
 }
 

@@ -158,7 +158,7 @@ RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm
     return wrap_err([&]() {
         auto ltsr = dynamic_cast<realm_list::thread_safe_reference*>(tsr);
         if (!ltsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto list = ltsr->resolve<List>(*realm);

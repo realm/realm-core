@@ -1017,7 +1017,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw util::overflow_error("Byte size overflow");
+        throw std::overflow_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;

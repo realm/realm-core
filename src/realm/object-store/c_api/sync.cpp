@@ -19,7 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -86,133 +86,9 @@ static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::up
 static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::download) ==
               RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD);
 
-namespace {
-using realm::sync::Client;
-static_assert(realm_sync_errno_client_e(Client::Error::connection_closed) == RLM_SYNC_ERR_CLIENT_CONNECTION_CLOSED);
-static_assert(realm_sync_errno_client_e(Client::Error::unknown_message) == RLM_SYNC_ERR_CLIENT_UNKNOWN_MESSAGE);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_syntax) == RLM_SYNC_ERR_CLIENT_BAD_SYNTAX);
-static_assert(realm_sync_errno_client_e(Client::Error::limits_exceeded) == RLM_SYNC_ERR_CLIENT_LIMITS_EXCEEDED);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_session_ident) == RLM_SYNC_ERR_CLIENT_BAD_SESSION_IDENT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_message_order) == RLM_SYNC_ERR_CLIENT_BAD_MESSAGE_ORDER);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_client_file_ident) ==
-              RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_progress) == RLM_SYNC_ERR_CLIENT_BAD_PROGRESS);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_changeset_header_syntax) ==
-              RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_HEADER_SYNTAX);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_changeset_size) == RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_SIZE);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_origin_file_ident) ==
-              RLM_SYNC_ERR_CLIENT_BAD_ORIGIN_FILE_IDENT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_server_version) == RLM_SYNC_ERR_CLIENT_BAD_SERVER_VERSION);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_changeset) == RLM_SYNC_ERR_CLIENT_BAD_CHANGESET);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_request_ident) == RLM_SYNC_ERR_CLIENT_BAD_REQUEST_IDENT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_error_code) == RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_compression) == RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_client_version) == RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION);
-static_assert(realm_sync_errno_client_e(Client::Error::ssl_server_cert_rejected) ==
-              RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED);
-static_assert(realm_sync_errno_client_e(Client::Error::pong_timeout) == RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_client_file_ident_salt) ==
-              RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_file_ident) == RLM_SYNC_ERR_CLIENT_BAD_FILE_IDENT);
-static_assert(realm_sync_errno_client_e(Client::Error::connect_timeout) == RLM_SYNC_ERR_CLIENT_CONNECT_TIMEOUT);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_timestamp) == RLM_SYNC_ERR_CLIENT_BAD_TIMESTAMP);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_protocol_from_server) ==
-              RLM_SYNC_ERR_CLIENT_BAD_PROTOCOL_FROM_SERVER);
-static_assert(realm_sync_errno_client_e(Client::Error::client_too_old_for_server) ==
-              RLM_SYNC_ERR_CLIENT_CLIENT_TOO_OLD_FOR_SERVER);
-static_assert(realm_sync_errno_client_e(Client::Error::client_too_new_for_server) ==
-              RLM_SYNC_ERR_CLIENT_CLIENT_TOO_NEW_FOR_SERVER);
-static_assert(realm_sync_errno_client_e(Client::Error::protocol_mismatch) == RLM_SYNC_ERR_CLIENT_PROTOCOL_MISMATCH);
-static_assert(realm_sync_errno_client_e(Client::Error::bad_state_message) == RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE);
-static_assert(realm_sync_errno_client_e(Client::Error::missing_protocol_feature) ==
-              RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE);
-static_assert(realm_sync_errno_client_e(Client::Error::http_tunnel_failed) == RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED);
-static_assert(realm_sync_errno_client_e(Client::Error::auto_client_reset_failure) ==
-              RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE);
-} // namespace
 
 namespace {
 using namespace realm::sync;
-static_assert(realm_sync_errno_connection_e(ProtocolError::connection_closed) ==
-              RLM_SYNC_ERR_CONNECTION_CONNECTION_CLOSED);
-static_assert(realm_sync_errno_connection_e(ProtocolError::other_error) == RLM_SYNC_ERR_CONNECTION_OTHER_ERROR);
-static_assert(realm_sync_errno_connection_e(ProtocolError::unknown_message) ==
-              RLM_SYNC_ERR_CONNECTION_UNKNOWN_MESSAGE);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_syntax) == RLM_SYNC_ERR_CONNECTION_BAD_SYNTAX);
-static_assert(realm_sync_errno_connection_e(ProtocolError::limits_exceeded) ==
-              RLM_SYNC_ERR_CONNECTION_LIMITS_EXCEEDED);
-static_assert(realm_sync_errno_connection_e(ProtocolError::wrong_protocol_version) ==
-              RLM_SYNC_ERR_CONNECTION_WRONG_PROTOCOL_VERSION);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_session_ident) ==
-              RLM_SYNC_ERR_CONNECTION_BAD_SESSION_IDENT);
-static_assert(realm_sync_errno_connection_e(ProtocolError::reuse_of_session_ident) ==
-              RLM_SYNC_ERR_CONNECTION_REUSE_OF_SESSION_IDENT);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bound_in_other_session) ==
-              RLM_SYNC_ERR_CONNECTION_BOUND_IN_OTHER_SESSION);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_message_order) ==
-              RLM_SYNC_ERR_CONNECTION_BAD_MESSAGE_ORDER);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_decompression) ==
-              RLM_SYNC_ERR_CONNECTION_BAD_DECOMPRESSION);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_header_syntax) ==
-              RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_size) ==
-              RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE);
-static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_flx_sync) ==
-              RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC);
-static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_pbs) == RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS);
-
-static_assert(realm_sync_errno_session_e(ProtocolError::session_closed) == RLM_SYNC_ERR_SESSION_SESSION_CLOSED);
-static_assert(realm_sync_errno_session_e(ProtocolError::other_session_error) ==
-              RLM_SYNC_ERR_SESSION_OTHER_SESSION_ERROR);
-static_assert(realm_sync_errno_session_e(ProtocolError::token_expired) == RLM_SYNC_ERR_SESSION_TOKEN_EXPIRED);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_authentication) ==
-              RLM_SYNC_ERR_SESSION_BAD_AUTHENTICATION);
-static_assert(realm_sync_errno_session_e(ProtocolError::illegal_realm_path) ==
-              RLM_SYNC_ERR_SESSION_ILLEGAL_REALM_PATH);
-static_assert(realm_sync_errno_session_e(ProtocolError::no_such_realm) == RLM_SYNC_ERR_SESSION_NO_SUCH_REALM);
-static_assert(realm_sync_errno_session_e(ProtocolError::permission_denied) == RLM_SYNC_ERR_SESSION_PERMISSION_DENIED);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_server_file_ident) ==
-              RLM_SYNC_ERR_SESSION_BAD_SERVER_FILE_IDENT);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_client_file_ident) ==
-              RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE_IDENT);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_server_version) ==
-              RLM_SYNC_ERR_SESSION_BAD_SERVER_VERSION);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_client_version) ==
-              RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION);
-static_assert(realm_sync_errno_session_e(ProtocolError::diverging_histories) ==
-              RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_changeset) == RLM_SYNC_ERR_SESSION_BAD_CHANGESET);
-static_assert(realm_sync_errno_session_e(ProtocolError::partial_sync_disabled) ==
-              RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED);
-static_assert(realm_sync_errno_session_e(ProtocolError::unsupported_session_feature) ==
-              RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_origin_file_ident) ==
-              RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_client_file) == RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE);
-static_assert(realm_sync_errno_session_e(ProtocolError::server_file_deleted) ==
-              RLM_SYNC_ERR_SESSION_SERVER_FILE_DELETED);
-static_assert(realm_sync_errno_session_e(ProtocolError::client_file_blacklisted) ==
-              RLM_SYNC_ERR_SESSION_CLIENT_FILE_BLACKLISTED);
-static_assert(realm_sync_errno_session_e(ProtocolError::user_blacklisted) == RLM_SYNC_ERR_SESSION_USER_BLACKLISTED);
-static_assert(realm_sync_errno_session_e(ProtocolError::transact_before_upload) ==
-              RLM_SYNC_ERR_SESSION_TRANSACT_BEFORE_UPLOAD);
-static_assert(realm_sync_errno_session_e(ProtocolError::client_file_expired) ==
-              RLM_SYNC_ERR_SESSION_CLIENT_FILE_EXPIRED);
-static_assert(realm_sync_errno_session_e(ProtocolError::user_mismatch) == RLM_SYNC_ERR_SESSION_USER_MISMATCH);
-static_assert(realm_sync_errno_session_e(ProtocolError::too_many_sessions) == RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS);
-static_assert(realm_sync_errno_session_e(ProtocolError::invalid_schema_change) ==
-              RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE);
-static_assert(realm_sync_errno_session_e(ProtocolError::bad_query) == RLM_SYNC_ERR_SESSION_BAD_QUERY);
-static_assert(realm_sync_errno_session_e(ProtocolError::object_already_exists) ==
-              RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS);
-static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_changed) ==
-              RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED);
-static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
-              RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
-static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
-static_assert(realm_sync_errno_session_e(ProtocolError::compensating_write) ==
-              RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
-
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::NoAction) == RLM_SYNC_ERROR_ACTION_NO_ACTION);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ProtocolViolation) ==
               RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION);
@@ -241,23 +117,13 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Su
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Uncommitted) ==
               RLM_SYNC_SUBSCRIPTION_UNCOMMITTED);
 
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found) ==
-              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::host_not_found_try_again) ==
-              RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_data) == RLM_SYNC_ERROR_RESOLVE_NO_DATA);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::no_recovery) == RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::service_not_found) ==
-              RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND);
-static_assert(realm_sync_error_resolve_e(network::ResolveErrors::socket_type_not_supported) ==
-              RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
-
 } // namespace
 
-realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
+realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
 
+    auto error_code = status.get_std_error_code();
     const std::error_category& category = error_code.category();
     if (category == realm::sync::client_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
@@ -273,8 +139,8 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
     else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
     }
-    else if (category == realm::sync::network::resolve_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_RESOLVE;
+    else if (category == realm::sync::websocket::websocket_error_category()) {
+        ret.category = RLM_SYNC_ERROR_CATEGORY_WEBSOCKET;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
@@ -283,6 +149,7 @@ realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& 
     ret.value = error_code.value();
     message = error_code.message(); // pass the string to the caller for lifetime purposes
     ret.message = message.c_str();
+    ret.category_name = category.name();
 
 
     return ret;
@@ -301,8 +168,8 @@ void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, st
         else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
             error_code_out->assign(sync_error_code.value, std::system_category());
         }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_RESOLVE) {
-            error_code_out->assign(sync_error_code.value, realm::sync::network::resolve_error_category());
+        else if (category == RLM_SYNC_ERROR_CATEGORY_WEBSOCKET) {
+            error_code_out->assign(sync_error_code.value, realm::sync::websocket::websocket_error_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
             error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
@@ -437,8 +304,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        c_error.error_code = to_capi(error.error_code, error_code_message);
-        c_error.detailed_message = error.message.c_str();
+        c_error.error_code = to_capi(error.to_status(), error_code_message);
+        c_error.detailed_message = error.what();
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
@@ -964,11 +831,11 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(std::error_code)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
-            if (e) {
+    util::UniqueFunction<void(Status)> cb =
+        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
+            if (s.get_std_error_code()) {
                 std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(e, error_code_message);
+                realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);
             }
             else {
@@ -983,11 +850,11 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(std::error_code)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
-            if (e) {
+    util::UniqueFunction<void(Status)> cb =
+        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
+            if (s.get_std_error_code()) {
                 std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(e, error_code_message);
+                realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);
             }
             else {

@@ -26,84 +26,31 @@
 #include <string>
 
 namespace realm::c_api {
-
-struct NotClonableException : std::exception {
-    const char* what() const noexcept
+class NotClonable : public RuntimeError {
+public:
+    NotClonable()
+        : RuntimeError(ErrorCodes::NotCloneable, "Not clonable")
     {
-        return "Not clonable";
     }
 };
 
-struct ImmutableException : std::exception {
-    const char* what() const noexcept
-    {
-        return "Immutable object";
-    }
-};
-
-
-struct UnexpectedPrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct DuplicatePrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct InvalidPropertyKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-struct CallbackFailed : std::runtime_error {
+class CallbackFailed : public RuntimeError {
+public:
     // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
     // realm_register_user_code_callback_error()
     void* usercode_error{nullptr};
 
     CallbackFailed()
-        : std::runtime_error("User-provided callback failed")
+        : RuntimeError(ErrorCodes::CallbackFailed, "User-provided callback failed")
     {
     }
 
-    CallbackFailed(void* usercode_error)
-        : std::runtime_error("User-provided callback failed")
-        , usercode_error(usercode_error)
+    CallbackFailed(void* str)
+        : CallbackFailed()
     {
+        usercode_error = str;
     }
 };
-
-//// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
-
-struct WrongPrimaryKeyTypeException : std::logic_error {
-    WrongPrimaryKeyTypeException(const std::string& object_type)
-        : std::logic_error(util::format("Wrong primary key type for '%1'", object_type))
-        , object_type(object_type)
-    {
-    }
-    const std::string object_type;
-};
-
-struct NotNullableException : std::logic_error {
-    NotNullableException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct PropertyTypeMismatch : std::logic_error {
-    PropertyTypeMismatch(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-//// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrapC {
     static constexpr uint64_t s_cookie_value = 0xdeadbeefdeadbeef;
@@ -119,7 +66,7 @@ struct WrapC {
 
     virtual WrapC* clone() const
     {
-        throw NotClonableException();
+        throw NotClonable();
     }
 
     virtual bool is_frozen() const
@@ -134,7 +81,8 @@ struct WrapC {
 
     virtual realm_thread_safe_reference_t* get_thread_safe_reference() const
     {
-        throw std::logic_error{"Thread safe references cannot be created for this object type"};
+        throw LogicError{ErrorCodes::IllegalOperation,
+                         "Thread safe references cannot be created for this object type"};
     }
 };
 

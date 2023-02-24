@@ -45,9 +45,19 @@ using TransactionRef = std::shared_ptr<Transaction>;
 
 /// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile(const std::string& msg)
-        : std::runtime_error("Incompatible lock file. " + msg)
+struct IncompatibleLockFile : FileAccessError {
+    IncompatibleLockFile(const std::string& path, const std::string& msg)
+        : FileAccessError(
+              ErrorCodes::IncompatibleLockFile,
+              util::format(
+                  "Realm file '%1' is currently open in another process which cannot share access with this process. "
+                  "This could either be due to the existing process being a different architecture or due to the "
+                  "existing process using an incompatible version of Realm. "
+                  "If the other process is Realm Studio, you may need to update it (or update Realm if your Studio "
+                  "version is too new), and if using an iOS simulator, make sure that you are using a 64-bit "
+                  "simulator. Underlying problem: %2",
+                  path, msg),
+              path)
     {
     }
 };
@@ -61,9 +71,10 @@ struct IncompatibleLockFile : std::runtime_error {
 /// This exception will also be thrown if the history schema version is lower
 /// than required, and no migration is possible
 /// (Replication::is_upgradable_history_schema()).
-struct IncompatibleHistories : util::File::AccessError {
+struct IncompatibleHistories : FileAccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
-        : util::File::AccessError("Incompatible histories. " + msg, path)
+        : FileAccessError(ErrorCodes::IncompatibleHistories,
+                          msg + " Synchronized Realms cannot be opened in non-sync mode, and vice versa.", path)
     {
     }
 };
@@ -76,9 +87,9 @@ struct IncompatibleHistories : util::File::AccessError {
 /// for read or write operations.
 /// It will also be thrown if a realm which requires upgrade is opened in read-only
 /// mode (Group::open).
-struct FileFormatUpgradeRequired : util::File::AccessError {
-    FileFormatUpgradeRequired(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+struct FileFormatUpgradeRequired : FileAccessError {
+    FileFormatUpgradeRequired(const std::string& path)
+        : FileAccessError(ErrorCodes::FileFormatUpgradeRequired, "Database upgrade required but prohibited.", path, 0)
     {
     }
 };
@@ -505,9 +516,9 @@ private:
     /// \param options See DBOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
     ///
-    /// \throw util::File::AccessError If the file could not be opened. If the
+    /// \throw FileAccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are derived from
-    /// util::File::AccessError, the derived exception type is thrown. Note that
+    /// FileAccessError, the derived exception type is thrown. Note that
     /// InvalidDatabase is among these derived exception types.
     ///
     /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
@@ -625,7 +636,12 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {
+struct DB::BadVersion : Exception {
+    BadVersion(version_type version)
+        : Exception(ErrorCodes::BadVersion,
+                    util::format("Unable to lock version %1 as it does not exist or has been cleaned up.", version))
+    {
+    }
 };
 
 inline bool DB::is_attached() const noexcept
