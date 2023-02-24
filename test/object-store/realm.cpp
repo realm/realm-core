@@ -4018,19 +4018,19 @@ TEST_CASE("Immutable Realms") {
 
     SECTION("unsupported functions") {
         SECTION("update_schema()") {
-            REQUIRE_THROWS_AS(realm->compact(), std::logic_error);
+            REQUIRE_THROWS_AS(realm->compact(), WrongTransactionState);
         }
         SECTION("begin_transaction()") {
-            REQUIRE_THROWS_AS(realm->begin_transaction(), std::logic_error);
+            REQUIRE_THROWS_AS(realm->begin_transaction(), WrongTransactionState);
         }
         SECTION("async_begin_transaction()") {
-            REQUIRE_THROWS_AS(realm->async_begin_transaction(nullptr), std::logic_error);
+            REQUIRE_THROWS_AS(realm->async_begin_transaction(nullptr), WrongTransactionState);
         }
         SECTION("refresh()") {
-            REQUIRE_THROWS_AS(realm->refresh(), std::logic_error);
+            REQUIRE_THROWS_AS(realm->refresh(), WrongTransactionState);
         }
         SECTION("compact()") {
-            REQUIRE_THROWS_AS(realm->compact(), std::logic_error);
+            REQUIRE_THROWS_AS(realm->compact(), WrongTransactionState);
         }
     }
 

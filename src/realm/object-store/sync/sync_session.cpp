@@ -681,21 +681,27 @@ void SyncSession::handle_error(SyncError error)
                 break;
         }
     }
-    else {
+    else if (error_code.category() == sync::websocket::websocket_error_category()) {
         // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        if (error_code.category() == sync::websocket::websocket_close_status_category()) {
-            bool restart_session = error_code.value() == ErrorCodes::WebSocketMovedPermanently;
-            if (restart_session || error_code.value() == ErrorCodes::WebSocketUnauthorized ||
-                error_code.value() == ErrorCodes::WebSocketAbnormalClosure) {
-                if (auto u = user()) {
-                    u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
-                    return;
-                }
+        bool restart_session = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
+        if (restart_session || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
+            error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
+            if (auto u = user()) {
+                u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
+                return;
             }
         }
+
+        // Surface a simplified websocket error to the user.
+        auto simplified_error = sync::websocket::get_simplified_websocket_error(
+            static_cast<sync::websocket::WebSocketError>(error_code.value()));
+        std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
+        error = SyncError(new_error_code, error.reason(), error.is_fatal);
+    }
+    else {
         // Unrecognized error code.
         error.is_unrecognized_by_client = true;
     }

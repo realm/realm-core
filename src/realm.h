@@ -3319,7 +3319,7 @@ typedef enum realm_sync_error_category {
     RLM_SYNC_ERROR_CATEGORY_CLIENT,
     RLM_SYNC_ERROR_CATEGORY_CONNECTION,
     RLM_SYNC_ERROR_CATEGORY_SESSION,
-    RLM_SYNC_ERROR_CATEGORY_RESOLVE,
+    RLM_SYNC_ERROR_CATEGORY_WEBSOCKET,
 
     /**
      * System error - POSIX errno, Win32 HRESULT, etc.
@@ -3342,15 +3342,6 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
 } realm_sync_error_action_e;
-
-typedef enum realm_sync_error_resolve {
-    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND = 1,
-    RLM_SYNC_ERROR_RESOLVE_HOST_NOT_FOUND_TRY_AGAIN = 2,
-    RLM_SYNC_ERROR_RESOLVE_NO_DATA = 3,
-    RLM_SYNC_ERROR_RESOLVE_NO_RECOVERY = 4,
-    RLM_SYNC_ERROR_RESOLVE_SERVICE_NOT_FOUND = 5,
-    RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED = 6,
-} realm_sync_error_resolve_e;
 
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
@@ -4092,30 +4083,6 @@ RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
-typedef enum status_error_code {
-    STATUS_OK = 0,
-    STATUS_UNKNOWN_ERROR = 1,
-    STATUS_RUNTIME_ERROR = 2,
-    STATUS_LOGIC_ERROR = 3,
-    STATUS_BROKEN_PROMISE = 4,
-    STATUS_OPERATION_ABORTED = 5,
-
-    /// WEBSOCKET ERRORS
-    // STATUS_WEBSOCKET_OK = 1000 IS NOT USED, JUST USE OK INSTEAD
-    STATUS_WEBSOCKET_GOING_AWAY = 1001,
-    STATUS_WEBSOCKET_PROTOCOL_ERROR = 1002,
-    STATUS_WEBSOCKET_UNSUPPORTED_DATA = 1003,
-    STATUS_WEBSOCKET_RESERVED = 1004,
-    STATUS_WEBSOCKET_NO_STATUS_RECEIVED = 1005,
-    STATUS_WEBSOCKET_ABNORMAL_CLOSURE = 1006,
-    STATUS_WEBSOCKET_INVALID_PAYLOAD_DATA = 1007,
-    STATUS_WEBSOCKET_POLICY_VIOLATION = 1008,
-    STATUS_WEBSOCKET_MESSAGE_TOO_BIG = 1009,
-    STATUS_WEBSOCKET_INAVALID_EXTENSION = 1010,
-    STATUS_WEBSOCKET_INTERNAL_SERVER_ERROR = 1011,
-    STATUS_WEBSOCKET_TLS_HANDSHAKE_FAILED = 1015, // USED BY DEFAULT WEBSOCKET
-} status_error_code_e;
-
 RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_sync_socket_post_func_t post_func,
     realm_sync_socket_create_timer_func_t create_timer_func,
@@ -4125,7 +4092,7 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
 RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 status_error_code_e status, const char* reason);
+                                                 realm_web_socket_errno_e status, const char* reason);
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);
@@ -4136,7 +4103,7 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
                                                  const char* data, size_t data_size);
 
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
-                                                status_error_code_e status, const char* reason);
+                                                realm_web_socket_errno_e status, const char* reason);
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
                                                       realm_sync_socket_t*) RLM_API_NOEXCEPT;

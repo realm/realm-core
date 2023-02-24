@@ -225,34 +225,9 @@ public:
         AppUnknownError = RLM_ERR_APP_UNKNOWN,
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
-
-        WebSocketGoingAway = RLM_ERR_WEBSOCKET_GOINGAWAY,
-        WebSocketProtocolError = RLM_ERR_WEBSOCKET_PROTOCOLERROR,
-        WebSocketUnsupportedData = RLM_ERR_WEBSOCKET_UNSUPPORTEDDATA,
-        WebSocketReserved = RLM_ERR_WEBSOCKET_RESERVED,
-        WebSocketNoStatusReceived = RLM_ERR_WEBSOCKET_NOSTATUSRECEIVED,
-        WebSocketAbnormalClosure = RLM_ERR_WEBSOCKET_ABNORMALCLOSURE,
-        WebSocketInvalidPayloadData = RLM_ERR_WEBSOCKET_INVALIDPAYLOADDATA,
-        WebSocketPolicyViolation = RLM_ERR_WEBSOCKET_POLICYVIOLATION,
-        WebSocketMessageTooBig = RLM_ERR_WEBSOCKET_MESSAGETOOBIG,
-        WebSocketInavalidExtension = RLM_ERR_WEBSOCKET_INAVALIDEXTENSION,
-        WebSocketInternalServerError = RLM_ERR_WEBSOCKET_INTERNALSERVERERROR,
-        WebSocketTLSHandshakeFailed = RLM_ERR_WEBSOCKET_TLSHANDSHAKEFAILED, // Used by default WebSocket
-
-        // HACK
-        ReadError,
-        WriteError,
-        ResolveFailed,
-        ConnectionFailed,
-        WebSocketRetryError,
-        WebSocketFatalError,
-        WebSocketUnauthorized,
-        WebSocketForbidden,
-        WebSocketMovedPermanently,
-        WebSocketClient_Too_Old,
-        WebSocketClient_Too_New,
-        WebSocketProtocol_Mismatch,
-        // HACK
+        WebSocketResolveFailedError = RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR,
+        WebSocketConnectionClosedClientError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_CLIENT_ERROR,
+        WebSocketConnectionClosedServerError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_SERVER_ERROR,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,

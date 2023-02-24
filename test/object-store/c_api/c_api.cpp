@@ -26,8 +26,7 @@
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/sync/client_base.hpp>
-#include <realm/sync/network/default_socket.hpp>
-#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
@@ -696,13 +695,14 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.category() == std::system_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
-        error_code = make_error_code(sync::network::ResolveErrors::socket_type_not_supported);
+        error_code.assign(ErrorCodes::WebSocketResolveFailedError,
+                          realm::sync::websocket::websocket_error_category());
         error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
-        CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_WEBSOCKET);
+        CHECK(error.value == realm_errno::RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR);
 
         c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::sync::network::resolve_error_category());
+        CHECK(ec_check.category() == realm::sync::websocket::websocket_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(util::error::misc_errors::unknown);
@@ -5948,7 +5948,7 @@ TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         auto cb = [callback_copy = callback](Status s) {
-            realm_sync_socket_callback_complete(callback_copy, static_cast<status_error_code_e>(s.code()),
+            realm_sync_socket_callback_complete(callback_copy, static_cast<realm_web_socket_errno_e>(s.code()),
                                                 s.reason().c_str());
         };
         test_data->socket_provider->post(std::move(cb));

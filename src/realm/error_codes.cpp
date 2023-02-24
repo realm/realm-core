@@ -207,18 +207,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
 
-        case WebSocketGoingAway:
-        case WebSocketProtocolError:
-        case WebSocketUnsupportedData:
-        case WebSocketReserved:
-        case WebSocketNoStatusReceived:
-        case WebSocketAbnormalClosure:
-        case WebSocketInvalidPayloadData:
-        case WebSocketPolicyViolation:
-        case WebSocketMessageTooBig:
-        case WebSocketInavalidExtension:
-        case WebSocketInternalServerError:
-        case WebSocketTLSHandshakeFailed:
+        case WebSocketResolveFailedError:
+        case WebSocketConnectionClosedClientError:
+        case WebSocketConnectionClosedServerError:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
 
         case UnknownError:
@@ -374,18 +365,9 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
-    {"WebSocketAbnormalClosure", ErrorCodes::WebSocketAbnormalClosure},
-    {"WebSocketGoingAway", ErrorCodes::WebSocketGoingAway},
-    {"WebSocketInavalidExtension", ErrorCodes::WebSocketInavalidExtension},
-    {"WebSocketInternalServerError", ErrorCodes::WebSocketInternalServerError},
-    {"WebSocketInvalidPayloadData", ErrorCodes::WebSocketInvalidPayloadData},
-    {"WebSocketMessageTooBig", ErrorCodes::WebSocketMessageTooBig},
-    {"WebSocketNoStatusReceived", ErrorCodes::WebSocketNoStatusReceived},
-    {"WebSocketPolicyViolation", ErrorCodes::WebSocketPolicyViolation},
-    {"WebSocketProtocolError", ErrorCodes::WebSocketProtocolError},
-    {"WebSocketReserved", ErrorCodes::WebSocketReserved},
-    {"WebSocketTLSHandshakeFailed", ErrorCodes::WebSocketTLSHandshakeFailed},
-    {"WebSocketUnsupportedData", ErrorCodes::WebSocketUnsupportedData},
+    {"WebSocketConnectionClosedClientError", ErrorCodes::WebSocketConnectionClosedClientError},
+    {"WebSocketConnectionClosedServerError", ErrorCodes::WebSocketConnectionClosedServerError},
+    {"WebSocketResolveFailedError", ErrorCodes::WebSocketResolveFailedError},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };
