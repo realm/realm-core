@@ -708,6 +708,7 @@ private:
 
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
+    friend class DB;
     friend class Group;
     friend class GroupWriter;
 };
