@@ -2,7 +2,6 @@
 #define REALM_SYNC_CLIENT_BASE_HPP
 
 #include <realm/transaction.hpp>
-#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/socket_provider.hpp>
