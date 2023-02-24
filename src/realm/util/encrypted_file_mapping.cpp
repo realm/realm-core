@@ -260,20 +260,21 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const std::array<uint8_
     return result == 0;
 }
 
-util::FlatMap<size_t, IVRefreshState> AESCryptor::refresh_ivs(FileDesc fd, off_t data_pos,
-                                                              size_t page_ndx_in_file_expected)
+util::FlatMap<size_t, IVRefreshState>
+AESCryptor::refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected, size_t end_page_ndx_in_file)
 {
+    REALM_ASSERT_EX(page_ndx_in_file_expected < end_page_ndx_in_file, page_ndx_in_file_expected,
+                    end_page_ndx_in_file);
     // the indices returned are page indices, not block indices
     util::FlatMap<size_t, IVRefreshState> page_states;
 
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
     // the call to get_iv_table() below reads in all ivs in a chunk with size = blocks_per_metadata_block
-    // so we will know if any page in this chunk has changed
+    // so we will know if any iv in this chunk has changed
     const size_t block_ndx_refresh_start =
         ((data_pos_casted / block_size) / blocks_per_metadata_block) * blocks_per_metadata_block;
     const size_t block_ndx_refresh_end = block_ndx_refresh_start + blocks_per_metadata_block;
-
     REALM_ASSERT_EX(block_ndx_refresh_end <= m_iv_buffer.size(), block_ndx_refresh_start, block_ndx_refresh_end,
                     m_iv_buffer.size());
 
@@ -282,9 +283,16 @@ util::FlatMap<size_t, IVRefreshState> AESCryptor::refresh_ivs(FileDesc fd, off_t
     size_t number_of_identical_blocks = 0;
     size_t last_page_index = -1;
     constexpr iv_table uninitialized_iv = {};
+    // there may be multiple iv blocks per page so all must be unchanged for a page
+    // to be considered unchanged. If any one of the ivs has changed then the entire page
+    // must be refreshed. Eg. with a page_size() of 16k and block_size of 4k, if any of
+    // the 4 ivs in that page are different, the entire page must be refreshed.
     const size_t num_required_identical_blocks_for_page_match = page_size() / block_size;
     for (size_t block_ndx = block_ndx_refresh_start; block_ndx < block_ndx_refresh_end; ++block_ndx) {
         size_t page_index = block_ndx * block_size / page_size();
+        if (page_index >= end_page_ndx_in_file) {
+            break;
+        }
         if (page_index != last_page_index) {
             number_of_identical_blocks = 0;
         }
@@ -697,13 +705,16 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
 
     if (!copy_up_to_date_page(local_page_ndx)) {
 
-        size_t page_ndx_in_file = local_page_ndx + m_first_page;
+        const size_t page_ndx_in_file = local_page_ndx + m_first_page;
+        const size_t end_page_ndx_in_file = m_first_page + m_page_state.size();
         off_t data_pos = off_t(page_ndx_in_file << m_page_shift);
         if (is(m_page_state[local_page_ndx], StaleIV)) {
-            auto refreshed_ivs = m_file.cryptor.refresh_ivs(m_file.fd, data_pos, page_ndx_in_file);
+            auto refreshed_ivs =
+                m_file.cryptor.refresh_ivs(m_file.fd, data_pos, page_ndx_in_file, end_page_ndx_in_file);
             for (const auto& [page_ndx, state] : refreshed_ivs) {
                 size_t local_page_ndx_of_iv_change = page_ndx - m_first_page;
-                if (!contains_page(page_ndx) || is(m_page_state[local_page_ndx_of_iv_change], Dirty | Writable)) {
+                REALM_ASSERT_EX(contains_page(page_ndx), page_ndx, m_first_page, m_page_state.size());
+                if (is(m_page_state[local_page_ndx_of_iv_change], Dirty | Writable)) {
                     continue;
                 }
                 switch (state) {

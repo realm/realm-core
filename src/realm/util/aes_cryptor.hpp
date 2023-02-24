@@ -74,7 +74,8 @@ public:
     size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
-    util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected);
+    util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected,
+                                                      size_t end_page_ndx_in_file);
 
     void check_key(const uint8_t* key);
 

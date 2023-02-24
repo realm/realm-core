@@ -200,6 +200,7 @@ TEST(EncryptedFile_IVRefreshing)
     TEST_PATH(path);
     // enough data to span two metadata blocks
     constexpr size_t data_size = block_size * blocks_per_metadata_block * 2;
+    const size_t num_pages = data_size / page_size();
     char data[block_size];
     for (size_t i = 0; i < sizeof(data); ++i)
         data[i] = static_cast<char>(i);
@@ -207,30 +208,31 @@ TEST(EncryptedFile_IVRefreshing)
     AESCryptor cryptor(test_key);
     cryptor.set_file_size(off_t(data_size));
     File file(path, realm::util::File::mode_Write);
+    const FileDesc fd = file.get_descriptor();
 
     auto make_external_write_at_pos = [&](off_t data_pos) -> size_t {
         const size_t begin_write_block = data_pos / block_size * block_size;
         const size_t ndx_in_block = data_pos % block_size;
         AESCryptor cryptor2(test_key);
         cryptor2.set_file_size(off_t(data_size));
-        cryptor2.read(file.get_descriptor(), off_t(begin_write_block), data, block_size);
+        cryptor2.read(fd, off_t(begin_write_block), data, block_size);
         ++data[ndx_in_block];
-        cryptor2.write(file.get_descriptor(), off_t(begin_write_block), data, block_size);
+        cryptor2.write(fd, off_t(begin_write_block), data, block_size);
         return data_pos / page_size();
     };
 
     for (size_t i = 0; i < data_size; i += block_size) {
-        cryptor.write(file.get_descriptor(), off_t(i), data, block_size);
+        cryptor.write(fd, off_t(i), data, block_size);
     }
 
-    IVPageStates states = cryptor.refresh_ivs(file.get_descriptor(), 0, 0);
+    IVPageStates states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
     std::vector<size_t> pages_needing_refresh = {};
     for (size_t i = 0; i < pages_per_metadata_block; ++i) {
         pages_needing_refresh.push_back(i);
     }
     // initial call requires refreshing all pages in range
     verify_page_states(states, 0, pages_needing_refresh);
-    states = cryptor.refresh_ivs(file.get_descriptor(), 0, 0);
+    states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
     // subsequent call does not require refreshing anything
     verify_page_states(states, 0, {});
 
@@ -239,65 +241,79 @@ TEST(EncryptedFile_IVRefreshing)
         pages_needing_refresh.push_back(i + pages_per_metadata_block);
     }
     off_t read_data_pos = off_t(pages_per_metadata_block * page_size());
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, pages_per_metadata_block);
+    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
     verify_page_states(states, read_data_pos, pages_needing_refresh);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, pages_per_metadata_block);
+    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
     verify_page_states(states, read_data_pos, {});
 
     read_data_pos = off_t(data_size / 2);
     size_t read_page_ndx = read_data_pos / page_size();
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, read_page_ndx);
+    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
     verify_page_states(states, read_data_pos, {});
 
     read_data_pos = off_t(data_size - 1);
     read_page_ndx = read_data_pos / page_size();
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, read_page_ndx);
+    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
     verify_page_states(states, read_data_pos, {});
 
     // write at pos 0, read half way through the first page
     make_external_write_at_pos(0);
     read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {0});
 
     // write at end of first page, read half way through first page
     make_external_write_at_pos(off_t(page_size() - 1));
     read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {0});
 
     // write at beginning of second page, read in first page
     make_external_write_at_pos(off_t(page_size()));
     read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {1});
 
     // write at last page of first metadata block, read in first page
     size_t page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
     read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {page_needing_refresh});
+
+    // test truncation of end_page: write to first page, and last page of first metadata block, read in first page,
+    // but set the end page index lower than the last write
+    make_external_write_at_pos(0);
+    page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
+    REALM_ASSERT(page_needing_refresh >= 1); // this test assumes page_size is < 64 * block_size
+    read_data_pos = off_t(0);
+    constexpr size_t end_page_index = 1;
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, end_page_index);
+    CHECK_EQUAL(states.size(), 1);
+    CHECK_EQUAL(states.count(size_t(0)), 1);
+    CHECK(states[0] == IVRefreshState::RequiresRefresh);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, 0, {page_needing_refresh});
 
     // write to a block indexed to the second metadata block
     page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size);
     // a read anywhere in the first metadata block domain does not require refresh
     read_data_pos = off_t(page_size() / 2);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {});
     // but a read in a page controlled by the second metadata block does require a refresh
     read_data_pos = off_t(blocks_per_metadata_block * block_size);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, page_needing_refresh);
+    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
     verify_page_states(states, read_data_pos, {page_needing_refresh});
 
     // write to the last byte of data
     page_needing_refresh = make_external_write_at_pos(data_size - 1);
     // a read anywhere in the first metadata block domain does not require refresh
     read_data_pos = 0;
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, 0);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
     verify_page_states(states, read_data_pos, {});
     // but a read in a page controlled by the second metadata block does require a refresh
     read_data_pos = off_t(data_size - 1);
-    states = cryptor.refresh_ivs(file.get_descriptor(), read_data_pos, page_needing_refresh);
+    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
     verify_page_states(states, read_data_pos, {page_needing_refresh});
 }
 
