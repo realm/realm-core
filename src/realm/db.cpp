@@ -269,34 +269,6 @@ struct VersionList {
     }
 #endif // REALM_DEBUG
 
-    std::vector<VersionedTopRef> get_versions_from(uint64_t begin_version, uint64_t end_version) noexcept
-    {
-        bool did_find_begin = false;
-        bool did_find_end = false;
-        std::vector<VersionedTopRef> versions;
-        for (auto* rc = data(); rc < data() + entries; ++rc) {
-            if (rc->is_active() && rc->version >= begin_version && rc->version <= end_version) {
-                if (rc->version == end_version) {
-                    did_find_end = true;
-                    REALM_ASSERT_EX(rc->count_live + rc->count_frozen + rc->count_full > 0, rc->count_live,
-                                    rc->count_frozen, rc->count_full);
-                }
-                else if (rc->version == begin_version) {
-                    did_find_begin = true;
-                    REALM_ASSERT_EX(rc->count_live + rc->count_frozen + rc->count_full > 0, rc->count_live,
-                                    rc->count_frozen, rc->count_full);
-                }
-                REALM_ASSERT_EX(!int_cast_has_overflow<ref_type>(rc->current_top), rc->current_top, rc->version,
-                                rc->filesize);
-                versions.push_back(VersionedTopRef{ref_type(rc->current_top), rc->version, rc->filesize});
-            }
-        }
-        // begin and end versions must be found because this should be called with a read lock on both
-        REALM_ASSERT_EX(did_find_begin, begin_version);
-        REALM_ASSERT_EX(did_find_end, end_version);
-        return versions;
-    }
-
     constexpr static uint32_t nil = (uint32_t)-1;
     const static int init_readers_size = 32;
     uint32_t entries;
@@ -560,34 +532,6 @@ public:
         std::lock_guard lock(m_mutex);
         ensure_reader_mapping();
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
-    }
-
-    std::vector<VersionedTopRef> get_versions_from(version_type from, version_type to)
-    {
-        std::lock_guard lock(m_mutex);
-        ensure_reader_mapping();
-        std::vector<VersionedTopRef> versions = m_info->readers.get_versions_from(from, to);
-        std::sort(versions.begin(), versions.end(), [](auto& a, auto& b) {
-            return a.version < b.version;
-        });
-#if REALM_DEBUG
-        // we must have locked all versions in the closed range [from, to]
-        // this should be guaranteed by m_last_encryption_page_reader being a "full" lock which prevents
-        // the verison manager from cleaning up intermediary versions after that
-        if (versions.size() != to - from + 1) {
-            util::format(std::cout, "version count mismatch: ");
-            for (size_t i = 1; i < versions.size(); ++i) {
-                if (versions[i - 1].version != versions[i].version - 1) {
-                    util::format(std::cout, "found abberation at index %1, (%2, %3)\n", i, versions[i - 1].version,
-                                 versions[i].version);
-                }
-            }
-            std::cout << std::endl;
-            m_info->readers.dump();
-        }
-#endif // REALM_DEBUG
-        REALM_ASSERT_EX(versions.size() == to - from + 1, versions.size(), from, to);
-        return versions;
     }
 
     version_type get_newest_version()

@@ -23,12 +23,12 @@
 #include <memory>
 #include <mutex>
 #include <map>
-#include <set>
 #include <atomic>
 #include <cstring>
 
 #if REALM_DEBUG
 #include <iostream>
+#include <unordered_set>
 #endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG

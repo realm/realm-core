@@ -73,18 +73,6 @@ private:
 };
 static_assert(std::is_trivially_copyable_v<MemRef>);
 
-struct RefRange {
-    ref_type begin;
-    ref_type end;
-};
-using RefRanges = std::vector<RefRange>;
-
-struct VersionedTopRef {
-    ref_type top_ref;
-    uint_fast64_t version;
-    uint64_t file_size;
-};
-
 /// The common interface for Realm allocators.
 ///
 /// A Realm allocator must associate a 'ref' to each allocated

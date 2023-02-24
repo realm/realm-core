@@ -900,9 +900,10 @@ ref_type GroupWriter::write_group()
             reserve_ref, reserve_ref + used, free_positions_ref, free_positions_ref + free_positions_size, top_ref);
         REALM_ASSERT_EX(free_sizes_ref >= reserve_ref && free_sizes_ref + free_sizes_size <= reserve_ref + used,
                         reserve_ref, reserve_ref + used, free_sizes_ref, free_sizes_ref + free_sizes_size, top_ref);
-        REALM_ASSERT_EX(free_versions_ref >= reserve_ref && free_versions_ref + free_versions_size <= reserve_ref + used,
-                        reserve_ref, reserve_ref + used, free_versions_ref, free_versions_ref + free_versions_size,
-                        top_ref);
+        REALM_ASSERT_EX(
+            free_versions_ref >= reserve_ref && free_versions_ref + free_versions_size <= reserve_ref + used,
+            reserve_ref, reserve_ref + used, free_versions_ref, free_versions_ref + free_versions_size, top_ref);
+
 
         // Write top
         write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws

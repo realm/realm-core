@@ -38,12 +38,10 @@
 namespace realm {
 
 // Pre-declarations
-class DB;
 class Group;
 class GroupWriter;
 
 namespace util {
-class EncryptedFileMapping;
 struct SharedFileInfo;
 } // namespace util
 
@@ -51,6 +49,7 @@ struct SharedFileInfo;
 /// (or memory buffer) does not appear to contain a valid Realm
 /// database.
 struct InvalidDatabase;
+
 
 /// The allocator that is used to manage the memory of a Realm
 /// group, i.e., a Realm database.
@@ -120,7 +119,8 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {};
+    struct Retry {
+    };
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -709,7 +709,6 @@ private:
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
     friend class Group;
-    friend class DB;
     friend class GroupWriter;
 };
 

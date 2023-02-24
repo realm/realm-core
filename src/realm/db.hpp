@@ -445,7 +445,6 @@ private:
     class AsyncCommitHelper;
     class VersionManager;
     class EncryptionMarkerObserver;
-    struct PageRefresherGuard;
     class FileVersionManager;
     class InMemoryVersionManager;
     struct SharedInfo;
