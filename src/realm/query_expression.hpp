@@ -3866,7 +3866,10 @@ public:
     {
         std::vector<ObjKey> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
-        m_query.init();
+        if (!m_initialized) {
+            m_query.init();
+            m_initialized = true;
+        }
 
         size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
             const Obj obj = m_link_map.get_target_table()->get_object(k);
@@ -3893,9 +3896,17 @@ public:
         return make_subexpr<SubQueryCount>(*this);
     }
 
+    SubQueryCount(const SubQueryCount& other)
+        : m_query(other.m_query)
+        , m_link_map(other.m_link_map)
+        , m_initialized(false)
+    {
+    }
+
 private:
     Query m_query;
     LinkMap m_link_map;
+    bool m_initialized = false;
 };
 
 // The unused template parameter is a hack to avoid a circular dependency between table.hpp and query_expression.hpp.

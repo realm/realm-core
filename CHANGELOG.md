@@ -7,9 +7,11 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
+* Fixed performance degradation on SubQueries ([#6327](https://github.com/realm/realm-core/issues/6327), since v6.0.0)
+* Fix crash if secure transport returns an error with a non-zero length. ([#5435](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
 
 ### Breaking changes
-* BindingCallbackThreadObserver interface was updated ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +19,9 @@
 -----------
 
 ### Internals
-* Add Binding Callback Thread Observer CAPI Test and updated Sync_MultipleSyncAgentsNotAllowed test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
+([#6319](https://github.com/realm/realm-core/pull/6319))
+* Add Binding Callback Thread Observer CAPI Test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ----------------------------------------------
 
