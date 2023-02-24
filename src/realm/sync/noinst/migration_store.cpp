@@ -67,6 +67,8 @@ MigrationStore::MigrationStore(DBRef db,
         }
         load_sync_metadata_schema(tr, &internal_tables);
     }
+
+    m_on_migration_state_changed(m_state);
 }
 
 std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shared_ptr<realm::SyncConfig> config)
@@ -95,14 +97,14 @@ void MigrationStore::migrate_to_flx(std::string rql_query_string)
 
     std::unique_lock lock{m_mutex};
     m_query_string = rql_query_string;
-    m_state = MigrationState::InProgress;
+    m_state = MigrationState::Completed;
     lock.unlock();
 
     auto tr = m_db->start_write();
     auto migration_store_obj = tr->get_table(m_migration_table)->get_object(0);
     migration_store_obj.set(m_migration_query_str, m_query_string);
     migration_store_obj.set(m_migration_state, m_state);
-    migration_store_obj.set(m_migration_started_at, Timestamp{std::chrono::system_clock::now()});
+    migration_store_obj.set(m_migration_completed_at, Timestamp{std::chrono::system_clock::now()});
     tr->commit();
 
     m_on_migration_state_changed(m_state);
@@ -122,7 +124,7 @@ void MigrationStore::cancel_migration()
 std::optional<Subscription> MigrationStore::make_subscription(const std::string& object_class_name)
 {
     std::lock_guard lock{m_mutex};
-    if (m_state != MigrationState::InProgress) {
+    if (m_state == MigrationState::NotStarted) {
         return std::nullopt;
     }
     if (object_class_name.empty()) {

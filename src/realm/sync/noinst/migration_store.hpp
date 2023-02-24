@@ -41,16 +41,15 @@ public:
 
     enum class MigrationState {
         NotStarted,
-        InProgress,
         Completed,
     };
 
     static MigrationStoreRef create(DBRef db,
                                     std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
 
-    // Converts the configuration from PBS to FLX if in the migrated or in progress state,
-    // otherwise returns the passed in config object. If the provided config is configured
-    // for FLX, the migration will be canceled and the migration state will be cleared.
+    // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
+    // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
+    // will be cleared.
     std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
 
     // Called when the server responds with migrate to FLX and stores the FLX
@@ -62,7 +61,7 @@ public:
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
-    // followed by the class name. If not in progress state, nullopt will be returned.
+    // followed by the class name. If not in the completed state, nullopt will be returned.
     std::optional<Subscription> make_subscription(const std::string& object_class_name);
 
 protected:
