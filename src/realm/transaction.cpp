@@ -147,10 +147,10 @@ size_t Transaction::get_commit_size() const
 
 DB::version_type Transaction::commit()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
+
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 
@@ -184,7 +184,7 @@ void Transaction::rollback()
         return; // Idempotency
 
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
@@ -197,16 +197,15 @@ void Transaction::end_read()
     if (m_transact_stage == DB::transact_Ready)
         return;
     if (m_transact_stage == DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Illegal end_read when in write mode");
     do_end_read();
 }
 
 VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
 
     flush_accessors_for_commit();
 
@@ -280,12 +279,9 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 
 VersionID Transaction::commit_and_continue_writing()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(is_attached());
+        throw WrongTransactionState("Not a write transaction");
 
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();
@@ -311,7 +307,7 @@ VersionID Transaction::commit_and_continue_writing()
 TransactionRef Transaction::freeze()
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Can only freeze a read transaction");
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);
 }
@@ -324,7 +320,7 @@ TransactionRef Transaction::duplicate()
     if (m_transact_stage == DB::transact_Frozen)
         return db->start_frozen(version);
 
-    throw LogicError(LogicError::wrong_transact_state);
+    throw WrongTransactionState("Can only duplicate a read/frozen transaction");
 }
 
 void Transaction::copy_to(TransactionRef dest) const
@@ -649,13 +645,14 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         if (!table->is_embedded()) {
             auto pk_col = table->get_primary_key_column();
             if (!pk_col)
-                throw std::runtime_error(
+                throw RuntimeError(
+                    ErrorCodes::BrokenInvariant,
                     util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
             auto pk_name = table->get_column_name(pk_col);
             if (pk_name != "_id")
-                throw std::runtime_error(
-                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
-                                 Group::table_name_to_class_name(table_name), pk_name));
+                throw RuntimeError(ErrorCodes::BrokenInvariant,
+                                   util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                                Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
                                             pk_col.is_nullable(), table->get_table_type());
         }

@@ -12,9 +12,9 @@ namespace sync {
 
 using InternStrings = std::vector<StringBufferRange>;
 
-struct BadChangesetError : ExceptionWithBacktrace<std::runtime_error> {
+struct BadChangesetError : Exception {
     BadChangesetError(const std::string& msg)
-        : ExceptionWithBacktrace<std::runtime_error>(util::format("%1. Please contact support.", msg))
+        : Exception(ErrorCodes::BadChangeset, util::format("%1. Please contact support.", msg))
     {
     }
 };

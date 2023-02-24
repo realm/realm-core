@@ -2246,7 +2246,7 @@ TEST(Shared_EncryptionPageReadFailure)
             CHECK_EQUAL(table->size(), num_objects);
         }
         catch (const InvalidDatabase& e) {
-            CHECK_STRING_CONTAINS(e.message(), "decryption failed");
+            CHECK_STRING_CONTAINS(e.what(), "decryption failed");
             did_throw = true;
         }
         CHECK(did_throw);
@@ -2518,7 +2518,7 @@ TEST(Shared_SessionDurabilityConsistency)
         DBRef sg = DB::create(path, no_create, DBOptions(durability_1));
 
         DBOptions::Durability durability_2 = DBOptions::Durability::MemOnly;
-        CHECK_LOGIC_ERROR(DB::create(path, no_create, DBOptions(durability_2)), LogicError::mixed_durability);
+        CHECK_RUNTIME_ERROR(DB::create(path, no_create, DBOptions(durability_2)), ErrorCodes::IncompatibleSession);
     }
 }
 
@@ -3366,12 +3366,12 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     CHECK(i5 == t4->end());
 }
 

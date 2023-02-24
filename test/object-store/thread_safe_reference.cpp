@@ -118,7 +118,9 @@ TEST_CASE("thread safe reference") {
             r->begin_transaction();
             r->commit_transaction();
             REQUIRE(db->get_number_of_versions() == 2);
-            REQUIRE_THROWS(db->start_read(initial_version));
+            REQUIRE_EXCEPTION(db->start_read(initial_version), BadVersion,
+                              util::format("Unable to lock version %1 as it does not exist or has been cleaned up.",
+                                           initial_version.version));
         }
 
         SECTION("other types do not") {
@@ -135,7 +137,9 @@ TEST_CASE("thread safe reference") {
             r->begin_transaction();
             r->commit_transaction();
             REQUIRE(db->get_number_of_versions() == 2);
-            REQUIRE_THROWS(db->start_read(initial_version));
+            REQUIRE_EXCEPTION(db->start_read(initial_version), BadVersion,
+                              util::format("Unable to lock version %1 as it does not exist or has been cleaned up.",
+                                           initial_version.version));
 
             // Should still be resolvable
             auto obj_2 = obj_ref.resolve<Object>(r);
@@ -866,14 +870,18 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            REQUIRE_THROWS(create_ref([](auto& r) {
-                auto obj =
-                    create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
-                                      .sort({{"value", true}});
-                REQUIRE(results.size() == 1);
-                return results;
-            }));
+            REQUIRE_EXCEPTION(create_ref([](auto& r) {
+                                  auto obj = create_object(r, "int array object",
+                                                           {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                                  Results results =
+                                      List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                          .sort({{"value", true}});
+                                  REQUIRE(results.size() == 1);
+                                  return results;
+                              }),
+                              WrongTransactionState,
+                              "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                              "inside the write transaction which created the collection.");
         }
 
         SECTION("int results") {
@@ -991,14 +999,18 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("object results") {
-            REQUIRE_THROWS(create_ref([](auto& r) {
-                auto obj =
-                    create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-                Results results = List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
-                                      .sort({{"value", true}});
-                REQUIRE(results.size() == 1);
-                return results;
-            }));
+            REQUIRE_EXCEPTION(create_ref([](auto& r) {
+                                  auto obj = create_object(r, "int array object",
+                                                           {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+                                  Results results =
+                                      List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"))
+                                          .sort({{"value", true}});
+                                  REQUIRE(results.size() == 1);
+                                  return results;
+                              }),
+                              WrongTransactionState,
+                              "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                              "inside the write transaction which created the collection.");
         }
 
         SECTION("int results") {

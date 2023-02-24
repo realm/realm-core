@@ -122,7 +122,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     constexpr uint64_t SCHEMA_VERSION = 6;
 
     if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
-        throw std::invalid_argument("Metadata Realm encryption was specified, but no encryption key was provided.");
+        throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
 
     m_metadata_config.automatic_change_notifications = false;
     m_metadata_config.path = path;
@@ -363,9 +363,7 @@ std::shared_ptr<Realm> SyncMetadataManager::try_get_realm() const
     try {
         return get_realm();
     }
-    catch (const RealmFileException& e) {
-        if (e.kind() != RealmFileException::Kind::AccessError)
-            throw;
+    catch (const InvalidDatabase&) {
         return nullptr;
     }
 }

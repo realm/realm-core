@@ -392,7 +392,7 @@ public:
         else if (left.m_from_list && right.m_from_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             // Eg: `{1, 2, 3} * {4, 5} > age`
-            throw std::logic_error("Operations involving two lists are not supported");
+            throw LogicError(ErrorCodes::InvalidQuery, "Operations involving two lists are not supported");
         }
         else if (!left.m_from_list && right.m_from_list) {
             // Right values come from link. Left must come from single row.
@@ -877,10 +877,12 @@ Query create2(const Subexpr2<L>& left, const Subexpr2<R>& right)
         REALM_ASSERT_DEBUG(t_right);
         // we only support multi column comparisons if they stem from the same table
         if (t->get_key() != t_right->get_key()) {
-            throw std::runtime_error(util::format(
-                "Comparison between two properties must be linked with a relationship or exist on the same "
-                "Table (%1 and %2)",
-                t->get_name(), t_right->get_name()));
+            throw Exception(
+                ErrorCodes::InvalidQuery,
+                util::format(
+                    "Comparison between two properties must be linked with a relationship or exist on the same "
+                    "Table (%1 and %2)",
+                    t->get_name(), t_right->get_name()));
         }
         if (!left_col->links_exist() && !right_col->links_exist()) {
             if constexpr (std::is_same_v<Cond, Less>)
@@ -2575,7 +2577,7 @@ public:
     Query is_null()
     {
         if (m_link_map.get_nb_hops() > 1)
-            throw util::runtime_error("Combining link() and is_null() is currently not supported");
+            throw Exception(ErrorCodes::InvalidQuery, "Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<false>>(m_link_map);
     }
@@ -2583,7 +2585,8 @@ public:
     Query is_not_null()
     {
         if (m_link_map.get_nb_hops() > 1)
-            throw util::runtime_error("Combining link() and is_not_null() is currently not supported");
+            throw Exception(ErrorCodes::InvalidQuery,
+                            "Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }

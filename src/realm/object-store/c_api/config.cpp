@@ -31,7 +31,7 @@ RLM_API bool realm_config_set_encryption_key(realm_config_t* config, const uint8
 {
     return wrap_err([=]() {
         if (key_size != 0 && key_size != 64) {
-            throw std::logic_error{"Wrong encryption key size (must be 0 or 64)"};
+            throw InvalidEncryptionKey();
         }
 
         config->encryption_key.clear();

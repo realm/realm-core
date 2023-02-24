@@ -79,7 +79,7 @@ Query::Query(ConstTableRef table, std::unique_ptr<TableView> tv)
 void Query::create()
 {
     if (m_table && m_table->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
     m_groups.emplace_back();
 }
@@ -181,7 +181,7 @@ void Query::set_table(TableRef tr)
     }
 
     if (tr->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
 
     m_table = tr;
@@ -265,7 +265,7 @@ namespace {
 
 REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_type_mismatch_error()
 {
-    throw LogicError{LogicError::type_mismatch};
+    throw LogicError(ErrorCodes::TypeMismatch, "Could not build query");
 }
 
 template <class Node>
@@ -939,7 +939,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 {
     auto index = m_table->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation{"Column has no fulltext index"};
     }
 
     auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
@@ -951,7 +951,7 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
 {
     auto index = link_map.get_target_table()->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation{"Column has no fulltext index"};
     }
 
     auto lm = std::make_unique<LinkMap>(link_map);
@@ -1640,7 +1640,7 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     std::string description;
     if (auto root = root_node()) {
         if (m_view) {
-            throw SerialisationError("Serialisation of a query constrained by a view is not currently supported");
+            throw SerializationError("Serialization of a query constrained by a view is not currently supported");
         }
         description = root->describe_expression(state);
     }
@@ -1795,7 +1795,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw util::runtime_error("negation of empty query is not supported");
+        throw Exception(ErrorCodes::InvalidQuery, "negation of empty query is not supported");
     Query q(m_table);
     q.Not();
     q.and_query(*this);
