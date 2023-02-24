@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 13.5.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
 * Fixed performance degradation on SubQueries ([#6327](https://github.com/realm/realm-core/issues/6327), since v6.0.0)
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
