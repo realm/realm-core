@@ -351,18 +351,4 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
     m_realm_changed_callbacks.invoke();
 }
 
-#if REALM_ENABLE_SYNC
-
-RLM_API
-void realm_sync_client_config_set_default_binding_thread_observer(
-    realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
-    realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
-    realm_userdata_t user_data, realm_free_userdata_func_t free_userdata)
-{
-    config->default_socket_provider_thread_observer = std::make_shared<realm::c_api::CBindingThreadObserver>(
-        on_thread_create, on_thread_destroy, on_error, user_data, free_userdata);
-}
-
-#endif // REALM_ENABLE_SYNC
-
 } // namespace realm::c_api

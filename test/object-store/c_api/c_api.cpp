@@ -4992,7 +4992,7 @@ struct BCTOState {
 };
 
 
-TEST_CASE("C API - binding callback thread observer") {
+TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
     auto bcto_user_data = BCTOState();
 
     auto bcto_free_userdata = [](realm_userdata_t userdata) {
@@ -5037,23 +5037,23 @@ TEST_CASE("C API - binding callback thread observer") {
             static_cast<realm_userdata_t>(&bcto_user_data), bcto_free_userdata);
         REQUIRE(config->default_socket_provider_thread_observer);
         auto observer_ptr =
-            static_cast<c_api::CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
-        REQUIRE(observer_ptr->get_create_callback_func() == bcto_on_thread_create);
-        REQUIRE(observer_ptr->get_destroy_callback_func() == bcto_on_thread_destroy);
-        REQUIRE(observer_ptr->get_error_callback_func() == bcto_on_thread_error);
-        REQUIRE(observer_ptr->get_userdata_ptr() == &bcto_user_data);
+            static_cast<CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
+        REQUIRE(observer_ptr->test_get_create_callback_func() == bcto_on_thread_create);
+        REQUIRE(observer_ptr->test_get_destroy_callback_func() == bcto_on_thread_destroy);
+        REQUIRE(observer_ptr->test_get_error_callback_func() == bcto_on_thread_error);
+        REQUIRE(observer_ptr->test_get_userdata_ptr() == &bcto_user_data);
 
         auto test_thread = std::thread([&]() {
             auto bcto_ptr = std::static_pointer_cast<realm::BindingCallbackThreadObserver>(
                 config->default_socket_provider_thread_observer);
-            BindingCallbackThreadObserver::call_did_create_thread(bcto_ptr);
-            REQUIRE(BindingCallbackThreadObserver::call_handle_error(MultipleSyncAgents(), bcto_ptr));
-            BindingCallbackThreadObserver::call_will_destroy_thread(bcto_ptr);
+            REQUIRE(bcto_ptr);
+            bcto_ptr->did_create_thread();
+            REQUIRE(bcto_ptr->handle_error(MultipleSyncAgents()));
+            bcto_ptr->will_destroy_thread();
         });
 
         // Wait for the thread to exit
-        if (test_thread.joinable())
-            test_thread.join();
+        test_thread.join();
 
         REQUIRE(bcto_user_data.thread_create_called);
         REQUIRE(bcto_user_data.thread_on_error_message.find(

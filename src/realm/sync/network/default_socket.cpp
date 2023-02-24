@@ -536,7 +536,8 @@ void DefaultSocketProvider::event_loop()
         std::notify_all_at_thread_exit(m_state_cv, std::move(lock));
     });
 
-    BindingCallbackThreadObserver::call_did_create_thread(m_observer_ptr);
+    if (m_observer_ptr)
+        m_observer_ptr->did_create_thread();
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -574,7 +575,8 @@ void DefaultSocketProvider::event_loop()
         do_state_update(lock, State::Stopping);
         lock.unlock();
         m_logger_ptr->error("Default event loop exception: ", e.what());
-        if (!BindingCallbackThreadObserver::call_handle_error(e, m_observer_ptr))
+        // If the observer_ptr is not set or the error was not handled, then throw the exception
+        if (!m_observer_ptr || !m_observer_ptr->handle_error(e))
             throw;
     }
 }

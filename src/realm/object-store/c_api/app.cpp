@@ -798,9 +798,8 @@ to_mongodb_collection_find_one_and_modify_options(const realm_mongodb_find_one_a
     return mongodb_options;
 }
 
-using UserDataPtr = std::unique_ptr<void, realm_free_userdata_func_t>;
 static void handle_mongodb_collection_result(util::Optional<bson::Bson> bson, util::Optional<AppError> app_error,
-                                             UserDataPtr data, realm_mongodb_callback_t callback)
+                                             UserdataPtr data, realm_mongodb_callback_t callback)
 {
     if (app_error) {
         auto error = to_capi(*app_error);

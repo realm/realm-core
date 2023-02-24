@@ -274,6 +274,26 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
     config->timeouts.fast_reconnect_limit = limit;
 }
 
+/// Register an app local callback handler for bindings interested in registering callbacks before/after
+/// the ObjectStore thread runs for this app. This only works for the default socket provider implementation.
+/// IMPORTANT: If a function is supplied that handles the exception, it must call abort() or cause the
+/// application to crash since the SyncClient will be in a bad state if this occurs and will not be able to
+/// shut down properly.
+/// @param config pointer to sync client config created by realm_sync_client_config_new()
+/// @param on_thread_create callback invoked when the object store thread is created
+/// @param on_thread_destroy callback invoked when the object store thread is destroyed
+/// @param on_error callback invoked to signal to the listener that some error has occured.
+/// @param user_data pointer to user defined data that is provided to each of the callback functions
+/// @param free_userdata callback invoked when the user_data is to be freed
+RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
+    realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
+    realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
+    realm_userdata_t user_data, realm_free_userdata_func_t free_userdata)
+{
+    config->default_socket_provider_thread_observer = std::make_shared<CBindingThreadObserver>(
+        on_thread_create, on_thread_destroy, on_error, user_data, free_userdata);
+}
+
 RLM_API void realm_config_set_sync_config(realm_config_t* config, realm_sync_config_t* sync_config)
 {
     config->sync_config = std::make_shared<SyncConfig>(*sync_config);

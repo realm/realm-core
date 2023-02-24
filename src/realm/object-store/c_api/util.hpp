@@ -118,23 +118,6 @@ inline void set_out_param(T* out_n, T n)
     }
 }
 
-struct FreeUserdata {
-    realm_free_userdata_func_t m_func;
-    FreeUserdata(realm_free_userdata_func_t func = nullptr)
-        : m_func(func)
-    {
-    }
-    void operator()(void* ptr)
-    {
-        if (m_func) {
-            (m_func)(ptr);
-        }
-    }
-};
-
-using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
-using SharedUserdata = std::shared_ptr<void>;
-
 /**
  * Convenience class for managing callbacks.
  *

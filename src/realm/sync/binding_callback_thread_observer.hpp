@@ -54,7 +54,8 @@ struct BindingCallbackThreadObserver {
     struct ThreadGuard {
         ~ThreadGuard()
         {
-            BindingCallbackThreadObserver::call_will_destroy_thread(m_observer);
+            if (m_observer)
+                m_observer->will_destroy_thread();
         }
         // Constructor that only works with the global thread observer
         ThreadGuard() = default;
@@ -69,39 +70,41 @@ struct BindingCallbackThreadObserver {
         std::shared_ptr<BindingCallbackThreadObserver> m_observer;
     };
 
-    // This method is called just before the thread is started
-    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
-    // global thread observer will be used.
-    static void call_did_create_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
+    // Call the stored create thread callback function with the id of this thread
+    // Can be overridden to provide a custom implementation
+    virtual void did_create_thread()
+    {
+        if (m_create_thread_callback) {
+            (*m_create_thread_callback)();
+        }
+    }
 
-    // This method is called just before the thread is being destroyed
-    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
-    // global thread observer will be used.
-    static void call_will_destroy_thread(const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
+    // Call the stored destroy thread callback function with the id of this thread
+    // Can be overridden to provide a custom implementation
+    virtual void will_destroy_thread()
+    {
+        if (m_destroy_thread_callback) {
+            (*m_destroy_thread_callback)();
+        }
+    }
 
-    // This method is called with any exception thrown by client.run().
-    // This takes an optional reference to an observer_ptr and will call that if non null, otherwise the
-    // global thread observer will be used.
+    // Call the stored handle error callback function with the id of this thread
+    // IMPORTANT: If a function is supplied that handles the exception, it must
+    // call abort() or cause the application to crash since the SyncClient will
+    // be in a bad state if this occurs and will not be able to shut down properly.
+    // Can be overridden to provide a custom implementation
     // Return true if the exception was handled by this function, otherwise false
-    static bool call_handle_error(const std::exception& e,
-                                  const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr);
+    virtual bool handle_error(const std::exception& e)
+    {
+        if (!m_create_thread_callback)
+            return false;
+
+        return (*m_handle_error_callback)(e);
+    }
 
 protected:
     // Default constructor
     BindingCallbackThreadObserver() = default;
-
-    // Call the stored create thread callback function with the id of this thread
-    // Can be overridden to provide a custom implementation
-    virtual void did_create_thread();
-
-    // Call the stored destroy thread callback function with the id of this thread
-    // Can be overridden to provide a custom implementation
-    virtual void will_destroy_thread();
-
-    // Call the stored handle error callback function with the id of this thread
-    // Can be overridden to provide a custom implementation
-    // Return true if the exception was handled by this function, otherwise false
-    virtual bool handle_error(const std::exception& e);
 
     std::optional<NotificationCallback> m_create_thread_callback;
     std::optional<NotificationCallback> m_destroy_thread_callback;
