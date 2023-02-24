@@ -464,8 +464,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string error_prefix = "CreateFile() failed: ";
-    std::string msg = get_last_error_msg(error_prefix.c_str(), err);
+    std::string msg = get_last_error_msg("CreateFile() failed: ", err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
@@ -474,7 +473,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_PATH_NOT_FOUND:
             throw FileAccessError(ErrorCodes::FileNotFound, msg, path, int(err));
         case ERROR_FILE_EXISTS:
-            throw Exists(error_prefix, path);
+            throw Exists(msg, path);
         default:
             throw FileAccessError(ErrorCodes::FileOperationFailed, msg, path, int(err));
     }
