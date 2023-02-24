@@ -11,7 +11,7 @@
 * Fix crash if secure transport returns an error with a non-zero length. ([#5435](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
 
 ### Breaking changes
-* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -21,7 +21,7 @@
 ### Internals
 * Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
 ([#6319](https://github.com/realm/realm-core/pull/6319))
-* Add Binding Callback Thread Observer CAPI Test ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* Add CAPI test for Binding Callback Thread Observer. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ----------------------------------------------
 
