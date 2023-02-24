@@ -63,7 +63,7 @@ typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
 typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 typedef void (*realm_on_object_store_thread_callback_t)(realm_userdata_t userdata);
-typedef void (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
+typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata, const char*);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -3474,6 +3474,12 @@ RLM_API void realm_sync_client_config_set_pong_keepalive_timeout(realm_sync_clie
                                                                  uint64_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*,
                                                                uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
+                                                      realm_sync_socket_t*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
+    realm_sync_client_config_t* config, realm_on_object_store_thread_callback_t on_thread_create,
+    realm_on_object_store_thread_callback_t on_thread_destroy, realm_on_object_store_error_callback_t on_error,
+    realm_userdata_t user_data, realm_free_userdata_func_t free_userdata);
 
 RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value) RLM_API_NOEXCEPT;
 RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;
@@ -3845,26 +3851,6 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(realm_userdata_t usercode_error) RLM_API_NOEXCEPT;
 
-#if REALM_ENABLE_SYNC
-
-typedef struct realm_thread_observer_token realm_thread_observer_token_t;
-
-/**
- * Register a callback handler for bindings interested in registering callbacks before/after the ObjectStore thread
- * runs.
- * @param on_thread_create callback invoked when the object store thread is created
- * @param on_thread_destroy callback invoked when the object store thread is destroyed
- * @param on_error callback invoked to signal to the listener that some error has occured.
- * @return a token that has to be released in order to stop receiving notifications
- */
-RLM_API realm_thread_observer_token_t*
-realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
-                                           realm_on_object_store_thread_callback_t on_thread_destroy,
-                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t,
-                                           realm_free_userdata_func_t free_userdata);
-
-#endif // REALM_ENABLE_SYNC
-
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 
 typedef struct realm_mongodb_find_options {
@@ -4104,8 +4090,5 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
 
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e status, const char* reason);
-
-RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t*,
-                                                      realm_sync_socket_t*) RLM_API_NOEXCEPT;
 
 #endif // REALM_H

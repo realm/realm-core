@@ -20,6 +20,7 @@
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #endif
 
 #include <stdexcept>
@@ -85,6 +86,23 @@ struct WrapC {
                          "Thread safe references cannot be created for this object type"};
     }
 };
+
+struct FreeUserdata {
+    realm_free_userdata_func_t m_func;
+    FreeUserdata(realm_free_userdata_func_t func = nullptr)
+        : m_func(func)
+    {
+    }
+    void operator()(void* ptr)
+    {
+        if (m_func) {
+            (m_func)(ptr);
+        }
+    }
+};
+
+using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
+using SharedUserdata = std::shared_ptr<void>;
 
 } // namespace realm::c_api
 
@@ -795,9 +813,69 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     }
 };
 
-struct realm_thread_observer_token : realm::c_api::WrapC {
-    explicit realm_thread_observer_token() = default;
-    ~realm_thread_observer_token();
+struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
+public:
+    CBindingThreadObserver(realm_on_object_store_thread_callback_t on_thread_create,
+                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                           realm_on_object_store_error_callback_t on_error, realm_userdata_t userdata,
+                           realm_free_userdata_func_t free_userdata)
+        : m_create_callback_func{on_thread_create}
+        , m_destroy_callback_func{on_thread_destroy}
+        , m_error_callback_func{on_error}
+        , m_user_data{realm::c_api::UserdataPtr(userdata, free_userdata)}
+    {
+    }
+
+    virtual ~CBindingThreadObserver() = default;
+
+    void did_create_thread() override
+    {
+        if (m_create_callback_func)
+            m_create_callback_func(m_user_data.get());
+    }
+
+    void will_destroy_thread() override
+    {
+        if (m_destroy_callback_func)
+            m_destroy_callback_func(m_user_data.get());
+    }
+
+    bool handle_error(std::exception const& e) override
+    {
+        if (!m_error_callback_func)
+            return false;
+
+        return m_error_callback_func(m_user_data.get(), e.what());
+    }
+
+    /// {@
+    /// For testing: Return the values in this CBindingThreadObserver for comparing if two objects
+    /// have the same callback functions and userdata ptr values.
+    inline realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
+    {
+        return m_create_callback_func;
+    }
+    inline realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
+    {
+        return m_destroy_callback_func;
+    }
+    inline realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
+    {
+        return m_error_callback_func;
+    }
+    inline realm_userdata_t test_get_userdata_ptr() const noexcept
+    {
+        return m_user_data.get();
+    }
+    /// @}
+
+protected:
+    CBindingThreadObserver() = default;
+
+    realm_on_object_store_thread_callback_t m_create_callback_func = nullptr;
+    realm_on_object_store_thread_callback_t m_destroy_callback_func = nullptr;
+    realm_on_object_store_error_callback_t m_error_callback_func = nullptr;
+    realm::c_api::UserdataPtr m_user_data;
 };
 
 #endif // REALM_ENABLE_SYNC

@@ -2142,7 +2142,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
                              AutoStart auto_start = AutoStart{true})
-            : DefaultSocketProvider(logger, user_agent, auto_start)
+            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
         {
         }
 
