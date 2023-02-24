@@ -11,6 +11,7 @@
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
 * Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
 * Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+* Fix crash if secure transport returns an error with a non-zero length. ([#5435](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
 
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
@@ -21,7 +22,8 @@
 -----------
 
 ### Internals
-* None.
+* Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
+([#6319](https://github.com/realm/realm-core/pull/6319))
 
 ----------------------------------------------
 
