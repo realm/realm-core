@@ -507,9 +507,6 @@ void DefaultSocketProvider::start()
     m_logger_ptr->trace("Default event loop: start()");
     REALM_ASSERT(m_state == State::Stopped);
 
-    // Reset the service so it can be run() again
-    m_service.reset();
-
     do_state_update(lock, State::Starting);
     m_thread = std::thread{&DefaultSocketProvider::event_loop, this};
     // Wait for the thread to start before continuing
