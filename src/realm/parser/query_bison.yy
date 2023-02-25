@@ -13,6 +13,7 @@
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
+    class GeospatialNode;
     class ListNode;
     class PostOpNode;
     class AggrNode;
@@ -92,6 +93,9 @@ using namespace realm::query_parser;
   AND     "&&"
   OR      "||"
   NOT     "!"
+  GEOBOX        "geobox"
+  GEOPOLYGON    "geopolygon"
+  GEOSPHERE     "geosphere"
 ;
 
 %token <std::string> ID "identifier"
@@ -115,6 +119,7 @@ using namespace realm::query_parser;
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
 %token <std::string> IN "in"
+%token <std::string> GEOWITHIN "geowithin"
 %token <std::string> OBJ "obj"
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
@@ -127,6 +132,7 @@ using namespace realm::query_parser;
 %type  <bool> direction
 %type  <int> equality relational stringop aggr_op
 %type  <ConstantNode*> constant primary_key
+%type  <GeospatialNode*> geospatial
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
 %type  <SubqueryNode*> subquery 
@@ -186,6 +192,7 @@ compare
                                     $$ = tmp;
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
+    | value GEOWITHIN geospatial  { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
 
 expr
     : value                     { $$ = $1; }
@@ -221,6 +228,9 @@ simple_prop
 
 subquery
     : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
+
+geospatial
+    : GEOBOX '(' '[' FLOAT ',' FLOAT ']' ',' '[' FLOAT ',' FLOAT ']' ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, GeospatialNode::PointString{$4, $6}, GeospatialNode::PointString{$10, $12}); }
 
 post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}

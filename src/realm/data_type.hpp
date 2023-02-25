@@ -152,7 +152,8 @@ static constexpr DataType type_OldDateTime = DataType{7};
 static_assert(!type_OldTable.is_valid());
 static_assert(!type_OldDateTime.is_valid());
 static constexpr DataType type_TypeOfValue = DataType{18};
-static constexpr DataType type_Geospatial = DataType{19};
+static constexpr DataType type_GeoPoint = DataType{19};
+static constexpr DataType type_Geospatial = DataType{20};
 
 constexpr inline DataType::operator util::Printable() const noexcept
 {

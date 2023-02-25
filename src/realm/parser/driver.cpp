@@ -739,6 +739,25 @@ Query StringOpsNode::visit(ParserDriver* drv)
     return {};
 }
 
+Query GeoWithinNode::visit(ParserDriver* drv)
+{
+    auto [left, right] = drv->cmp(values);
+
+    auto left_type = left->get_type();
+    auto right_type = right->get_type();
+    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
+
+    if (left_type == type_Link && right_type == type_Geospatial) {
+        auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
+        auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
+        if (link_column && geo_value) {
+            return link_column->geo_within(geo_value->get_mixed().get<Geospatial>());
+        }
+    }
+    REALM_UNREACHABLE();
+    //    verify_only_string_types(right_type, opstr[op]);
+}
+
 Query TrueOrFalseNode::visit(ParserDriver* drv)
 {
     Query q = drv->m_base_table->where();
@@ -1303,6 +1322,19 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             util::format("Unsupported comparison between property of type '%1' and constant value: %2",
                          get_data_type_name(hint), explain_value_message));
     }
+    return ret;
+}
+
+GeospatialNode::GeospatialNode(GeospatialNode::Box, GeospatialNode::PointString p1, GeospatialNode::PointString p2)
+: m_geo{Geospatial{GeoBox{GeoPoint{string_to<double>(p1.longitude), string_to<double>(p1.latitude)},
+    GeoPoint{string_to<double>(p2.longitude), string_to<double>(p2.latitude)}}}}
+{
+}
+
+std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
+{
+    std::unique_ptr<Subexpr> ret;
+    ret = std::make_unique<ConstantGeospatialValue>(m_geo); // FIXME: Mixed value type
     return ret;
 }
 

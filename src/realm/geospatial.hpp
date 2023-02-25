@@ -102,10 +102,17 @@ public:
     static Geospatial from_link(const Obj& obj);
     void assign_to(Obj& link) const;
 
-    std::string get_type() const noexcept
+    std::string get_type_string() const noexcept
     {
         return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : *m_invalid_type;
     }
+    Type get_type() const noexcept
+    {
+        return m_type;
+    }
+
+    template <class T>
+    T get() const noexcept;
 
     bool is_valid() const noexcept
     {
@@ -147,6 +154,50 @@ private:
 
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
+};
+
+template <>
+inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
+{
+    REALM_ASSERT_EX(m_type == Type::CenterSphere, get_type_string());
+    REALM_ASSERT(m_radius_radians);
+    REALM_ASSERT(m_points.size() >= 1);
+    return GeoCenterSphere{*m_radius_radians, m_points[0]};
+}
+
+class GeospatialStore {
+public:
+    GeospatialStore(GeoPoint* data, size_t size, Geospatial::Type type)
+        : m_data(data)
+        , m_size(size)
+        , m_type(type)
+    {
+    }
+    Geospatial get() const
+    {
+        REALM_ASSERT(m_data);
+        switch (m_type) {
+            case Geospatial::Type::Invalid:
+                return Geospatial(""); // FIXME: error handling
+            case Geospatial::Type::Point:
+                REALM_ASSERT_EX(m_size == 1, m_size);
+                return Geospatial(m_data[0]);
+            case Geospatial::Type::Box:
+                REALM_ASSERT_EX(m_size == 2, m_size);
+                return Geospatial(GeoBox{m_data[0], m_data[1]});
+            case Geospatial::Type::Polygon:
+                REALM_UNREACHABLE(); // FIXME: implement dynamic fill
+                break;
+            case Geospatial::Type::CenterSphere:
+                REALM_UNREACHABLE(); // FIXME: implement dynamic fill
+                break;
+        }
+    }
+
+private:
+    const GeoPoint* m_data = nullptr;
+    size_t m_size = 0;
+    Geospatial::Type m_type = Geospatial::Type::Invalid;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);

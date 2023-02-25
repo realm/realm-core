@@ -5648,4 +5648,43 @@ TEST(Parser_PrimaryKey)
     CHECK_EQUAL(q.get_description(), query_string);
 }
 
+ONLY(Parser_Geospatial)
+{
+    Group g;
+    auto table = g.add_table("Restaurant");
+    auto geo_table = g.add_table("Position", Table::Type::Embedded);
+    ColKey type_col = geo_table->add_column(type_String, "type");
+    ColKey coords_col = geo_table->add_column_list(type_Double, "coordinates");
+    auto col_int = table->add_column(type_UUID, "_id");
+    auto col_link = table->add_column(*geo_table, "link");
+    auto col_links = table->add_column_list(*geo_table, "links");
+
+    auto add_data = [&](Geospatial geo) {
+        Obj top_obj = table->create_object();
+        Obj geo_obj = top_obj.create_and_set_linked_object(col_link);
+        geo.assign_to(geo_obj);
+    };
+    std::vector<Geospatial> point_data = {GeoPoint{0, 0}, GeoPoint{0.5, 0.5}, GeoPoint{1, 1}, GeoPoint{2, 2}};
+    for (auto& geo : point_data) {
+        add_data(geo);
+    }
+
+    GeoBox box{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+
+    CHECK_EQUAL(table->column<Link>(col_link).geo_within(box).count(), 1);
+
+    verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
+
+    // find restaurants within an arbitrary polygon
+    // realm.objects("Restaurant").filtered("location geoWithin geospatial('Polygon', [[ [-73.99, 40.75],
+    // [-73.98, 40.76], [-73.99, 40.75] ]])"); find restaurants within a box, the points specified are two opposite
+    // corners of the box realm.objects("Restaurant").filtered("location geoWithin geospatial('Box', [[
+    // [-73.99, 40.75], [-73.98, 40.76] ]])"); find restaurants within a circle of radius 10 from a specific
+    // restaurant’s  location (single point) const fooResult = realm.objects("Restaurant").filtered("name == 'Foo'");
+    // realm.objects("Restaurant").filtered("location geoWithin $0", RealmGeospatial('circle', 10,
+    // fooResult[0].location)); find restaurants within a sphere of radius 10 centered at a specific hard coded point
+    // realm.objects("Restaurant").filtered("location geoWithin $0", RealmGeospatial('centerSphere', 10,
+    // [-74, 40.74]));
+}
+
 #endif // TEST_PARSER

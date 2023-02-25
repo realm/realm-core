@@ -137,7 +137,7 @@ void Geospatial::assign_to(Obj& link) const
         throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property %1 doesn't exist", c_geo_point_coords_col_name));
     }
-    if (!type_is_valid(get_type())) {
+    if (m_type != Type::Point) {
         throw IllegalOperation("The only Geospatial type currently supported is 'point'");
     }
     if (m_points.size() > 1) {
@@ -146,7 +146,7 @@ void Geospatial::assign_to(Obj& link) const
     if (m_points.size() == 0) {
         throw InvalidArgument("Geospatial value must have one point");
     }
-    link.set(type_col, get_type());
+    link.set(type_col, get_type_string());
     Lst<double> coords = link.get_list<double>(coords_col);
     if (coords.size() >= 1) {
         coords.set(0, m_points[0].longitude);

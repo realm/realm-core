@@ -148,7 +148,7 @@ public:
         NULL_VAL,
         TRUE,
         FALSE,
-        ARG
+        ARG,
     };
 
     Type type;
@@ -177,6 +177,24 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
+};
+
+class GeospatialNode : public ValueNode {
+public:
+    struct Box {};
+    struct Polygon {};
+    struct Sphere {};
+    struct PointString {
+        std::string longitude;
+        std::string latitude;
+    };
+    GeospatialNode(Box, PointString p1, PointString p2);
+    bool is_constant() final
+    {
+        return true;
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+    Geospatial m_geo;
 };
 
 class ListNode : public ValueNode {
@@ -415,6 +433,17 @@ public:
 
     StringOpsNode(ValueNode* left, int t, ValueNode* right)
         : op(t)
+    {
+        values.emplace_back(left);
+        values.emplace_back(right);
+    }
+    Query visit(ParserDriver*) override;
+};
+
+class GeoWithinNode : public CompareNode {
+public:
+    std::vector<ExpressionNode*> values;
+    GeoWithinNode(ValueNode* left, ValueNode* right)
     {
         values.emplace_back(left);
         values.emplace_back(right);

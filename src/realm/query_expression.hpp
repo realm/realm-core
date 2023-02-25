@@ -742,7 +742,7 @@ public:
         REALM_ASSERT(false); // Unimplemented
     }
 
-    virtual Mixed get_mixed()
+    virtual Mixed get_mixed() const
     {
         return {};
     }
@@ -1166,6 +1166,16 @@ public:
     }
 };
 
+template <>
+class Subexpr2<Geospatial> : public Subexpr, public Overloads<Geospatial, Geospatial> {
+public:
+    // FIXME: Query geoWithin(const Geospatial& other);
+    DataType get_type() const final
+    {
+        return type_Geospatial;
+    }
+};
+
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
     {
@@ -1308,7 +1318,7 @@ public:
         m_comparison_type = type;
     }
 
-    Mixed get_mixed() override
+    Mixed get_mixed() const override
     {
         return get(0);
     }
@@ -1435,6 +1445,37 @@ private:
 
     OwnedBinaryData m_buffer;
 };
+
+class ConstantGeospatialValue : public Value<Geospatial> {
+public:
+    ConstantGeospatialValue(const Geospatial& geo)
+        : Value()
+        , m_points(geo.get_points())
+        , m_type(geo.get_type())
+    {
+        if (geo.is_valid()) {
+            set(0, Mixed{GeospatialStore{m_points.data(), m_points.size(), m_type}});
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantGeospatialValue(*this));
+    }
+
+private:
+    ConstantGeospatialValue(const ConstantGeospatialValue& other)
+        : Value()
+        , m_points(other.m_points)
+        , m_type(other.m_type)
+    {
+        if (m_type != Geospatial::Type::Invalid)
+            set(0, Mixed{GeospatialStore{m_points.data(), m_points.size(), m_type}});
+    }
+    std::vector<GeoPoint> m_points;
+    Geospatial::Type m_type;
+};
+
 
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
@@ -2446,7 +2487,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, ColKey()) + " " + util::serializer::print_value(m_bounds);
+        return state.describe_columns(m_link_map, ColKey()) + " GEOWITHIN " + util::serializer::print_value(m_bounds);
     }
 
     std::unique_ptr<Expression> clone() const override
@@ -2688,7 +2729,7 @@ public:
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
-    Query geo_within(Geospatial bounds)
+    Query geo_within(Geospatial bounds) const
     {
         return make_expression<GeoWithinCompare>(m_link_map, bounds);
     }
