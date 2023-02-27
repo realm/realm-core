@@ -66,7 +66,7 @@ TestFile::TestFile()
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -192,8 +192,8 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_SYNC_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+#if TEST_ENABLE_LOGGING
+                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_ENABLE_LOGGING_LEVEL);
                    m_logger.reset(logger);
 #else
                    // Logging is disabled, use a NullLogger to prevent printing anything
@@ -332,7 +332,7 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_LOGGING_LEVEL);
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);

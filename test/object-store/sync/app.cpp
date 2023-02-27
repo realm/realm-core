@@ -2014,7 +2014,7 @@ constexpr size_t minus_25_percent(size_t val)
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
-    auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+    auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
 

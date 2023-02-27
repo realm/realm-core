@@ -94,20 +94,19 @@ struct InMemoryTestFile : realm::Realm::Config {
 void advance_and_notify(realm::Realm& realm);
 void on_change_but_no_notify(realm::Realm& realm);
 
-#if REALM_ENABLE_SYNC
-
-#ifndef TEST_ENABLE_SYNC_LOGGING
-#define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable trace-level logging
+#ifndef TEST_ENABLE_LOGGING
+#define TEST_ENABLE_LOGGING 0 // change to 1 to enable trace-level logging
 #endif
 
-#ifndef TEST_ENABLE_SYNC_LOGGING_LEVEL
-#if TEST_ENABLE_SYNC_LOGGING
-#define TEST_ENABLE_SYNC_LOGGING_LEVEL all
+#ifndef TEST_LOGGING_LEVEL
+#if TEST_ENABLE_LOGGING
+#define TEST_LOGGING_LEVEL all
 #else
-#define TEST_ENABLE_SYNC_LOGGING_LEVEL off
-#endif // TEST_ENABLE_SYNC_LOGGING
-#endif // TEST_ENABLE_SYNC_LOGGING_LEVEL
+#define TEST_LOGGING_LEVEL off
+#endif // TEST_ENABLE_LOGGING
+#endif // TEST_LOGGING_LEVEL
 
+#if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
@@ -217,7 +216,7 @@ public:
         std::string base_path;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
         bool should_teardown_test_directory = true;
-        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
+        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_ENABLE_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
     };
