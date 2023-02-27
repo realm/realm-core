@@ -66,6 +66,7 @@ TestFile::TestFile()
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
     path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
     if (const char* crypt_key = test_util::crypt_key()) {
         encryption_key = std::vector<char>(crypt_key, crypt_key + 64);
     }
@@ -331,12 +332,12 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);
     SyncClientConfig sc_config;
     sc_config.base_file_path = m_base_file_path;
-    sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
     sc_config.socket_provider = custom_socket_provider;
@@ -376,13 +377,13 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 {
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
+    util::Logger::set_default_level_threshold(config.log_level);
 
     SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
     util::try_make_dir(m_base_file_path);
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
-    sc_config.log_level = config.sync_client_log_level;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {

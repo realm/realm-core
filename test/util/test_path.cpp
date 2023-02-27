@@ -19,6 +19,8 @@
 #include "test_path.hpp"
 
 #include <realm/util/file.hpp>
+#include <realm/db.hpp>
+#include <realm/history.hpp>
 
 #include <algorithm>
 #include <string>
@@ -290,6 +292,23 @@ TestDirNameGenerator::TestDirNameGenerator(std::string path)
 std::string TestDirNameGenerator::next()
 {
     return m_path + "/" + std::to_string(m_counter++);
+}
+
+std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
+{
+    const char* str = getenv("UNITTEST_LOG_LEVEL");
+    realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;
+    if (str && strlen(str) != 0) {
+        std::istringstream in(str);
+        in.imbue(std::locale::classic());
+        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+        in >> core_log_level;
+    }
+
+    DBOptions options;
+    options.logger = std::make_shared<util::StderrLogger>(core_log_level);
+    options.encryption_key = crypt_key;
+    return DB::create(make_in_realm_history(), path, options);
 }
 
 } // namespace realm::test_util

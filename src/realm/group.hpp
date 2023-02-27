@@ -815,6 +815,10 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
+    size_t get_logical_file_size() const noexcept
+    {
+        return get_logical_file_size(m_top);
+    }
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>

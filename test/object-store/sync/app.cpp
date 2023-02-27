@@ -2177,7 +2177,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
         sc_config.base_file_path = base_file_path;
-        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
 
         // initialize app and sync client
@@ -2363,7 +2362,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_file_path);
         SyncClientConfig sc_config;
         sc_config.base_file_path = base_file_path;
-        sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
         sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoMetadata;
 
         // initialize app and sync client

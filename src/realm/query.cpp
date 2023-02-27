@@ -1185,66 +1185,91 @@ ObjKey Query::find() const
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
 
+    auto logger = m_table->get_logger();
+    auto t1 = std::chrono::steady_clock::now();
+
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description());
+    }
+
+    ObjKey ret;
     init();
 
     // ordering could change the way in which objects are returned, in this case we need to run find_all()
     if (m_ordering && (m_ordering->will_apply_sort() || m_ordering->will_apply_distinct())) {
-        auto table = find_all();
-        if (table.size() > 0) {
+        auto table_view = find_all();
+        if (table_view.size() > 0) {
             // we just need to find the first.
-            return table.get_key(0);
-        }
-        else {
-            return null_key;
+            ret = table_view.get_key(0);
         }
     }
-
-    // User created query with no criteria; return first
-    if (!has_conditions()) {
+    else if (!has_conditions()) {
+        // User created query with no criteria; return first
         if (m_view) {
             if (m_view->size() > 0) {
-                return m_view->get_key(0);
-            }
-            return null_key;
-        }
-        else
-            return m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
-    }
-
-    if (m_view) {
-        size_t sz = m_view->size();
-        for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->get_object(i);
-            if (eval_object(obj)) {
-                return obj.get_key();
+                ret = m_view->get_key(0);
             }
         }
-        return null_key;
+        else {
+            ret = m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
+        }
     }
     else {
-        auto node = root_node();
-        ObjKey key;
-        auto f = [&node, &key](const Cluster* cluster) {
-            size_t end = cluster->node_size();
-            node->set_cluster(cluster);
-            size_t res = node->find_first(0, end);
-            if (res != not_found) {
-                key = cluster->get_real_key(res);
-                // We should just find one - we're done
-                return IteratorControl::Stop;
+        if (m_view) {
+            size_t sz = m_view->size();
+            for (size_t i = 0; i < sz; i++) {
+                const Obj obj = m_view->get_object(i);
+                if (eval_object(obj)) {
+                    ret = obj.get_key();
+                    break;
+                }
             }
-            return IteratorControl::AdvanceToNext;
-        };
+        }
+        else {
+            auto node = root_node();
+            ObjKey key;
+            auto f = [&node, &key](const Cluster* cluster) {
+                size_t end = cluster->node_size();
+                node->set_cluster(cluster);
+                size_t res = node->find_first(0, end);
+                if (res != not_found) {
+                    key = cluster->get_real_key(res);
+                    // We should just find one - we're done
+                    return IteratorControl::Stop;
+                }
+                return IteratorControl::AdvanceToNext;
+            };
 
-        m_table->traverse_clusters(f);
-        return key;
+            m_table->traverse_clusters(f);
+            ret = key;
+        }
     }
+
+    auto t2 = std::chrono::steady_clock::now();
+    if (logger) {
+        logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+    }
+
+    return ret;
 }
 
 void Query::do_find_all(TableView& ret, size_t limit) const
 {
-    if (limit == 0)
+    auto logger = m_table->get_logger();
+
+    if (limit == 0) {
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query find all: limit = 0 -> result: 0");
+        }
         return;
+    }
+
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description(),
+                    int64_t(limit));
+    }
+    auto t1 = std::chrono::steady_clock::now();
 
     init();
 
@@ -1305,24 +1330,32 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                         }
                     }
                 }
-                return;
             }
-            // no index on best node (and likely no index at all), descend B+-tree
-            node = pn;
-            QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
+            else {
+                // no index on best node (and likely no index at all), descend B+-tree
+                node = pn;
+                QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
 
-            auto f = [&node, &st, this](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                node->set_cluster(cluster);
-                st.m_key_offset = cluster->get_offset();
-                st.m_key_values = cluster->get_key_array();
-                aggregate_internal(node, &st, 0, e, nullptr);
-                // Stop if limit is reached
-                return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
-            };
+                auto f = [&node, &st, this](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    node->set_cluster(cluster);
+                    st.m_key_offset = cluster->get_offset();
+                    st.m_key_values = cluster->get_key_array();
+                    aggregate_internal(node, &st, 0, e, nullptr);
+                    // Stop if limit is reached
+                    return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
+                };
 
-            m_table->traverse_clusters(f);
+                m_table->traverse_clusters(f);
+            }
         }
+    }
+
+
+    auto t2 = std::chrono::steady_clock::now();
+    if (logger) {
+        logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", ret.size(),
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -1343,21 +1376,38 @@ TableView Query::find_all(size_t limit) const
 
 size_t Query::do_count(size_t limit) const
 {
-    if (limit == 0)
+    auto logger = m_table->get_logger();
+
+    if (limit == 0) {
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
+        }
         return 0;
+    }
 
     if (!has_conditions()) {
         // User created query with no criteria; count all
+        size_t cnt_all;
         if (m_view) {
-            return std::min(m_view->size(), limit);
+            cnt_all = std::min(m_view->size(), limit);
         }
         else {
-            return std::min(m_table->size(), limit);
+            cnt_all = std::min(m_table->size(), limit);
         }
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query count (no condition): limit = %1 -> result: %2",
+                        int64_t(limit), cnt_all);
+        }
+        return cnt_all;
     }
 
-    init();
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description(), int64_t(limit));
+    }
+    auto t1 = std::chrono::steady_clock::now();
     size_t cnt = 0;
+
+    init();
 
     if (m_view) {
         m_view->for_each([&](const Obj& obj) {
@@ -1368,7 +1418,6 @@ size_t Query::do_count(size_t limit) const
         });
     }
     else {
-        size_t counter = 0;
         auto pn = root_node();
         auto best = find_best_node(pn);
         auto node = pn->m_children[best];
@@ -1382,8 +1431,8 @@ size_t Query::do_count(size_t limit) const
                 for (auto key : keys) {
                     auto obj = m_table->get_object(key);
                     if (eval_object(obj)) {
-                        ++counter;
-                        if (counter == limit)
+                        ++cnt;
+                        if (cnt == limit)
                             break;
                     }
                 }
@@ -1391,27 +1440,34 @@ size_t Query::do_count(size_t limit) const
             else {
                 // The node having the search index is the only node
                 auto sz = keys.size();
-                counter = std::min(limit, sz);
+                cnt = std::min(limit, sz);
             }
-            return counter;
         }
-        // no index, descend down the B+-tree instead
-        node = pn;
-        QueryStateCount st(limit);
+        else {
+            // no index, descend down the B+-tree instead
+            node = pn;
+            QueryStateCount st(limit);
 
-        auto f = [&node, &st, this](const Cluster* cluster) {
-            size_t e = cluster->node_size();
-            node->set_cluster(cluster);
-            st.m_key_offset = cluster->get_offset();
-            st.m_key_values = cluster->get_key_array();
-            aggregate_internal(node, &st, 0, e, nullptr);
-            // Stop if limit or end is reached
-            return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
-        };
+            auto f = [&node, &st, this](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                node->set_cluster(cluster);
+                st.m_key_offset = cluster->get_offset();
+                st.m_key_values = cluster->get_key_array();
+                aggregate_internal(node, &st, 0, e, nullptr);
+                // Stop if limit or end is reached
+                return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
+            };
 
-        m_table->traverse_clusters(f);
+            m_table->traverse_clusters(f);
 
-        cnt = st.get_count();
+            cnt = st.get_count();
+        }
+    }
+
+    auto t2 = std::chrono::steady_clock::now();
+    if (logger) {
+        logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
     return cnt;
