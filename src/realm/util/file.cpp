@@ -1638,8 +1638,7 @@ std::string File::get_path() const
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    path = path.empty() ? "." : path;
-    return (u8path(base_dir) / u8path(path)).u8string();
+    return (u8path(base_dir) / u8path(path)).lexically_normal().u8string();
 #else
     char dir_sep = '/';
     std::string path_2 = path;
