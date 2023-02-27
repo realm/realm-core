@@ -115,7 +115,7 @@ TEST(Utils_File_dir)
     CHECK(dir_exists);
 }
 
-ONLY(Utils_File_dir_unicode)
+TEST(Utils_File_dir_unicode)
 {
     using std::filesystem::u8path;
 
