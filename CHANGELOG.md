@@ -5,8 +5,7 @@
 * Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
 
 ### Breaking changes
 * BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
