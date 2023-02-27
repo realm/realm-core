@@ -116,9 +116,10 @@ TEST(Utils_File_dir)
 
 TEST(Utils_File_dir_unicode)
 {
-    // Test make_dir and remove_dir with paths that include special characters
-    // This would previously fail on Windows
-    std::string dir_name = File::resolve("temporäreDatei", test_util::get_test_path_prefix());
+    std::string all_the_unicode = "фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
+
+    std::string dir_name = File::resolve(all_the_unicode, test_util::get_test_path_prefix());
+    CHECK(dir_name.find(all_the_unicode) != std::string::npos);
 
     // Create directory
     bool dir_exists = File::is_dir(dir_name);
@@ -134,6 +135,11 @@ TEST(Utils_File_dir_unicode)
         dir_exists = File::is_dir(dir_name);
     }
     CHECK(dir_exists);
+
+    // Create file
+    File f(File::resolve("test.realm", dir_name), File::mode_Write);
+    f.close();
+    File::remove(f.get_path());
 
     // Remove directory
     remove_dir(dir_name);
