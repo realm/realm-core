@@ -344,6 +344,7 @@ std::string make_temp_dir()
         if (error && error != std::errc::file_exists) {
             throw SystemError(error, util::format("Failed to create temporary directory: %1", error.message()));
         }
+        break;
     }
     return path.u8string();
 
