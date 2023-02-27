@@ -57,7 +57,7 @@ MigrationStore::MigrationStore(DBRef db,
         create_sync_metadata_schema(tr, &internal_tables);
         // create migration object
         auto migration_store_obj = tr->get_table(m_migration_table)->create_object();
-        migration_store_obj.set(m_migration_state, MigrationState::NotStarted);
+        migration_store_obj.set(m_migration_state, int64_t(MigrationState::NotStarted));
         tr->commit_and_continue_as_read();
         m_state = MigrationState::NotStarted;
     }
@@ -103,7 +103,7 @@ void MigrationStore::migrate_to_flx(std::string rql_query_string)
     auto tr = m_db->start_write();
     auto migration_store_obj = tr->get_table(m_migration_table)->get_object(0);
     migration_store_obj.set(m_migration_query_str, m_query_string);
-    migration_store_obj.set(m_migration_state, m_state);
+    migration_store_obj.set(m_migration_state, int64_t(m_state));
     migration_store_obj.set(m_migration_completed_at, Timestamp{std::chrono::system_clock::now()});
     tr->commit();
 
@@ -117,8 +117,12 @@ void MigrationStore::cancel_migration()
     migration_table->clear();
     tr->commit();
 
-    std::lock_guard lock{m_mutex};
-    m_state = MigrationState::NotStarted;
+    {
+        std::lock_guard lock{m_mutex};
+        m_state = MigrationState::NotStarted;
+    }
+
+    m_on_migration_state_changed(m_state);
 }
 
 std::optional<Subscription> MigrationStore::make_subscription(const std::string& object_class_name)
