@@ -222,8 +222,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         client.register_email(email, password, [&](Optional<AppError> error) {
             // Error returned states the account has already been created
             REQUIRE(error);
-            CHECK(error->message == "name already in use");
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::account_name_in_use);
+            CHECK(error->reason() == "name already in use");
+            CHECK(error->code() == ErrorCodes::AccountNameInUse);
             CHECK(!error->link_to_server_logs.empty());
             CHECK(error->link_to_server_logs.find(base_url) != std::string::npos);
             processed = true;
@@ -236,8 +236,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
         client.register_email(email_to_reject, password, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == util::format("failed to confirm user \"%1\"", email_to_reject));
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::bad_request);
+            CHECK(error->reason() == util::format("failed to confirm user \"%1\"", email_to_reject));
+            CHECK(error->code() == ErrorCodes::BadRequest);
             processed = true;
         });
         CHECK(processed);
@@ -253,8 +253,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<AppError> error) {
                                          CHECK(!user);
                                          REQUIRE(error);
-                                         REQUIRE(error->error_code.value() ==
-                                                 int(ServiceErrorCode::invalid_email_password));
+                                         REQUIRE(error->code() == ErrorCodes::InvalidPassword);
                                          processed = true;
                                      });
         CHECK(processed);
@@ -263,7 +262,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     SECTION("confirm user") {
         client.confirm_user("a_token", "a_token_id", [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "invalid token data");
+            CHECK(error->reason() == "invalid token data");
             processed = true;
         });
         CHECK(processed);
@@ -272,7 +271,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     SECTION("resend confirmation email") {
         client.resend_confirmation_email(email, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "already confirmed");
+            CHECK(error->reason() == "already confirmed");
             processed = true;
         });
         CHECK(processed);
@@ -281,7 +280,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     SECTION("reset password invalid tokens") {
         client.reset_password(password, "token_sample", "token_id_sample", [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "invalid token data");
+            CHECK(error->reason() == "invalid token data");
             CHECK(!error->link_to_server_logs.empty());
             CHECK(error->link_to_server_logs.find(base_url) != std::string::npos);
             processed = true;
@@ -304,7 +303,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         std::string rejected_password = util::format("%1", random_string(10));
         client.call_reset_password_function(email, rejected_password, {"foo", "bar"}, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == util::format("failed to reset password for user \"%1\"", email));
+            CHECK(error->reason() == util::format("failed to reset password for user \"%1\"", email));
             CHECK(error->is_service_error());
             processed = true;
         });
@@ -315,10 +314,9 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         client.call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)), password,
                                             {"foo", "bar"}, [&](Optional<AppError> error) {
                                                 REQUIRE(error);
-                                                CHECK(error->message == "user not found");
+                                                CHECK(error->reason() == "user not found");
                                                 CHECK(error->is_service_error());
-                                                CHECK(ServiceErrorCode(error->error_code.value()) ==
-                                                      ServiceErrorCode::user_not_found);
+                                                CHECK(error->code() == ErrorCodes::UserNotFound);
                                                 processed = true;
                                             });
         CHECK(processed);
@@ -327,7 +325,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     SECTION("retry custom confirmation") {
         client.retry_custom_confirmation(email, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "already confirmed");
+            CHECK(error->reason() == "already confirmed");
             processed = true;
         });
         CHECK(processed);
@@ -337,9 +335,9 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         client.retry_custom_confirmation(
             util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<AppError> error) {
                 REQUIRE(error);
-                CHECK(error->message == "user not found");
+                CHECK(error->reason() == "user not found");
                 CHECK(error->is_service_error());
-                CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::user_not_found);
+                CHECK(error->code() == ErrorCodes::UserNotFound);
                 processed = true;
             });
         CHECK(processed);
@@ -454,61 +452,61 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         client.create_api_key(api_key_name, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             CHECK(user_api_key.name == "");
         });
 
         client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             CHECK(user_api_key.name == "");
         });
 
         client.fetch_api_keys(no_user, [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             CHECK(api_keys.size() == 0);
         });
 
         client.enable_api_key(api_key.id, no_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
         });
 
         client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             CHECK(user_api_key.name == "");
         });
 
         client.disable_api_key(api_key.id, no_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
         });
 
         client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             CHECK(user_api_key.name == "");
         });
 
         client.delete_api_key(api_key.id, no_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
         });
 
         client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(user_api_key.name == "");
             REQUIRE(error);
             CHECK(error->is_service_error());
-            CHECK(error->message == "must authenticate first");
+            CHECK(error->reason() == "must authenticate first");
             processed = true;
         });
         CHECK(processed);
@@ -538,9 +536,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
             CHECK(user_api_key.name == "");
         });
 
@@ -563,9 +561,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         provider.enable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
         });
 
         provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
@@ -577,9 +575,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(user_api_key.name == "");
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
         });
 
         provider.disable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
@@ -588,9 +586,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
         provider.disable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
         });
 
         provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
@@ -602,16 +600,16 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(user_api_key.name == "");
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
         });
 
         provider.delete_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
         });
 
         provider.delete_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
@@ -621,18 +619,18 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(user_api_key.name == "");
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
             processed = true;
         });
 
         provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(user_api_key.name == "");
             REQUIRE(error);
-            CHECK(error->message == "API key not found");
+            CHECK(error->reason() == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(error->code() == ErrorCodes::APIKeyNotFound);
             processed = true;
         });
 
@@ -708,7 +706,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
-            CHECK(error->message == "User must be logged in to be deleted.");
+            CHECK(error->reason() == "User must be logged in to be deleted.");
             CHECK(app->sync_manager()->all_users().size() == 0);
         });
 
@@ -755,13 +753,13 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
         app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             CHECK(!user);
             REQUIRE(error);
-            REQUIRE(error->error_code.value() == int(ServiceErrorCode::invalid_email_password));
+            REQUIRE(error->code() == ErrorCodes::InvalidPassword);
         });
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         CHECK(app->sync_manager()->all_users().size() == 0);
         app->delete_user(user, [](Optional<app::AppError> err) {
-            CHECK(err->error_code.value() > 0);
+            CHECK(err->code() > 0);
         });
 
         CHECK(app->sync_manager()->get_current_user() == nullptr);
@@ -1228,7 +1226,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options,
                                            [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE(error);
-                                               CHECK(error->message == "insert not permitted");
+                                               CHECK(error->reason() == "insert not permitted");
                                                CHECK(!document);
                                                processed = true;
                                            });
@@ -1509,7 +1507,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 
         app->push_notification_client("gcm_blah").register_device("hello", sync_user, [&](Optional<AppError> error) {
             REQUIRE(error);
-            CHECK(error->message == "service not found: 'gcm_blah'");
+            CHECK(error->reason() == "service not found: 'gcm_blah'");
             processed = true;
         });
         CHECK(processed);
@@ -1703,7 +1701,8 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     Schema schema{
         {"origin",
          {{valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
-          {"link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "target"},
+          {"embedded_link", PropertyType::Object | PropertyType::Nullable, "embedded"}}},
         {"target",
          {{valid_pk_name, PropertyType::String, Property::IsPrimary{true}},
           {"value", PropertyType::Int},
@@ -1713,6 +1712,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
           {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
         {"other_target",
          {{valid_pk_name, PropertyType::UUID, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
+        {"embedded", ObjectSchema::ObjectType::Embedded, {{"name", PropertyType::String | PropertyType::Nullable}}},
     };
 
     /*             Create local realm             */
@@ -1727,7 +1727,12 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
         local_realm->begin_transaction();
         auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
+        // 'embedded_link' property is null.
         origin->create_object_with_primary_key(47).set("link", o.get_key());
+        // 'embedded_link' property is not null.
+        auto obj = origin->create_object_with_primary_key(42);
+        auto col_key = origin->get_column_key("embedded_link");
+        obj.create_and_set_linked_object(col_key);
         other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
         other_origin->create_object_with_primary_key(ObjectId::gen());
         local_realm->commit_transaction();
@@ -1779,7 +1784,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     advance_and_notify(*r2);
     Group& g = r2->read_group();
     // g.to_json(std::cout);
-    REQUIRE(g.get_table("class_origin")->size() == 1);
+    REQUIRE(g.get_table("class_origin")->size() == 2);
     REQUIRE(g.get_table("class_target")->size() == 2);
     REQUIRE(g.get_table("class_other_origin")->size() == 2);
     REQUIRE(g.get_table("class_other_target")->size() == 2);
@@ -2137,7 +2142,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
         HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
                              AutoStart auto_start = AutoStart{true})
-            : DefaultSocketProvider(logger, user_agent, auto_start)
+            : DefaultSocketProvider(logger, user_agent, nullptr, auto_start)
         {
         }
 
@@ -2200,8 +2205,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                     REQUIRE(error);
                     REQUIRE(error->is_client_error());
-                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
-                    REQUIRE(error->message == "Redirect response missing location header");
+                    REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
+                    REQUIRE(error->reason() == "Redirect response missing location header");
                 });
 
             // This will fail due to empty Location header
@@ -2209,8 +2214,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 creds.email, creds.password, [&](util::Optional<app::AppError> error) {
                     REQUIRE(error);
                     REQUIRE(error->is_client_error());
-                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::redirect_error));
-                    REQUIRE(error->message == "Redirect response missing location header");
+                    REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
+                    REQUIRE(error->reason() == "Redirect response missing location header");
                 });
         }
 
@@ -2320,8 +2325,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(!user);
                     REQUIRE(error);
                     REQUIRE(error->is_client_error());
-                    REQUIRE(error->error_code.value() == static_cast<int>(ClientErrorCode::too_many_redirects));
-                    REQUIRE(error->message == "number of redirections exceeded 20");
+                    REQUIRE(error->code() == ErrorCodes::ClientTooManyRedirects);
+                    REQUIRE(error->reason() == "number of redirections exceeded 20");
                 });
         }
         SECTION("Test server in maintenance") {
@@ -2339,10 +2344,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(!user);
                     REQUIRE(error);
                     REQUIRE(error->is_service_error());
-                    REQUIRE(error->error_code.value() == static_cast<int>(ServiceErrorCode::maintenance_in_progress));
-                    REQUIRE(error->message == "This service is currently undergoing maintenance");
+                    REQUIRE(error->code() == ErrorCodes::MaintenanceInProgress);
+                    REQUIRE(error->reason() == "This service is currently undergoing maintenance");
                     REQUIRE(error->link_to_server_logs == "https://link.to/server_logs");
-                    REQUIRE(error->http_status_code == 500);
+                    REQUIRE(*error->additional_status_code == 500);
                 });
         }
     }
@@ -2480,12 +2485,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SyncTestFile r_config(user1, partition, schema);
         // Overrride the default
         r_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                         error.message);
+                         error.what());
             abort();
         };
 
@@ -2716,8 +2721,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.message == "Unable to refresh the user access token.");
+                REQUIRE(error.get_system_error() ==
+                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2788,8 +2794,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // requesting a new access token fails because the refresh token used for this request is revoked
             user->refresh_custom_data([&](Optional<AppError> error) {
                 REQUIRE(error);
-                REQUIRE(error->http_status_code == 401);
-                REQUIRE(error->error_code == make_error_code(ServiceErrorCode::invalid_session));
+                REQUIRE(error->additional_status_code == 401);
+                REQUIRE(error->code() == ErrorCodes::InvalidSession);
             });
 
             // Set a bad access token. This will force a request for a new access token when the sync session opens
@@ -2804,8 +2810,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 std::lock_guard<std::mutex> lock(mtx);
                 sync_error_handler_called.store(true);
-                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.message == "Unable to refresh the user access token.");
+                REQUIRE(error.get_system_error() ==
+                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
@@ -2816,10 +2823,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!sync_error_handler_called.load());
             {
                 std::atomic<bool> called{false};
-                session->wait_for_upload_completion([&](std::error_code err) {
+                session->wait_for_upload_completion([&](Status stat) {
                     std::lock_guard<std::mutex> lock(mtx);
                     called.store(true);
-                    REQUIRE(err == make_error_code(ServiceErrorCode::invalid_session));
+                    REQUIRE(stat.code() == ErrorCodes::InvalidSession);
                 });
                 transport->unblock();
                 timed_wait_for([&] {
@@ -2849,7 +2856,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             // logging in again doesn't fix things while the account is disabled
             auto error = failed_log_in(app, creds);
-            REQUIRE(error.error_code == make_error_code(ServiceErrorCode::user_disabled));
+            REQUIRE(error.code() == ErrorCodes::UserDisabled);
 
             // admin enables user sessions again which should allow the session to continue
             app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
@@ -2921,7 +2928,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // new requests for an access token do not work for anon users
             anon_user->refresh_custom_data([&](Optional<AppError> error) {
                 REQUIRE(error);
-                REQUIRE(error->message ==
+                REQUIRE(error->reason() ==
                         util::format("Cannot initiate a refresh on user '%1' because the user has been removed",
                                      anon_user->identity()));
             });
@@ -2993,9 +3000,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
-        r->sync_session()->wait_for_upload_completion([&](auto ec) {
+        r->sync_session()->wait_for_upload_completion([&](Status ec) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec);
+            REQUIRE(!ec.get_std_error_code());
             done = true;
         });
         r->sync_session()->resume();
@@ -3034,9 +3041,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->commit_transaction();
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
-        REQUIRE(error.error_code == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.message == "Sync websocket closed because the server received a message that was too large: "
-                                 "read limited at 16777217 bytes");
+        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
+        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
+                                  "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
@@ -3075,8 +3082,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             config.sync_config->partition_value = "not a bson serialized string";
             std::atomic<bool> error_did_occur = false;
             config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-                CHECK(error.message.find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
-                                         "string' is invalid") != std::string::npos);
+                CHECK(error.reason().find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
+                                          "string' is invalid") != std::string::npos);
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
@@ -3330,7 +3337,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
     const std::string partition_key_col_name = "partition_key_prop";
     const std::string table_name = "class_partition_test_type";
     REQUIRE(!base_url.empty());
-    auto partition_property = Property(partition_key_col_name, TestType::property_type());
+    auto partition_property = Property(partition_key_col_name, TestType::property_type);
     Schema schema = {{Group::table_name_to_class_name(table_name),
                       {
                           {valid_pk_name, PropertyType::Int, true},
@@ -3435,8 +3442,8 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         TestSyncManager tsm(config);
         auto error = failed_log_in(tsm.app());
         CHECK(error.is_custom_error());
-        CHECK(error.error_code.value() == 1001);
-        CHECK(error.message == "Boom!");
+        CHECK(*error.additional_status_code == 1001);
+        CHECK(error.reason() == "Boom!");
     }
 }
 
@@ -3841,11 +3848,10 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         config.transport = instance_of<transport>;
         TestSyncManager tsm(config);
         auto error = failed_log_in(tsm.app());
-        CHECK(error.message == std::string("jwt missing parts"));
-        CHECK(error.error_code.message() == "bad token");
-        CHECK(error.error_code.category() == json_error_category());
+        CHECK(error.reason() == std::string("jwt missing parts"));
+        CHECK(error.code_string() == "BadToken");
         CHECK(error.is_json_error());
-        CHECK(JSONErrorCode(error.error_code.value()) == JSONErrorCode::bad_token);
+        CHECK(error.code() == ErrorCodes::BadToken);
     }
 
     SECTION("login_anonynous multiple users") {
@@ -4072,10 +4078,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_custom_error());
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
-        CHECK(error.error_code.value() == 404);
-        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
-        CHECK(error.error_code.message() == "Client Error: 404");
-        CHECK(error.link_to_server_logs.empty());
+        CHECK(*error.additional_status_code == 404);
+        CHECK(error.reason().find(std::string("http error code considered fatal")) != std::string::npos);
     }
     SECTION("http 500") {
         response.http_status_code = 500;
@@ -4084,11 +4088,11 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_custom_error());
         CHECK(!error.is_service_error());
         CHECK(error.is_http_error());
-        CHECK(error.error_code.value() == 500);
-        CHECK(error.message.find(std::string("http error code considered fatal")) != std::string::npos);
-        CHECK(error.error_code.message() == "Server Error: 500");
+        CHECK(*error.additional_status_code == 500);
+        CHECK(error.reason().find(std::string("http error code considered fatal")) != std::string::npos);
         CHECK(error.link_to_server_logs.empty());
     }
+
     SECTION("custom error code") {
         response.custom_status_code = 42;
         response.body = "Custom error message";
@@ -4097,9 +4101,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_json_error());
         CHECK(!error.is_service_error());
         CHECK(error.is_custom_error());
-        CHECK(error.error_code.value() == 42);
-        CHECK(error.message == std::string("Custom error message"));
-        CHECK(error.error_code.message() == "code 42");
+        CHECK(*error.additional_status_code == 42);
+        CHECK(error.reason() == std::string("Custom error message"));
         CHECK(error.link_to_server_logs.empty());
     }
 
@@ -4119,9 +4122,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_json_error());
         CHECK(!error.is_custom_error());
         CHECK(error.is_service_error());
-        CHECK(ServiceErrorCode(error.error_code.value()) == ServiceErrorCode::mongodb_error);
-        CHECK(error.message == std::string("a fake MongoDB error message!"));
-        CHECK(error.error_code.message() == "MongoDBError");
+        CHECK(error.code() == ErrorCodes::MongoDBError);
+        CHECK(error.reason() == std::string("a fake MongoDB error message!"));
         CHECK(error.link_to_server_logs == std::string("http://...whatever the server passes us"));
     }
 
@@ -4132,11 +4134,11 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(error.is_json_error());
         CHECK(!error.is_custom_error());
         CHECK(!error.is_service_error());
-        CHECK(JSONErrorCode(error.error_code.value()) == JSONErrorCode::malformed_json);
-        CHECK(error.message ==
+        CHECK(error.code() == ErrorCodes::MalformedJson);
+        CHECK(error.reason() ==
               std::string("[json.exception.parse_error.101] parse error at line 1, column 2: syntax error "
                           "while parsing value - invalid literal; last read: 'th'"));
-        CHECK(error.error_code.message() == "malformed json");
+        CHECK(error.code_string() == "MalformedJson");
     }
 }
 
@@ -4215,7 +4217,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().empty());
 
         app->remove_user(user_a, [&](Optional<AppError> error) {
-            CHECK(error->message == "User has already been removed");
+            CHECK(error->reason() == "User has already been removed");
             CHECK(app->sync_manager()->all_users().size() == 0);
         });
 
@@ -4265,7 +4267,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
-        CHECK(error->error_code.value() > 0);
+        CHECK(error->code() > 0);
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }
@@ -4302,7 +4304,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
         bool processed = false;
         app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-            CHECK(error->message == "The specified user is not logged in.");
+            CHECK(error->reason() == "The specified user is not logged in.");
             CHECK(!user);
             processed = true;
         });
@@ -4460,8 +4462,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
         bool processed = false;
         app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
-            CHECK(error->message == "jwt missing parts");
-            CHECK(error->error_code.value() == 1);
+            CHECK(error->reason() == "jwt missing parts");
+            CHECK(error->code() == ErrorCodes::BadToken);
             CHECK(session_route_hit);
             processed = true;
         });
@@ -4734,17 +4736,18 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         // Ignore websocket errors, since sometimes a websocket connection gets started during the test
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
             // Ignore websocket errors, since there's not really an app out there...
-            if (error.message.find("Bad WebSocket") != std::string::npos) {
+            if (error.reason().find("Bad WebSocket") != std::string::npos ||
+                error.reason().find("ConnectionFailed") != std::string::npos) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
-                             error.message, session->path());
+                             error.what(), session->path());
             }
             else {
                 util::format(std::cerr,
                              "An unexpected sync error was caught during test: 'app destroyed during token refresh': "
                              "'%1' for '%2'",
-                             error.message, session->path());
+                             error.what(), session->path());
                 abort();
             }
         };

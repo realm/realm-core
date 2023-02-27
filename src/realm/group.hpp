@@ -113,9 +113,9 @@ public:
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     explicit Group(const std::string& file, const char* encryption_key = nullptr);
@@ -280,6 +280,10 @@ public:
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    StringData get_class_name(TableKey key) const
+    {
+        return table_name_to_class_name(get_table_name(key));
+    }
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
@@ -353,9 +357,9 @@ public:
     ///
     /// \param write_history Indicates if you want the Sync Client History to
     /// be written to the file (only relevant for synchronized files).
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
@@ -832,6 +836,11 @@ private:
         if (m_table_names.find_first(name) != not_found)
             throw TableNameInUse();
     }
+    void check_attached() const
+    {
+        if (!is_attached())
+            throw StaleAccessor("Stale transaction");
+    }
 
     friend class Table;
     friend class GroupWriter;
@@ -957,8 +966,7 @@ inline TableKey Group::find_table(StringData name) const noexcept
 
 inline TableRef Group::get_table(TableKey key)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -966,8 +974,7 @@ inline TableRef Group::get_table(TableKey key)
 
 inline ConstTableRef Group::get_table(TableKey key) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -975,24 +982,21 @@ inline ConstTableRef Group::get_table(TableKey key) const
 
 inline TableRef Group::get_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     Table* table = do_get_table(name); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::add_table(StringData name, Table::Type table_type)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
@@ -1001,8 +1005,7 @@ inline TableRef Group::add_table(StringData name, Table::Type table_type)
 inline TableRef Group::get_or_add_table(StringData name, Table::Type table_type, bool* was_added)
 {
     REALM_ASSERT(table_type != Table::Type::Embedded);
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
@@ -1020,7 +1023,7 @@ inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataTy
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
             table->is_nullable(table->get_primary_key_column()) != nullable ||
             table->get_table_type() != table_type) {
-            throw std::runtime_error("Inconsistent schema");
+            return {};
         }
         return table;
     }

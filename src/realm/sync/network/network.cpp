@@ -2502,6 +2502,10 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
     std::size_t in_avail = m_end - m_begin;
     std::size_t out_avail = end - begin;
     std::size_t n = std::min(in_avail, out_avail);
+    // If n is 0, return whether or not the read expects 0 bytes for the completed response
+    if (n == 0)
+        return out_avail == 0;
+
     bool delim_mode = (delim != std::char_traits<char>::eof());
     char* i =
         (!delim_mode ? m_begin + n : std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim)));
