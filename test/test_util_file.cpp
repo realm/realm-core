@@ -171,7 +171,15 @@ TEST(Utils_File_resolve)
 {
     std::string res;
     res = File::resolve("", "");
+
+#if REALM_HAVE_STD_FILESYSTEM
+    // The std::filesystem-based implementation canonicalizes the resolved path in terms of '.' and '..'
+    // This doesn't affect the actual behavior of the file APIs since 'some/dir/.' == 'some/dir'
+    // but it does produce a different string value.
+    CHECK_EQUAL(res, "");
+#else
     CHECK_EQUAL(res, ".");
+#endif
 
 #ifdef _WIN32
     res = File::resolve("C:\\foo\\bar", "dir");
