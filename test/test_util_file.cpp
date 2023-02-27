@@ -2,6 +2,7 @@
 #ifdef TEST_UTIL_FILE
 
 #include <realm/util/file.hpp>
+#include <filesystem>
 
 #include "test.hpp"
 #include <cstdio>
@@ -114,12 +115,12 @@ TEST(Utils_File_dir)
     CHECK(dir_exists);
 }
 
-TEST(Utils_File_dir_unicode)
+ONLY(Utils_File_dir_unicode)
 {
-    std::string all_the_unicode = "фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
+    using std::filesystem::u8path;
 
+    constexpr char all_the_unicode[] = u8"фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
     std::string dir_name = File::resolve(all_the_unicode, test_util::get_test_path_prefix());
-    CHECK(dir_name.find(all_the_unicode) != std::string::npos);
 
     // Create directory
     bool dir_exists = File::is_dir(dir_name);
@@ -135,6 +136,9 @@ TEST(Utils_File_dir_unicode)
         dir_exists = File::is_dir(dir_name);
     }
     CHECK(dir_exists);
+
+    // Double-check using filesystem facilities with enforce UTF-8 handling
+    CHECK(std::filesystem::exists(u8path(test_util::get_test_path_prefix()) / u8path(all_the_unicode)));
 
     // Create file
     File f(File::resolve("test.realm", dir_name), File::mode_Write);
