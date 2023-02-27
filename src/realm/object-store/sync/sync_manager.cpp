@@ -230,10 +230,22 @@ void SyncManager::reset_for_testing()
     }
 
     {
-        util::CheckedLockGuard lock(m_session_mutex);
+        util::CheckedUniqueLock lock(m_session_mutex);
+
+        bool no_sessions = !do_has_existing_sessions();
+        // There's a race between this function and sessions tearing themselves down waiting for m_session_mutex.
+        // So we give up to a 5 second grace period for any sessions being torn down to unregister themselves.
+        auto since_poll_start = [start = std::chrono::steady_clock::now()] {
+            return std::chrono::steady_clock::now() - start;
+        };
+        for (; !no_sessions && since_poll_start() < std::chrono::seconds(5);
+             no_sessions = !do_has_existing_sessions()) {
+            lock.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            lock.lock();
+        }
         // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
         // prior to calling `reset_for_testing`.
-        bool no_sessions = !do_has_existing_sessions();
         REALM_ASSERT_RELEASE(no_sessions);
 
         // Destroy any inactive sessions.
