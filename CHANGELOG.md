@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Implement MigrationStore to support migration from PBS to FLX ([PR #6324](https://github.com/realm/realm-core/pull/6324))
 
 ----------------------------------------------
 
