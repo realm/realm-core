@@ -305,6 +305,7 @@ add_library(Storage STATIC
     ${REALM_NOINST_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
+    $<TARGET_OBJECTS:s2geometry>
 )
 add_library(Realm::Storage ALIAS Storage)
 
@@ -331,6 +332,8 @@ target_include_directories(Storage INTERFACE
     $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+target_include_directories(Storage PRIVATE "${CMAKE_SOURCE_DIR}/src/external")
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha_win32>)

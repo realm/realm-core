@@ -52,7 +52,7 @@ set(S2_UTIL_MATH_SOURCES
     util/math/mathutil.cc
 )
 
-add_library(s2geometry STATIC
+add_library(s2geometry OBJECT
     ${S2_SOURCES}
     ${S2_BASE_SOURCES}
     ${S2_STRINGS_SOURCES}
@@ -62,7 +62,7 @@ add_library(s2geometry STATIC
 
 add_library(Realm::external::s2geometry ALIAS s2geometry)
 
-target_compile_options(s2geometry PUBLIC
+target_compile_options(s2geometry PRIVATE
     -Wno-macro-redefined
     -Wno-deprecated-declarations
     -Wno-unused-local-typedef
@@ -74,4 +74,3 @@ target_compile_options(s2geometry PUBLIC
     -Wno-unused-const-variable
     -Wno-unused-function
 )
-

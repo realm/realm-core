@@ -46,7 +46,6 @@ set(CORE_TEST_SOURCES
     test_dictionary.cpp
     test_file.cpp
     test_file_locks.cpp
-    test_geo.cpp
     test_global_key.cpp
     test_group.cpp
     test_impl_simulated_failure.cpp
@@ -59,6 +58,7 @@ set(CORE_TEST_SOURCES
     test_object_id.cpp
     test_optional.cpp
     test_priority_queue.cpp
+    test_query_geo.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp
@@ -158,7 +158,7 @@ if(WINDOWS_STORE)
     set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
 endif()
 
-target_link_libraries(CoreTests TestUtil QueryParser s2geometry)
+target_link_libraries(CoreTests TestUtil QueryParser)
 enable_stdfilesystem(CoreTests)
 
 if(UNIX AND NOT APPLE)
@@ -166,10 +166,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(CoreTests "-rdynamic")
 endif()
 
-target_include_directories(CoreTests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_SOURCE_DIR}/src/external"
-)
+target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_bundled_test(CoreTests)
 
