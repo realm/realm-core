@@ -138,6 +138,8 @@ struct WindowsFileHandleHolder {
 #endif
 
 #if REALM_HAVE_STD_FILESYSTEM
+using std::filesystem::u8path;
+
 void throwIfCreateDirectoryError(std::error_code error, const std::string& path)
 {
     if (!error)
@@ -193,7 +195,7 @@ bool try_make_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    bool result = std::filesystem::create_directory(path, error);
+    bool result = std::filesystem::create_directory(u8path(path), error);
     throwIfCreateDirectoryError(error, path);
     return result;
 #else // POSIX
@@ -229,7 +231,7 @@ void make_dir_recursive(std::string path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    std::filesystem::create_directories(path, error);
+    std::filesystem::create_directories(u8path(path), error);
     throwIfCreateDirectoryError(error, path);
 #else
     // Skip the first separator as we're assuming an absolute path
@@ -268,7 +270,7 @@ bool try_remove_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    bool result = std::filesystem::remove(path, error);
+    bool result = std::filesystem::remove(u8path(path), error);
     throwIfFileError(error, path);
     return result;
 #else // POSIX
@@ -299,7 +301,7 @@ bool try_remove_dir_recursive(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    auto removed_count = std::filesystem::remove_all(path, error);
+    auto removed_count = std::filesystem::remove_all(u8path(path), error);
     throwIfFileError(error, path);
     return removed_count > 0;
 #else
@@ -330,21 +332,21 @@ std::string make_temp_dir()
     wchar_t buffer[MAX_PATH];
     std::filesystem::path path;
     for (;;) {
-        if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
-            throw SystemError(GetLastError(), "GetTempFileName() failed");
+        if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0) {
+            DWORD error = GetLastError();
+            throw SystemError(error, get_last_error_msg("GetTempFileName() failed: ", error));
+        }
         path = buffer;
         std::filesystem::remove(path);
-        try {
-            std::filesystem::create_directory(path);
-            break;
+
+        std::error_code error;
+        std::filesystem::create_directory(path, error);
+        if (error && error != std::errc::file_exists) {
+            throw SystemError(error, util::format("Failed to create temporary directory: %1", error.message()));
         }
-        catch (const std::filesystem::filesystem_error& ex) {
-            if (ex.code() != std::errc::file_exists) {
-                throw;
-            }
-        }
+        break;
     }
-    return path.string();
+    return path.u8string();
 
 #else // POSIX.1-2008 version
 
@@ -373,11 +375,12 @@ std::string make_temp_file(const char* prefix)
     std::filesystem::path temp = std::filesystem::temp_directory_path();
 
     wchar_t buffer[MAX_PATH];
-    std::filesystem::path path;
-    if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
-        throw std::system_error(GetLastError(), std::system_category(), "GetTempFileName() failed");
-    path = buffer;
-    return path.string();
+    if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0) {
+        DWORD error = GetLastError();
+        throw SystemError(error, get_last_error_msg("GetTempFileName() failed: ", error));
+    }
+
+    return std::filesystem::path(buffer).u8string();
 
 #else // POSIX.1-2008 version
 
@@ -445,8 +448,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    HANDLE handle =
-        CreateFile2(std::filesystem::path(path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    HANDLE handle = CreateFile2(u8path(path).c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_fd = handle;
         m_have_lock = false;
@@ -1401,7 +1403,7 @@ void File::sync_map(FileDesc fd, void* addr, size_t size)
 bool File::exists(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    return std::filesystem::exists(path);
+    return std::filesystem::exists(u8path(path));
 #else // POSIX
     if (::access(path.c_str(), F_OK) == 0)
         return true;
@@ -1420,7 +1422,7 @@ bool File::exists(const std::string& path)
 bool File::is_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    return std::filesystem::is_directory(path);
+    return std::filesystem::is_directory(u8path(path));
 #elif !defined(_WIN32)
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0)
@@ -1454,7 +1456,7 @@ bool File::try_remove(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    bool result = std::filesystem::remove(path, error);
+    bool result = std::filesystem::remove(u8path(path), error);
     throwIfFileError(error, path);
     return result;
 #else // POSIX
@@ -1486,7 +1488,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
     std::error_code error;
-    std::filesystem::rename(old_path, new_path, error);
+    std::filesystem::rename(u8path(old_path), u8path(new_path), error);
 
     if (error == std::errc::no_such_file_or_directory) {
         throw FileAccessError(ErrorCodes::FileNotFound, error.message(), old_path);
@@ -1519,7 +1521,8 @@ void File::move(const std::string& old_path, const std::string& new_path)
 void File::copy(const std::string& origin_path, const std::string& target_path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::copy_file(origin_path, target_path, std::filesystem::copy_options::overwrite_existing); // Throws
+    std::filesystem::copy_file(u8path(origin_path), u8path(target_path),
+                               std::filesystem::copy_options::overwrite_existing); // Throws
 #else
     File origin_file{origin_path, mode_Read};  // Throws
     File target_file{target_path, mode_Write}; // Throws
@@ -1583,7 +1586,7 @@ std::optional<File::UniqueID> File::get_unique_id(const std::string& path)
 #ifdef _WIN32 // Windows version
     // CreateFile2 with creationDisposition OPEN_EXISTING will return a file handle only if the file exists
     // otherwise it will raise ERROR_FILE_NOT_FOUND. This call will never create a new file.
-    WindowsFileHandleHolder fileHandle(::CreateFile2(std::filesystem::path(path).c_str(), FILE_READ_ATTRIBUTES,
+    WindowsFileHandleHolder fileHandle(::CreateFile2(u8path(path).c_str(), FILE_READ_ATTRIBUTES,
                                                      FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                      OPEN_EXISTING, nullptr));
 
@@ -1636,8 +1639,7 @@ std::string File::get_path() const
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    std::filesystem::path path_(path.empty() ? "." : path);
-    return (std::filesystem::path(base_dir) / path_).string();
+    return (u8path(base_dir) / u8path(path)).lexically_normal().u8string();
 #else
     char dir_sep = '/';
     std::string path_2 = path;
@@ -1679,8 +1681,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 std::string File::parent_dir(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    namespace fs = std::filesystem;
-    return fs::path(path).parent_path().string(); // Throws
+    return u8path(path).parent_path().u8string(); // Throws
 #else
     auto is_sep = [](char c) -> bool {
         return c == '/' || c == '\\';
@@ -1842,7 +1843,7 @@ void File::MapBase::flush()
 std::time_t File::last_write_time(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    auto time = std::filesystem::last_write_time(path);
+    auto time = std::filesystem::last_write_time(u8path(path));
 
     using namespace std::chrono;
 #if __cplusplus >= 202002L
@@ -1864,7 +1865,7 @@ std::time_t File::last_write_time(const std::string& path)
 File::SizeType File::get_free_space(const std::string& path)
 {
 #if REALM_HAVE_STD_FILESYSTEM
-    return std::filesystem::space(path).available;
+    return std::filesystem::space(u8path(path)).available;
 #else
     struct statvfs stat;
     if (statvfs(path.c_str(), &stat) != 0) {
@@ -1879,7 +1880,7 @@ File::SizeType File::get_free_space(const std::string& path)
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
     try {
-        m_iterator = std::filesystem::directory_iterator(path);
+        m_iterator = std::filesystem::directory_iterator(u8path(path));
     }
     catch (const std::filesystem::filesystem_error& e) {
         if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
@@ -1894,7 +1895,7 @@ bool DirScanner::next(std::string& name)
     const std::filesystem::directory_iterator end;
     if (m_iterator == end)
         return false;
-    name = m_iterator->path().filename().string();
+    name = m_iterator->path().filename().u8string();
     m_iterator++;
     return true;
 }
