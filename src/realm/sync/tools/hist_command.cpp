@@ -14,7 +14,6 @@
 #include <realm/array_integer.hpp>
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
-#include <realm/util/enum.hpp>
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/timestamp_formatter.hpp>
 #include <realm/util/load_file.hpp>

@@ -94,7 +94,6 @@ set(UTIL_SOURCES
     util/thread.cpp
     util/to_string.cpp
     util/demangle.cpp
-    util/enum.cpp
     util/json_parser.cpp
     util/load_file.cpp
     util/misc_ext_errors.cpp
@@ -267,7 +266,6 @@ set(REALM_NOINST_HEADERS
     util/circular_buffer.hpp
     util/cli_args.hpp
     util/demangle.hpp
-    util/enum.hpp
     util/from_chars.hpp
     util/get_file_size.hpp
     util/json_parser.hpp

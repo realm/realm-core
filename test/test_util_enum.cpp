@@ -1,5 +1,3 @@
-#include <realm/util/enum.hpp>
-
 #include "test.hpp"
 
 using namespace realm;
