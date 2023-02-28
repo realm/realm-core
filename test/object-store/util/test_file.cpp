@@ -332,7 +332,7 @@ TestAppSession::TestAppSession(AppSession session,
     if (!m_transport)
         m_transport = instance_of<SynchronousTestTransport>;
     auto app_config = get_config(m_transport, *m_app_session);
-    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_ENABLE_LOGGING_LEVEL);
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
     set_app_config_defaults(app_config, m_transport);
 
     util::try_make_dir(m_base_file_path);

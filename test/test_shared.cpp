@@ -604,8 +604,7 @@ TEST(Shared_EncryptedRemap)
     const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
-        // DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
-        DBRef sg = DB::create(path, crypt_key());
+        DBRef sg = get_test_db(path, crypt_key());
 
         // Create table entries
 
@@ -619,7 +618,7 @@ TEST(Shared_EncryptedRemap)
         wt.commit();
     }
 
-    DBRef sg2 = DB::create(path, crypt_key());
+    DBRef sg2 = get_test_db(path, crypt_key());
 
     CHECK_EQUAL(true, sg2->compact());
     ReadTransaction rt2(sg2);
