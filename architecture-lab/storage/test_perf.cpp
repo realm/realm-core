@@ -39,14 +39,14 @@
 
 #include "db.hpp"
 
-#define CHUNK_SIZE 20
+#define CHUNK_SIZE 10
 
 struct chunk {
-    char chars[CHUNK_SIZE];
+    uint16_t symbols[CHUNK_SIZE];
     int prefix_index = -1;
     bool operator==(const chunk& a2) const
     {
-        return memcmp(chars, a2.chars, CHUNK_SIZE) == 0 && prefix_index == a2.prefix_index;
+        return memcmp(symbols, a2.symbols, 2 * CHUNK_SIZE) == 0 && prefix_index == a2.prefix_index;
     };
 };
 
@@ -54,6 +54,17 @@ template <>
 struct std::hash<chunk> {
     std::size_t operator()(chunk const& c) const noexcept
     {
+        std::size_t ret = (uint64_t)c.symbols[0] << 48;
+        ret ^= (uint64_t)c.symbols[1] << 32;
+        ret ^= (uint64_t)c.symbols[2] << 16;
+        ret ^= (uint64_t)c.symbols[3];
+        ret ^= (uint64_t)c.symbols[4] << 48;
+        ret ^= (uint64_t)c.symbols[5] << 32;
+        ret ^= (uint64_t)c.symbols[6] << 16;
+        ret ^= (uint64_t)c.symbols[7];
+        ret ^= (uint64_t)c.symbols[8] << 48;
+        ret ^= (uint64_t)c.symbols[9] << 32;
+#if 0
         std::size_t ret = (unsigned long)c.chars[0] << 56;
         ret ^= (unsigned long)c.chars[1] << 48;
         ret ^= (unsigned long)c.chars[2] << 40;
@@ -78,6 +89,7 @@ struct std::hash<chunk> {
         ret ^= (unsigned long)c.chars[18] << 40;
         ret ^= (unsigned long)c.chars[19] << 32;
 #endif
+#endif
         ret ^= (unsigned long)c.prefix_index;
         // std::cout << " *" << ret << "* " << std::flush;
         return ret;
@@ -88,34 +100,70 @@ class string_compressor {
 public:
     std::vector<chunk> chunks;
     std::unordered_map<chunk, int> map;
-    std::vector<int> buddies;
+    // std::vector<int> buddies;
+    std::unordered_map<uint32_t, uint16_t> encoding_table;
     string_compressor()
     {
-        buddies.resize(65536, 0);
+        // buddies.resize(65536, 0);
     }
-    int handle(const char* first, const char* past)
+    int compress_symbols(uint16_t symbols[], int size)
     {
-        int size = past - first;
-        // std::cout << "\nSize " << size << " : --- " << std::flush;
+        for (int runs = 0; runs < 6; ++runs) {
+            uint16_t* from = symbols;
+            uint16_t* to = symbols;
+
+            for (int p = 0; p < size; p += 2) {
+                uint32_t pair = (from[0] << 16) | from[1];
+                auto it = encoding_table.find(pair);
+                if (it == encoding_table.end()) {
+                    bool learning = encoding_table.size() < 65535 - 256;
+                    if (learning) {
+                        uint16_t symbol = encoding_table.size() + 256;
+                        encoding_table[pair] = symbol;
+                        *to++ = symbol;
+                    }
+                    else {
+                        to += 2; // retain old symbols
+                    }
+                }
+                else {
+                    *to++ = it->second;
+                }
+                from += 2;
+            }
+            size = to - symbols;
+        }
+        return size;
+    }
+    int handle(const char* _first, const char* _past)
+    {
+        // expand into 16 bit symbols:
+        int size = _past - _first;
         total_chars += size;
-        const char* last = first + CHUNK_SIZE;
+        assert(size < 8191);
+        uint16_t symbols[8192];
+        uint16_t* to = symbols;
+        for (const char* p = _first; p < _past; ++p)
+            *to++ = *p & 0xFF;
+        *to = 0;
+        size = compress_symbols(symbols, size);
+        //        if (size <= 3) {
+        //            return (symbols[0]) << 1 | (symbols[1] << 17) | (symbols[2] << 33);
+        //        }
+        uint16_t* first = symbols;
+        uint16_t* past = symbols + size;
+        uint16_t* last = first + CHUNK_SIZE;
         int prefix = -1;
         chunk c;
         while (first < past) {
             if (last >= past) {
                 last = past;
-                memset(c.chars, 0, CHUNK_SIZE);
+                memset(c.symbols, 0, 2 * CHUNK_SIZE);
             }
-            memcpy(c.chars, first, last - first);
+            memcpy(c.symbols, first, 2 * (last - first));
             c.prefix_index = prefix;
             auto it = map.find(c);
             if (it == map.end()) {
-                for (int j = 0; j < CHUNK_SIZE; j += 2) {
-                    uint16_t p = ((c.chars[j] & 0xFF) << 8) | (c.chars[j + 1] & 0xFF);
-                    buddies[p]++;
-                    // std::cout << " " << c.chars[j] << c.chars[j + 1] << c.chars[j + 2] << " -> " << p <<
-                    // std::flush;
-                }
                 prefix = chunks.size();
                 map[c] = prefix;
                 chunks.push_back(c);
@@ -129,12 +177,9 @@ public:
         // std::cout << "   " << tmp << " -> " << prefix << std::endl;
         return prefix;
     }
-    int get_num_buddies()
+    int symbol_table_size()
     {
-        int sum = 0;
-        for (auto x : buddies)
-            sum += (x != 0) ? 1 : 0;
-        return sum;
+        return encoding_table.size();
     }
     int next_id = 0;
     int next_prefix_id = -1;
@@ -284,7 +329,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 16;
+    int num_work_packages = 12;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -453,7 +498,7 @@ int main(int argc, char* argv[])
                 std::cout << "Field " << i << " with " << compressors[i]->map.size() << " chunks ("
                           << compressors[i]->map.size() * sizeof(chunk) << " bytes) from total "
                           << compressors[i]->total_chars << " chars"
-                          << " encoded in buddies: " << compressors[i]->get_num_buddies() << std::endl;
+                          << " (symbol table: " << compressors[i]->symbol_table_size() << " )" << std::endl;
                 compressors[i].reset();
             }
         }
