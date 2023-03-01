@@ -39,8 +39,8 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
         os << "(none)";
     }
     else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+        os << "AppError(error_code=" << error->code()
+           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
            << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
     }
     return os;
@@ -350,7 +350,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
                                                uint64_t count, util::Optional<app::AppError> error) mutable {
                 REQUIRE(!error);
                 if (error) {
-                    promise.set_error({ErrorCodes::RuntimeError, error->message});
+                    promise.set_error({ErrorCodes::RuntimeError, error->reason()});
                 }
                 else {
                     promise.emplace_value(count);

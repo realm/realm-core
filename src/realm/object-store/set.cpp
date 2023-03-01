@@ -25,6 +25,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm::object_store {
 
@@ -43,7 +44,7 @@ ConstTableRef Set::get_table() const
     verify_attached();
     if (m_type == PropertyType::Object)
         return set_base().get_target_table();
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <class T>
@@ -60,13 +61,12 @@ size_t Set::find(Query&& q) const
         ObjKey key = get_query().and_query(std::move(q)).find();
         return key ? as<Obj>().find_first(key) : not_found;
     }
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <typename T>
 T Set::get(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
     return as<T>().get(row_ndx);
 }
 
@@ -158,7 +158,7 @@ std::pair<size_t, bool> Set::insert_any(Mixed value)
 
 Mixed Set::get_any(size_t ndx) const
 {
-    verify_valid_row(ndx);
+    verify_attached();
     auto value = set_base().get_any(ndx);
     record_audit_read(value);
     return value;
@@ -172,6 +172,7 @@ std::pair<size_t, bool> Set::remove_any(Mixed value)
 
 size_t Set::find_any(Mixed value) const
 {
+    verify_attached();
     return set_base().find_any(value);
 }
 
@@ -199,7 +200,7 @@ size_t Set::find<int>(const int& value) const
 template <>
 Mixed Set::get<Mixed>(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
+    verify_attached();
     auto& set = as<Mixed>();
     auto value = set.get(row_ndx);
     record_audit_read(value);
@@ -209,7 +210,7 @@ Mixed Set::get<Mixed>(size_t row_ndx) const
 template <>
 Obj Set::get<Obj>(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
+    verify_attached();
     auto& set = as<Obj>();
     auto obj = set.get_object(row_ndx);
     record_audit_read(obj);

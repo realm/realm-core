@@ -163,16 +163,44 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
-    struct FLXSyncRole {
-        std::string name;
-        nlohmann::json apply_when = nlohmann::json::object();
+    struct ServiceRoleDocumentFilters {
         nlohmann::json read;
         nlohmann::json write;
     };
 
+    // ServiceRole represents the set of permissions used MongoDB-based services (Flexible Sync, DataAPI, GraphQL,
+    // etc.). In flexible sync, roles are assigned on a per-table, per-session basis by the server. NB: there are
+    // restrictions on the role configuration when used with flexible sync. See
+    // https://www.mongodb.com/docs/atlas/app-services/rules/sync-compatibility/ for more information.
+    struct ServiceRole {
+        std::string name;
+
+        // apply_when describes when a role applies. Set it to an empty JSON expression ("{}") if
+        // the role should always apply
+        nlohmann::json apply_when = nlohmann::json::object();
+
+        // document_filters describe which objects can be read from/written to, as
+        // specified by the below read and write expressions. Set both to true to give read/write
+        // access on all objects
+        ServiceRoleDocumentFilters document_filters;
+
+        // insert_filter and delete_filter describe which objects can be created and erased by the client,
+        // respectively. Set both to true if all objects can be created/erased by the client
+        nlohmann::json insert_filter;
+        nlohmann::json delete_filter;
+
+        // read and write describe the permissions for "read-all-fields"/"write-all-fields" behavior. Set both to true
+        // if all fields should have read/write access
+        nlohmann::json read;
+        nlohmann::json write;
+
+        // NB: for more granular field-level permissions, the "fields" and "additional_fields" keys can be included in
+        // a service role to describe which fields individually can be read/written. These fields have been omitted
+        // here for simplicity
+    };
+
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
-        std::vector<FLXSyncRole> default_roles;
     };
 
     std::string app_name;
@@ -197,6 +225,7 @@ struct AppCreateConfig {
     bool enable_custom_token_auth = false;
 
     std::shared_ptr<util::Logger> logger;
+    std::vector<ServiceRole> service_roles;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);

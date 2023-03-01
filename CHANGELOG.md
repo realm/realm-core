@@ -2,14 +2,13 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
 
 ### Breaking changes
-* None.
+* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +16,35 @@
 -----------
 
 ### Internals
+* Add CAPI test for Binding Callback Thread Observer. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* Implement MigrationStore to support migration from PBS to FLX ([PR #6324](https://github.com/realm/realm-core/pull/6324))
+
+----------------------------------------------
+
+# 13.5.0 Release notes
+
+### Enhancements
 * None.
+
+### Fixed
+* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
+* Fixed performance degradation on SubQueries ([#6327](https://github.com/realm/realm-core/issues/6327), since v6.0.0)
+* The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
+* Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
+* Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+* Fix crash if secure transport returns an error with a non-zero length. ([#5435](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
+
+### Breaking changes
+* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
+([#6319](https://github.com/realm/realm-core/pull/6319))
 
 ----------------------------------------------
 
@@ -87,7 +114,7 @@
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
 ### Breaking changes
-* None.
+* Remove Group::compute_aggregated_byte_size(), which is no longer used by anything.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -107,6 +134,7 @@
 * Improve the performance of `Realm::freeze()` by eliminating some redudant work around schema initialization and validation. These optimizations do not apply to Realm::get_frozen_realm() ([PR #6211](https://github.com/realm/realm-core/pull/6211)).
 * Include context about what object caused the merge exception in OT ([#6204](https://github.com/realm/realm-core/issues/6204))
 * Add support for `Dictionary::get_keys()`, `Dictionary::contains()`, `Dictionary::find_any()` in the C API. ([#6181](https://github.com/realm/realm-core/issues/6181))
+* Adds upport for in-memory Realms. If a Realm is opened without a path it will be in memory only.
 
 ### Fixed
 * "find first" on Decimal128 field with value NaN does not find objects ([6182](https://github.com/realm/realm-core/issues/6182), since v6.0.0)
@@ -464,7 +492,7 @@
 * Fix crash when upserting a document with the primary key not an ObjectId into a mongo collection. ([#5345](https://github.com/realm/realm-core/issues/5345), since v10.0.0).
 
 ### Breaking changes
-None.
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -555,7 +583,7 @@ None.
 * Using the Query Parser, it was not allowed to query on a property named 'desc'. ([#5723](https://github.com/realm/realm-core/issues/5723))
 
 ### Breaking changes
-* None.
+* None
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

@@ -34,9 +34,9 @@ void validate_key_value(const Mixed& key)
         auto str = key.get_string();
         if (str.size()) {
             if (str[0] == '$')
-                throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not start with '$'");
             if (memchr(str.data(), '.', str.size()))
-                throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not contain '.'");
         }
     }
 }
@@ -70,8 +70,10 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     if (!col_key.is_dictionary()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
     }
+    if (!(m_key_type == type_String || m_key_type == type_Int))
+        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
 }
 
 Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)
@@ -130,27 +132,21 @@ bool Dictionary::is_null(size_t ndx) const
 Mixed Dictionary::get_any(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    CollectionBase::validate_index("get_any()", ndx, size());
     return m_values->get(ndx);
 }
 
 std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    CollectionBase::validate_index("get_pair()", ndx, size());
     return do_get_pair(ndx);
 }
 
 Mixed Dictionary::get_key(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    CollectionBase::validate_index("get_key()", ndx, size());
     return do_get_key(ndx);
 }
 
@@ -453,7 +449,7 @@ Mixed Dictionary::get(Mixed key) const
     if (auto opt_val = try_get(key)) {
         return *opt_val;
     }
-    throw realm::KeyNotFound("Dictionary::get");
+    throw KeyNotFound("Dictionary::get");
 }
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
@@ -483,21 +479,21 @@ Dictionary::Iterator Dictionary::end() const
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
     if (key.get_type() != m_key_type) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: Invalid key type");
     }
     if (value.is_null()) {
         if (!m_col_key.is_nullable()) {
-            throw LogicError(LogicError::type_mismatch);
+            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
         }
     }
     else {
         if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
             if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-                throw std::runtime_error("Dictionary::insert: Wrong object type");
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
             }
         }
         else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-            throw LogicError(LogicError::type_mismatch);
+            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
         }
     }
 
@@ -514,14 +510,14 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
         auto key = value.get<ObjKey>();
         if (!key.is_unresolved() && !target_table->is_valid(key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
         }
         new_link = ObjLink(target_table->get_key(), key);
         value = Mixed(new_link);
     }
 
     if (!m_dictionary_top) {
-        throw LogicError(LogicError::detached_accessor);
+        throw StaleAccessor("Stale dictionary");
     }
 
     bool old_entry = false;
@@ -536,7 +532,6 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 static_cast<BPlusTree<Int>*>(m_keys.get())->insert(ndx, key.get_int());
                 break;
             default:
-                throw std::runtime_error("Not implemented");
                 break;
         }
         m_values->insert(ndx, value);
@@ -678,16 +673,14 @@ bool Dictionary::try_erase(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     if (!try_erase(key)) {
-        throw KeyNotFound("Dictionary::erase");
+        throw KeyNotFound(util::format("Cannot remove key %1 from dictionary: key not found", key));
     }
 }
 
 auto Dictionary::erase(Iterator it) -> Iterator
 {
     auto pos = it.m_ndx;
-    if (pos >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    CollectionBase::validate_index("erase()", pos, size());
 
     do_erase(pos, do_get_key(pos));
     if (pos < size())
@@ -759,7 +752,6 @@ bool Dictionary::init_from_parent(bool allow_create) const
                 break;
             }
             default:
-                throw std::runtime_error("Not implemented");
                 break;
         }
         m_keys->set_parent(m_dictionary_top.get(), 0);
@@ -878,7 +870,6 @@ Mixed Dictionary::do_get_key(size_t ndx) const
             return static_cast<BPlusTree<Int>*>(m_keys.get())->get(ndx);
         }
         default:
-            throw std::runtime_error("Not implemented");
             break;
     }
 

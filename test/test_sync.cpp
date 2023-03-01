@@ -11,6 +11,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <chrono>
 
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
@@ -18,6 +19,7 @@
 #include <realm/history.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/list.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/client.hpp>
@@ -3708,7 +3710,7 @@ TEST(Sync_UploadDownloadProgress_6)
     // The check is that we reach this point without deadlocking.
 }
 
-// Event Loop TODO: re-enable test once errors are propogating
+// Commenting out test for now and will be fixed in a later PR
 #if 0
 TEST(Sync_MultipleSyncAgentsNotAllowed)
 {
@@ -3719,16 +3721,73 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
+    using namespace std::literals::chrono_literals;
+
+    std::mutex thread_mutex;
+    bool create_thread_called = false;
+    bool destroy_thread_called = false;
+    std::string error_message;
+    std::condition_variable error_cv;
+
+    auto&& create_thread = [&thread_mutex, &create_thread_called]() {
+        std::lock_guard<std::mutex> lock(thread_mutex);
+        create_thread_called = true;
+    };
+
+    auto&& destroy_thread = [&thread_mutex, &destroy_thread_called]() {
+        std::lock_guard<std::mutex> lock(thread_mutex);
+        destroy_thread_called = true;
+    };
+
+    auto&& handle_error = [&thread_mutex, &error_cv, &error_message](const std::exception& e) {
+        std::unique_lock<std::mutex> lock(thread_mutex);
+        error_message = e.what();
+        error_cv.notify_all();
+        return true;
+    };
+
+    // Since the event loop thread has been moved into the DefaultSocketProvider, use the
+    // client local BindingCallbackThreadObserver to receive the error message
+    auto observer_ptr = std::make_shared<BindingCallbackThreadObserver>(
+        std::move(create_thread), std::move(destroy_thread), std::move(handle_error));
+
     TEST_CLIENT_DB(db);
     Client::Config config;
     config.logger = test_context.logger;
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(
+        config.logger, "", observer_ptr, websocket::DefaultSocketProvider::AutoStart{false});
+    config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
     Client client{config};
-    Session session_1{client, db, nullptr};
-    Session session_2{client, db, nullptr};
-    session_1.bind("realm://foo/bar", "blablabla");
-    session_2.bind("realm://foo/bar", "blablabla");
-    CHECK_THROW(client.run(), MultipleSyncAgents);
+    {
+        Session session_1{client, db, nullptr};
+        Session session_2{client, db, nullptr};
+        session_1.bind("realm://foo/bar", "blablabla");
+        session_2.bind("realm://foo/bar", "blablabla");
+        socket_provider->start();
+
+        {
+            std::unique_lock<std::mutex> lock(thread_mutex);
+            // Wait up to 10 seconds for the exception to be thrown by event loop
+            // Skip the wait if the exception has already been processed
+            if (error_message.empty()) {
+                CHECK(error_cv.wait_for(lock, 10s, [&error_message]() {
+                    return !error_message.empty();
+                }));
+            }
+            CHECK_STRING_CONTAINS(error_message, "Multiple sync agents attempted to join the same session");
+        }
+    }
+    socket_provider->stop(true);
+    {
+        std::unique_lock<std::mutex> lock(thread_mutex);
+        CHECK(create_thread_called);
+        CHECK(destroy_thread_called);
+    }
+    // restart the socket_provider event loop thread after the exception so we can clean up and resume
+    socket_provider->start();
+    // Now start the client shutdown
+    client.shutdown();
 }
 #endif
 
@@ -4439,7 +4498,8 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, sync::websocket::make_error_code(ErrorCodes::ReadError));
+        bool valid_error = ec == sync::websocket::WebSocketError::websocket_read_error;
+        CHECK(valid_error);
         bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));

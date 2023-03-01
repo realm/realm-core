@@ -86,8 +86,9 @@ private:
     std::string m_temp_dir;
 };
 
-struct InMemoryTestFile : TestFile {
+struct InMemoryTestFile : realm::Realm::Config {
     InMemoryTestFile();
+    realm::DBOptions options() const;
 };
 
 void advance_and_notify(realm::Realm& realm);
@@ -238,6 +239,8 @@ public:
         return m_sync_server;
     }
 
+    std::shared_ptr<realm::SyncUser> fake_user(const std::string& name = "test");
+
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
     realm::util::UniqueFunction<void(const realm::app::Response&)> network_callback;
@@ -275,8 +278,8 @@ inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
 {
 }
 
-std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
-std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
 void set_app_config_defaults(realm::app::App::Config& app_config,
                              const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
