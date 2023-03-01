@@ -30,16 +30,11 @@ static bool type_is_valid(std::string str_type)
     return str_type == "point";
 }
 
-static bool type_is(std::string str_type, const char* lower)
-{
-    std::transform(str_type.begin(), str_type.end(), str_type.begin(), realm::toLowerAscii);
-    return str_type == lower;
-}
-
-
 } // anonymous namespace
 
 namespace realm {
+
+const double Geospatial::RadiusKm = 6371.01;
 
 Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
@@ -125,7 +120,7 @@ void Geospatial::assign_to(Obj& link) const
     if (m_points.size() == 0) {
         throw InvalidArgument("Geospatial value must have one point");
     }
-    link.set(type_col, m_type);
+    link.set(type_col, get_type());
     Lst<double> coords = link.get_list<double>(coords_col);
     if (coords.size() >= 1) {
         coords.set(0, m_points[0].longitude);
@@ -153,15 +148,14 @@ bool Geospatial::is_within(const Geospatial& bounds) const noexcept
 {
     REALM_ASSERT(m_points.size() == 1); // point
 
-    if (type_is(bounds.get_type(), "box") && bounds.m_points.size() == 2) {
+    if (bounds.m_type == Type::Box && bounds.m_points.size() == 2) {
         return m_points[0].latitude >= bounds.m_points[0].latitude &&
                m_points[0].latitude <= bounds.m_points[1].latitude &&
                m_points[0].longitude >= bounds.m_points[0].longitude &&
                m_points[0].longitude <= bounds.m_points[1].longitude;
     }
-    else {
-        REALM_UNREACHABLE(); // FIXME: other types and error handling
-    }
+
+    REALM_UNREACHABLE(); // FIXME: other types and error handling
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)

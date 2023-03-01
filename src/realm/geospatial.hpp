@@ -45,23 +45,56 @@ struct GeoBox {
     GeoPoint p2;
 };
 
+struct GeoPolygon {
+    GeoPolygon(std::initializer_list<GeoPoint>&& l)
+        : points(l)
+    {
+    }
+    std::vector<GeoPoint> points;
+};
+
+struct GeoCenterSphere {
+    double radius_km = 0.0;
+    GeoPoint center;
+};
+
 class Geospatial {
 public:
+    enum class Type { Point, Box, Polygon, CenterSphere, Invalid };
+
     Geospatial(GeoPoint point)
-        : m_type("Point")
+        : m_type(Type::Point)
         , m_points({point})
     {
     }
     Geospatial(GeoBox box)
-        : m_type("Box")
+        : m_type(Type::Box)
         , m_points({box.p1, box.p2})
     {
     }
-    Geospatial(StringData invalid_type)
-        : m_type(invalid_type)
-        , m_is_valid(false)
+    Geospatial(GeoPolygon polygon)
+        : m_type(Type::Polygon)
+        , m_points(std::move(polygon.points))
     {
     }
+    Geospatial(GeoCenterSphere centerSphere)
+        : m_type(Type::CenterSphere)
+        , m_points({centerSphere.center})
+        , m_radius_radians(centerSphere.radius_km / RadiusKm)
+    {
+    }
+
+    Geospatial(StringData invalid_type) // FIXME remove or use for error outside of the type?
+        : m_type(Type::Invalid)
+        , m_invalid_type(invalid_type)
+    {
+    }
+
+    Geospatial(const Geospatial&) = default;
+    Geospatial& operator=(const Geospatial&) = default;
+
+    Geospatial(Geospatial&& other) = default;
+    Geospatial& operator=(Geospatial&&) = default;
 
     static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
@@ -69,12 +102,12 @@ public:
 
     std::string get_type() const noexcept
     {
-        return m_type;
+        return is_valid() ? std::string(types[static_cast<size_t>(m_type)]) : m_invalid_type.value();
     }
 
     bool is_valid() const noexcept
     {
-        return m_is_valid;
+        return m_type != Type::Invalid;
     }
 
     bool is_within(const Geospatial& bounds) const noexcept;
@@ -99,11 +132,16 @@ public:
 
     constexpr static std::string_view c_geo_point_type_col_name = "type";
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
+    constexpr static std::string_view types[] = {"Point", "Box", "Polygon", "CenterSphere"};
+
+    static const double RadiusKm;
 
 private:
-    std::string m_type;
+    Type m_type;
+    std::optional<std::string> m_invalid_type;
+
     std::vector<GeoPoint> m_points;
-    bool m_is_valid = true;
+    std::optional<double> m_radius_radians;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);
