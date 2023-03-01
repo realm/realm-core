@@ -1245,8 +1245,8 @@ ObjKey Query::find() const
         }
     }
 
-    auto t2 = std::chrono::steady_clock::now();
     if (logger) {
+        auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
@@ -1352,8 +1352,8 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     }
 
 
-    auto t2 = std::chrono::steady_clock::now();
     if (logger) {
+        auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", ret.size(),
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
@@ -1464,8 +1464,8 @@ size_t Query::do_count(size_t limit) const
         }
     }
 
-    auto t2 = std::chrono::steady_clock::now();
     if (logger) {
+        auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }

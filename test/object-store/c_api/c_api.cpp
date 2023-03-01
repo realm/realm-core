@@ -1065,6 +1065,16 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
     return false;
 }
 
+struct LogUserData {
+    std::vector<std::string> log;
+};
+
+void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
+{
+    LogUserData* userdata = static_cast<LogUserData*>(u);
+    userdata->log.emplace_back(message);
+}
+
 } // anonymous namespace
 
 TEST_CASE("C API", "[c_api]") {
@@ -1357,6 +1367,26 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(realm_clear_last_error());
             delete ex;
         }
+    }
+
+    SECTION("logging") {
+        LogUserData userdata;
+        auto log_level_old = util::Logger::get_default_level_threshold();
+        realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+        auto config = make_config(test_file.path.c_str(), false);
+        realm_t* realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.size() == 2);
+        userdata.log.clear();
+        realm_set_log_level(RLM_LOG_LEVEL_ERROR);
+        realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.empty());
+
+        // Remove this logger again
+        realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
+        // Restore old log level
+        util::Logger::set_default_level_threshold(log_level_old);
     }
 
     realm_t* realm;
