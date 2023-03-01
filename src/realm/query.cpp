@@ -1189,7 +1189,7 @@ ObjKey Query::find() const
     auto t1 = std::chrono::steady_clock::now();
 
     if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description());
+        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
     }
 
     ObjKey ret;
@@ -1266,7 +1266,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     }
 
     if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description(),
+        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
                     int64_t(limit));
     }
     auto t1 = std::chrono::steady_clock::now();
@@ -1402,7 +1402,8 @@ size_t Query::do_count(size_t limit) const
     }
 
     if (logger && logger->would_log(util::Logger::Level::debug)) {
-        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description(), int64_t(limit));
+        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
+                    int64_t(limit));
     }
     auto t1 = std::chrono::steady_clock::now();
     size_t cnt = 0;
@@ -1695,9 +1696,6 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
 {
     std::string description;
     if (auto root = root_node()) {
-        if (m_view) {
-            throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-        }
         description = root->describe_expression(state);
     }
     else {
@@ -1724,8 +1722,22 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
+    if (m_view) {
+        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
+    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
+}
+
+std::string Query::get_description_safe() const noexcept
+{
+    try {
+        util::serializer::SerialisationState state(m_table->get_parent_group());
+        return get_description(state);
+    }
+    catch (...) {
+    }
+    return "Unknown Query";
 }
 
 void Query::init() const

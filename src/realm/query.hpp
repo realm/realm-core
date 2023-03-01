@@ -312,7 +312,7 @@ public:
     std::string validate() const;
 
     std::string get_description() const;
-    std::string get_description(util::serializer::SerialisationState& state) const;
+    std::string get_description_safe() const noexcept;
 
     Query& set_ordering(util::bind_ptr<DescriptorOrdering> ordering);
     // This will remove the ordering from the Query object
@@ -327,6 +327,7 @@ private:
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     void handle_pending_not();
     void set_table(TableRef tr);
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
 public:
     std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
