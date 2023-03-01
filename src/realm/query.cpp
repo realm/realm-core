@@ -1186,10 +1186,13 @@ ObjKey Query::find() const
 #endif
 
     auto logger = m_table->get_logger();
-    auto t1 = std::chrono::steady_clock::now();
+    bool do_log = false;
+    std::chrono::steady_clock::time_point t1;
 
     if (logger && logger->would_log(util::Logger::Level::debug)) {
         logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
     }
 
     ObjKey ret;
@@ -1245,7 +1248,7 @@ ObjKey Query::find() const
         }
     }
 
-    if (logger) {
+    if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
@@ -1257,6 +1260,8 @@ ObjKey Query::find() const
 void Query::do_find_all(TableView& ret, size_t limit) const
 {
     auto logger = m_table->get_logger();
+    std::chrono::steady_clock::time_point t1;
+    bool do_log = false;
 
     if (limit == 0) {
         if (logger) {
@@ -1268,8 +1273,9 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     if (logger && logger->would_log(util::Logger::Level::debug)) {
         logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
                     int64_t(limit));
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
     }
-    auto t1 = std::chrono::steady_clock::now();
 
     init();
 
@@ -1352,7 +1358,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
     }
 
 
-    if (logger) {
+    if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", ret.size(),
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
@@ -1377,6 +1383,8 @@ TableView Query::find_all(size_t limit) const
 size_t Query::do_count(size_t limit) const
 {
     auto logger = m_table->get_logger();
+    std::chrono::steady_clock::time_point t1;
+    bool do_log = false;
 
     if (limit == 0) {
         if (logger) {
@@ -1404,8 +1412,9 @@ size_t Query::do_count(size_t limit) const
     if (logger && logger->would_log(util::Logger::Level::debug)) {
         logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
                     int64_t(limit));
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
     }
-    auto t1 = std::chrono::steady_clock::now();
     size_t cnt = 0;
 
     init();
@@ -1465,7 +1474,7 @@ size_t Query::do_count(size_t limit) const
         }
     }
 
-    if (logger) {
+    if (do_log) {
         auto t2 = std::chrono::steady_clock::now();
         logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
