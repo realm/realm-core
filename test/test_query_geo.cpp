@@ -36,28 +36,39 @@ using namespace realm::test_util;
 TEST(Query_GeoWithin)
 {
     Group g;
-    auto table = g.add_table("Restuarnts");
-    auto geo_table = g.add_table("MyPosition", Table::Type::Embedded);
-    ColKey type_col = geo_table->add_column(type_String, "type");
-    ColKey coords_col = geo_table->add_column_list(type_Double, "coordinates");
-    auto col_int = table->add_column(type_UUID, "_id");
-    auto col_any = table->add_column(type_Mixed, "mixed");
-    auto col_link = table->add_column(*geo_table, "link");
-    auto col_links = table->add_column_list(*geo_table, "links");
 
-    auto add_data = [&](Geospatial geo) {
-        Obj top_obj = table->create_object();
-        Obj geo_obj = top_obj.create_and_set_linked_object(col_link);
-        geo.assign_to(geo_obj);
+    auto location_table = g.add_table("Location", Table::Type::Embedded);
+    location_table->add_column(type_String, "type");
+    location_table->add_column_list(type_Double, "coordinates");
+
+    auto table = g.add_table("Restaurant");
+    table->add_column(type_UUID, "_id");
+    auto location_column_key = table->add_column(*location_table, "location");
+
+    auto add_data = [&](const Geospatial& point) {
+        Obj restaurant = table->create_object();
+        Obj location = restaurant.create_and_set_linked_object(location_column_key);
+        point.assign_to(location);
     };
-    std::vector<Geospatial> point_data = {GeoPoint{0, 0}, GeoPoint{0.5, 0.5}, GeoPoint{1, 1}, GeoPoint{2, 2}};
-    for (auto& geo : point_data) {
-        add_data(geo);
+
+    std::vector<Geospatial> data = {GeoPoint{-2, -1},   GeoPoint{-1, -2}, GeoPoint{0, 0},
+                                    GeoPoint{0.5, 0.5}, GeoPoint{1, 1},   GeoPoint{2, 2}};
+    for (auto& p : data) {
+        add_data(p);
     }
 
-    GeoBox box{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+    auto&& location = table->column<Link>(location_column_key);
 
-    CHECK_EQUAL(table->column<Link>(col_link).geo_within(box).count(), 1);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}).count(), 1);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 3);
+
+    GeoPolygon p{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}};
+    CHECK_EQUAL(location.geo_within(p).count(), 3);
+    p = {GeoPoint{-3.0, -1.0}, GeoPoint{-2.0, -2.0}, GeoPoint{-1.0, -1.0}, GeoPoint{1.5, -1.0}, GeoPoint{-1.0, 1.5}};
+    CHECK_EQUAL(location.geo_within(p).count(), 2);
+
+    CHECK_EQUAL(location.geo_within(GeoCenterSphere{150.0, GeoPoint{1.0, 0.5}}).count(), 3);
+    CHECK_EQUAL(location.geo_within(GeoCenterSphere{90.0, GeoPoint{-1.5, -1.5}}).count(), 2);
 }
 
 #endif

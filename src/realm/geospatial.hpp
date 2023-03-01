@@ -26,6 +26,8 @@
 #include <string_view>
 #include <vector>
 
+class S2Region;
+
 namespace realm {
 
 class Obj;
@@ -142,6 +144,9 @@ private:
 
     std::vector<GeoPoint> m_points;
     std::optional<double> m_radius_radians;
+
+    mutable std::shared_ptr<S2Region> m_region;
+    S2Region& get_region() const;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);

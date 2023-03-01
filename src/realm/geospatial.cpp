@@ -18,6 +18,25 @@
 
 #include <realm/geospatial.hpp>
 
+#ifndef _WIN32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedef"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wshorten-64-to-32"
+#pragma GCC diagnostic ignored "-Wundefined-var-template"
+#endif
+
+#include "s2/s2cap.h"
+#include "s2/s2latlng.h"
+#include "s2/s2polygon.h"
+
+#ifndef _WIN32
+#pragma GCC diagnostic pop
+#endif
+
 #include <realm/list.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
@@ -144,15 +163,60 @@ void Geospatial::assign_to(Obj& link) const
     }
 }
 
-bool Geospatial::is_within(const Geospatial& bounds) const noexcept
+S2Region& Geospatial::get_region() const
+{
+    if (m_region)
+        return *m_region.get();
+
+    switch (m_type) {
+        // FIXME 'box' assumes legacy flat plane, should be removed?
+        case Type::Box: {
+            REALM_ASSERT(m_points.size() == 2);
+            auto &&lo = m_points[0], &&hi = m_points[1];
+            m_region = std::make_unique<S2LatLngRect>(S2LatLng::FromDegrees(lo.latitude, lo.longitude),
+                                                      S2LatLng::FromDegrees(hi.latitude, hi.longitude));
+        } break;
+        case Type::Polygon: {
+            REALM_ASSERT(m_points.size() >= 3);
+            // should be really S2Polygon, but it's really needed only for MultyPolygon
+            std::vector<S2Point> points;
+            points.reserve(m_points.size());
+            for (auto&& p : m_points)
+                // FIXME rewrite without copying
+                points.emplace_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
+            m_region = std::make_unique<S2Loop>(points);
+        } break;
+        case Type::CenterSphere: {
+            REALM_ASSERT(m_points.size() == 1);
+            REALM_ASSERT(m_radius_radians && m_radius_radians > 0.0);
+            auto&& p = m_points.front();
+            auto center = S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint();
+            auto radius = S1Angle::Radians(m_radius_radians.value());
+            m_region.reset(S2Cap::FromAxisAngle(center, radius).Clone()); // FIXME without extra copy
+        } break;
+        default:
+            REALM_UNREACHABLE();
+    }
+
+    return *m_region.get();
+}
+
+bool Geospatial::is_within(const Geospatial& geometry) const noexcept
 {
     REALM_ASSERT(m_points.size() == 1); // point
 
-    if (bounds.m_type == Type::Box && bounds.m_points.size() == 2) {
-        return m_points[0].latitude >= bounds.m_points[0].latitude &&
-               m_points[0].latitude <= bounds.m_points[1].latitude &&
-               m_points[0].longitude >= bounds.m_points[0].longitude &&
-               m_points[0].longitude <= bounds.m_points[1].longitude;
+    auto point = S2LatLng::FromDegrees(m_points[0].latitude, m_points[0].longitude).ToPoint();
+
+    auto& region = geometry.get_region();
+    switch (geometry.m_type) {
+        case Type::Box:
+            return static_cast<S2LatLngRect&>(region).Contains(point);
+        case Type::Polygon:
+            return static_cast<S2Loop&>(region).Contains(point);
+        case Type::CenterSphere:
+            return static_cast<S2Cap&>(region).Contains(point);
+        default:
+            break;
     }
 
     REALM_UNREACHABLE(); // FIXME: other types and error handling
