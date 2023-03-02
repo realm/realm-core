@@ -327,8 +327,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
 
 SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                          SyncManager* sync_manager)
-    : m_config{config}
-    , m_db{std::move(db)}
+    : m_db{std::move(db)}
     , m_migration_store{sync::MigrationStore::create(m_db,
                                                      [this](sync::MigrationStore::MigrationState) {
                                                          // Migration state changed - Restart the session with the
@@ -341,14 +340,16 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
                                                          // session connection
                                                          update_configuration(sync_config);
                                                      })}
-    , m_original_sync_config{[&](std::shared_ptr<SyncConfig>& sync_config) {
+    , m_original_sync_config{config.sync_config}
+    , m_config{[&](const RealmConfig& realm_config) {
+        RealmConfig new_config = realm_config; // make a copy
+
         // Update the configuration to use the appropriate sync_config based on the current PBS->FLX
         // migration state
-        util::CheckedLockGuard lck(m_config_mutex);
-        m_config.sync_config = m_migration_store->convert_sync_config(sync_config);
-        // Save a copy of the original sync config
-        return sync_config;
-    }(m_config.sync_config)}
+        new_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
+        // Return the copy of the original sync config
+        return new_config;
+    }(config)}
     , m_flx_subscription_store{}
     , m_client(client)
     , m_sync_manager(sync_manager)

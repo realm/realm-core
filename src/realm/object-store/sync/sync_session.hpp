@@ -434,10 +434,10 @@ private:
     size_t m_death_count GUARDED_BY(m_state_mutex) = 0;
 
     mutable util::CheckedMutex m_config_mutex;
-    RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     const std::shared_ptr<sync::MigrationStore> m_migration_store;
     const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
+    RealmConfig m_config GUARDED_BY(m_config_mutex);
     std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
     sync::ProtocolErrorInfo::Action
         m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
