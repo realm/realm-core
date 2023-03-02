@@ -112,7 +112,7 @@ public:
         // std::cout << "compress ";
         // for (int i = 0; i < size; ++i)
         //     std::cout << symbols[i] << " ";
-        for (int runs = 0; runs < 4; ++runs) {
+        for (int runs = 0; runs < 5; ++runs) {
             uint16_t* from = symbols;
             uint16_t* to = symbols;
             int p;
@@ -143,6 +143,8 @@ public:
             }
             *to = 0;
             size = to - symbols;
+            if (from == to)
+                break; // early out, no change
             //    std::cout << std::endl << " ---> ";
             //    for (int i = 0; i < size; ++i)
             //        std::cout << symbols[i] << " ";
