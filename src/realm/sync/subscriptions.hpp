@@ -264,6 +264,7 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    friend class MigrationStore;
 
     MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
                            MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});

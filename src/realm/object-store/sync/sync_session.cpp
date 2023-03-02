@@ -841,12 +841,23 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
-    if (sync_config.on_sync_client_event_hook) {
-        session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
-                                                    anchor = weak_from_this()](const SyncClientHookData& data) {
-            return hook(anchor, data);
-        };
-    }
+    session_config.on_sync_client_event_hook =
+        [hook = sync_config.on_sync_client_event_hook,
+         weak_self = weak_from_this()](const SyncClientHookData& data) -> SyncClientHookAction {
+        // In the case of PBS to FLX migrations, create new subscriptions if needed when bootstrap is completed.
+        if (data.event == SyncClientHookEvent::BootstrapProcessed) {
+            if (auto self = weak_self.lock()) {
+                util::CheckedUniqueLock lock(self->m_state_mutex);
+                if (self->m_migration_store && self->m_flx_subscription_store) {
+                    self->m_migration_store->create_subscriptions(*self->m_flx_subscription_store);
+                }
+            }
+        }
+        if (hook) {
+            return hook(weak_self, data);
+        }
+        return SyncClientHookAction::NoAction;
+    };
 
     {
         std::string sync_route = m_sync_manager->sync_route();

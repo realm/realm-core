@@ -189,18 +189,52 @@ void MigrationStore::clear(std::unique_lock<std::mutex>)
     tr->commit();
 }
 
-std::optional<Subscription> MigrationStore::make_subscription(const std::string& object_class_name)
+Subscription MigrationStore::make_subscription(const std::string& object_class_name)
 {
-    std::lock_guard lock{m_mutex};
-    if (m_state == MigrationState::NotMigrated) {
-        return std::nullopt;
-    }
-    if (object_class_name.empty()) {
-        return std::nullopt;
-    }
+    REALM_ASSERT(!object_class_name.empty());
 
     std::string subscription_name = c_flx_subscription_name_prefix.data() + object_class_name;
     return Subscription{subscription_name, object_class_name, m_query_string};
+}
+
+bool MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
+{
+    if (!is_migrated()) {
+        return false;
+    }
+
+    auto mut_sub = subs_store.get_latest().make_mutable_copy();
+    auto sub_count = mut_sub.size();
+
+    auto tr = m_db->start_read();
+    // List of tables covered by latest subscription set.
+    auto tables = subs_store.get_tables_for_latest(*tr);
+
+    // List of tables in the realm.
+    auto table_keys = tr->get_table_keys();
+    for (const auto& key : table_keys) {
+        if (!tr->table_is_public(key)) {
+            continue;
+        }
+        auto table = tr->get_table(key);
+        if (table->get_table_type() != Table::Type::TopLevel) {
+            continue;
+        }
+        auto object_class_name = table->get_class_name();
+        if (tables.find(object_class_name) == tables.end()) {
+            auto sub = make_subscription(object_class_name);
+            mut_sub.insert_sub(sub);
+        }
+    }
+
+    // No new subscription was added.
+    if (mut_sub.size() == sub_count) {
+        return false;
+    }
+
+    // Commit new subscription set.
+    mut_sub.commit();
+    return true;
 }
 
 } // namespace realm::sync
