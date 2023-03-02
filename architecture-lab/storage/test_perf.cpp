@@ -376,7 +376,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 12;
+    int num_work_packages = 8;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -479,8 +479,8 @@ int main(int argc, char* argv[])
         while (read_ptr < file_start + size) {
             long limit = num_line + step_size;
             long first_line = num_line;
-            start = std::chrono::high_resolution_clock::now();
             results* res = to_reader.get();
+            start = std::chrono::high_resolution_clock::now();
             while (num_line < limit && read_ptr < file_start + size) {
                 long num_value = 0;
                 if ((num_line % 100000) == 0)
