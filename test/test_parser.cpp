@@ -5651,16 +5651,16 @@ TEST(Parser_PrimaryKey)
 ONLY(Parser_Geospatial)
 {
     Group g;
-    auto table = g.add_table("Restaurant");
+    auto table = g.add_table_with_primary_key("Restaurant", type_ObjectId, "_id");
     auto geo_table = g.add_table("Position", Table::Type::Embedded);
     ColKey type_col = geo_table->add_column(type_String, "type");
     ColKey coords_col = geo_table->add_column_list(type_Double, "coordinates");
-    auto col_int = table->add_column(type_UUID, "_id");
     auto col_link = table->add_column(*geo_table, "link");
     auto col_links = table->add_column_list(*geo_table, "links");
+    table->add_column(*table, "self_link");
 
     auto add_data = [&](Geospatial geo) {
-        Obj top_obj = table->create_object();
+        Obj top_obj = table->create_object_with_primary_key(ObjectId::gen());
         Obj geo_obj = top_obj.create_and_set_linked_object(col_link);
         geo.assign_to(geo_obj);
     };
@@ -5675,6 +5675,7 @@ ONLY(Parser_Geospatial)
 
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
 
+
     // find restaurants within an arbitrary polygon
     // realm.objects("Restaurant").filtered("location geoWithin geospatial('Polygon', [[ [-73.99, 40.75],
     // [-73.98, 40.76], [-73.99, 40.75] ]])"); find restaurants within a box, the points specified are two opposite
@@ -5685,6 +5686,19 @@ ONLY(Parser_Geospatial)
     // fooResult[0].location)); find restaurants within a sphere of radius 10 centered at a specific hard coded point
     // realm.objects("Restaurant").filtered("location geoWithin $0", RealmGeospatial('centerSphere', 10,
     // [-74, 40.74]));
+
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The left hand side of 'geoWithin' must be a link to geoJSON formatted "
+                                         "data. But the provided type is 'objectId'") != std::string::npos));
+    CHECK_THROW_ANY(verify_query(test_context, table, "link geoWithin _id", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "link geoWithin link", 0));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "self_link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 0),
+        std::runtime_error,
+        CHECK(std::string(e.what()).find("Query 'self_link GEOWITHIN GeoBox([0.2, 0.2], [0.7, 0.7])' links to data "
+                                         "in the wrong format for a geoWithin query") != std::string::npos));
 }
 
 #endif // TEST_PARSER
