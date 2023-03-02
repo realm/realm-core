@@ -40,7 +40,6 @@ set(S2_BASE_SOURCES
 
 set(S2_STRINGS_SOURCES
     strings/split.cc
-    strings/stringprintf.cc
     strings/strutil.cc
 )
 

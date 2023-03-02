@@ -1,7 +1,7 @@
 // Copyright 2005 Google Inc. All Rights Reserved.
 #include "s2.h"
 #include "base/logging.h"
-#include "strings/stringprintf.h"
+#include "base/stringprintf.h"
 #include "s2latlng.h"
 
 S2LatLng S2LatLng::Normalized() const {

@@ -23,6 +23,7 @@ using std::vector;
 
 #include "base/integral_types.h"
 #include "base/logging.h"
+#include "base/stringprintf.h"
 #include "strings/strutil.h"
 #include "s2.h"
 #include "s2latlng.h"
