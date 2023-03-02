@@ -3341,6 +3341,8 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_DELETE_REALM,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+    RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX,
+    RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS,
 } realm_sync_error_action_e;
 
 typedef struct realm_sync_session realm_sync_session_t;

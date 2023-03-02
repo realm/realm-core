@@ -102,6 +102,10 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) 
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::MigrateToFLX) ==
+              RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RevertToPBS) ==
+              RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS);
 
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
               RLM_SYNC_SUBSCRIPTION_PENDING);

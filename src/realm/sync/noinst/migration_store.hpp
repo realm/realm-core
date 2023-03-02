@@ -54,7 +54,7 @@ public:
 
     // Called when the server responds with migrate to FLX and stores the FLX
     // subscription RQL query string
-    void migrate_to_flx(std::string rql_query_string);
+    void migrate_to_flx(std::string_view rql_query_string);
 
     // Clear the migrated state
     void cancel_migration();
@@ -68,12 +68,13 @@ protected:
     explicit MigrationStore(DBRef db,
                             std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
 
+    void reset_migration_info();
+
     DBRef m_db;
 
     std::function<void(MigrationStore::MigrationState)> m_on_migration_state_changed;
 
     TableKey m_migration_table;
-    ColKey m_migration_started_at;
     ColKey m_migration_completed_at;
     ColKey m_migration_state;
     ColKey m_migration_query_str;

@@ -337,6 +337,11 @@ public:
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
+    // Erase all the persistent subscription store data
+    // This is primarily used during a client migration when rolling back to PBS and is
+    // not intended to be used during normal operation.
+    void flush();
+
     struct PendingSubscription {
         int64_t query_version;
         DB::version_type snapshot_version;

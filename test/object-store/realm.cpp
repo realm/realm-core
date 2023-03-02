@@ -993,6 +993,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
+            // Initialize a realm with config before locking it
+            auto origin = Realm::get_shared_realm(config);
         }
 
         DBOptions options;

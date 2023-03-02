@@ -273,8 +273,8 @@ public:
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = json["message"];
-                    info.log_url = util::make_optional<std::string>(json["logURL"]);
-                    info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+                    info.log_url = std::make_optional<std::string>(json["logURL"]);
+                    info.should_client_reset = std::make_optional<bool>(json["shouldClientReset"]);
                     info.server_requests_action = string_to_action(json["action"]); // Throws
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
@@ -285,6 +285,20 @@ public:
                             std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
                         info.resumption_delay_interval->resumption_delay_backoff_multiplier =
                             json.at("backoffMultiplier").get<int>();
+                    }
+
+                    if (info.raw_error_code == static_cast<int>(sync::ProtocolError::migrate_to_flx)) {
+                        if (auto query_string = json.find("partitionQuery");
+                            query_string != json.end() && query_string->is_string() &&
+                            !query_string->get<std::string_view>().empty()) {
+                            info.migration_query_string = *query_string;
+                            logger.debug("FLX migration query string: %1", info.migration_query_string);
+                        }
+                        else {
+                            return report_error(
+                                Error::bad_syntax,
+                                "Missing/invalid partition query string in migrate to flexible sync error response");
+                        }
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
@@ -486,6 +500,8 @@ private:
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
+            {"MigrateToFLX", action::MigrateToFLX},
+            {"RevertToPBS", action::RevertToPBS},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {

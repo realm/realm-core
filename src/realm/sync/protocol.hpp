@@ -219,7 +219,9 @@ struct ProtocolErrorInfo {
         Transient,
         DeleteRealm,
         ClientReset,
-        ClientResetNoRecovery
+        ClientResetNoRecovery,
+        MigrateToFLX,
+        RevertToPBS
     };
 
     ProtocolErrorInfo() = default;
@@ -236,13 +238,14 @@ struct ProtocolErrorInfo {
     std::string message;
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
-    util::Optional<bool> should_client_reset;
-    util::Optional<std::string> log_url;
+    std::optional<bool> should_client_reset;
+    std::optional<std::string> log_url;
     version_type compensating_write_server_version = 0;
     version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
-    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+    std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
+    std::string migration_query_string;
 
     bool is_fatal() const
     {
@@ -314,7 +317,9 @@ enum class ProtocolError {
     compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies and
                                                                                     // object outside the current query, and the server undid the modification
                                                                                     // (UPLOAD)
+    migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated to FLX -> migrate client to FLX
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
+    revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS -> revert FLX client migration
 
     // clang-format on
 };
@@ -399,6 +404,10 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "ClientReset";
         case ProtocolErrorInfo::Action::ClientResetNoRecovery:
             return o << "ClientResetNoRecovery";
+        case ProtocolErrorInfo::Action::MigrateToFLX:
+            return o << "MigrateToFLX";
+        case ProtocolErrorInfo::Action::RevertToPBS:
+            return o << "RevertToPBS";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

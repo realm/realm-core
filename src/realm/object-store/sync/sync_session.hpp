@@ -40,6 +40,7 @@ class SyncUser;
 
 namespace sync {
 class Session;
+class MigrationStore;
 }
 
 namespace _impl {
@@ -358,6 +359,14 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
+    // Create a subscription store pointer based on the flexible based sync configuration or return
+    // null if not using flexible sync.
+    // Return true if the sync type changed, otherwise false
+    bool update_subscription_store(std::shared_ptr<SyncConfig>& sync_config) REQUIRES(m_state_mutex, m_config_mutex);
+
+    void update_configuration(std::shared_ptr<SyncConfig> new_config)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
+
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
     void handle_fresh_realm_downloaded(DBRef db, Status status,
@@ -427,7 +436,9 @@ private:
     mutable util::CheckedMutex m_config_mutex;
     RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
-    const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
+    const std::shared_ptr<sync::MigrationStore> m_migration_store;
+    const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
+    std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
     sync::ProtocolErrorInfo::Action
         m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
