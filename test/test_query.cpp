@@ -156,6 +156,11 @@ TEST(Query_Parser)
     // You don't need to create a query object first:
     match = books.query("pages >= 200 && author == \"David Griffiths\"").find();
     CHECK_EQUAL(obj2.get_key(), match);
+
+    // Check that we handle unicode strings correctly
+    std::string query_string = "author == \"جمعتs\"";
+    q = books.query(query_string);
+    CHECK_EQUAL(q.get_description(), query_string);
 }
 
 

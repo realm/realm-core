@@ -92,13 +92,28 @@ static bool contains_invalids(StringData data)
 {
     // the custom whitelist is different from std::isprint because it doesn't include quotations
     const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
-    for (size_t i = 0; i < data.size(); ++i) {
+    const char* ptr = data.data();
+    const char* end = ptr + data.size();
+    while (ptr < end) {
         using unsigned_char_t = unsigned char;
-        char c = data.data()[i];
-        // std::isalnum takes an int, but is undefined for negative values so we must pass an unsigned char
-        if (!std::isalnum(unsigned_char_t(c)) && whitelist.find(c) == std::string::npos) {
-            return true;
+        char c = *ptr;
+        size_t len = sequence_length(c);
+        if (len == 1) {
+            // std::isalnum takes an int, but is undefined for negative values so we must pass an unsigned char
+            if (!std::isalnum(unsigned_char_t(c)) && whitelist.find(c) == std::string::npos) {
+                return true;
+            }
         }
+        else {
+            // multibyte utf8, check if subsequent bytes have the upper bit set
+            for (size_t i = 1; i < len; i++) {
+                ++ptr;
+                if (ptr == end || (*ptr & 0x80) == 0) {
+                    return true;
+                }
+            }
+        }
+        ++ptr;
     }
     return false;
 }
