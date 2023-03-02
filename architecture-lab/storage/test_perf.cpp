@@ -102,17 +102,21 @@ public:
     std::unordered_map<chunk, int> map;
     // std::vector<int> buddies;
     std::unordered_map<uint32_t, uint16_t> encoding_table;
+    std::vector<uint32_t> decoding_table;
     string_compressor()
     {
         // buddies.resize(65536, 0);
     }
     int compress_symbols(uint16_t symbols[], int size)
     {
-        for (int runs = 0; runs < 6; ++runs) {
+        // std::cout << "compress ";
+        // for (int i = 0; i < size; ++i)
+        //     std::cout << symbols[i] << " ";
+        for (int runs = 0; runs < 4; ++runs) {
             uint16_t* from = symbols;
             uint16_t* to = symbols;
-
-            for (int p = 0; p < size; p += 2) {
+            int p;
+            for (p = 0; p < size - 1; p += 2) {
                 uint32_t pair = (from[0] << 16) | from[1];
                 auto it = encoding_table.find(pair);
                 if (it == encoding_table.end()) {
@@ -120,10 +124,13 @@ public:
                     if (learning) {
                         uint16_t symbol = encoding_table.size() + 256;
                         encoding_table[pair] = symbol;
+                        decoding_table.push_back(pair);
                         *to++ = symbol;
                     }
                     else {
-                        to += 2; // retain old symbols
+                        // retain old symbols
+                        *to++ = from[0];
+                        *to++ = from[1];
                     }
                 }
                 else {
@@ -131,25 +138,66 @@ public:
                 }
                 from += 2;
             }
+            if (p < size) {
+                *to++ = *from;
+            }
+            *to = 0;
             size = to - symbols;
+            //    std::cout << std::endl << " ---> ";
+            //    for (int i = 0; i < size; ++i)
+            //        std::cout << symbols[i] << " ";
+            //    std::cout << std::endl;
         }
         return size;
+    }
+    void decompress_and_verify(uint16_t symbols[], int size, const char* first, const char* past)
+    {
+        uint16_t decompressed[8192];
+        uint16_t* from = symbols;
+        uint16_t* to = decompressed;
+
+        auto decompress = [&](uint16_t symbol, auto& recurse) -> void {
+            if (symbol < 256)
+                *to++ = symbol;
+            else {
+                auto expansion = decoding_table[symbol - 256];
+                recurse(expansion >> 16, recurse);
+                recurse(expansion & 0x0FFFF, recurse);
+            }
+        };
+
+        while (size--) {
+            decompress(*from++, decompress);
+        }
+        // walk back on any trailing zeroes:
+        while (to[-1] == 0 && to > decompressed) {
+            --to;
+        }
+        size = to - decompressed;
+        std::cout << "reverse -> ";
+        for (int i = 0; i < size; ++i) {
+            std::cout << decompressed[i] << " ";
+        }
+        std::cout << std::endl;
+        assert(size == past - first);
+        uint16_t* checked = decompressed;
+        while (first < past) {
+            assert((0xFF & *first++) == *checked++);
+        }
     }
     int handle(const char* _first, const char* _past)
     {
         // expand into 16 bit symbols:
         int size = _past - _first;
         total_chars += size;
-        assert(size < 8191);
+        assert(size < 8180);
         uint16_t symbols[8192];
         uint16_t* to = symbols;
         for (const char* p = _first; p < _past; ++p)
             *to++ = *p & 0xFF;
-        *to = 0;
+        *to++ = 0;
         size = compress_symbols(symbols, size);
-        //        if (size <= 3) {
-        //            return (symbols[0]) << 1 | (symbols[1] << 17) | (symbols[2] << 33);
-        //        }
+        // decompress_and_verify(symbols, size, _first, _past);
         uint16_t* first = symbols;
         uint16_t* past = symbols + size;
         uint16_t* last = first + CHUNK_SIZE;
@@ -174,7 +222,6 @@ public:
             first += CHUNK_SIZE;
             last += CHUNK_SIZE;
         }
-        // std::cout << "   " << tmp << " -> " << prefix << std::endl;
         return prefix;
     }
     int symbol_table_size()
@@ -474,6 +521,7 @@ int main(int argc, char* argv[])
                 std::vector<std::unique_ptr<std::thread>> threads;
                 for (auto& p : drivers) {
                     if (p) {
+                        // p->perform();
                         threads.push_back(std::make_unique<std::thread>([&]() { p->perform(); }));
                     }
                 }
