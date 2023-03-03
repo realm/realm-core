@@ -96,16 +96,29 @@ struct std::hash<chunk> {
     }
 };
 
+struct encoding_entry {
+    uint32_t expansion;
+    uint16_t symbol;
+    bool valid = false;
+};
+
+int hash(uint32_t expansion)
+{
+    // range must match size of encoding table
+    uint32_t tmp = (expansion >> 16) + 3;
+    tmp *= expansion + 7;
+    return (tmp ^ (tmp >> 16)) & 0xFFFF;
+}
+
 class string_compressor {
 public:
     std::vector<chunk> chunks;
     std::unordered_map<chunk, int> map;
-    // std::vector<int> buddies;
-    std::unordered_map<uint32_t, uint16_t> encoding_table;
+    std::vector<encoding_entry> encoding_table;
     std::vector<uint32_t> decoding_table;
     string_compressor()
     {
-        // buddies.resize(65536, 0);
+        encoding_table.resize(65536);
     }
     int compress_symbols(uint16_t symbols[], int size)
     {
@@ -118,24 +131,47 @@ public:
             int p;
             for (p = 0; p < size - 1; p += 2) {
                 uint32_t pair = (from[0] << 16) | from[1];
-                auto it = encoding_table.find(pair);
-                if (it == encoding_table.end()) {
-                    bool learning = encoding_table.size() < 65535 - 256;
-                    if (learning) {
-                        uint16_t symbol = encoding_table.size() + 256;
-                        encoding_table[pair] = symbol;
-                        decoding_table.push_back(pair);
-                        *to++ = symbol;
-                    }
-                    else {
-                        // retain old symbols
-                        *to++ = from[0];
-                        *to++ = from[1];
-                    }
+                auto index = hash(pair);
+                auto& e = encoding_table[index];
+                if (e.valid && e.expansion == pair) {
+                    // existing matching entry
+                    *to++ = e.symbol;
+                }
+                else if (e.valid || decoding_table.size() >= 65536 - 256) {
+                    // existing conflicting entry or at capacity
+                    *to++ = from[0];
+                    *to++ = from[1];
                 }
                 else {
-                    *to++ = it->second;
+                    // no entry yet, creating new one
+                    e.symbol = decoding_table.size() + 256;
+                    decoding_table.push_back(pair);
+                    e.expansion = pair;
+                    e.valid = true;
+                    *to++ = e.symbol;
                 }
+
+                /*
+
+                                    auto it = encoding_table.find(pair);
+                                if (it == encoding_table.end()) {
+                                    bool learning = encoding_table.size() < 65535 - 256;
+                                    if (learning) {
+                                        uint16_t symbol = encoding_table.size() + 256;
+                                        encoding_table[pair] = symbol;
+                                        decoding_table.push_back(pair);
+                                        *to++ = symbol;
+                                    }
+                                    else {
+                                        // retain old symbols
+                                        *to++ = from[0];
+                                        *to++ = from[1];
+                                    }
+                                }
+                                else {
+                                    *to++ = it->second;
+                                }
+                                */
                 from += 2;
             }
             if (p < size) {
@@ -176,11 +212,11 @@ public:
             --to;
         }
         size = to - decompressed;
-        std::cout << "reverse -> ";
-        for (int i = 0; i < size; ++i) {
-            std::cout << decompressed[i] << " ";
-        }
-        std::cout << std::endl;
+        // std::cout << "reverse -> ";
+        // for (int i = 0; i < size; ++i) {
+        //    std::cout << decompressed[i] << " ";
+        // }
+        // std::cout << std::endl;
         assert(size == past - first);
         uint16_t* checked = decompressed;
         while (first < past) {
@@ -228,7 +264,7 @@ public:
     }
     int symbol_table_size()
     {
-        return encoding_table.size();
+        return decoding_table.size();
     }
     int next_id = 0;
     int next_prefix_id = -1;
@@ -363,7 +399,7 @@ int main(int argc, char* argv[])
     Db& db = Db::create("perf.core2");
 
     Snapshot& ss = db.create_changes();
-    Table t = ss.create_table(fields);
+    Table t = ss.create_table(fields, 100000000);
     Field<String> f_s[max_fields];
     Field<int64_t> f_i[max_fields];
     for (int j = 0; j < max_fields; ++j) {
@@ -378,7 +414,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 8;
+    int num_work_packages = 12;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));

@@ -23,30 +23,32 @@
 #include "table.hpp"
 #include "memory.hpp"
 
-SnapshotImpl::SnapshotImpl(Memory& mem, Ref<_Snapshot> top_ref, bool writable) : mem(mem) {
+SnapshotImpl::SnapshotImpl(Memory& mem, Ref<_Snapshot> top_ref, bool writable)
+    : mem(mem)
+{
     m_top = top_ref;
     m_top_ptr = mem.txl(top_ref);
     versioning_counter = m_top_ptr->version;
     is_writable = writable;
 }
 
-void SnapshotImpl::print_stat(std::ostream& out) {
-    out << "Footprint: " << mem.get_footprint() 
-        << "  Recycled: " << mem.get_recycled() 
-        << "  Freed: " << mem.get_freed() 
-        << std::endl;
+void SnapshotImpl::print_stat(std::ostream& out)
+{
+    out << "Footprint: " << mem.get_footprint() << "  Recycled: " << mem.get_recycled()
+        << "  Freed: " << mem.get_freed() << std::endl;
     uint64_t use = mem.get_footprint() - (mem.get_freed() - mem.get_recycled());
-    out << "Freelists (heap frag): " << mem.get_freed() - mem.get_recycled()
-        << "  In actual use: " << use 
+    out << "Freelists (heap frag): " << mem.get_freed() - mem.get_recycled() << "  In actual use: " << use
         << std::endl;
 }
 
-void SnapshotImpl::cow() {
+void SnapshotImpl::cow()
+{
     m_top = _Snapshot::cow(mem, m_top);
     m_top_ptr = mem.txl(m_top);
 }
 
-Ref<_Snapshot> SnapshotImpl::commit() {
+Ref<_Snapshot> SnapshotImpl::commit()
+{
     assert(is_writable);
     versioning_counter++;
     m_top_ptr->version = versioning_counter;
@@ -54,29 +56,34 @@ Ref<_Snapshot> SnapshotImpl::commit() {
     return _Snapshot::commit(mem, m_top);
 }
 
-void _Snapshot::init() {
+void _Snapshot::init()
+{
     tables.init(64);
 }
 
-Table SnapshotImpl::create_table(const char* typeinfo) {
+Table SnapshotImpl::create_table(const char* typeinfo, uint64_t capacity)
+{
     assert(mem.is_writable(m_top));
     uint64_t key = m_top_ptr->tables.insert(mem);
     Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, key);
-    *table = _Table::create(mem, typeinfo);
+    *table = _Table::create(mem, typeinfo, capacity);
     versioning_counter += 2;
     return {key};
 }
 
-Table SnapshotImpl::get_table_dir() {
+Table SnapshotImpl::get_table_dir()
+{
     return m_top_ptr->table_directory;
 }
 
-Table SnapshotImpl::get_layout_dir() {
+Table SnapshotImpl::get_layout_dir()
+{
     return m_top_ptr->table_layouts;
 }
 
-template<typename T>
-Field<T> Snapshot::get_field(Table t, int number) const {
+template <typename T>
+Field<T> Snapshot::get_field(Table t, int number) const
+{
     const SnapshotImpl* real_this = static_cast<const SnapshotImpl*>(this);
     return real_this->get_field<T>(t, number);
 }
@@ -96,14 +103,16 @@ template Field<List<float>> Snapshot::get_field<List<float>>(Table, int) const;
 template Field<List<double>> Snapshot::get_field<List<double>>(Table, int) const;
 template Field<List<Table>> Snapshot::get_field<List<Table>>(Table, int) const;
 
-template<typename T>
-Field<T> SnapshotImpl::get_field(Table t, int number) const {
+template <typename T>
+Field<T> SnapshotImpl::get_field(Table t, int number) const
+{
     Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
     _Table* table_ptr = mem.txl(table);
     return table_ptr->check_field<T>(number);
 }
 
-void SnapshotImpl::insert(Table t, Row r) {
+void SnapshotImpl::insert(Table t, Row r)
+{
     assert(mem.is_writable(m_top));
     m_top_ptr->tables.cow_path(mem, t.key);
     Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, t.key);
@@ -112,13 +121,15 @@ void SnapshotImpl::insert(Table t, Row r) {
     table_ptr->insert(mem, r.key);
 }
 
-bool SnapshotImpl::exists(Table t, Row r) const {
+bool SnapshotImpl::exists(Table t, Row r) const
+{
     Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
     _Table* table_ptr = mem.txl(table);
     return table_ptr->find(mem, r.key);
 }
 
-Object SnapshotImpl::get(Table t, Row r) const {
+Object SnapshotImpl::get(Table t, Row r) const
+{
     Object res;
     res.ss = const_cast<SnapshotImpl*>(this);
     res.versioning_count = versioning_counter;
@@ -131,7 +142,8 @@ Object SnapshotImpl::get(Table t, Row r) const {
     return res;
 }
 
-Object SnapshotImpl::change(Table t, Row r) {
+Object SnapshotImpl::change(Table t, Row r)
+{
     Object res;
     res.ss = this;
     assert(is_writable);
@@ -149,7 +161,8 @@ Object SnapshotImpl::change(Table t, Row r) {
     return res;
 }
 
-Memory& SnapshotImpl::change(Object* o) {
+Memory& SnapshotImpl::change(Object* o)
+{
     if (!is_writable) {
         throw std::runtime_error("Attempt to change a const Snapshot");
     }
@@ -165,14 +178,16 @@ Memory& SnapshotImpl::change(Object* o) {
     return mem;
 }
 
-Memory& SnapshotImpl::refresh(Object* o) const {
+Memory& SnapshotImpl::refresh(Object* o) const
+{
     if (o->versioning_count != versioning_counter) {
         *o = get(o->t, o->r);
     }
     return mem;
 }
 
-Ref<_Snapshot> _Snapshot::cow(Memory& mem, Ref<_Snapshot> from) {
+Ref<_Snapshot> _Snapshot::cow(Memory& mem, Ref<_Snapshot> from)
+{
     if (!mem.is_writable(from)) {
         _Snapshot* to_ptr;
         Ref<_Snapshot> to = mem.alloc<_Snapshot>(to_ptr);
@@ -184,7 +199,8 @@ Ref<_Snapshot> _Snapshot::cow(Memory& mem, Ref<_Snapshot> from) {
     return from;
 }
 
-Ref<_Snapshot> _Snapshot::commit(Memory& mem, Ref<_Snapshot> from) {
+Ref<_Snapshot> _Snapshot::commit(Memory& mem, Ref<_Snapshot> from)
+{
     if (mem.is_writable(from)) {
         _Snapshot* to_ptr;
         Ref<_Snapshot> to = mem.alloc_in_file<_Snapshot>(to_ptr);
@@ -197,7 +213,8 @@ Ref<_Snapshot> _Snapshot::commit(Memory& mem, Ref<_Snapshot> from) {
     return from;
 }
 
-bool SnapshotImpl::first_access(Table t, ObjectIterator& oi, uint64_t start_index) const {
+bool SnapshotImpl::first_access(Table t, ObjectIterator& oi, uint64_t start_index) const
+{
     oi.o.ss = const_cast<SnapshotImpl*>(this);
     oi.o.versioning_count = versioning_counter;
     oi.o.t = t;
@@ -210,8 +227,9 @@ bool SnapshotImpl::first_access(Table t, ObjectIterator& oi, uint64_t start_inde
     return ok;
 }
 
-uint64_t SnapshotImpl::get_universe_size(Table t) const {
+uint64_t SnapshotImpl::get_universe_size(Table t) const
+{
     Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
     _Table* table_ptr = mem.txl(table);
-    return table_ptr->cuckoo.primary_tree.mask+1;
+    return table_ptr->cuckoo.primary_tree.mask + 1;
 }

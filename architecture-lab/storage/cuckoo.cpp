@@ -24,12 +24,16 @@
 #include "hash.hpp"
 
 
-void _Cuckoo::init() {
-    primary_tree.init(256);
-    secondary_tree.init(0);
+void _Cuckoo::init(uint64_t capacity)
+{
+    primary_tree.init(capacity);
+    secondary_tree.init(capacity);
 }
 
-struct CondensationEntry { uint8_t idx; uint8_t quick_key; };
+struct CondensationEntry {
+    uint8_t idx;
+    uint8_t quick_key;
+};
 
 struct TreeLeaf {
     uint16_t sz;
@@ -41,32 +45,43 @@ struct TreeLeaf {
 };
 
 
-size_t get_leaf_size(int sz) {
+size_t get_leaf_size(int sz)
+{
     size_t res = sizeof(TreeLeaf) + (sz - 256) * sizeof(uint64_t);
     assert(res > 0);
     assert(res < 10000);
     return res;
 }
 
-void clone_leaf(TreeLeaf* from, TreeLeaf* to, int to_capacity) {
-    //std::cout << " - clone_leaf" << std::endl;
+void clone_leaf(TreeLeaf* from, TreeLeaf* to, int to_capacity)
+{
+    // std::cout << " - clone_leaf" << std::endl;
     to->sz = from->sz;
     to->payload = from->payload;
     to->capacity = to_capacity;
-    for (int j=0; j<256; ++j) to->condenser[j] = from->condenser[j];
-    for (int j=0; j<from->sz; ++j) to->keys[j] = from->keys[j];
-    for (int j=from->sz; j<to_capacity; ++j) to->keys[j] = 0;
+    for (int j = 0; j < 256; ++j)
+        to->condenser[j] = from->condenser[j];
+    for (int j = 0; j < from->sz; ++j)
+        to->keys[j] = from->keys[j];
+    for (int j = from->sz; j < to_capacity; ++j)
+        to->keys[j] = 0;
 }
 
 struct CuckooLeafCommitter : public _TreeTop<TreeLeaf>::LeafCommitter {
     virtual Ref<TreeLeaf> commit(Ref<TreeLeaf> from);
     Memory& mem;
     PayloadMgr& pmgr;
-    CuckooLeafCommitter(Memory& mem, PayloadMgr& pmgr) : mem(mem), pmgr(pmgr) {}
+    CuckooLeafCommitter(Memory& mem, PayloadMgr& pmgr)
+        : mem(mem)
+        , pmgr(pmgr)
+    {
+    }
 };
 
-Ref<TreeLeaf> CuckooLeafCommitter::commit(Ref<TreeLeaf> from) {
-    if (is_null(from)) return from;
+Ref<TreeLeaf> CuckooLeafCommitter::commit(Ref<TreeLeaf> from)
+{
+    if (is_null(from))
+        return from;
     if (mem.is_writable(from)) {
         TreeLeaf* from_ptr = mem.txl(from);
         TreeLeaf* to_ptr;
@@ -79,7 +94,8 @@ Ref<TreeLeaf> CuckooLeafCommitter::commit(Ref<TreeLeaf> from) {
     return from;
 }
 
-void _Cuckoo::copied_to_file(Memory& mem, PayloadMgr& pmgr) {
+void _Cuckoo::copied_to_file(Memory& mem, PayloadMgr& pmgr)
+{
     CuckooLeafCommitter cmt(mem, pmgr);
     primary_tree.copied_to_file(mem, cmt);
     secondary_tree.copied_to_file(mem, cmt);
@@ -87,7 +103,8 @@ void _Cuckoo::copied_to_file(Memory& mem, PayloadMgr& pmgr) {
 
 
 // return index with matching key, or -1 if no match found
-int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key) {
+int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key)
+{
     int subhash = hash & 0xFF; // cut off all above one byte
     int subhash_limit = (subhash + 4) & 0xFF;
     key >>= 1; // shift out hash indicator prior to key comparions
@@ -108,7 +125,8 @@ int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key) {
 }
 
 // return subhash for empty index within search range of hash, -1 if no match
-int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash) {
+int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash)
+{
     int subhash = hash & 0xFF; // cut off all above one byte
     int subhash_limit = (subhash + 4) & 0xFF;
     while (subhash != subhash_limit) {
@@ -122,7 +140,8 @@ int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash) {
     return -1;
 }
 
-bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index, uint8_t& size) {
+bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index, uint8_t& size)
+{
     key <<= 1;
     uint64_t h_1 = hash_a(key);
     Ref<TreeLeaf> leaf_ref = primary_tree.lookup(mem, h_1);
@@ -149,13 +168,11 @@ bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index,
 }
 
 
-
-
-
 // get a null ref back if key could not be found. If found, cow the path to the payload
 // and return a pointer allowing for later update of the payload ref.
-bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key, 
-                                Ref<DynType>& payload, int& index, uint8_t& size) {
+bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key, Ref<DynType>& payload, int& index,
+                                uint8_t& size)
+{
     key <<= 1;
     uint64_t h_1 = hash_a(key);
     Ref<DynType> leaf = primary_tree.lookup(mem, h_1);
@@ -183,7 +200,8 @@ bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key,
         mem.free(leaf, size);
         primary_tree.cow_path(mem, h_1, new_leaf);
         payload = new_leaf_ptr->payload;
-    } else {
+    }
+    else {
         payload = leaf_ptr->payload;
     }
     index = in_leaf_idx;
@@ -193,8 +211,9 @@ bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key,
 
 struct KeyInUse {};
 
-bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_ptr, 
-		    uint64_t hash, uint64_t &key, PayloadMgr& pm) {
+bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_ptr, uint64_t hash, uint64_t& key,
+                    PayloadMgr& pm)
+{
 
     TreeLeaf* leaf_ptr = mem.txl(leaf);
     if (find_in_leaf(mem, leaf_ptr, hash, key) >= 0)
@@ -207,9 +226,9 @@ bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_pt
     }
 
     // Need room for one more key, only if there was no conflict
-    size_t needed = leaf_ptr->sz + (conflict ? 0:1);
+    size_t needed = leaf_ptr->sz + (conflict ? 0 : 1);
     size_t old_capacity = leaf_ptr->capacity;
-    //std::cout << "    - capacity: " << capacity << " needed: " << needed << std::endl;
+    // std::cout << "    - capacity: " << capacity << " needed: " << needed << std::endl;
     if (!mem.is_writable(leaf) || needed > old_capacity) {
         // need to cow leaf and path to it:
         assert(needed <= 256);
@@ -231,7 +250,8 @@ bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_pt
         leaf_ptr->condenser[subhash].quick_key = key >> 1;
         pm.swap_internalbuffer(leaf_ptr->payload, idx, leaf_ptr->sz);
         key = old_key;
-    } else { // we're adding a new key:
+    }
+    else { // we're adding a new key:
         uint8_t idx = leaf_ptr->sz;
         leaf_ptr->keys[idx] = key;
         leaf_ptr->condenser[subhash].quick_key = key >> 1;
@@ -245,7 +265,8 @@ bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_pt
 }
 
 
-bool _Cuckoo::first_access(Memory& mem, ObjectIterator& oi) {
+bool _Cuckoo::first_access(Memory& mem, ObjectIterator& oi)
+{
 
     uint64_t tree_index = oi.tree_index;
     while (tree_index < primary_tree.mask) {
@@ -271,7 +292,8 @@ bool _Cuckoo::first_access(Memory& mem, ObjectIterator& oi) {
 
 // a bit cowboy-like to put the ObjectIterator method here, but we want
 // access to the TreeLeaf definition
-bool ObjectIterator::next_access() {
+bool ObjectIterator::next_access()
+{
     o.index++;
     if (o.index < leaf->sz) {
         o.r.key = leaf->keys[o.index] >> 1;
@@ -280,7 +302,8 @@ bool ObjectIterator::next_access() {
     return false;
 }
 
-void _Cuckoo::rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm) {
+void _Cuckoo::rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm)
+{
     for (uint64_t index = 0; index < tree.mask; index += 256) {
         Ref<DynType> leaf = tree.lookup(mem, index);
         if (mem.is_valid(leaf)) {
@@ -298,10 +321,11 @@ void _Cuckoo::rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm)
     tree.free(mem);
 }
 
-void _Cuckoo::grow_tree(Memory& mem, PayloadMgr& pm) {
+void _Cuckoo::grow_tree(Memory& mem, PayloadMgr& pm)
+{
     // make a backup and set up new tree:
     _TreeTop<TreeLeaf> t_p = primary_tree;
-    uint64_t sz1 = 1 + 2*t_p.mask;
+    uint64_t sz1 = 1 + 2 * t_p.mask;
     primary_tree.init(sz1);
     // iterate through old tree, rehashing everything
     // even though rehash calls insert, it cannot overflow
@@ -311,26 +335,28 @@ void _Cuckoo::grow_tree(Memory& mem, PayloadMgr& pm) {
 
 const int max_collisions = 20;
 
-void _Cuckoo::insert(Memory& mem, uint64_t key, PayloadMgr& pm) {
+void _Cuckoo::insert(Memory& mem, uint64_t key, PayloadMgr& pm)
+{
     int collision_count = 1;
     while (collision_count < max_collisions) {
         uint64_t hash;
         _TreeTop<TreeLeaf>* tree_ptr;
         if ((key & 1) == 0) { // key encodes which hash was used
             hash = hash_a(key);
-        } else {
+        }
+        else {
             hash = hash_b(key);
         }
         tree_ptr = &primary_tree;
         Ref<TreeLeaf> leaf = tree_ptr->lookup(mem, hash);
         // insert, potentially update 'key' with value to move
-        //uint64_t old_key = key;
+        // uint64_t old_key = key;
         bool conflict = insert_in_leaf(mem, leaf, tree_ptr, hash, key, pm);
         if (!conflict) {
-            //std::cout << " - added key: " << old_key << std::endl;
+            // std::cout << " - added key: " << old_key << std::endl;
             break;
         }
-        //std::cout << " - added key: " << old_key << " and has to move " << key << std::endl;
+        // std::cout << " - added key: " << old_key << " and has to move " << key << std::endl;
         key = key ^ 1; // switch hash functions for the key
         ++collision_count;
     }
@@ -343,4 +369,3 @@ void _Cuckoo::insert(Memory& mem, uint64_t key, PayloadMgr& pm) {
     if ((primary_tree.count + (primary_tree.count >> 1)) > primary_tree.mask)
         grow_tree(mem, pm);
 }
-

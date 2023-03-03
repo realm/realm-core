@@ -36,20 +36,20 @@ struct _Cuckoo {
     // get a ref to any payload and the row index into it
     bool find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index, uint8_t& size);
 
-    void init();
+    void init(uint64_t capacity);
 
     // get a null ref back if key could not be found. If found, cow the path to the payload
     // and return a pointer allowing for later update of the payload ref.
-    bool find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key, 
-                           Ref<DynType>& payload, int& index, uint8_t& size);
+    bool find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key, Ref<DynType>& payload, int& index,
+                           uint8_t& size);
 
     void insert(Memory& mem, uint64_t key, PayloadMgr& pm);
 
     bool first_access(Memory& mem, ObjectIterator& oc);
+
 private:
     void rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm);
     void grow_tree(Memory& mem, PayloadMgr& pm);
-
 };
 
 
