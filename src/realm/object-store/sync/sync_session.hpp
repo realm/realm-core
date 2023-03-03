@@ -364,9 +364,6 @@ private:
     void update_subscription_store() REQUIRES(m_config_mutex, m_state_mutex);
     void update_sync_config(bool is_migrated) REQUIRES(m_config_mutex);
 
-    void update_configuration(std::shared_ptr<SyncConfig> new_config)
-        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
-
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
     void handle_fresh_realm_downloaded(DBRef db, Status status,

@@ -1230,13 +1230,6 @@ sync::SaltedFileIdent SyncSession::get_file_ident() const
 
 void SyncSession::update_configuration(SyncConfig new_config)
 {
-    update_configuration(std::make_shared<SyncConfig>(std::move(new_config)));
-}
-
-void SyncSession::update_configuration(std::shared_ptr<SyncConfig> new_config)
-{
-    REALM_ASSERT(new_config); // should never be called with null
-
     while (true) {
         util::CheckedUniqueLock state_lock(m_state_mutex);
         if (m_state != State::Inactive && m_state != State::Paused) {
@@ -1252,9 +1245,8 @@ void SyncSession::update_configuration(std::shared_ptr<SyncConfig> new_config)
         util::CheckedUniqueLock config_lock(m_config_mutex);
         REALM_ASSERT(m_state == State::Inactive || m_state == State::Paused);
         REALM_ASSERT(!m_session);
-        REALM_ASSERT(m_config.sync_config->user == new_config->user);
-        m_config.sync_config = new_config;
-        update_subscription_store();
+        REALM_ASSERT(m_config.sync_config->user == new_config.user);
+        m_config.sync_config = std::make_shared<SyncConfig>(std::move(new_config));
         break;
     }
     revive_if_needed();
