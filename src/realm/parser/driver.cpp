@@ -1332,9 +1332,21 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+static GeoPoint convert(const GeospatialNode::PointString& point)
+{
+    if (point[2] == "") {
+        return GeoPoint{string_to<double>(point[0]), string_to<double>(point[1])};
+    }
+    return GeoPoint{string_to<double>(point[0]), string_to<double>(point[1]), string_to<double>(point[2])};
+}
+
 GeospatialNode::GeospatialNode(GeospatialNode::Box, GeospatialNode::PointString p1, GeospatialNode::PointString p2)
-: m_geo{Geospatial{GeoBox{GeoPoint{string_to<double>(p1.longitude), string_to<double>(p1.latitude)},
-    GeoPoint{string_to<double>(p2.longitude), string_to<double>(p2.latitude)}}}}
+    : m_geo{Geospatial{GeoBox{convert(p1), convert(p2)}}}
+{
+}
+
+GeospatialNode::GeospatialNode(Sphere, PointString p, std::string radius)
+    : m_geo{Geospatial{GeoCenterSphere{string_to<double>(radius), convert(p)}}}
 {
 }
 

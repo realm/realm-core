@@ -110,7 +110,7 @@ Geospatial Geospatial::from_link(const Obj& link)
         return Geospatial{point};
     }
     if (!type_is_valid(link.get<String>(type_col))) {
-        return Geospatial(link.get<String>(type_col));
+        return Geospatial();
     }
     Lst<double> geo_data = link.get_list<double>(coords_col);
     const size_t num_entries = geo_data.size();

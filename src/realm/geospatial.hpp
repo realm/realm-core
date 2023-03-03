@@ -64,6 +64,10 @@ class Geospatial {
 public:
     enum class Type { Point, Box, Polygon, CenterSphere, Invalid };
 
+    Geospatial()
+        : m_type(Type::Invalid)
+    {
+    }
     Geospatial(GeoPoint point)
         : m_type(Type::Point)
         , m_points({point})
@@ -86,12 +90,6 @@ public:
     {
     }
 
-    Geospatial(StringData invalid_type) // FIXME remove or use for error outside of the type?
-        : m_type(Type::Invalid)
-        , m_invalid_type(invalid_type)
-    {
-    }
-
     Geospatial(const Geospatial&) = default;
     Geospatial& operator=(const Geospatial&) = default;
 
@@ -104,7 +102,7 @@ public:
 
     std::string get_type_string() const noexcept
     {
-        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : *m_invalid_type;
+        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : "Invalid";
     }
     Type get_type() const noexcept
     {
@@ -128,7 +126,7 @@ public:
 
     bool operator==(const Geospatial& other) const
     {
-        return m_type == other.m_type && m_points == other.m_points;
+        return m_type == other.m_type && m_points == other.m_points && m_radius_radians == other.m_radius_radians;
     }
     bool operator!=(const Geospatial& other) const
     {
@@ -147,13 +145,13 @@ public:
 
 private:
     Type m_type;
-    std::optional<std::string> m_invalid_type;
-
     std::vector<GeoPoint> m_points;
     std::optional<double> m_radius_radians;
 
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
+
+    friend class GeospatialStore;
 };
 
 template <>
@@ -167,10 +165,11 @@ inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
 
 class GeospatialStore {
 public:
-    GeospatialStore(GeoPoint* data, size_t size, Geospatial::Type type)
+    GeospatialStore(GeoPoint* data, const Geospatial& geo)
         : m_data(data)
-        , m_size(size)
-        , m_type(type)
+        , m_size(geo.m_points.size())
+        , m_type(geo.m_type)
+        , m_sphere_radius(geo.m_radius_radians)
     {
     }
     Geospatial get() const
@@ -178,7 +177,7 @@ public:
         REALM_ASSERT(m_data);
         switch (m_type) {
             case Geospatial::Type::Invalid:
-                return Geospatial(""); // FIXME: error handling
+                return Geospatial(); // FIXME: error handling, should this throw instead?
             case Geospatial::Type::Point:
                 REALM_ASSERT_EX(m_size == 1, m_size);
                 return Geospatial(m_data[0]);
@@ -189,8 +188,9 @@ public:
                 REALM_UNREACHABLE(); // FIXME: implement dynamic fill
                 break;
             case Geospatial::Type::CenterSphere:
-                REALM_UNREACHABLE(); // FIXME: implement dynamic fill
-                break;
+                REALM_ASSERT_EX(m_size == 1, m_size);
+                REALM_ASSERT(m_sphere_radius);
+                return Geospatial(GeoCenterSphere{*m_sphere_radius * Geospatial::c_radius_km, m_data[0]});
         }
     }
 
@@ -198,6 +198,7 @@ private:
     const GeoPoint* m_data = nullptr;
     size_t m_size = 0;
     Geospatial::Type m_type = Geospatial::Type::Invalid;
+    std::optional<double> m_sphere_radius;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);

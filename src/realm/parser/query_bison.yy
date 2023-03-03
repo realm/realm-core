@@ -10,6 +10,7 @@
 %code requires {
   #include <string>
   #include <realm/mixed.hpp>
+  #include <array>
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -42,6 +43,10 @@
 
   }
   using namespace realm::query_parser;
+
+  static inline std::ostream& operator<<(std::ostream& os, std::array<std::string, 3> point) {
+      return os << "['" << point[0] << "', '" << point[1] << "', '" << point[2] << "']";
+  }
 }
 
 // The parsing context.
@@ -133,6 +138,7 @@ using namespace realm::query_parser;
 %type  <int> equality relational stringop aggr_op
 %type  <ConstantNode*> constant primary_key
 %type  <GeospatialNode*> geospatial
+%type  < std::array<std::string, 3> > geopoint
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
 %type  <SubqueryNode*> subquery 
@@ -146,7 +152,7 @@ using namespace realm::query_parser;
 %type  <PathNode*> path
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
-%type  <std::string> id
+%type  <std::string> id double
 %type  <PathElem> path_elem
 %type  <PropertyNode*> simple_prop
 
@@ -229,8 +235,17 @@ simple_prop
 subquery
     : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
 
+double
+    : FLOAT         { $$ = $1; }
+    | NATURAL0      { $$ = $1; }
+
+geopoint
+    : '[' double ',' double ']' { $$ = std::array<std::string, 3>{$2, $4, ""}; }
+    | '[' double ',' double ',' FLOAT ']' { $$ = std::array<std::string, 3>{$2, $4, $6}; }
+
 geospatial
-    : GEOBOX '(' '[' FLOAT ',' FLOAT ']' ',' '[' FLOAT ',' FLOAT ']' ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, GeospatialNode::PointString{$4, $6}, GeospatialNode::PointString{$10, $12}); }
+    : GEOBOX '(' geopoint ',' geopoint ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, $3, $5); }
+    | GEOSPHERE '(' geopoint ',' double ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, $3, $5); }
 
 post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}

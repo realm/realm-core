@@ -48,6 +48,7 @@
 
   #include <string>
   #include <realm/mixed.hpp>
+  #include <array>
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -80,6 +81,10 @@
 
   }
   using namespace realm::query_parser;
+
+  static inline std::ostream& operator<<(std::ostream& os, std::array<std::string, 3> point) {
+      return os << "['" << point[0] << "', '" << point[1] << "', '" << point[2] << "']";
+  }
 
 
 # include <cassert>
@@ -438,68 +443,71 @@ namespace yy {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
+      // geopoint
+      char dummy1[sizeof ( std::array<std::string, 3> )];
+
       // aggregate
-      char dummy1[sizeof (AggrNode*)];
+      char dummy2[sizeof (AggrNode*)];
 
       // constant
       // primary_key
-      char dummy2[sizeof (ConstantNode*)];
+      char dummy3[sizeof (ConstantNode*)];
 
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy3[sizeof (DescriptorNode*)];
+      char dummy4[sizeof (DescriptorNode*)];
 
       // post_query
-      char dummy4[sizeof (DescriptorOrderingNode*)];
+      char dummy5[sizeof (DescriptorOrderingNode*)];
 
       // expr
-      char dummy5[sizeof (ExpressionNode*)];
+      char dummy6[sizeof (ExpressionNode*)];
 
       // geospatial
-      char dummy6[sizeof (GeospatialNode*)];
+      char dummy7[sizeof (GeospatialNode*)];
 
       // list
       // list_content
-      char dummy7[sizeof (ListNode*)];
+      char dummy8[sizeof (ListNode*)];
 
       // path_elem
-      char dummy8[sizeof (PathElem)];
+      char dummy9[sizeof (PathElem)];
 
       // path
-      char dummy9[sizeof (PathNode*)];
+      char dummy10[sizeof (PathNode*)];
 
       // post_op
-      char dummy10[sizeof (PostOpNode*)];
+      char dummy11[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy11[sizeof (PropertyNode*)];
+      char dummy12[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy12[sizeof (QueryNode*)];
+      char dummy13[sizeof (QueryNode*)];
 
       // subquery
-      char dummy13[sizeof (SubqueryNode*)];
+      char dummy14[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy14[sizeof (TrueOrFalseNode*)];
+      char dummy15[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy15[sizeof (ValueNode*)];
+      char dummy16[sizeof (ValueNode*)];
 
       // direction
-      char dummy16[sizeof (bool)];
+      char dummy17[sizeof (bool)];
 
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy17[sizeof (int)];
+      char dummy18[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -532,8 +540,9 @@ namespace yy {
       // "@size"
       // "@type"
       // "key or value"
+      // double
       // id
-      char dummy18[sizeof (std::string)];
+      char dummy19[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -739,28 +748,30 @@ namespace yy {
         SYM_aggregate = 80,                      // aggregate
         SYM_simple_prop = 81,                    // simple_prop
         SYM_subquery = 82,                       // subquery
-        SYM_geospatial = 83,                     // geospatial
-        SYM_post_query = 84,                     // post_query
-        SYM_distinct = 85,                       // distinct
-        SYM_distinct_param = 86,                 // distinct_param
-        SYM_sort = 87,                           // sort
-        SYM_sort_param = 88,                     // sort_param
-        SYM_limit = 89,                          // limit
-        SYM_direction = 90,                      // direction
-        SYM_list = 91,                           // list
-        SYM_list_content = 92,                   // list_content
-        SYM_constant = 93,                       // constant
-        SYM_primary_key = 94,                    // primary_key
-        SYM_boolexpr = 95,                       // boolexpr
-        SYM_comp_type = 96,                      // comp_type
-        SYM_post_op = 97,                        // post_op
-        SYM_aggr_op = 98,                        // aggr_op
-        SYM_equality = 99,                       // equality
-        SYM_relational = 100,                    // relational
-        SYM_stringop = 101,                      // stringop
-        SYM_path = 102,                          // path
-        SYM_path_elem = 103,                     // path_elem
-        SYM_id = 104                             // id
+        SYM_double = 83,                         // double
+        SYM_geopoint = 84,                       // geopoint
+        SYM_geospatial = 85,                     // geospatial
+        SYM_post_query = 86,                     // post_query
+        SYM_distinct = 87,                       // distinct
+        SYM_distinct_param = 88,                 // distinct_param
+        SYM_sort = 89,                           // sort
+        SYM_sort_param = 90,                     // sort_param
+        SYM_limit = 91,                          // limit
+        SYM_direction = 92,                      // direction
+        SYM_list = 93,                           // list
+        SYM_list_content = 94,                   // list_content
+        SYM_constant = 95,                       // constant
+        SYM_primary_key = 96,                    // primary_key
+        SYM_boolexpr = 97,                       // boolexpr
+        SYM_comp_type = 98,                      // comp_type
+        SYM_post_op = 99,                        // post_op
+        SYM_aggr_op = 100,                       // aggr_op
+        SYM_equality = 101,                      // equality
+        SYM_relational = 102,                    // relational
+        SYM_stringop = 103,                      // stringop
+        SYM_path = 104,                          // path
+        SYM_path_elem = 105,                     // path_elem
+        SYM_id = 106                             // id
       };
     };
 
@@ -795,6 +806,10 @@ namespace yy {
       {
         switch (this->kind ())
     {
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move<  std::array<std::string, 3>  > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (std::move (that.value));
         break;
@@ -906,6 +921,7 @@ namespace yy {
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
+      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.move< std::string > (std::move (that.value));
         break;
@@ -928,6 +944,18 @@ namespace yy {
 #else
       basic_symbol (typename Base::kind_type t)
         : Base (t)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t,  std::array<std::string, 3> && v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const  std::array<std::string, 3> & v)
+        : Base (t)
+        , value (v)
       {}
 #endif
 
@@ -1191,6 +1219,10 @@ namespace yy {
         // Value type destructor.
 switch (yykind)
     {
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.template destroy<  std::array<std::string, 3>  > ();
+        break;
+
       case symbol_kind::SYM_aggregate: // aggregate
         value.template destroy< AggrNode* > ();
         break;
@@ -1302,6 +1334,7 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
+      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
         break;
@@ -2439,7 +2472,7 @@ switch (yykind)
     /// \param yyvalue   the value to check
     static bool yy_table_value_is_error_ (int yyvalue) YY_NOEXCEPT;
 
-    static const signed char yypact_ninf_;
+    static const short yypact_ninf_;
     static const signed char yytable_ninf_;
 
     /// Convert a scanner token kind \a t to a symbol kind.
@@ -2717,8 +2750,8 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 553,     ///< Last index in yytable_.
-      yynnts_ = 32,  ///< Number of nonterminal symbols.
+      yylast_ = 548,     ///< Last index in yytable_.
+      yynnts_ = 34,  ///< Number of nonterminal symbols.
       yyfinal_ = 66 ///< Termination state number.
     };
 
@@ -2791,6 +2824,10 @@ switch (yykind)
   {
     switch (this->kind ())
     {
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.copy<  std::array<std::string, 3>  > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_aggregate: // aggregate
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
@@ -2902,6 +2939,7 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
+      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.copy< std::string > (YY_MOVE (that.value));
         break;
@@ -2937,6 +2975,10 @@ switch (yykind)
     super_type::move (s);
     switch (this->kind ())
     {
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move<  std::array<std::string, 3>  > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
@@ -3048,6 +3090,7 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
+      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.move< std::string > (YY_MOVE (s.value));
         break;

@@ -184,11 +184,9 @@ public:
     struct Box {};
     struct Polygon {};
     struct Sphere {};
-    struct PointString {
-        std::string longitude;
-        std::string latitude;
-    };
+    using PointString = std::array<std::string, 3>; // lon, lat, alt
     GeospatialNode(Box, PointString p1, PointString p2);
+    GeospatialNode(Sphere, PointString p, std::string radius);
     bool is_constant() final
     {
         return true;

@@ -205,9 +205,9 @@ std::string print_value<>(realm::Geospatial geo)
     const auto& data = geo.get_points();
     auto point_str = [&](const GeoPoint& point) -> std::string {
         if (point.altitude) {
-            return util::format("%1, %2, %3", point.longitude, point.latitude, *point.altitude);
+            return util::format("[%1, %2, %3]", point.longitude, point.latitude, *point.altitude);
         }
-        return util::format("%1, %2", point.longitude, point.latitude);
+        return util::format("[%1, %2]", point.longitude, point.latitude);
     };
     switch (geo.get_type()) {
         case Geospatial::Type::Point:
@@ -215,7 +215,7 @@ std::string print_value<>(realm::Geospatial geo)
             return util::format("GeoPoint(%1)", point_str(data[0]));
         case Geospatial::Type::Box:
             REALM_ASSERT_EX(data.size() >= 2, data.size());
-            return util::format("GeoBox([%1], [%2])", point_str(data[0]), point_str(data[1]));
+            return util::format("GeoBox(%1, %2)", point_str(data[0]), point_str(data[1]));
         case Geospatial::Type::Polygon: {
             std::string points = "";
             for (size_t i = 0; i < data.size(); ++i) {
@@ -225,7 +225,8 @@ std::string print_value<>(realm::Geospatial geo)
         }
         case Geospatial::Type::CenterSphere: {
             GeoCenterSphere sphere = geo.get<GeoCenterSphere>();
-            return util::format("GeoSphere(%1, %2)", sphere.radius_km, point_str(sphere.center));
+            return util::format("GeoSphere(%1, %2)", point_str(sphere.center),
+                                sphere.radius_km * Geospatial::RadiusKm);
         }
         case Geospatial::Type::Invalid:
             return "NULL";

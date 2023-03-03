@@ -1451,10 +1451,10 @@ public:
     ConstantGeospatialValue(const Geospatial& geo)
         : Value()
         , m_points(geo.get_points())
-        , m_type(geo.get_type())
+        , m_geostore(m_points.data(), geo)
     {
         if (geo.is_valid()) {
-            set(0, Mixed{GeospatialStore{m_points.data(), m_points.size(), m_type}});
+            set(0, Mixed{m_geostore});
         }
     }
 
@@ -1467,13 +1467,16 @@ private:
     ConstantGeospatialValue(const ConstantGeospatialValue& other)
         : Value()
         , m_points(other.m_points)
-        , m_type(other.m_type)
+        , m_geostore(other.m_geostore)
     {
-        if (m_type != Geospatial::Type::Invalid)
-            set(0, Mixed{GeospatialStore{m_points.data(), m_points.size(), m_type}});
+        Geospatial geo = other.m_geostore.get();
+        m_geostore = GeospatialStore{m_points.data(), geo};
+        if (geo.is_valid()) {
+            set(0, Mixed{m_geostore});
+        }
     }
     std::vector<GeoPoint> m_points;
-    Geospatial::Type m_type;
+    GeospatialStore m_geostore;
 };
 
 
