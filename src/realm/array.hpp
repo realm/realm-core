@@ -472,7 +472,6 @@ private:
     void do_ensure_minimum_width(int_fast64_t);
 
     int64_t sum(size_t start, size_t end) const;
-    size_t count(int64_t value) const noexcept;
 
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;

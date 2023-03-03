@@ -1468,6 +1468,12 @@ TEST(Array_set_all_zero)
 {
     Array c(Allocator::get_default());
     c.create(Array::type_Normal);
+
+    CHECK_EQUAL(c.size(), 0);
+    // size or width zero is basically no-op
+    c.set_all_to_zero();
+    CHECK_EQUAL(c.size(), 0);
+
     c.add(0x01);
     c.set_all_to_zero();
     CHECK_EQUAL(c.size(), 1);
