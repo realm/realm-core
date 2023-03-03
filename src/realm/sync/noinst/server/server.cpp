@@ -1824,16 +1824,16 @@ private:
             websocket::make_http_response(request, sec_websocket_protocol_2, ec); // Throws
 
         if (ec) {
-            if (ec == websocket::Error::bad_request_header_upgrade) {
+            if (ec == websocket::HttpError::bad_request_header_upgrade) {
                 logger.error("There must be a header of the form 'Upgrade: websocket'");
             }
-            else if (ec == websocket::Error::bad_request_header_connection) {
+            else if (ec == websocket::HttpError::bad_request_header_connection) {
                 logger.error("There must be a header of the form 'Connection: Upgrade'");
             }
-            else if (ec == websocket::Error::bad_request_header_websocket_version) {
+            else if (ec == websocket::HttpError::bad_request_header_websocket_version) {
                 logger.error("There must be a header of the form 'Sec-WebSocket-Version: 13'");
             }
-            else if (ec == websocket::Error::bad_request_header_websocket_key) {
+            else if (ec == websocket::HttpError::bad_request_header_websocket_key) {
                 logger.error("The header Sec-WebSocket-Key is missing");
             }
 

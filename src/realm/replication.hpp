@@ -235,6 +235,8 @@ public:
         hist_SyncServer = 4
     };
 
+    static const char* history_type_name(int);
+
     /// Returns the type of history maintained by this Replication
     /// implementation, or \ref hist_None if no history is maintained by it.
     ///

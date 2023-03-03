@@ -78,10 +78,11 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
 
     m_err.emplace();
-    m_err->kind.code = 0;
     m_err->usercode_error = nullptr;
-    auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
-        m_err->error = error_number;
+    m_err->path = nullptr;
+    auto populate_error = [&](const std::exception& ex, ErrorCodes::Error error_code) {
+        m_err->error = realm_errno_e(error_code);
+        m_err->categories = ErrorCodes::error_categories(error_code).value();
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
@@ -98,113 +99,37 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         std::rethrow_exception(eptr);
     }
 
-    // C API exceptions:
-    catch (const NotClonableException& ex) {
-        populate_error(ex, RLM_ERR_NOT_CLONABLE);
-    }
-    catch (const InvalidatedObjectException& ex) {
-        populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
-    }
-    catch (const UnexpectedPrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
-    }
-    catch (const DuplicatePrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
-    }
-    catch (const InvalidPropertyKeyException& ex) {
-        populate_error(ex, RLM_ERR_INVALID_PROPERTY);
-    }
-    catch (const CallbackFailed& ex) {
-        populate_error(ex, RLM_ERR_CALLBACK);
-        m_err->usercode_error = ex.usercode_error;
-    }
-
     // Core exceptions:
-    catch (const NoSuchTable& ex) {
-        populate_error(ex, RLM_ERR_NO_SUCH_TABLE);
-    }
-    catch (const KeyNotFound& ex) {
-        populate_error(ex, RLM_ERR_NO_SUCH_OBJECT);
-    }
-    catch (const LogicError& ex) {
-        using Kind = LogicError::ErrorKind;
-        switch (ex.kind()) {
-            case Kind::column_does_not_exist:
-            case Kind::column_index_out_of_range:
-                populate_error(ex, RLM_ERR_INVALID_PROPERTY);
-                break;
-            case Kind::wrong_transact_state:
-                populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
-                break;
-            case Kind::wrong_kind_of_table:
-                populate_error(ex, RLM_ERR_ILLEGAL_OPERATION);
-                break;
-            default:
-                populate_error(ex, RLM_ERR_LOGIC);
+    catch (const Exception& ex) {
+        populate_error(ex, ex.code());
+        if (ex.code() == ErrorCodes::CallbackFailed) {
+            m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
         }
-    }
-
-    // File exceptions:
-    catch (const util::File::PermissionDenied& ex) {
-        populate_error(ex, RLM_ERR_FILE_PERMISSION_DENIED);
-    }
-    catch (const util::File::AccessError& ex) {
-        populate_error(ex, RLM_ERR_FILE_ACCESS_ERROR);
-    }
-
-    // Object Store exceptions:
-    catch (const InvalidTransactionException& ex) {
-        populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
-    }
-    catch (const IncorrectThreadException& ex) {
-        populate_error(ex, RLM_ERR_WRONG_THREAD);
-    }
-    catch (const DeleteOnOpenRealmException& ex) {
-        populate_error(ex, RLM_ERR_DELETE_OPENED_REALM);
-    }
-    catch (const List::InvalidatedException& ex) {
-        populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
-    }
-    catch (const MissingPrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_MISSING_PRIMARY_KEY);
-    }
-    catch (const WrongPrimaryKeyTypeException& ex) {
-        populate_error(ex, RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
-    }
-    catch (const PropertyTypeMismatch& ex) {
-        populate_error(ex, RLM_ERR_PROPERTY_TYPE_MISMATCH);
-    }
-    catch (const NotNullableException& ex) {
-        populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
-    }
-    catch (const object_store::Collection::OutOfBoundsIndexException& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
-    }
-    catch (const Results::OutOfBoundsIndexException& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
-    }
-    catch (const query_parser::InvalidQueryError& ex) {
-        populate_error(ex, RLM_ERR_INVALID_QUERY);
-    }
-    catch (const query_parser::SyntaxError& ex) {
-        populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
+        if (ErrorCodes::error_categories(ex.code()).test(ErrorCategory::file_access)) {
+            auto& file_access_error = static_cast<const FileAccessError&>(ex);
+            m_path_buf = file_access_error.get_path();
+            m_err->path = m_path_buf.c_str();
+        }
     }
 
     // Generic exceptions:
     catch (const std::invalid_argument& ex) {
-        populate_error(ex, RLM_ERR_INVALID_ARGUMENT);
+        populate_error(ex, ErrorCodes::InvalidArgument);
     }
     catch (const std::out_of_range& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+        populate_error(ex, ErrorCodes::OutOfBounds);
     }
     catch (const std::logic_error& ex) {
-        populate_error(ex, RLM_ERR_LOGIC);
+        populate_error(ex, ErrorCodes::LogicError);
+    }
+    catch (const std::runtime_error& ex) {
+        populate_error(ex, ErrorCodes::RuntimeError);
     }
     catch (const std::bad_alloc& ex) {
-        populate_error(ex, RLM_ERR_OUT_OF_MEMORY);
+        populate_error(ex, ErrorCodes::OutOfMemory);
     }
     catch (const std::exception& ex) {
-        populate_error(ex, RLM_ERR_OTHER_EXCEPTION);
+        populate_error(ex, ErrorCodes::UnknownError);
     }
     // FIXME: Handle more exception types.
     catch (...) {

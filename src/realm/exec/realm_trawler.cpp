@@ -269,6 +269,17 @@ public:
                 // Must be a Core-6 file.
                 m_enum_keys.init(alloc, spec.get_ref(4));
                 m_column_colkeys.init(alloc, spec.get_ref(5));
+
+                size_t num_spec_cols = m_column_types.size();
+
+                for (size_t spec_ndx = 0; spec_ndx < num_spec_cols; ++spec_ndx) {
+                    realm::ColKey col_key{m_column_colkeys.get_val(spec_ndx)};
+                    unsigned leaf_ndx = col_key.get_index().val;
+                    if (leaf_ndx >= m_leaf_ndx2spec_ndx.size()) {
+                        m_leaf_ndx2spec_ndx.resize(leaf_ndx + 1, -1);
+                    }
+                    m_leaf_ndx2spec_ndx[leaf_ndx] = spec_ndx;
+                }
             }
             else if (spec.size() > 3) {
                 // In pre Core-6, the subspecs array is optional
@@ -291,9 +302,9 @@ public:
             }
         }
     }
-    std::string get_column_name(size_t i) const
+    std::string get_column_name(realm::ColKey col_key) const
     {
-        return m_column_names.get_string(i);
+        return m_column_names.get_string(m_leaf_ndx2spec_ndx[col_key.get_index().val]);
     }
     void print_columns(const Group&) const;
     size_t get_size(realm::Allocator& alloc) const
@@ -345,6 +356,7 @@ private:
     Array m_clusters;
     realm::ColKey m_pk_col;
     realm::Table::Type m_table_type = realm::Table::Type::TopLevel;
+    std::vector<size_t> m_leaf_ndx2spec_ndx;
 };
 
 class Group : public Array {
@@ -358,7 +370,7 @@ public:
             m_file_size = get_val(2);
             current_logical_file_size = m_file_size;
             m_table_names.init(alloc, get_ref(0));
-            m_tables.init(alloc, get_ref(1));
+            m_table_refs.init(alloc, get_ref(1));
             if (size() > 3) {
                 m_free_list_positions.init(alloc, get_ref(3));
                 m_free_list_sizes.init(alloc, get_ref(4));
@@ -416,6 +428,15 @@ public:
                 ret.emplace_back(node.data(), node.size());
             }
         }
+        if (int(get_val(7)) == 3) {
+            auto ref = m_history.get_ref(0); // ct history
+            m_history.init(m_alloc, ref);
+            for (size_t n = 0; n < m_history.size(); n++) {
+                ref = m_history.get_ref(n);
+                Node node(m_alloc, ref);
+                ret.emplace_back(node.data(), node.size());
+            }
+        }
         return ret;
     }
     int get_history_schema_version() const
@@ -452,9 +473,13 @@ public:
     {
         return m_table_names.get_string(i);
     }
-    Table get_table(size_t i) const
+    Table* get_table(size_t i) const
     {
-        return Table(m_alloc, m_tables.get_ref(i));
+        auto& ret = m_tables[i];
+        if (!ret) {
+            ret = new Table(m_alloc, m_table_refs.get_ref(i));
+        }
+        return ret;
     }
     std::vector<Entry> get_allocated_nodes() const;
     std::vector<FreeListEntry> get_free_list() const;
@@ -465,12 +490,13 @@ private:
     realm::Allocator& m_alloc;
     uint64_t m_file_size;
     Array m_table_names;
-    Array m_tables;
+    Array m_table_refs;
     Array m_free_list_positions;
     Array m_free_list_sizes;
     Array m_free_list_versions;
     Array m_evacuation_info;
     Array m_history;
+    mutable std::map<size_t, Table*> m_tables;
 };
 
 class RealmFile {
@@ -604,10 +630,10 @@ void Group::print_schema() const
         std::cout << "Tables: " << std::endl;
 
         for (unsigned i = 0; i < get_nb_tables(); i++) {
-            Table table = get_table(i);
-            std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table.get_size(m_alloc)
+            Table* table = get_table(i);
+            std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table->get_size(m_alloc)
                       << std::endl;
-            table.print_columns(*this);
+            table->print_columns(*this);
         }
     }
 }
@@ -921,8 +947,7 @@ public:
 
     bool modify_object(realm::ColKey col_key, realm::ObjKey key)
     {
-        std::cout << "Modify object: " << m_table.get_column_name(col_key.get_index().val) << " on " << key
-                  << std::endl;
+        std::cout << "Modify object: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;
     }
 
@@ -963,7 +988,7 @@ public:
 
     bool insert_column(realm::ColKey col_key)
     {
-        std::cout << "Add column: " << m_table.get_column_name(col_key.get_index().val) << std::endl;
+        std::cout << "Add column: " << m_table->get_column_name(col_key) << std::endl;
         return true;
     }
 
@@ -979,8 +1004,7 @@ public:
 
     bool select_collection(realm::ColKey col_key, realm::ObjKey key)
     {
-        std::cout << "Select collection: " << m_table.get_column_name(col_key.get_index().val) << " on " << key
-                  << std::endl;
+        std::cout << "Select collection: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;
     }
 
@@ -1027,7 +1051,7 @@ public:
 
 private:
     Group* m_group;
-    Table m_table;
+    Table* m_table;
 };
 
 void RealmFile::changes() const
@@ -1152,6 +1176,7 @@ int main(int argc, const char* argv[])
                      "crypt-key-in-hex] [--top "
                      "top_ref] <realmfile>"
                   << std::endl;
+        std::cout << "   c : dump changelog" << std::endl;
         std::cout << "   f : free list analysis" << std::endl;
         std::cout << "   m : memory leak check" << std::endl;
         std::cout << "   s : schema dump" << std::endl;

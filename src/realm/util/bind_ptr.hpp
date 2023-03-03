@@ -20,6 +20,7 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
+#include <memory>
 #include <atomic>
 #include <ostream>
 #include <utility>

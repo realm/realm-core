@@ -34,7 +34,7 @@
 #include <unistd.h>
 #endif
 
-
+using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -307,7 +307,7 @@ TEST(File_SetEncryptionKey)
 #if REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
 #else
-    CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
+    CHECK_THROW_EX(f.set_encryption_key(key), Exception, (e.code() == ErrorCodes::NotSupported));
 #endif
 }
 
@@ -396,14 +396,14 @@ TEST(File_NotFound)
 {
     TEST_PATH(path);
     File file;
-    CHECK_THROW_EX(file.open(path), File::NotFound, e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path), FileAccessError, e.get_path() == std::string(path));
 }
 
 
 TEST(File_PathNotFound)
 {
     File file;
-    CHECK_THROW(file.open(""), File::NotFound);
+    CHECK_THROW_EX(file.open(""), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 
@@ -413,8 +413,8 @@ TEST(File_Exists)
     File file;
     file.open(path, File::mode_Write); // Create the file
     file.close();
-    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), File::Exists,
-                   e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), FileAccessError,
+                   e.get_path() == std::string(path) && e.code() == ErrorCodes::FileAlreadyExists);
 }
 
 
@@ -575,6 +575,17 @@ TEST(File_GetUniqueID)
     uid4_1 = uid4_2;
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
+}
+
+TEST(File_Temp)
+{
+    auto tmp_file_name = make_temp_file("foo");
+    {
+        File file1;
+        file1.open(tmp_file_name, File::mode_Write);
+        CHECK(file1.is_attached());
+    }
+    remove(tmp_file_name.c_str());
 }
 
 #endif // TEST_FILE

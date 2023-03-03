@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.4.2"
+let versionStr = "13.5.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -93,7 +93,6 @@ let notSyncServerSources: [String] = [
     "realm/spec.cpp",
     "realm/status.cpp",
     "realm/string_data.cpp",
-    "realm/sync/binding_callback_thread_observer.cpp",
     "realm/sync/changeset.cpp",
     "realm/sync/changeset_encoder.cpp",
     "realm/sync/changeset_parser.cpp",
@@ -115,6 +114,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/client_reset_recovery.cpp",
     "realm/sync/noinst/compact_changesets.cpp",
+    "realm/sync/noinst/migration_store.cpp",
     "realm/sync/noinst/pending_bootstrap_store.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/noinst/sync_metadata_schema.cpp",

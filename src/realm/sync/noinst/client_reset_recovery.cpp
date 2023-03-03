@@ -838,7 +838,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddColumn& ins
     catch (const BadChangesetError& err) {
         handle_error(
             util::format("While recovering during client reset, an AddColumn instruction could not be applied: '%1'",
-                         err.message()));
+                         err.reason()));
     }
 }
 
