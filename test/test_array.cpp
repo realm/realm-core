@@ -1470,8 +1470,8 @@ TEST(Array_set_all_zero)
     c.create(Array::type_Normal);
     c.add(0x01);
     c.set_all_to_zero();
-    CHECK_EQUAL(c.size(), 1)
-    CHECK_EQUAL(c.get(0), 0x0);
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(c.get(0), 0);
     c.destroy();
 }
 
