@@ -194,7 +194,7 @@ void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_
         do_encryption_write_barrier(map.get_addr() + index, sizeof(T) * num_elements, mapping);
     }
 }
-void encryption_refresh_outdated_pages(EncryptedFileMapping* mapping);
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;

@@ -119,8 +119,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -390,7 +389,7 @@ protected:
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
-    void refresh_outdated_encrypted_pages();
+    void schedule_refresh_of_outdated_encrypted_pages();
 
 private:
     enum AttachMode {

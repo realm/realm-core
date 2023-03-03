@@ -1201,7 +1201,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     if (file_size <= old_baseline) {
-        refresh_outdated_encrypted_pages();
+        schedule_refresh_of_outdated_encrypted_pages();
         return;
     }
 
@@ -1324,20 +1324,20 @@ void SlabAlloc::update_reader_view(size_t file_size)
     //
     rebuild_translations(replace_last_mapping, old_num_mappings);
 
-    refresh_outdated_encrypted_pages();
+    schedule_refresh_of_outdated_encrypted_pages();
 }
 
 
-void SlabAlloc::refresh_outdated_encrypted_pages()
+void SlabAlloc::schedule_refresh_of_outdated_encrypted_pages()
 {
 #if REALM_ENABLE_ENCRYPTION
     // callers must already hold m_mapping_mutex
     for (auto& e : m_mappings) {
         if (auto m = e.primary_mapping.get_encrypted_mapping()) {
-            encryption_refresh_outdated_pages(m);
+            encryption_mark_pages_for_IV_check(m);
         }
         if (auto m = e.xover_mapping.get_encrypted_mapping()) {
-            encryption_refresh_outdated_pages(m);
+            encryption_mark_pages_for_IV_check(m);
         }
     }
     // unsafe to do outside writing thread: verify();

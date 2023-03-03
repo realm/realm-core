@@ -750,7 +750,7 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
     clear(m_page_state[local_page_ndx], StaleIV);
 }
 
-void EncryptedFileMapping::refresh_outdated_pages()
+void EncryptedFileMapping::mark_pages_for_IV_check()
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];

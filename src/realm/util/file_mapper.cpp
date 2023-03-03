@@ -331,10 +331,10 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
-void encryption_refresh_outdated_pages(EncryptedFileMapping* mapping)
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping)
 {
     UniqueLock lock(mapping_mutex);
-    mapping->refresh_outdated_pages();
+    mapping->mark_pages_for_IV_check();
 }
 
 namespace {

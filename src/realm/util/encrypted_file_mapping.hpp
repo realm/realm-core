@@ -61,12 +61,12 @@ public:
     // Pages selected must have been marked for modification at an earlier read barrier
     void write_barrier(const void* addr, size_t size) noexcept;
 
-    // Checks if the ivs on disk have changed compared to the in memory versions and
-    // marks those pages for refresh if any have changed. This is the process by which
-    // a reader in a multiprocess scenario detects if its mapping should be refreshed
-    // while advancing versions. The pages marked for refresh will be refetched and
-    // re-decrypted by later calls to read_barrier.
-    void refresh_outdated_pages();
+    // Mark pages for later checks of the ivs on disk. If the IVs have changed compared to 
+    // the in memory versions the page will later need to be refreshed.
+    // This is the process by which a reader in a multiprocess scenario detects if its 
+    // mapping should be refreshed while advancing versions. 
+    // The pages marked for IV-checks will be refetched and re-decrypted by later calls to read_barrier.
+    void mark_pages_for_IV_check();
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
