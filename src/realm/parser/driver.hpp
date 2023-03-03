@@ -187,6 +187,8 @@ public:
     using PointString = std::array<std::string, 3>; // lon, lat, alt
     GeospatialNode(Box, PointString p1, PointString p2);
     GeospatialNode(Sphere, PointString p, std::string radius);
+    GeospatialNode(Polygon, PointString p);
+    void add_point_to_polygon(PointString p);
     bool is_constant() final
     {
         return true;

@@ -5674,8 +5674,11 @@ ONLY(Parser_Geospatial)
     CHECK_EQUAL(table->column<Link>(col_link).geo_within(box).count(), 1);
 
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
+    verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
+    verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
 
+    verify_query(test_context, table, "link geoWithin geoPolygon([0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1])", 1);
 
     // find restaurants within an arbitrary polygon
     // realm.objects("Restaurant").filtered("location geoWithin geospatial('Polygon', [[ [-73.99, 40.75],

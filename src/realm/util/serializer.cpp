@@ -219,7 +219,7 @@ std::string print_value<>(realm::Geospatial geo)
         case Geospatial::Type::Polygon: {
             std::string points = "";
             for (size_t i = 0; i < data.size(); ++i) {
-                points += util::format("%1[%2]", i == 0 ? "" : ", ", point_str(data[i]));
+                points += util::format("%1%2", i == 0 ? "" : ", ", point_str(data[i]));
             }
             return util::format("GeoPolygon(%1)", points);
         }

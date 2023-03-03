@@ -1350,6 +1350,16 @@ GeospatialNode::GeospatialNode(Sphere, PointString p, std::string radius)
 {
 }
 
+GeospatialNode::GeospatialNode(Polygon, PointString p)
+    : m_geo(Geospatial{GeoPolygon{convert(p)}})
+{
+}
+
+void GeospatialNode::add_point_to_polygon(PointString p)
+{
+    m_geo.add_point_to_polygon(convert(p));
+}
+
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
 {
     std::unique_ptr<Subexpr> ret;

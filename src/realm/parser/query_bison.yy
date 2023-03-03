@@ -137,7 +137,7 @@ using namespace realm::query_parser;
 %type  <bool> direction
 %type  <int> equality relational stringop aggr_op
 %type  <ConstantNode*> constant primary_key
-%type  <GeospatialNode*> geospatial
+%type  <GeospatialNode*> geospatial geopoly_content
 %type  < std::array<std::string, 3> > geopoint
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
@@ -243,9 +243,14 @@ geopoint
     : '[' double ',' double ']' { $$ = std::array<std::string, 3>{$2, $4, ""}; }
     | '[' double ',' double ',' FLOAT ']' { $$ = std::array<std::string, 3>{$2, $4, $6}; }
 
+geopoly_content
+    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, $1); }
+    | geopoly_content ',' geopoint { $1->add_point_to_polygon($3); $$ = $1; }
+
 geospatial
-    : GEOBOX '(' geopoint ',' geopoint ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, $3, $5); }
+    : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, $3, $5); }
     | GEOSPHERE '(' geopoint ',' double ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, $3, $5); }
+    | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}

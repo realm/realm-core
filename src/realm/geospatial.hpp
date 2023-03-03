@@ -52,6 +52,10 @@ struct GeoPolygon {
         : points(l)
     {
     }
+    GeoPolygon(std::vector<GeoPoint> p)
+        : points(std::move(p))
+    {
+    }
     std::vector<GeoPoint> points;
 };
 
@@ -124,6 +128,12 @@ public:
         return m_points;
     }
 
+    void add_point_to_polygon(const GeoPoint& p)
+    {
+        REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
+        m_points.push_back(p);
+    }
+
     bool operator==(const Geospatial& other) const
     {
         return m_type == other.m_type && m_points == other.m_points && m_radius_radians == other.m_radius_radians;
@@ -163,6 +173,14 @@ inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
     return GeoCenterSphere{*m_radius_radians, m_points[0]};
 }
 
+template <>
+inline GeoPolygon Geospatial::get<GeoPolygon>() const noexcept
+{
+    REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
+    REALM_ASSERT(m_points.size() >= 1);
+    return GeoPolygon(m_points);
+}
+
 class GeospatialStore {
 public:
     GeospatialStore(GeoPoint* data, const Geospatial& geo)
@@ -184,9 +202,13 @@ public:
             case Geospatial::Type::Box:
                 REALM_ASSERT_EX(m_size == 2, m_size);
                 return Geospatial(GeoBox{m_data[0], m_data[1]});
-            case Geospatial::Type::Polygon:
-                REALM_UNREACHABLE(); // FIXME: implement dynamic fill
-                break;
+            case Geospatial::Type::Polygon: {
+                GeoPolygon poly{};
+                for (size_t i = 0; i < m_size; ++i) {
+                    poly.points.push_back(m_data[i]);
+                }
+                return Geospatial{poly};
+            }
             case Geospatial::Type::CenterSphere:
                 REALM_ASSERT_EX(m_size == 1, m_size);
                 REALM_ASSERT(m_sphere_radius);
