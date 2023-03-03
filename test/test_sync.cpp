@@ -2711,6 +2711,7 @@ TEST(Sync_SSL_Certificate_1)
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "crt.pem";
+    session_config.signed_user_token = g_signed_test_user_token;
 
     Session session = fixture.make_session(db, "/test", std::move(session_config));
     session.bind();
@@ -2806,6 +2807,7 @@ TEST(Sync_SSL_Certificate_DER)
     session_config.protocol_envelope = ProtocolEnvelope::realms;
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "localhost-chain.crt.cer";
+    session_config.signed_user_token = g_signed_test_user_token;
 
     Session session = fixture.make_session(db, "/test", std::move(session_config));
     session.bind();
