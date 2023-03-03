@@ -119,6 +119,11 @@ public:
         return ndx;
     }
 
+    StringData get_property_name() const
+    {
+        return get_table()->get_column_name(get_col_key());
+    }
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -126,14 +131,36 @@ protected:
     CollectionBase(CollectionBase&&) noexcept = default;
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
+
+    void validate_index(const char* msg, size_t index, size_t size) const;
 };
+
+inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
+{
+    if (col.is_list())
+        return uppercase ? "List" : "list";
+    if (col.is_set())
+        return uppercase ? "Set" : "set";
+    if (col.is_dictionary())
+        return uppercase ? "Dictionary" : "dictionary";
+    return "";
+}
+
+inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
+{
+    if (index >= size) {
+        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_col_key()),
+                                       get_table()->get_class_name(), get_property_name()),
+                          index, size);
+    }
+}
 
 
 template <class T>
 inline void check_column_type(ColKey col)
 {
     if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -141,7 +168,7 @@ template <>
 inline void check_column_type<Int>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -149,7 +176,7 @@ template <>
 inline void check_column_type<util::Optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -160,7 +187,7 @@ inline void check_column_type<ObjKey>(ColKey col)
         bool is_link_list = (col.get_type() == col_type_LinkList);
         bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
         if (!(is_link_list || is_link_set))
-            throw LogicError(LogicError::collection_type_mismatch);
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }
 

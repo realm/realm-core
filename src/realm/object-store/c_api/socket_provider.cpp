@@ -2,6 +2,7 @@
 #include <realm/status.hpp>
 #include <realm/object-store/c_api/util.hpp>
 #include <realm/sync/socket_provider.hpp>
+#include <realm/sync/network/websocket.hpp>
 
 namespace realm::c_api {
 namespace {
@@ -12,7 +13,8 @@ public:
               realm_sync_socket_create_timer_func_t create_timer_func,
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
-        : m_timer_create(create_timer_func)
+        : m_handler(handler)
+        , m_timer_create(create_timer_func)
         , m_timer_cancel(cancel_timer_func)
         , m_timer_free(free_timer_func)
     {
@@ -24,6 +26,7 @@ public:
     {
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
+        realm_release(m_handler);
     }
 
     /// Cancel the timer immediately.
@@ -36,6 +39,7 @@ private:
     realm_sync_socket_timer_t m_timer = nullptr;
 
     realm_userdata_t m_userdata = nullptr;
+    realm_sync_socket_callback_t* m_handler = nullptr;
     realm_sync_socket_create_timer_func_t m_timer_create = nullptr;
     realm_sync_socket_timer_canceled_func_t m_timer_cancel = nullptr;
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
@@ -96,8 +100,8 @@ private:
 
 struct CAPIWebSocketObserver : sync::WebSocketObserver {
 public:
-    CAPIWebSocketObserver(sync::WebSocketObserver& observer)
-        : m_observer(observer)
+    CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
+        : m_observer(std::move(observer))
     {
     }
 
@@ -105,26 +109,26 @@ public:
 
     void websocket_connected_handler(const std::string& protocol) final
     {
-        m_observer.websocket_connected_handler(protocol);
+        m_observer->websocket_connected_handler(protocol);
     }
 
     void websocket_error_handler() final
     {
-        m_observer.websocket_error_handler();
+        m_observer->websocket_error_handler();
     }
 
     bool websocket_binary_message_received(util::Span<const char> data) final
     {
-        return m_observer.websocket_binary_message_received(data);
+        return m_observer->websocket_binary_message_received(data);
     }
 
     bool websocket_closed_handler(bool was_clean, Status status) final
     {
-        return m_observer.websocket_closed_handler(was_clean, status);
+        return m_observer->websocket_closed_handler(was_clean, status);
     }
 
 private:
-    sync::WebSocketObserver& m_observer;
+    std::unique_ptr<sync::WebSocketObserver> m_observer;
 };
 
 struct CAPISyncSocketProvider : sync::SyncSocketProvider {
@@ -165,10 +169,10 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         m_free(m_userdata);
     }
 
-    std::unique_ptr<sync::WebSocketInterface> connect(sync::WebSocketObserver* observer,
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
-        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(*observer);
+        auto capi_observer = std::make_shared<CAPIWebSocketObserver>(std::move(observer));
         return std::make_unique<CAPIWebSocket>(m_userdata, m_websocket_connect, m_websocket_async_write,
                                                m_websocket_free, new realm_websocket_observer_t(capi_observer),
                                                std::move(endpoint));
@@ -215,11 +219,12 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
 }
 
 RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback,
-                                                 status_error_code_e status, const char* reason)
+                                                 realm_web_socket_errno_e code, const char* reason)
 {
-    auto complete_status = status == status_error_code_e::STATUS_OK
+    auto status = sync::websocket::WebSocketError(code);
+    auto complete_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
                                ? Status::OK()
-                               : Status{static_cast<ErrorCodes::Error>(status), reason};
+                               : Status{sync::websocket::make_error_code(status), reason};
     (*(realm_callback->get()))(complete_status);
     realm_release(realm_callback);
 }
@@ -242,11 +247,12 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
 }
 
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
-                                                status_error_code_e status, const char* reason)
+                                                realm_web_socket_errno_e code, const char* reason)
 {
-    auto closed_status = status == status_error_code_e::STATUS_OK
+    auto status = sync::websocket::WebSocketError(code);
+    auto closed_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
                              ? Status::OK()
-                             : Status{static_cast<ErrorCodes::Error>(status), reason};
+                             : Status{sync::websocket::make_error_code(status), reason};
     realm_websocket_observer->get()->websocket_closed_handler(was_clean, closed_status);
 }
 

@@ -188,6 +188,10 @@ private:
 /// until its completion handler starts executing.
 class Stream {
 public:
+#if REALM_HAVE_SECURE_TRANSPORT
+    struct MockSSLError;
+#endif
+
     using port_type = network::Endpoint::port_type;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
@@ -384,6 +388,11 @@ public:
     /// Returns a reference to the underlying socket.
     Socket& lowest_layer() noexcept;
 
+#if REALM_HAVE_SECURE_TRANSPORT
+    /// Mock the error value returned by ssl_perform() - currently only used by Apple Secure Transport
+    void set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error = nullptr);
+#endif
+
 private:
     using Want = Service::Want;
     using StreamOps = Service::BasicStreamOps<Stream>;
@@ -502,6 +511,7 @@ private:
 #elif REALM_HAVE_SECURE_TRANSPORT
     util::CFPtr<SSLContextRef> m_ssl;
     VerifyMode m_verify_mode = VerifyMode::none;
+    std::unique_ptr<MockSSLError> m_mock_ssl_perform_error;
 
     enum class BlockingOperation {
         read,
@@ -536,6 +546,9 @@ private:
 
     friend class Service::BasicStreamOps<Stream>;
     friend class network::ReadAheadBuffer;
+#if REALM_HAVE_SECURE_TRANSPORT
+    friend struct MockSSLError; // for access to Service::Want
+#endif
 };
 
 
@@ -989,7 +1002,6 @@ inline Socket& Stream::lowest_layer() noexcept
     return m_tcp_socket;
 }
 
-
 #if REALM_HAVE_OPENSSL
 
 inline void Stream::ssl_handshake(std::error_code& ec, Want& want) noexcept
@@ -1266,6 +1278,47 @@ inline int Stream::do_ssl_shutdown() noexcept
 
 #elif REALM_HAVE_SECURE_TRANSPORT
 
+inline void Stream::set_mock_ssl_perform_error(std::unique_ptr<MockSSLError>&& error)
+{
+    if (!error)
+        m_mock_ssl_perform_error.reset();
+    else
+        m_mock_ssl_perform_error = std::move(error);
+}
+
+// Structure for mocking the error returned by Oper called by ssl_perform()
+// By default, this is a one-shot error that will be cleared after it is read,
+// unless clear_after_access is set to false.
+struct Stream::MockSSLError {
+    using Operation = Stream::BlockingOperation;
+
+    explicit MockSSLError(Operation op, int ssl_error, int bytes_processed, bool clear_after_access = true)
+        : operation{op}
+        , ssl_error{ssl_error}
+        , sys_error{0}
+        , bytes_processed{bytes_processed}
+        , clear_after_access{clear_after_access}
+    {
+    }
+
+    explicit MockSSLError(Operation op, int ssl_error, int sys_error, int bytes_processed,
+                          bool clear_after_access = true)
+        : operation{op}
+        , ssl_error{ssl_error}
+        , sys_error{sys_error}
+        , bytes_processed{bytes_processed}
+        , clear_after_access{clear_after_access}
+    {
+    }
+
+    Operation operation;
+    int ssl_error;
+    int sys_error;
+    int bytes_processed;
+    bool clear_after_access;
+};
+
+
 // Provides a homogeneous, and mostly quirks-free interface across the SecureTransport
 // operations (handshake, read, write, shutdown).
 //
@@ -1274,7 +1327,8 @@ inline int Stream::do_ssl_shutdown() noexcept
 // `want` to something other than `Want::nothing`, and return zero.
 //
 // If an error occurred, ssl_perform() will set `ec` to something other than
-// `std::system_error()`, `want` to `Want::nothing`, and return 0.
+// `std::system_error()`, `want` to `Want::nothing`, and return 0. If the error
+// is end_of_input, it is possible that the value returned is non-zero.
 //
 // If no error occurred, and the operation completed (`!ec && want ==
 // Want::nothing`), then the return value indicates the outcome of the
@@ -1293,7 +1347,31 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
 {
     OSStatus result;
     std::size_t n;
-    std::tie(result, n) = oper();
+
+    // Use caution with MockSSLError, since errSSLWouldBlock will potentially perform
+    // another read that may block
+    if (REALM_UNLIKELY(m_mock_ssl_perform_error)) {
+        result = static_cast<OSStatus>(m_mock_ssl_perform_error->ssl_error);
+        n = static_cast<std::size_t>(m_mock_ssl_perform_error->bytes_processed);
+        if (m_mock_ssl_perform_error->clear_after_access)
+            m_mock_ssl_perform_error.reset();
+    }
+    else {
+        // Call the operation if there is no mock error set
+        std::tie(result, n) = oper();
+    }
+
+    Want blocking_want = [this]() {
+        if (!m_last_operation)
+            return Want::nothing;
+        switch (*m_last_operation) {
+            case BlockingOperation::read:
+                return Want::read;
+            case BlockingOperation::write:
+                return Want::write;
+        };
+    }();
+    m_last_operation.reset();
 
     if (result == noErr) {
         ec = std::error_code();
@@ -1301,11 +1379,11 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
         return n;
     }
 
+    // Don't return an error, but keep reading if more data is needed
     if (result == errSSLWouldBlock) {
-        REALM_ASSERT(m_last_operation);
+        REALM_ASSERT(blocking_want != Want::nothing);
         ec = std::error_code();
-        want = m_last_operation == BlockingOperation::read ? Want::read : Want::write;
-        m_last_operation = {};
+        want = blocking_want;
         return n;
     }
 
@@ -1315,10 +1393,11 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
         return n;
     }
 
+    // Always return 0 if an error (other than end_of_input) occurs
     if (result == errSSLClosedAbort || result == errSSLClosedNoNotify) {
         ec = util::MiscExtErrors::premature_end_of_input;
         want = Want::nothing;
-        return n;
+        return 0;
     }
 
     if (result == errSecIO) {
@@ -1327,7 +1406,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
         REALM_ASSERT(m_last_error);
         ec = m_last_error;
         want = Want::nothing;
-        return n;
+        return 0;
     }
 
     ec = std::error_code(result, secure_transport_error_category);

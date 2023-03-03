@@ -150,6 +150,7 @@ set(REALM_INSTALL_HEADERS
     decimal128.hpp
     dictionary.hpp
     disable_sync_to_disk.hpp
+    error_codes.h
     error_codes.hpp
     exceptions.hpp
     geospatial.hpp

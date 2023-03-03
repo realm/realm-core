@@ -91,11 +91,7 @@ std::string system_category::message(int value) const
 
 } // anonymous namespace
 
-
-namespace realm {
-namespace util {
-namespace error {
-
+namespace realm::util::error {
 std::error_code make_error_code(basic_system_errors err) noexcept
 {
     return std::error_code(err, basic_system_error_category());
@@ -106,7 +102,4 @@ const std::error_category& basic_system_error_category()
     static system_category system_category;
     return system_category;
 }
-
-} // namespace error
-} // namespace util
-} // namespace realm
+} // namespace realm::util::error

@@ -108,7 +108,15 @@ DBOptions TestFile::options() const
 InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
+    schema_version = 0;
     encryption_key = std::vector<char>();
+}
+
+DBOptions InMemoryTestFile::options() const
+{
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    return options;
 }
 
 #if REALM_ENABLE_SYNC
@@ -117,10 +125,14 @@ static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token"
 static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
 static const std::string fake_device_id = "123400000000000000000000";
 
+static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
+{
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
+                                        fake_device_id);
+}
+
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
-    : SyncTestFile(app->sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app->base_url(),
-                                                 fake_device_id),
-                   bson::Bson(name))
+    : SyncTestFile(get_fake_user(*app, user_name), bson::Bson(name))
 {
 }
 
@@ -131,9 +143,22 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                     error.message);
+                     error.what());
         abort();
     };
+    schema_version = 1;
+    this->schema = std::move(schema);
+    schema_mode = SchemaMode::AdditiveExplicit;
+}
+
+SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
+                           realm::util::Optional<realm::Schema> schema,
+                           std::function<SyncSessionErrorHandler>&& error_handler)
+{
+    REALM_ASSERT(user);
+    sync_config = std::make_shared<realm::SyncConfig>(user, partition);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = std::move(error_handler);
     schema_version = 1;
     this->schema = std::move(schema);
     schema_mode = SchemaMode::AdditiveExplicit;
@@ -147,7 +172,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
         util::format(std::cerr,
                      "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
-                     error.message, session->path());
+                     error.what(), session->path());
         abort();
     };
     schema_version = 1;
@@ -218,23 +243,22 @@ struct WaitForSessionState {
     std::condition_variable cv;
     std::mutex mutex;
     bool complete = false;
-    std::error_code ec;
+    Status status = Status::OK();
 };
 
-static std::error_code wait_for_session(Realm& realm,
-                                        void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
-                                        std::chrono::seconds timeout)
+static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
+                               std::chrono::seconds timeout)
 {
     auto shared_state = std::make_shared<WaitForSessionState>();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](std::error_code error) {
+    (session.*fn)([weak_state = std::weak_ptr<WaitForSessionState>(shared_state)](Status s) {
         auto shared_state = weak_state.lock();
         if (!shared_state) {
             return;
         }
         std::lock_guard<std::mutex> lock(shared_state->mutex);
         shared_state->complete = true;
-        shared_state->ec = error;
+        shared_state->status = s;
         shared_state->cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(shared_state->mutex);
@@ -242,19 +266,19 @@ static std::error_code wait_for_session(Realm& realm,
         return shared_state->complete == true;
     });
     if (!completed) {
-        throw std::runtime_error("wait_For_session() timed out");
+        throw std::runtime_error("wait_for_session() timed out");
     }
-    return shared_state->ec;
+    return shared_state->status;
 }
 
-std::error_code wait_for_upload(Realm& realm, std::chrono::seconds timeout)
+bool wait_for_upload(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_upload_completion, timeout);
+    return !wait_for_session(realm, &SyncSession::wait_for_upload_completion, timeout).is_ok();
 }
 
-std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
+bool wait_for_download(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
+    return !wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout).is_ok();
 }
 
 void set_app_config_defaults(app::App::Config& app_config,
@@ -297,7 +321,8 @@ TestAppSession::TestAppSession()
 
 TestAppSession::TestAppSession(AppSession session,
                                std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
-                               DeleteApp delete_app, ReconnectMode reconnect_mode)
+                               DeleteApp delete_app, ReconnectMode reconnect_mode,
+                               std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider)
     : m_app_session(std::make_unique<AppSession>(session))
     , m_base_file_path(util::make_temp_dir() + random_string(10))
     , m_delete_app(delete_app)
@@ -314,6 +339,7 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.log_level = realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
+    sc_config.socket_provider = custom_socket_provider;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 
@@ -339,7 +365,7 @@ TestAppSession::~TestAppSession()
     }
 }
 
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
 
@@ -380,6 +406,11 @@ TestSyncManager::~TestSyncManager()
             app::App::clear_cached_apps();
         }
     }
+}
+
+std::shared_ptr<realm::SyncUser> TestSyncManager::fake_user(const std::string& name)
+{
+    return get_fake_user(*m_app, name);
 }
 
 #endif // REALM_ENABLE_SYNC

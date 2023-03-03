@@ -2476,7 +2476,7 @@ TEST(Shared_SessionDurabilityConsistency)
         DBRef sg = DB::create(path, no_create, DBOptions(durability_1));
 
         DBOptions::Durability durability_2 = DBOptions::Durability::MemOnly;
-        CHECK_LOGIC_ERROR(DB::create(path, no_create, DBOptions(durability_2)), LogicError::mixed_durability);
+        CHECK_RUNTIME_ERROR(DB::create(path, no_create, DBOptions(durability_2)), ErrorCodes::IncompatibleSession);
     }
 }
 
@@ -2960,7 +2960,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3007,7 +3007,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3059,7 +3059,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3125,7 +3125,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
 
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3177,7 +3177,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3231,7 +3231,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
         f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
-        f.lock_shared();
+        f.rw_lock_shared();
         File::UnlockGuard ug(f);
 
         CHECK(f.is_attached());
@@ -3321,12 +3321,12 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     CHECK(i5 == t4->end());
 }
 
