@@ -332,8 +332,10 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     , m_flx_subscription_store{}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{[&](bool is_flexible_sync) -> std::shared_ptr<sync::MigrationStore> {
-        if (is_flexible_sync)
+        if (is_flexible_sync) {
+            sync::MigrationStore::clear(m_db);
             return nullptr;
+        }
 
         using MigrationState = sync::MigrationStore::MigrationState;
         return sync::MigrationStore::create(m_db, [this](MigrationState state) {
@@ -625,11 +627,24 @@ void SyncSession::handle_error(SyncError error)
                 }
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
-                m_migration_store->migrate_to_flx(error.migration_query_string);
-                return; // do not propagate the error to the user
+                if (m_migration_store) {
+                    m_migration_store->migrate_to_flx(error.migration_query_string);
+                    return; // do not propagate the error to the user
+                }
+                else {
+                    // If there is not a migration store, we should already be using FLX
+                    REALM_UNREACHABLE();
+                }
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
-                m_migration_store->cancel_migration();
-                return; // do not propagate the error to the user
+                if (m_migration_store) {
+                    m_migration_store->cancel_migration();
+                    return; // do not propagate the error to the user
+                }
+                else {
+                    // Update the error to switchToPBS
+                    error = SyncError(sync::ProtocolError::switch_to_pbs, "", true);
+                    break;
+                }
         }
     }
     else if (error_code.category() == realm::sync::client_error_category()) {
