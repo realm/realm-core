@@ -339,7 +339,7 @@ public:
 
     // Erase all the persistent subscription store data
     // The subscription store object must be deleted before calling this function
-    static void clear(DBRef db);
+    void clear();
 
     struct PendingSubscription {
         int64_t query_version;

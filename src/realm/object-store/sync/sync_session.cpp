@@ -332,12 +332,15 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     , m_flx_subscription_store{}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{[&](bool is_flexible_sync) -> std::shared_ptr<sync::MigrationStore> {
+        using MigrationState = sync::MigrationStore::MigrationState;
         if (is_flexible_sync) {
-            sync::MigrationStore::clear(m_db);
+            // Make sure the migration info is cleared
+            auto migration_store = sync::MigrationStore::create(m_db, [](MigrationState) {});
+            migration_store->clear();
+
             return nullptr;
         }
 
-        using MigrationState = sync::MigrationStore::MigrationState;
         return sync::MigrationStore::create(m_db, [this](MigrationState state) {
             // Migration state changed - Update the configuration to
             // match the new sync mode.
@@ -1283,9 +1286,9 @@ void SyncSession::update_subscription_store()
     // If the subscription store exists and switching to PBS, then clear the store
     if (!m_config.sync_config->flx_sync_requested) {
         if (m_flx_subscription_store) {
-            m_flx_subscription_store.reset();
             history.set_write_validator_factory(nullptr);
-            sync::SubscriptionStore::clear(m_db);
+            m_flx_subscription_store->clear();
+            m_flx_subscription_store.reset();
         }
         return;
     }

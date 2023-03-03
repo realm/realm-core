@@ -54,8 +54,8 @@ public:
     // Clear the migrated state
     void cancel_migration();
 
-    // Clear the migration metadata info
-    static void clear(DBRef db);
+    // Clear the migration store info
+    void clear();
 
     bool is_migrated();
 

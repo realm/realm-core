@@ -906,10 +906,10 @@ bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
     return version < m_db->get_version_of_latest_snapshot();
 }
 
-void SubscriptionStore::clear(DBRef db)
+void SubscriptionStore::clear()
 {
-    auto tr = db->start_read();
-    auto sub_sets = tr->get_table(c_flx_subscription_sets_table);
+    auto tr = m_db->start_read();
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty())
         return;
 

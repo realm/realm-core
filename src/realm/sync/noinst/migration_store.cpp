@@ -113,18 +113,18 @@ void MigrationStore::cancel_migration()
     // Clear the migration state
     {
         std::lock_guard lock{m_mutex};
-        MigrationStore::clear(m_db);
+        clear();
         m_state = MigrationState::NotMigrated;
+        m_query_string = {};
     }
 
     m_on_migration_state_changed(MigrationState::NotMigrated);
 }
 
-void MigrationStore::clear(DBRef db)
+void MigrationStore::clear()
 {
-    REALM_ASSERT(db);
-    auto tr = db->start_read();
-    auto migration_table = tr->get_table(c_flx_migration_table);
+    auto tr = m_db->start_read();
+    auto migration_table = tr->get_table(m_migration_table);
     if (migration_table->is_empty())
         return;
 
