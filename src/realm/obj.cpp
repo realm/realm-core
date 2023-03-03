@@ -1709,7 +1709,8 @@ Obj& Obj::set(ColKey col_key, Geospatial value, bool)
     auto type = col_key.get_type();
 
     if (type != ColumnTypeTraits<Link>::column_id)
-        throw LogicError(LogicError::illegal_type);
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
 
     Obj geo = create_and_set_linked_object(col_key);
     value.assign_to(geo);
@@ -1720,14 +1721,16 @@ template <>
 Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
 {
     update_if_needed();
-    get_table()->check_column(col_key);
+    auto table = get_table();
+    table->check_column(col_key);
     auto type = col_key.get_type();
     auto attrs = col_key.get_attrs();
 
     if (type != ColumnTypeTraits<Link>::column_id)
-        throw LogicError(LogicError::illegal_type);
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
     if (!value && !attrs.test(col_attr_Nullable))
-        throw LogicError(LogicError::column_not_nullable);
+        throw NotNullable(Group::table_name_to_class_name(table->get_name()), table->get_column_name(col_key));
 
     if (!value) {
         set_null(col_key);
