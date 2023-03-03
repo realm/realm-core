@@ -121,6 +121,7 @@ typedef enum realm_value_type {
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
+    RLM_TYPE_GEOSPATIAL,
 } realm_value_type_e;
 
 typedef enum realm_schema_validation_mode {
@@ -187,7 +188,6 @@ typedef struct realm_value {
         realm_decimal128_t decimal128;
         realm_object_id_t object_id;
         realm_uuid_t uuid;
-
         realm_link_t link;
 
         char data[16];

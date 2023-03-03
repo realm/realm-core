@@ -245,6 +245,10 @@ public:
     {
         return mixed_for_argument(n).get<ObjLink>();
     }
+    Geospatial geospatial_for_argument(size_t n) final
+    {
+        return mixed_for_argument(n).get<Geospatial>();
+    }
     std::vector<Mixed> list_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
@@ -1318,6 +1322,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                                                               drv->m_base_table->get_parent_group()));
                         break;
                     default:
+                        if (type == type_Geospatial || type == type_GeoPoint) {
+                            ret = std::make_unique<ConstantGeospatialValue>(
+                                drv->m_args.geospatial_for_argument(arg_no));
+                        }
                         break;
                 }
             }

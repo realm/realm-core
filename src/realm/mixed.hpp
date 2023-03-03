@@ -148,7 +148,7 @@ public:
     Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
     Mixed(GeoPoint) noexcept;
-    Mixed(GeospatialStore) noexcept;
+    Mixed(GeospatialRef) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -266,7 +266,7 @@ protected:
         ObjLink link_val;
         UUID uuid_val;
         GeoPoint geopoint_val;
-        GeospatialStore geospatial_val;
+        GeospatialRef geospatial_val;
     };
 
 private:
@@ -519,7 +519,7 @@ inline Mixed::Mixed(GeoPoint geo) noexcept
     geopoint_val = geo;
 }
 
-inline Mixed::Mixed(GeospatialStore store) noexcept
+inline Mixed::Mixed(GeospatialRef store) noexcept
 {
     m_type = int(type_Geospatial) + 1;
     geospatial_val = store;

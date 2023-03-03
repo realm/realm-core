@@ -1470,13 +1470,13 @@ private:
         , m_geostore(other.m_geostore)
     {
         Geospatial geo = other.m_geostore.get();
-        m_geostore = GeospatialStore{m_points.data(), geo};
+        m_geostore = GeospatialRef{m_points.data(), geo};
         if (geo.is_valid()) {
             set(0, Mixed{m_geostore});
         }
     }
     std::vector<GeoPoint> m_points;
-    GeospatialStore m_geostore;
+    GeospatialRef m_geostore;
 };
 
 

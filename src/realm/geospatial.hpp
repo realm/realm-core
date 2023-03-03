@@ -161,7 +161,7 @@ private:
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
 
-    friend class GeospatialStore;
+    friend class GeospatialRef;
 };
 
 template <>
@@ -181,9 +181,9 @@ inline GeoPolygon Geospatial::get<GeoPolygon>() const noexcept
     return GeoPolygon(m_points);
 }
 
-class GeospatialStore {
+class GeospatialRef {
 public:
-    GeospatialStore(GeoPoint* data, const Geospatial& geo)
+    GeospatialRef(const GeoPoint* data, const Geospatial& geo)
         : m_data(data)
         , m_size(geo.m_points.size())
         , m_type(geo.m_type)
@@ -221,6 +221,29 @@ private:
     size_t m_size = 0;
     Geospatial::Type m_type = Geospatial::Type::Invalid;
     std::optional<double> m_sphere_radius;
+};
+
+class GeospatialStorage {
+public:
+    GeospatialStorage(std::initializer_list<Geospatial>&& data)
+        : m_storage(std::move(data))
+    {
+    }
+    void add(const Geospatial& geo)
+    {
+        m_storage.push_back(geo);
+    }
+    GeospatialRef get(size_t ndx) const noexcept
+    {
+        return GeospatialRef(m_storage[ndx].get_points().data(), m_storage[ndx]);
+    }
+    size_t size() const noexcept
+    {
+        return m_storage.size();
+    }
+
+private:
+    std::vector<Geospatial> m_storage;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);

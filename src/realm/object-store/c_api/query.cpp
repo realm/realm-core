@@ -104,6 +104,15 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         return from_capi(m_args[i].arg[0].link);
     }
 
+    Geospatial geospatial_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        if (m_args[i].arg[0].type == RLM_TYPE_GEOSPATIAL) {
+            // return from_capi(m_args[i].arg[0].geospatial); // FIXME: c_api Mixed(Geospatial)
+        }
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+    }
+
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);
@@ -155,6 +164,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
                 return type_Decimal;
             case RLM_TYPE_UUID:
                 return type_UUID;
+            case RLM_TYPE_GEOSPATIAL:
+                return type_Geospatial;
         }
         throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
         return type_Int;

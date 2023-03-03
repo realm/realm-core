@@ -122,6 +122,7 @@ public:
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual ObjLink objlink_for_argument(size_t argument_index) = 0;
+    virtual Geospatial geospatial_for_argument(size_t argument_index) = 0;
     virtual std::vector<Mixed> list_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     virtual bool is_argument_list(size_t argument_index) = 0;
@@ -206,6 +207,10 @@ public:
     ObjLink objlink_for_argument(size_t i) override
     {
         return get<ObjLink>(i);
+    }
+    Geospatial geospatial_for_argument(size_t i) override
+    {
+        return get<Geospatial>(i);
     }
     std::vector<Mixed> list_for_argument(size_t i) override
     {
@@ -301,6 +306,10 @@ public:
         throw NoArgsError();
     }
     ObjLink objlink_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    Geospatial geospatial_for_argument(size_t)
     {
         throw NoArgsError();
     }

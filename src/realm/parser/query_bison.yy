@@ -199,6 +199,7 @@ compare
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
     | value GEOWITHIN geospatial  { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
+    | value GEOWITHIN ARG         { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $3)); }
 
 expr
     : value                     { $$ = $1; }
