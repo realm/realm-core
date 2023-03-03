@@ -5,8 +5,7 @@
 * Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
 
 ### Breaking changes
 * BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
@@ -115,7 +114,7 @@
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
 ### Breaking changes
-* None.
+* Remove Group::compute_aggregated_byte_size(), which is no longer used by anything.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
