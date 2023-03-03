@@ -231,16 +231,11 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-    bool wait_for_change_internal(uint64_t change_from_version) REQUIRES(!m_mutex);
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
-    /// wake any thread waiting in wait_for_change, but without disabling
-    /// the functionality.
-    void wait_for_change_internal_release();
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-    void enable_wait_for_change_internal();
     // Transactions:
 
     using version_type = _impl::History::version_type;
@@ -490,8 +485,7 @@ private:
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     std::unique_ptr<SharedInfo> m_in_memory_info;
     SharedInfo* m_info = nullptr;
-    bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
-    bool m_wait_for_change_internal_enabled = true;
+    bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
     int m_file_format_version = 0;

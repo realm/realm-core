@@ -2038,23 +2038,6 @@ void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
     m_commit_helper->sync_to_disk(std::move(fn));
 }
 
-void DB::wait_for_change_internal_release()
-{
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    m_wait_for_change_internal_enabled = false;
-    m_new_commit_available.notify_all();
-}
-
-bool DB::wait_for_change_internal(uint64_t change_from_version)
-{
-    SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (change_from_version == info->latest_version_number && m_wait_for_change_internal_enabled) {
-        m_new_commit_available.wait(m_controlmutex, 0);
-    }
-    return change_from_version != info->latest_version_number;
-}
-
 bool DB::has_changed(TransactionRef& tr)
 {
     if (m_fake_read_lock_if_immutable)
@@ -2089,13 +2072,6 @@ void DB::enable_wait_for_change()
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
-}
-
-void DB::enable_wait_for_change_internal()
-{
-    REALM_ASSERT(!m_fake_read_lock_if_immutable);
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    m_wait_for_change_internal_enabled = true;
 }
 
 void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
