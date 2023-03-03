@@ -288,17 +288,15 @@ public:
                     }
 
                     if (info.raw_error_code == static_cast<int>(sync::ProtocolError::migrate_to_flx)) {
-                        if (auto query_string = json.find("partitionQuery");
-                            query_string != json.end() && query_string->is_string() &&
-                            !query_string->get<std::string_view>().empty()) {
-                            info.migration_query_string = *query_string;
-                            logger.debug("FLX migration query string: %1", info.migration_query_string);
-                        }
-                        else {
+                        auto query_string = json.find("partitionQuery");
+                        if (query_string == json.end() || !query_string->is_string() ||
+                            query_string->get<std::string_view>().empty()) {
                             return report_error(
                                 Error::bad_syntax,
                                 "Missing/invalid partition query string in migrate to flexible sync error response");
                         }
+
+                        info.migration_query_string = *query_string;
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {

@@ -255,7 +255,7 @@ public:
         return m_server_url;
     }
 
-    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store();
+    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store() REQUIRES(!m_config_mutex);
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
@@ -361,8 +361,8 @@ private:
 
     // Create a subscription store pointer based on the flexible based sync configuration or return
     // null if not using flexible sync.
-    // Return true if the sync type changed, otherwise false
-    bool update_subscription_store(std::shared_ptr<SyncConfig>& sync_config) REQUIRES(m_state_mutex, m_config_mutex);
+    void update_subscription_store() REQUIRES(m_config_mutex, m_state_mutex);
+    void update_sync_config(bool is_migrated) REQUIRES(m_config_mutex);
 
     void update_configuration(std::shared_ptr<SyncConfig> new_config)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
@@ -434,11 +434,12 @@ private:
     size_t m_death_count GUARDED_BY(m_state_mutex) = 0;
 
     mutable util::CheckedMutex m_config_mutex;
-    const std::shared_ptr<DB> m_db;
-    const std::shared_ptr<sync::MigrationStore> m_migration_store;
-    const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
     RealmConfig m_config GUARDED_BY(m_config_mutex);
-    std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
+    const std::shared_ptr<DB> m_db;
+    std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store GUARDED_BY(m_config_mutex);
+    // Original sync config for reverting back to PBS if FLX migration is rolled back
+    const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
+    const std::shared_ptr<sync::MigrationStore> m_migration_store;
     sync::ProtocolErrorInfo::Action
         m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);

@@ -906,15 +906,15 @@ bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
     return version < m_db->get_version_of_latest_snapshot();
 }
 
-void SubscriptionStore::flush()
+void SubscriptionStore::clear(DBRef db)
 {
-    auto tr = m_db->start_write();
-    auto sub_sets = tr->get_table(m_sub_set_table);
+    auto tr = db->start_read();
+    auto sub_sets = tr->get_table(c_flx_subscription_sets_table);
+    if (sub_sets->is_empty())
+        return;
+
+    tr->promote_to_write();
     sub_sets->clear();
-    // Create subscription at index 0 for the schema
-    auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
-    zero_sub.set(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
-    zero_sub.set(m_sub_set_snapshot_version, tr->get_version());
     tr->commit();
 }
 

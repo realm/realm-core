@@ -338,9 +338,8 @@ public:
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
     // Erase all the persistent subscription store data
-    // This is primarily used during a client migration when rolling back to PBS and is
-    // not intended to be used during normal operation.
-    void flush();
+    // The subscription store object must be deleted before calling this function
+    static void clear(DBRef db);
 
     struct PendingSubscription {
         int64_t query_version;

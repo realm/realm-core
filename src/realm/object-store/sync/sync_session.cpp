@@ -327,30 +327,24 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
 
 SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                          SyncManager* sync_manager)
-    : m_db{std::move(db)}
-    , m_migration_store{sync::MigrationStore::create(m_db,
-                                                     [this](sync::MigrationStore::MigrationState) {
-                                                         // Migration state changed - Restart the session with the
-                                                         // updated configuration update_configuration() will
-                                                         // create/delete the subscription store, if switching between
-                                                         // pbs and flx
-                                                         auto sync_config = m_migration_store->convert_sync_config(
-                                                             m_original_sync_config);
-                                                         // Update the SyncSession's sync_config and restart the
-                                                         // session connection
-                                                         update_configuration(sync_config);
-                                                     })}
-    , m_original_sync_config{config.sync_config}
-    , m_config{[&](const RealmConfig& realm_config) {
-        RealmConfig new_config = realm_config; // make a copy
-
-        // Update the configuration to use the appropriate sync_config based on the current PBS->FLX
-        // migration state
-        new_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
-        // Return the copy of the original sync config
-        return new_config;
-    }(config)}
+    : m_config{config}
+    , m_db{std::move(db)}
     , m_flx_subscription_store{}
+    , m_original_sync_config{m_config.sync_config}
+    , m_migration_store{[&](bool is_flexible_sync) -> std::shared_ptr<sync::MigrationStore> {
+        if (is_flexible_sync)
+            return nullptr;
+
+        using MigrationState = sync::MigrationStore::MigrationState;
+        return sync::MigrationStore::create(m_db, [this](MigrationState state) {
+            // Migration state changed - Update the configuration to
+            // match the new sync mode.
+            {
+                util::CheckedLockGuard lock(m_config_mutex);
+                update_sync_config(state == MigrationState::Migrated);
+            }
+        });
+    }(m_config.sync_config&& m_config.sync_config->flx_sync_requested)}
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -358,8 +352,14 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     // we don't want the following configs enabled during a client reset
     m_config.scheduler = nullptr;
     m_config.audit_config = nullptr;
-    // Set up m_flx_subscription_store and the history_write_validator
-    update_subscription_store(m_config.sync_config);
+
+    // Adjust the sync_config if using PBS sync (migration store exists) and already in the migrated state
+    if (m_migration_store && m_migration_store->is_migrated()) {
+        update_sync_config(true);
+    }
+
+    // If using FLX, set up m_flx_subscription_store and the history_write_validator
+    update_subscription_store();
 }
 
 std::shared_ptr<SyncManager> SyncSession::sync_manager() const
@@ -469,8 +469,8 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     }
 
     fresh_sync_session->assert_mutex_unlocked();
-    if (m_flx_subscription_store) {
-        sync::SubscriptionSet active = m_flx_subscription_store->get_active();
+    if (auto local_subs_store = get_flx_subscription_store(); local_subs_store) {
+        sync::SubscriptionSet active = local_subs_store->get_active();
         auto fresh_sub_store = fresh_sync_session->get_flx_subscription_store();
         REALM_ASSERT(fresh_sub_store);
         auto fresh_mut_sub = fresh_sub_store->get_latest().make_mutable_copy();
@@ -521,12 +521,12 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             return;
         }
         lock.unlock();
-        if (m_flx_subscription_store) {
+        if (auto local_subs_store = get_flx_subscription_store(); local_subs_store) {
             // In DiscardLocal mode, only the active subscription set is preserved
             // this means that we have to remove all other subscriptions including later
             // versioned ones.
-            auto mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
-            m_flx_subscription_store->supercede_all_except(mut_sub);
+            auto mut_sub = local_subs_store->get_active().make_mutable_copy();
+            local_subs_store->supercede_all_except(mut_sub);
             mut_sub.update_state(sync::SubscriptionSet::State::Error,
                                  util::make_optional<std::string_view>(status.reason()));
             std::move(mut_sub).commit();
@@ -1196,6 +1196,7 @@ std::string const& SyncSession::path() const
 
 const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
 {
+    util::CheckedLockGuard lock(m_config_mutex);
     return m_flx_subscription_store;
 }
 
@@ -1238,37 +1239,54 @@ void SyncSession::update_configuration(std::shared_ptr<SyncConfig> new_config)
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.sync_config->user == new_config->user);
         m_config.sync_config = new_config;
-        update_subscription_store(m_config.sync_config);
+        update_subscription_store();
         break;
     }
     revive_if_needed();
 }
 
-bool SyncSession::update_subscription_store(std::shared_ptr<SyncConfig>& sync_config)
+void SyncSession::update_sync_config(bool is_migrated)
 {
-    REALM_ASSERT(sync_config);
+    // Can only be used if sync is enabled
+    REALM_ASSERT(m_config.sync_config);
+
+    if (!is_migrated) {
+        // Use the original PBS configuration
+        m_config.sync_config = m_original_sync_config;
+    }
+    else {
+        // Convert the original PBS configuration to FLX
+        auto sync_config = std::make_shared<SyncConfig>(*m_original_sync_config);
+        sync_config->flx_sync_requested = true;
+        sync_config->partition_value = {};
+        m_config.sync_config = sync_config;
+    }
+}
+
+void SyncSession::update_subscription_store()
+{
     REALM_ASSERT(!m_session);
+
+    // Not using sync
+    if (!m_config.sync_config)
+        return;
 
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
 
-    // If the subscription store is not needed (for PBS), then flush the store if it currently
-    // exists
-    if (!sync_config->flx_sync_requested) {
-        if (!m_flx_subscription_store)
-            return false; // pbs -> pbs - no change
-
-        m_flx_subscription_store->flush();
-        m_flx_subscription_store.reset();
-        history.set_write_validator_factory(nullptr);
-        return true; // changing from flx -> pbs
+    // If the subscription store exists and switching to PBS, then clear the store
+    if (!m_config.sync_config->flx_sync_requested) {
+        if (m_flx_subscription_store) {
+            m_flx_subscription_store.reset();
+            history.set_write_validator_factory(nullptr);
+            sync::SubscriptionStore::clear(m_db);
+        }
+        return;
     }
 
-    // Don't create a new subscription store if there already is one
     if (m_flx_subscription_store)
-        return false; // flx -> flx - no change
+        return; // Using FLX and subscription store already exists
 
-    // Otherwise, create a new subscription store
-    // i.e. going from pbs -> flx
+    // Going from PBS -> FLX (or one doesn't exist yet), create a new subscription store
     m_flx_subscription_store = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
         util::CheckedLockGuard lk(m_state_mutex);
         if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
@@ -1298,7 +1316,7 @@ bool SyncSession::update_subscription_store(std::shared_ptr<SyncConfig>& sync_co
                 }
             };
         });
-    return true; // changing from pbs -> flx
+    return;
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.

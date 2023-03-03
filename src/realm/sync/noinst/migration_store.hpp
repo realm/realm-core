@@ -40,17 +40,12 @@ public:
     MigrationStore& operator=(const MigrationStore&) = delete;
 
     enum class MigrationState {
-        NotStarted,
-        Completed,
+        NotMigrated,
+        Migrated,
     };
 
     static MigrationStoreRef create(DBRef db,
                                     std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
-
-    // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
-    // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
-    // will be cleared.
-    std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
 
     // Called when the server responds with migrate to FLX and stores the FLX
     // subscription RQL query string
@@ -58,6 +53,13 @@ public:
 
     // Clear the migrated state
     void cancel_migration();
+
+    // Clear the migration metadata info
+    static void clear(DBRef db);
+
+    bool is_migrated();
+
+    std::string_view get_query_string();
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
@@ -67,8 +69,6 @@ public:
 protected:
     explicit MigrationStore(DBRef db,
                             std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
-
-    void reset_migration_info();
 
     DBRef m_db;
 
