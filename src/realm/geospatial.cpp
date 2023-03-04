@@ -93,7 +93,7 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
         geo.latitude = coords[1];
     }
     if (coords.size() >= 3) {
-        geo.altitude = coords[2];
+        geo.set_altitude(coords[2]);
     }
     return geo;
 }
@@ -119,7 +119,7 @@ Geospatial Geospatial::from_link(const Obj& link)
         point.latitude = geo_data.get(1);
     }
     if (num_entries >= 3) {
-        point.altitude = geo_data.get(2);
+        point.set_altitude(geo_data.get(2));
     }
     return Geospatial{point};
 }
@@ -160,12 +160,13 @@ void Geospatial::assign_to(Obj& link) const
     else {
         coords.add(m_points[0].latitude);
     }
-    if (m_points[0].altitude) {
+    std::optional<double> altitude = m_points[0].get_altitude();
+    if (altitude) {
         if (coords.size() >= 3) {
-            coords.set(2, *m_points[0].altitude);
+            coords.set(2, *altitude);
         }
         else {
-            coords.add(*m_points[0].altitude);
+            coords.add(*altitude);
         }
     }
 }

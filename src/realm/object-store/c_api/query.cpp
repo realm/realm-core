@@ -108,7 +108,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     {
         verify_ndx(i);
         if (m_args[i].arg[0].type == RLM_TYPE_GEOSPATIAL) {
-            // return from_capi(m_args[i].arg[0].geospatial); // FIXME: c_api Mixed(Geospatial)
+            return from_capi(m_args[i].arg[0].geospatial).get();
         }
         throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }

@@ -204,8 +204,8 @@ std::string print_value<>(realm::Geospatial geo)
 {
     const auto& data = geo.get_points();
     auto point_str = [&](const GeoPoint& point) -> std::string {
-        if (point.altitude) {
-            return util::format("[%1, %2, %3]", point.longitude, point.latitude, *point.altitude);
+        if (point.get_altitude()) {
+            return util::format("[%1, %2, %3]", point.longitude, point.latitude, *point.get_altitude());
         }
         return util::format("[%1, %2]", point.longitude, point.latitude);
     };
@@ -226,7 +226,7 @@ std::string print_value<>(realm::Geospatial geo)
         case Geospatial::Type::CenterSphere: {
             GeoCenterSphere sphere = geo.get<GeoCenterSphere>();
             return util::format("GeoSphere(%1, %2)", point_str(sphere.center),
-                                sphere.radius_km * Geospatial::RadiusKm);
+                                sphere.radius_km * Geospatial::c_radius_km);
         }
         case Geospatial::Type::Invalid:
             return "NULL";

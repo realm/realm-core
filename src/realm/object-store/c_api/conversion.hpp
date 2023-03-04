@@ -109,6 +109,29 @@ static inline UUID from_capi(realm_uuid_t val)
     return UUID{bytes};
 }
 
+static inline Geospatial::Type from_capi(realm_geospatial_type_e type)
+{
+    switch (type) {
+        case RLM_GEOSPATIAL_POINT:
+            return Geospatial::Type::Point;
+        case RLM_GEOSPATIAL_BOX:
+            return Geospatial::Type::Box;
+        case RLM_GEOSPATIAL_POLYGON:
+            return Geospatial::Type::Polygon;
+        case RLM_GEOSPATIAL_CENTER_SPHERE:
+            return Geospatial::Type::CenterSphere;
+        case RLM_GEOSPATIAL_INVALID:
+            return Geospatial::Type::Invalid;
+    }
+}
+
+static inline GeospatialRef from_capi(realm_geospatial_t val)
+{
+    static_assert(sizeof(realm_geopoint_t) == sizeof(GeoPoint), "mismatch on point data storage");
+    return GeospatialRef{reinterpret_cast<const GeoPoint*>(val.points), val.size, from_capi(val.type),
+                         val.sphere_radius};
+}
+
 static inline realm_uuid_t to_capi(UUID val)
 {
     realm_uuid_t uuid;
@@ -144,6 +167,8 @@ static inline Mixed from_capi(realm_value_t val)
             return Mixed{ObjLink{TableKey(val.link.target_table), ObjKey(val.link.target)}};
         case RLM_TYPE_UUID:
             return Mixed{UUID{from_capi(val.uuid)}};
+        case RLM_TYPE_GEOSPATIAL:
+            return Mixed{from_capi(val.geospatial)};
     }
     REALM_TERMINATE("Invalid realm_value_t"); // LCOV_EXCL_LINE
 }

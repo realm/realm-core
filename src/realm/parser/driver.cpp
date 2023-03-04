@@ -1345,7 +1345,9 @@ static GeoPoint convert(const GeospatialNode::PointString& point)
     if (point[2] == "") {
         return GeoPoint{string_to<double>(point[0]), string_to<double>(point[1])};
     }
-    return GeoPoint{string_to<double>(point[0]), string_to<double>(point[1]), string_to<double>(point[2])};
+    GeoPoint geo{string_to<double>(point[0]), string_to<double>(point[1])};
+    geo.set_altitude(string_to<double>(point[2]));
+    return geo;
 }
 
 GeospatialNode::GeospatialNode(GeospatialNode::Box, GeospatialNode::PointString p1, GeospatialNode::PointString p2)

@@ -5648,7 +5648,7 @@ TEST(Parser_PrimaryKey)
     CHECK_EQUAL(q.get_description(), query_string);
 }
 
-ONLY(Parser_Geospatial)
+TEST(Parser_Geospatial)
 {
     Group g;
     auto table = g.add_table_with_primary_key("Restaurant", type_ObjectId, "_id");
@@ -5710,19 +5710,19 @@ ONLY(Parser_Geospatial)
                              "Invalid predicate: 'link geoWithin 'test string'': syntax error, unexpected string") !=
                          std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $3", args, 1), std::runtime_error,
+        verify_query_sub(test_context, table, "link GEOWITHIN $3", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'null'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $4", args, 1), std::runtime_error,
+        verify_query_sub(test_context, table, "link GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'double'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $5", args, 1), std::runtime_error,
+        verify_query_sub(test_context, table, "link GEOWITHIN $5", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $6", args, 1), std::runtime_error,
+        verify_query_sub(test_context, table, "link GEOWITHIN $6", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'string'") != std::string::npos));
 }

@@ -33,13 +33,42 @@ namespace realm {
 class Obj;
 
 struct GeoPoint {
+    GeoPoint()
+        : longitude(0)
+        , latitude(0)
+        , altitude(c_null_altitude)
+    {
+    }
+    GeoPoint(double lon, double lat)
+        : longitude(lon)
+        , latitude(lat)
+        , altitude(c_null_altitude)
+    {
+    }
+    GeoPoint(double lon, double lat, double alt)
+        : longitude(lon)
+        , latitude(lat)
+        , altitude(alt)
+    {
+    }
     double longitude = 0;
     double latitude = 0;
-    std::optional<double> altitude;
     bool operator==(const GeoPoint& other) const
     {
-        return longitude == other.longitude && latitude == other.latitude && altitude == other.altitude;
+        return longitude == other.longitude && latitude == other.latitude && get_altitude() == other.get_altitude();
     }
+    std::optional<double> get_altitude() const noexcept
+    {
+        return altitude == c_null_altitude ? std::optional<double>{} : altitude;
+    }
+    void set_altitude(std::optional<double> val) noexcept
+    {
+        altitude = val.value_or(c_null_altitude);
+    }
+
+private:
+    double altitude = c_null_altitude;
+    static constexpr double c_null_altitude = std::numeric_limits<double>::max();
 };
 
 struct GeoBox {
@@ -188,6 +217,13 @@ public:
         , m_size(geo.m_points.size())
         , m_type(geo.m_type)
         , m_sphere_radius(geo.m_radius_radians)
+    {
+    }
+    GeospatialRef(const GeoPoint* data, size_t size, Geospatial::Type type, std::optional<double> sphere_radius)
+        : m_data(data)
+        , m_size(size)
+        , m_type(type)
+        , m_sphere_radius(sphere_radius)
     {
     }
     Geospatial get() const
