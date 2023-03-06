@@ -6,6 +6,7 @@
 
 ### Fixed
 * Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* Improved query descriptions by adding support for printing utf8 characters in strings instead of printing the base 64 equivalent encoding. This makes serialized queries more readable in many cases. ([#6350](https://github.com/realm/realm-core/issues/6350), since forever)
 
 ### Breaking changes
 * BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
