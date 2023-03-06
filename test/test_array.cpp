@@ -1481,7 +1481,7 @@ TEST(Array_set_all_zero)
     c.destroy();
 }
 
-ONLY(Array_set_type)
+TEST(Array_set_type)
 {
     Array c(Allocator::get_default());
     c.create(Array::type_Normal);
