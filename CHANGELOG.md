@@ -1,12 +1,11 @@
-# NEXT RELEASE
+# 13.6.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 
 ### Fixed
-* Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
-* Improved query descriptions by adding support for printing utf8 characters in strings instead of printing the base 64 equivalent encoding. This makes serialized queries more readable in many cases. ([#6350](https://github.com/realm/realm-core/issues/6350), since forever)
+* You may have a crash on Windows if you try to open a file with non-ASCII path. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* Creating subscriptions with queries having unicode parameters causes a server error. ([#6350](https://github.com/realm/realm-core/issues/6350), since v11.7.0)
 
 ### Breaking changes
 * BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
