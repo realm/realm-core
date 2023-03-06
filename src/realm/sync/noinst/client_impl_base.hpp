@@ -1128,8 +1128,8 @@ private:
     void initiate_deactivation();
     void complete_deactivation();
     void connection_established(bool fast_reconnect);
+    void suspend(const SessionErrorInfo& session_error);
     void connection_lost();
-    void close_connection();
     void send_message();
     void message_sent();
     void send_bind_message();
@@ -1357,8 +1357,8 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
     if (REALM_LIKELY(resume_upload)) {
         // Since the deactivation process has not been initiated, the UNBIND
         // message cannot have been sent unless an ERROR message was received.
-        REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_error_message_received)
+        REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+        if (m_ident_message_sent && !m_suspended)
             ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1379,8 +1379,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
     // Since the deactivation process has not been initiated, the UNBIND message
     // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received)
+    REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_suspended)
         ensure_enlisted_to_send(); // Throws
 }
 
@@ -1419,7 +1419,7 @@ inline bool ClientImpl::Session::have_client_file_ident() const noexcept
 
 inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 {
-    return (m_unbind_message_sent_2 && (m_error_message_received || m_unbound_message_received));
+    return (m_unbind_message_sent_2 && (m_suspended || m_error_message_received || m_unbound_message_received));
 }
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)

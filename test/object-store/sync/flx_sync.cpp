@@ -594,8 +594,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                         .get();
                 REQUIRE(actual == sync::SubscriptionSet::State::Complete);
             })
-            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm local_realm) {
-                auto sync_error = std::move(err_future).get();
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm local_realm) mutable {
+                auto sync_error = wait_for_future(std::move(err_future)).get();
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
                 REQUIRE(sync_error.get_system_error() ==
@@ -641,8 +641,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         };
 
         reset_utils::TestClientReset::Callback verify_post_reset_state = [&, err_future = std::move(error_future)](
-                                                                             SharedRealm local_realm) {
-            auto sync_error = std::move(err_future).get();
+                                                                             SharedRealm local_realm) mutable {
+            auto sync_error = wait_for_future(std::move(err_future)).get();
             REQUIRE(before_reset_count == 1);
             REQUIRE(after_reset_count == 0);
             REQUIRE(sync_error.get_system_error() ==
@@ -670,7 +670,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto&& [error_future2, err_handler2] = make_error_handler();
             config_copy.sync_config->error_handler = err_handler2;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            auto sync_error = std::move(error_future2).get();
+            auto sync_error = wait_for_future(std::move(error_future2)).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
             REQUIRE(sync_error.get_system_error() ==
@@ -693,7 +693,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            ClientResyncMode mode = client_reset_future.get();
+            ClientResyncMode mode = wait_for_future(std::move(client_reset_future)).get();
             REQUIRE(mode == ClientResyncMode::DiscardLocal);
             realm_post_reset->refresh();
             auto table = realm_post_reset->read_group().get_table("class_TopLevel");
@@ -715,11 +715,11 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             ->make_remote_changes([&](SharedRealm remote_realm) {
                 add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
             })
-            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
-                ClientResyncMode mode = client_reset_future.get();
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) mutable {
+                ClientResyncMode mode = wait_for_future(std::move(client_reset_future)).get();
                 REQUIRE(mode == ClientResyncMode::DiscardLocal);
                 auto subs = local_realm->get_latest_subscription_set();
-                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_future(subs.get_state_change_notification(sync::SubscriptionSet::State::Complete)).get();
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 auto queryable_str_field = table->get_column_key("queryable_str_field");
@@ -736,7 +736,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
                 auto latest_subs = local_realm->get_latest_subscription_set();
                 REQUIRE(latest_subs.version() > subs.version());
-                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_future(latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete)).get();
                 local_realm->refresh();
                 count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
                 REQUIRE(count_of_foo == 1);
@@ -807,8 +807,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 baas_sync_config.queryable_field_names->erase(it);
                 app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
             })
-            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) {
-                auto sync_error = std::move(err_future).get();
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
+                auto sync_error = wait_for_future(std::move(err_future)).get();
                 // There is a race here depending on if the server produces a query error or responds to
                 // the ident message first. We consider either error to be a sufficient outcome.
                 if (sync_error.get_system_error() ==

@@ -132,7 +132,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
-    , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
+    , m_connection_linger_time{config.connection_linger_time}
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
@@ -144,7 +144,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
-    , m_one_connection_per_session{config.one_connection_per_session}
+    , m_one_connection_per_session{false}
     , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.
@@ -1695,8 +1695,8 @@ void Session::on_integration_failure(const IntegrationException& error)
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received) {
+    REALM_ASSERT(m_suspended || m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1723,8 +1723,8 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received) {
+    REALM_ASSERT(m_suspended || m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1871,7 +1871,7 @@ void Session::send_message()
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (m_state == Deactivating || m_error_message_received) {
+    if (m_state == Deactivating || m_error_message_received || m_suspended) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
@@ -2200,7 +2200,7 @@ void Session::send_mark_message()
 
 void Session::send_unbind_message()
 {
-    REALM_ASSERT(m_state == Deactivating || m_error_message_received);
+    REALM_ASSERT(m_state == Deactivating || m_error_message_received || m_suspended);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
 
@@ -2266,18 +2266,6 @@ void Session::send_test_command_message()
     it->pending = false;
 
     enlist_to_send();
-}
-
-
-void Session::close_connection()
-{
-    REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_client_error);
-
-    m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
-    m_client_error = util::none;
 }
 
 
@@ -2381,8 +2369,11 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        logger.error("A fatal error occured during client reset: '%1'", e.what());
-        return make_error_code(sync::ClientError::auto_client_reset_failure);
+        auto err_msg = util::format("A fatal error occured during client reset: '%1'", e.what());
+        logger.error(err_msg.c_str());
+        SessionErrorInfo err_info(make_error_code(ClientError::auto_client_reset_failure), err_msg, false);
+        suspend(err_info);
+        return {};
     }
     if (!did_client_reset) {
         repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
@@ -2608,11 +2599,17 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return {};
     }
 
+    m_error_message_received = true;
+    suspend(SessionErrorInfo{info, make_error_code(error_code)});
+    return {};
+}
+
+void Session::suspend(const SessionErrorInfo& info)
+{
     REALM_ASSERT(!m_suspended);
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
     logger.debug("Suspended"); // Throws
 
-    m_error_message_received = true;
     m_suspended = true;
 
     // Detect completion of the unbinding process
@@ -2633,7 +2630,7 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     // still in the Active state
     if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(SessionErrorInfo{info, make_error_code(error_code)}); // Throws
+        on_suspended(info); // Throws
     }
 
     if (info.try_again) {
@@ -2643,8 +2640,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     // Ready to send the UNBIND message, if it has not been sent already
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
-
-    return std::error_code{}; // Success;
 }
 
 std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)
