@@ -1485,6 +1485,8 @@ TEST(Array_set_type)
 {
     Array c(Allocator::get_default());
     c.create(Array::type_Normal);
+
+    c.set_type(Array::type_Normal);
     CHECK_EQUAL(c.get_type(), Array::type_Normal);
 
     c.set_type(Array::type_InnerBptreeNode);
@@ -1492,6 +1494,26 @@ TEST(Array_set_type)
 
     c.set_type(Array::type_HasRefs);
     CHECK_EQUAL(c.get_type(), Array::type_HasRefs);
+}
+
+TEST(Array_get_sum)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    for (int i = 0; i < 0x10; i++)
+        c.add(i);
+    CHECK_EQUAL(c.get_sum(), 120);
+    c.clear();
+
+    for (int i = 0; i < 0x30000; ++i)
+        c.add(i);
+    CHECK_EQUAL(c.get_sum(), 0x47FFE8000);
+
+    c.clear();
+    for (int i = 0; i < 0x5; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.get_sum(), 0x5);
 }
 
 #endif // TEST_ARRAY

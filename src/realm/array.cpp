@@ -645,8 +645,6 @@ int64_t Array::sum(size_t start, size_t end) const
         if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
             __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
             __m128i sum_result = {0};
-            __m128i sum2;
-
             size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
 
             for (size_t t = 0; t < chunks; t++) {
@@ -710,7 +708,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop
             // (vc2010/gcc4.6)
-            sum2 = sum_result;
+            __m128i sum2 = sum_result;
 
             // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
             char sum3[sizeof sum2];
