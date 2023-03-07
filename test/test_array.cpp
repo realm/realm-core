@@ -1494,6 +1494,8 @@ TEST(Array_set_type)
 
     c.set_type(Array::type_HasRefs);
     CHECK_EQUAL(c.get_type(), Array::type_HasRefs);
+
+    c.destroy();
 }
 
 TEST(Array_get_sum)
@@ -1514,6 +1516,8 @@ TEST(Array_get_sum)
     for (int i = 0; i < 0x5; ++i)
         c.add(0x1);
     CHECK_EQUAL(c.get_sum(), 0x5);
+
+    c.destroy();
 }
 
 #endif // TEST_ARRAY
