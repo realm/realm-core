@@ -1503,19 +1503,64 @@ TEST(Array_get_sum)
     Array c(Allocator::get_default());
     c.create(Array::type_Normal);
 
+    // simple sum1
     for (int i = 0; i < 0x10; i++)
         c.add(i);
     CHECK_EQUAL(c.get_sum(), 120);
     c.clear();
 
-    for (int i = 0; i < 0x30000; ++i)
-        c.add(i);
-    CHECK_EQUAL(c.get_sum(), 0x47FFE8000);
-
-    c.clear();
+    // simple sum2
     for (int i = 0; i < 0x5; ++i)
         c.add(0x1);
     CHECK_EQUAL(c.get_sum(), 0x5);
+
+    // test multiple chunks w=1
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(1);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(3);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(13);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(100);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(10000);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=32
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(100000);
+    CHECK(c.get_sum() != 0);
+
+    // test multiple chunks w=64
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+        c.add(8000000000LL);
+    CHECK(c.get_sum() != 0);
+
+    // test generic case
+    c.clear();
+    for (uint64_t i = 0; i < 0x30000; ++i)
+        c.add(i);
+    CHECK_EQUAL(c.get_sum(), 0x47FFE8000);
 
     c.destroy();
 }
