@@ -302,6 +302,7 @@ echo "Starting mongodb"
     --replSet rs \
     --bind_ip_all \
     --port 26000 \
+    --oplogMinRetentionHours 1.0 \
     --logpath "$WORK_PATH/mongodb-dbpath/mongod.log" \
     --dbpath "$WORK_PATH/mongodb-dbpath/" \
     --pidfilepath "$WORK_PATH/mongod.pid" &

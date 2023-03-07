@@ -573,6 +573,13 @@ void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t fi
     endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
 }
 
+void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::string& service_id,
+                                     bool migrate_to_flx) const
+{
+    auto endpoint = apps()[app_id]["sync"]["migration"];
+    endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
+}
+
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
@@ -702,6 +709,19 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
                 return false;
             }
         }
+        return true;
+    }
+    return false;
+}
+
+bool AdminAPISession::is_migration_complete(const std::string& app_id, bool& migrated_out) const
+{
+    auto progress_endpoint = apps()[app_id]["sync"]["migration"];
+    auto progress_result = progress_endpoint.get_json();
+    auto status = progress_result["statusMessage"];
+    auto complete = progress_result["isMigrated"];
+    if (status.is_string() && status.get<std::string>().empty() && complete.is_boolean()) {
+        migrated_out = complete.get<bool>();
         return true;
     }
     return false;
