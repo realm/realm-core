@@ -13,7 +13,8 @@
 
 using namespace realm;
 
-static void trigger_server_migration(const AppSession& app_session, bool switch_to_flx)
+static void trigger_server_migration(const AppSession& app_session, bool switch_to_flx,
+                                     const std::shared_ptr<util::Logger>& logger = nullptr)
 {
     auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
 
@@ -22,13 +23,34 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
 
     // While the server migration is in progress, the server cannot be used - wait until the migration
     // is complete. migrated with be populated with the 'isMigrated' value from the complete response
-    bool migrated = false;
-    timed_sleeping_wait_for(
-        [&] {
-            return app_session.admin_api.is_migration_complete(app_session.server_app_id, migrated);
-        },
-        std::chrono::seconds(60), std::chrono::milliseconds(500));
-    REQUIRE(switch_to_flx == migrated);
+    AdminAPISession::MigrationStatus status;
+    std::string last_status;
+    const int duration = 90;
+    try {
+        timed_sleeping_wait_for(
+            [&] {
+                status = app_session.admin_api.get_migration_status(app_session.server_app_id);
+                if (logger && last_status != status.statusMessage) {
+                    last_status = status.statusMessage;
+                    logger->debug("PBS->FLX Migration status: %1", last_status);
+                }
+                return status.complete;
+            },
+            std::chrono::seconds(duration), std::chrono::milliseconds(500));
+    }
+    catch (std::runtime_error) {
+        if (logger)
+            logger->debug("PBS->FLX Migration timed out after %1 seconds", duration);
+        REQUIRE(false);
+    }
+    REQUIRE(switch_to_flx == status.isMigrated);
+    if (logger) {
+        if (!status.errorMessage.empty())
+            logger->debug("PBS->FLX Migration returned error: %1", status.errorMessage);
+        else
+            logger->debug("PBS->FLX %1 complete", switch_to_flx ? "Migration" : "Rollback");
+    }
+    REQUIRE(status.errorMessage.empty());
 }
 
 // Populates a FLXSyncTestHarness with the g_large_array_schema with objects that are large enough that
@@ -57,6 +79,9 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string pa
 }
 
 TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+
     const std::string base_url = get_base_url();
     const std::string partition1 = "migration-test";
     const std::string partition2 = "another-value";
@@ -80,7 +105,7 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     }
 
     // Migrate to FLX
-    trigger_server_migration(session.app_session(), true);
+    trigger_server_migration(session.app_session(), true, logger_ptr);
 
     {
         SyncTestFile flx_config(session.app()->current_user(), server_app_config.schema,
@@ -88,8 +113,6 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
 
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto table = flx_realm->read_group().get_table("class_Dog");
-        auto partition_col = table->get_column_key("realm_id");
-        auto breed_col = table->get_column_key("breed");
 
         CHECK(!wait_for_download(*flx_realm));
         {
@@ -99,13 +122,16 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
             wait_for_advance(*flx_realm);
-        }
 
-        REQUIRE(table->size() == 5);
-        REQUIRE(table->find_first(partition_col, StringData(partition1)));
-        REQUIRE(table->find_first(breed_col, StringData("breed-5")));
-        REQUIRE_FALSE(table->find_first(partition_col, StringData(partition2)));
-        REQUIRE_FALSE(table->find_first(breed_col, StringData("breed-6")));
+            auto flx_table = flx_realm->read_group().get_table("class_Dog");
+            auto partition_col = table->get_column_key("realm_id");
+            auto breed_col = table->get_column_key("breed");
+            REQUIRE(flx_table->size() == 5);
+            REQUIRE(flx_table->find_first(partition_col, StringData(partition1)));
+            REQUIRE(flx_table->find_first(breed_col, StringData("breed-5")));
+            REQUIRE_FALSE(flx_table->find_first(partition_col, StringData(partition2)));
+            REQUIRE_FALSE(flx_table->find_first(breed_col, StringData("breed-6")));
+        }
 
         {
             auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
@@ -114,17 +140,21 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
             wait_for_advance(*flx_realm);
-        }
 
-        REQUIRE(table->size() == 10);
-        REQUIRE(table->find_first(partition_col, StringData(partition1)));
-        REQUIRE(table->find_first(breed_col, StringData("breed-5")));
-        REQUIRE(table->find_first(partition_col, StringData(partition2)));
-        REQUIRE(table->find_first(breed_col, StringData("breed-6")));
+            auto flx_table = flx_realm->read_group().get_table("class_Dog");
+            auto partition_col = table->get_column_key("realm_id");
+            auto breed_col = table->get_column_key("breed");
+
+            REQUIRE(flx_table->size() == 10);
+            REQUIRE(flx_table->find_first(partition_col, StringData(partition1)));
+            REQUIRE(flx_table->find_first(breed_col, StringData("breed-5")));
+            REQUIRE(flx_table->find_first(partition_col, StringData(partition2)));
+            REQUIRE(flx_table->find_first(breed_col, StringData("breed-6")));
+        }
     }
 
     // Roll back to PBS
-    trigger_server_migration(session.app_session(), false);
+    trigger_server_migration(session.app_session(), false, logger_ptr);
 
     {
         SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);

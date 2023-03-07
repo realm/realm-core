@@ -119,7 +119,17 @@ public:
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
     bool is_initial_sync_complete(const std::string& app_id) const;
-    bool is_migration_complete(const std::string& app_id, bool& migrated_out) const;
+
+    struct MigrationStatus {
+        std::string statusMessage;
+        std::string errorMessage;
+        bool isMigrated = false;
+        bool isCancelable = false;
+        bool isRevertible = false;
+        bool complete = false;
+    };
+
+    MigrationStatus get_migration_status(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {

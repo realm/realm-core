@@ -714,17 +714,23 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
     return false;
 }
 
-bool AdminAPISession::is_migration_complete(const std::string& app_id, bool& migrated_out) const
+AdminAPISession::MigrationStatus AdminAPISession::get_migration_status(const std::string& app_id) const
 {
+    MigrationStatus status;
     auto progress_endpoint = apps()[app_id]["sync"]["migration"];
     auto progress_result = progress_endpoint.get_json();
-    auto status = progress_result["statusMessage"];
-    auto complete = progress_result["isMigrated"];
-    if (status.is_string() && status.get<std::string>().empty() && complete.is_boolean()) {
-        migrated_out = complete.get<bool>();
-        return true;
+    if (progress_result["statusMessage"].is_string() && progress_result["isMigrated"].is_boolean()) {
+        status.statusMessage = progress_result["statusMessage"].get<std::string>();
+        status.errorMessage = progress_result["errorMessage"].get<std::string>();
+        status.isMigrated = progress_result["isMigrated"].get<bool>();
+        status.isCancelable = progress_result["isCancelable"].get<bool>();
+        status.isRevertible = progress_result["isRevertible"].get<bool>();
     }
-    return false;
+    else {
+        status.errorMessage = "Empty result returned from migration status request";
+    }
+    status.complete = status.statusMessage.empty() || !status.errorMessage.empty();
+    return status;
 }
 
 AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
