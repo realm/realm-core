@@ -101,21 +101,21 @@ void Encoding<_List<T>>::commit_from_quad(Memory& mem, uint64_t& quad)
 template <typename T>
 void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz, int capacity)
 {
-    // make room for non-zero value of e_sz at index. Also, as this
-    // always happen in preparation for a later write, make sure the
-    // array is writable.
-    int old_cap = a.get_cap();
-    int new_cap = old_cap;
-    if (index >= new_cap)
-        new_cap = index + 1;
-    _Array<T> b(a);
     // check for early out:
-    if (e_sz <= b.get_esz() && index < old_cap) {
+    int old_cap = a.get_cap();
+    if (e_sz <= a.get_esz() && index < old_cap) {
         if (a.is_inlined())
             return;
         if (a.is_writable(mem))
             return;
     }
+    // make room for non-zero value of e_sz at index. Also, as this
+    // always happen in preparation for a later write, make sure the
+    // array is writable.
+    int new_cap = old_cap;
+    if (index >= new_cap)
+        new_cap = index + 16;
+    _Array<T> b(a);
     if (e_sz < b.get_esz())
         e_sz = b.get_esz();
     if (!_Array<T>::can_be_inlined(e_sz, new_cap)) {

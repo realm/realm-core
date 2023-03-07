@@ -26,7 +26,7 @@
 #include "memory.hpp"
 #include "tree.hpp"
 
-template<typename _TLeaf>
+template <typename _TLeaf>
 struct _DirectMap {
 
     using _TEntry = typename _TLeaf::TEntry;
@@ -51,7 +51,6 @@ struct _DirectMap {
 };
 
 
-
 /* Implementation: (move to implementation header file?)
  */
 
@@ -60,7 +59,7 @@ struct _DirectMap {
 #include "excn.hpp"
 
 
-template<typename _TEntry>
+template <typename _TEntry>
 struct _DirectMapLeaf {
     using TLeaf = _DirectMapLeaf<_TEntry>;
     using TEntry = _TEntry;
@@ -75,7 +74,8 @@ struct _DirectMapLeaf {
     _Entry entries[1];
 
     // helper functions
-    static size_t get_size(int sz) {
+    static size_t get_size(int sz)
+    {
         size_t res = sizeof(_DirectMapLeaf<_TEntry>) + (sz - 1) * sizeof(_Entry);
         return res;
     }
@@ -87,15 +87,17 @@ struct _DirectMapLeaf {
     static Ref<TLeaf> commit(Memory& mem, Ref<TLeaf> from);
 };
 
-template<typename _TEntry>
-auto _DirectMapLeaf<_TEntry>::grow(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf> {
+template <typename _TEntry>
+auto _DirectMapLeaf<_TEntry>::grow(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf>
+{
     TLeaf* from_ptr = mem.txl(from);
     int entries = from_ptr->num_entries;
-    size_t cap = get_size(entries+1);
+    size_t cap = get_size(entries + 1);
     TLeaf* to_ptr;
     Ref<TLeaf> to = mem.alloc<TLeaf>(to_ptr, cap);
     to_ptr->num_entries = from_ptr->num_entries;
-    for (int j = 0; j < 256; ++j) to_ptr->condenser_array[j] = from_ptr->condenser_array[j];
+    for (int j = 0; j < 256; ++j)
+        to_ptr->condenser_array[j] = from_ptr->condenser_array[j];
     for (int j = 0; j < from_ptr->num_entries; ++j) {
         to_ptr->entries[j] = from_ptr->entries[j];
         to_ptr->entries[j].entry.copied_from_file(mem);
@@ -104,16 +106,19 @@ auto _DirectMapLeaf<_TEntry>::grow(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf> {
     return to;
 }
 
-template<typename _TEntry>
-auto _DirectMapLeaf<_TEntry>::commit(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf> {
-    if (is_null(from)) return from;
+template <typename _TEntry>
+auto _DirectMapLeaf<_TEntry>::commit(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf>
+{
+    if (is_null(from))
+        return from;
     if (mem.is_writable(from)) {
         TLeaf* from_ptr = mem.txl(from);
         TLeaf* to_ptr;
         size_t sz = get_size(from_ptr->num_entries);
         Ref<TLeaf> to = mem.alloc_in_file<TLeaf>(to_ptr, sz);
         to_ptr->num_entries = from_ptr->num_entries;
-        for (int j = 0; j < 256; ++j) to_ptr->condenser_array[j] = from_ptr->condenser_array[j];
+        for (int j = 0; j < 256; ++j)
+            to_ptr->condenser_array[j] = from_ptr->condenser_array[j];
         for (int j = 0; j < from_ptr->num_entries; ++j) {
             to_ptr->entries[j] = from_ptr->entries[j];
             to_ptr->entries[j].entry.copied_to_file(mem);
@@ -124,15 +129,17 @@ auto _DirectMapLeaf<_TEntry>::commit(Memory& mem, Ref<TLeaf> from) -> Ref<TLeaf>
     return from;
 }
 
-template<typename _TEntry>
-bool _DirectMapLeaf<_TEntry>::is_empty(uint64_t key) {
+template <typename _TEntry>
+bool _DirectMapLeaf<_TEntry>::is_empty(uint64_t key)
+{
     uint8_t subhash = key;
     uint8_t idx = condenser_array[subhash];
     return idx >= num_entries;
 }
 
-template<typename _TEntry>
-int _DirectMapLeaf<_TEntry>::find(uint64_t key) {
+template <typename _TEntry>
+int _DirectMapLeaf<_TEntry>::find(uint64_t key)
+{
     uint8_t subhash = key;
     uint8_t idx = condenser_array[subhash];
     --idx; //
@@ -142,8 +149,9 @@ int _DirectMapLeaf<_TEntry>::find(uint64_t key) {
     return -1; // not found!
 }
 
-template<typename _TEntry>
-void _DirectMapLeaf<_TEntry>::insert(Memory& mem, uint64_t key) {
+template <typename _TEntry>
+void _DirectMapLeaf<_TEntry>::insert(Memory& mem, uint64_t key)
+{
     uint8_t subhash = key;
     int idx = num_entries;
     entries[idx].key = key;
@@ -153,8 +161,9 @@ void _DirectMapLeaf<_TEntry>::insert(Memory& mem, uint64_t key) {
     condenser_array[subhash] = idx;
 }
 
-template<typename _TLeaf>
-auto _DirectMap<_TLeaf>::get_ref(Memory& mem, uint64_t key) -> _TEntry* {
+template <typename _TLeaf>
+auto _DirectMap<_TLeaf>::get_ref(Memory& mem, uint64_t key) -> _TEntry*
+{
     Ref<_TLeaf> leaf = tree.lookup(mem, key);
     _TLeaf* leaf_ptr = mem.txl(leaf);
     int in_leaf_idx = leaf_ptr->find(key);
@@ -163,8 +172,9 @@ auto _DirectMap<_TLeaf>::get_ref(Memory& mem, uint64_t key) -> _TEntry* {
     throw NotFound();
 }
 
-template<typename _TLeaf>
-auto _DirectMap<_TLeaf>::get(Memory& mem, uint64_t key) const -> _TEntry {
+template <typename _TLeaf>
+auto _DirectMap<_TLeaf>::get(Memory& mem, uint64_t key) const -> _TEntry
+{
     Ref<_TLeaf> leaf = tree.lookup(mem, key);
     _TLeaf* leaf_ptr = mem.txl(leaf);
     int in_leaf_idx = leaf_ptr->find(key);
@@ -173,11 +183,12 @@ auto _DirectMap<_TLeaf>::get(Memory& mem, uint64_t key) const -> _TEntry {
     throw NotFound();
 }
 
-template<typename _TLeaf>
-uint64_t _DirectMap<_TLeaf>::insert(Memory& mem) {
+template <typename _TLeaf>
+uint64_t _DirectMap<_TLeaf>::insert(Memory& mem)
+{
     for (;;) {
         uint64_t key;
-        key = rand(); //replace with something better
+        key = rand(); // replace with something better
         Ref<_TLeaf> leaf = tree.lookup(mem, key);
         _TLeaf* leaf_ptr = mem.txl(leaf);
         bool found = leaf_ptr->is_empty(key);
@@ -192,8 +203,9 @@ uint64_t _DirectMap<_TLeaf>::insert(Memory& mem) {
     }
 }
 
-template<typename _TLeaf>
-void _DirectMap<_TLeaf>::cow_path(Memory& mem, uint64_t key) {
+template <typename _TLeaf>
+void _DirectMap<_TLeaf>::cow_path(Memory& mem, uint64_t key)
+{
     Ref<_TLeaf> leaf = tree.lookup(mem, key);
     _TLeaf* leaf_ptr = mem.txl(leaf);
     bool found = leaf_ptr->is_empty(key);
@@ -204,31 +216,37 @@ void _DirectMap<_TLeaf>::cow_path(Memory& mem, uint64_t key) {
         leaf_ptr = mem.txl(leaf);
         tree.cow_path(mem, key, leaf);
     }
-    // why was this here: leaf_ptr->insert(mem, key);
+    // why was this here:
+    // leaf_ptr->insert(mem, key);
 }
 
-template<typename _TEntry>
+template <typename _TEntry>
 struct LeafCommitter : public _TreeTop<_DirectMapLeaf<_TEntry>>::LeafCommitter {
     using _TLeaf = _DirectMapLeaf<_TEntry>;
-    virtual Ref<_TLeaf> commit(Ref<_TLeaf> from) { return _TLeaf::commit(mem, from); }
+    virtual Ref<_TLeaf> commit(Ref<_TLeaf> from)
+    {
+        return _TLeaf::commit(mem, from);
+    }
     Memory& mem;
-    LeafCommitter(Memory& mem) : mem(mem) {};
+    LeafCommitter(Memory& mem)
+        : mem(mem){};
 };
 
-template<typename _TLeaf>
-void _DirectMap<_TLeaf>::copied_to_file(Memory& mem) {
+template <typename _TLeaf>
+void _DirectMap<_TLeaf>::copied_to_file(Memory& mem)
+{
     LeafCommitter<_TEntry> cmt(mem);
     tree.copied_to_file(mem, cmt);
 }
 
-template<typename _TLeaf>
-void _DirectMap<_TLeaf>::init(size_t initial_size) {
+template <typename _TLeaf>
+void _DirectMap<_TLeaf>::init(size_t initial_size)
+{
     tree.init(initial_size);
 }
 
 // Explicit instantiations:
-//template class _DirectMap<_DirectMapLeaf<Ref<_Table>>, Ref<_Table>>;
+// template class _DirectMap<_DirectMapLeaf<Ref<_Table>>, Ref<_Table>>;
 
 
 #endif
-

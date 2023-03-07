@@ -479,19 +479,44 @@ int main(int argc, char* argv[])
             db.release(std::move(s3));
             Snapshot& s2 = db.create_changes(); // create_changes();
             auto num_line = res->first_line;
-            auto num_value = 0;
-            auto val_ptr = res->values;
             auto limit = res->first_line + res->num_lines;
             std::cout << "Writing " << num_line << " to " << limit << " width " << res->num_fields << std::endl;
-            while (num_line < limit) {
+            auto write_object = [&](long num_line, long*& val_ptr) {
                 auto row = row_order[num_line];
                 Object o = s2.get(t, row);
-                num_value = 0;
+                auto num_value = 0;
                 while (num_value < res->num_fields) {
                     auto val = *val_ptr++;
                     o.set(f_i[num_value++], val);
                 }
-                num_line++;
+            };
+            auto write_range = [&](long first, long past) {
+                std::cout << "constructing [" << first << " - " << past << "[" << std::endl;
+                auto val_ptr = res->values + (first - res->first_line) * res->num_fields;
+                for (auto line = first; line < past; ++line) {
+                    write_object(line, val_ptr);
+                }
+            };
+            // split in 5 chunks and guard them against races by writing 500 entries
+            // at the borders of each of the chunks.
+            auto step = 1000000; // res->num_lines / 5;
+            // 4 separating zone:
+            for (auto line = num_line + step; line < limit; line += step) {
+                write_range(line, line + 500);
+            }
+            // write 5 much larger in-between ranges in parallel
+            std::vector<std::unique_ptr<std::thread>> threads;
+            threads.push_back(std::make_unique<std::thread>([&]() { write_range(num_line, num_line + step); }));
+            threads.push_back(
+                std::make_unique<std::thread>([&]() { write_range(num_line + step + 500, num_line + 2 * step); }));
+            threads.push_back(std::make_unique<std::thread>(
+                [&]() { write_range(num_line + 2 * step + 500, num_line + 3 * step); }));
+            threads.push_back(std::make_unique<std::thread>(
+                [&]() { write_range(num_line + 3 * step + 500, num_line + 4 * step); }));
+            write_range(num_line + 4 * step + 500, limit);
+            for (auto& p : threads) {
+                if (p)
+                    p->join();
             }
             to_reader.put(res);
             end = std::chrono::high_resolution_clock::now();

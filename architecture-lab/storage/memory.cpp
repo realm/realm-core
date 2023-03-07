@@ -40,6 +40,7 @@ Memory::Memory()
     // searching without having to check if they hit the null-page
     // also - all Ref in objects in the null-page must always
     // refer back to the null page
+    allocation_ref = scratch_ref_start;
     null_page = new char[chunk_size];
     for (size_t j = 0; j < chunk_size; ++j)
         null_page[j] = 0;
@@ -112,14 +113,50 @@ uint64_t Memory::internal_alloc(size_t sz)
     int bin = size_to_bin(sz - 1);
     sz = bin_to_size(bin + 1);
     assert(bin < 500);
-    if (free_lists[bin]) {
-        uint64_t head = free_lists[bin];
-        uint64_t* ptr = internal_txl<uint64_t>(head);
-        free_lists[bin] = *ptr;
+    std::atomic<uint64_t>& head = free_lists[bin];
+    uint64_t curr_head, next_head;
+    do {
+        curr_head = head.load(std::memory_order_relaxed);
+        if (curr_head) {
+            uint64_t* ptr = internal_txl<uint64_t>(curr_head);
+            next_head = *ptr;
+        }
+    } while (curr_head && !head.compare_exchange_weak(curr_head, next_head));
+    if (curr_head) {
         recycled += sz;
-        // std::cout << "  recycled " << head << std::endl;
-        return head;
+        return curr_head;
     }
+    /*
+            if (free_lists[bin])
+        {
+            uint64_t head = free_lists[bin];
+            uint64_t* ptr = internal_txl<uint64_t>(head);
+            free_lists[bin] = *ptr;
+            recycled += sz;
+            // std::cout << "  recycled " << head << std::endl;
+            return head;
+        }
+        */
+retry:
+    auto old_allocation_ref = allocation_ref.load(std::memory_order_relaxed);
+    uint64_t next_allocation_ref;
+    bool aborted = false;
+    do {
+        next_allocation_ref = old_allocation_ref + sz;
+        if (next_allocation_ref > last_valid_ref)
+            aborted = true;
+    } while (!aborted && !allocation_ref.compare_exchange_weak(old_allocation_ref, next_allocation_ref));
+    if (!aborted) {
+        return old_allocation_ref;
+    }
+    /*
+    if (next_allocation_ref <= last_valid_ref) {
+        auto res = allocation_ref;
+        allocation_ref = next_allocation_ref;
+        return res;
+    }
+    */
+    std::lock_guard<std::mutex> lock(mutex);
     if (allocation_ref + sz > last_valid_ref) {
         uint64_t chunk_index = last_valid_ref >> chunk_shift;
         void* addr = mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
@@ -129,6 +166,8 @@ uint64_t Memory::internal_alloc(size_t sz)
         allocation_ref = last_valid_ref;
         last_valid_ref += chunk_size;
     }
+    goto retry;
+
     uint64_t res = allocation_ref;
     allocation_ref += sz;
     return res;
@@ -146,11 +185,18 @@ void Memory::internal_free(uint64_t ref, size_t sz)
     // otherwise add to free list
     int bin = size_to_bin(sz - 1);
     sz = bin_to_size(bin + 1);
+
+    // std::lock_guard<std::mutex> lock(mutex);
     freed += sz;
     assert(bin < 500);
     uint64_t* ptr = internal_txl<uint64_t>(ref);
-    *ptr = free_lists[bin];
-    free_lists[bin] = ref;
+    std::atomic<uint64_t>& head = free_lists[bin];
+    uint64_t new_next = head.load(std::memory_order_relaxed);
+    do {
+        *ptr = new_next;
+    } while (!head.compare_exchange_weak(new_next, ref));
+    // *ptr = free_lists[bin];
+    // free_lists[bin] = ref;
     // std::cout << "  freelisted " << ref << std::endl;
 }
 
@@ -160,14 +206,14 @@ uint64_t Memory::internal_alloc_in_file(void*& p, size_t real_size)
     if (file_alloc_ref + real_size > file_alloc_limit) {
         // save old chunk!
         write_maps.push_back(file_alloc_base_ptr);
-        //msync(file_alloc_base_ptr, chunk_size, MS_SYNC);
-        //munmap(file_alloc_base_ptr, chunk_size);
+        // msync(file_alloc_base_ptr, chunk_size, MS_SYNC);
+        // munmap(file_alloc_base_ptr, chunk_size);
         uint64_t new_file_size = file_size + chunk_size;
         int status = ftruncate(fd, new_file_size);
         if (status < 0)
             throw std::runtime_error("failed to extend file for writing");
-        file_alloc_base_ptr =
-            reinterpret_cast<char*>(mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, file_size));
+        file_alloc_base_ptr = reinterpret_cast<char*>(
+            mmap(0, chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, file_size));
         if (file_alloc_base_ptr == MAP_FAILED)
             throw std::runtime_error("failed to mmap file for writing");
         file_size = new_file_size;

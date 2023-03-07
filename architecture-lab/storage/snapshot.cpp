@@ -168,6 +168,7 @@ Memory& SnapshotImpl::change(Object* o)
     }
     if (!o->is_writable) {
         *o = change(o->t, o->r);
+        assert(o->is_writable);
     }
     else if (o->versioning_count != versioning_counter) {
         // coming here, we know that the object was already writable,
