@@ -6680,4 +6680,94 @@ TEST(Sync_InvalidChangesetFromServer)
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }
 
+// Tests that an empty reciprocal changesets is set and retrieved correctly.
+TEST(Sync_SetAndGetEmptyReciprocalChangeset)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_verson = [&] {
+        auto tr = db->start_write();
+        // Create schema: single table with array of ints as property.
+        tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
+        tr->commit_and_continue_writing();
+
+        // Create object and initialize array.
+        TableRef table = tr->get_table("class_table");
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        for (auto i = 0; i < 8; ++i) {
+            ints.insert(i, i);
+        }
+        tr->commit_and_continue_writing();
+
+        // Move element in array.
+        ints.move(7, 2);
+        return tr->commit();
+    }();
+
+    // Create changeset which moves element from index 7 to index 0 in array.
+    // This changeset will discard the previous move (reciprocal changeset), leaving the local reciprocal changesets
+    // with no instructions (empty).
+    Changeset changeset;
+    ArrayMove instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.path.push_back(7);
+    instr.ndx_2 = 0;
+    instr.prior_size = 8;
+    changeset.push_back(instr);
+    changeset.version = 1;
+    changeset.last_integrated_remote_version = latest_local_verson - 1;
+    changeset.origin_timestamp = timestamp;
+    changeset.origin_file_ident = 2;
+
+    ChangesetEncoder::Buffer encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    encode_changeset(changeset, encoded);
+    server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                           changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    progress.download.server_version = changeset.version;
+    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.latest_server_version.version = changeset.version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, logger, transact);
+
+    bool is_compressed = false;
+    auto data = history.get_reciprocal_transform(latest_local_verson, is_compressed);
+    Changeset reciprocal_changeset;
+    ChunkedBinaryInputStream in{data};
+    if (is_compressed) {
+        size_t total_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
+        REALM_ASSERT(decompressed);
+        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
+    }
+    else {
+        sync::parse_changeset(in, reciprocal_changeset); // Throws
+    }
+    // The only instruction in the reciprocal changeset was discarded during OT.
+    CHECK(reciprocal_changeset.empty());
+}
+
 } // unnamed namespace

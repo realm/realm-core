@@ -764,6 +764,7 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
 
 void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 {
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());
@@ -1175,6 +1176,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
 
     m_ct_history_base_version = version - ct_history_size();
     m_sync_history_base_version = version - sync_history_size();
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());
