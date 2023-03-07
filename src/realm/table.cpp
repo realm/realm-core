@@ -2720,16 +2720,6 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
 }
 
 
-size_t Table::compute_aggregated_byte_size() const noexcept
-{
-    if (!m_top.is_attached())
-        return 0;
-    const Array& real_top = (m_top);
-    MemStats stats_2;
-    real_top.stats(stats_2);
-    return stats_2.allocated;
-}
-
 bool Table::operator==(const Table& t) const
 {
     if (size() != t.size()) {

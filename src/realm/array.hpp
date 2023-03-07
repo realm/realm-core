@@ -441,6 +441,7 @@ public:
     /// FIXME: Belongs in IntegerArray
     static size_t calc_aligned_byte_size(size_t size, int width);
 
+#ifdef REALM_DEBUG
     class MemUsageHandler {
     public:
         virtual void handle(ref_type ref, size_t allocated, size_t used) = 0;
@@ -449,6 +450,7 @@ public:
     void report_memory_usage(MemUsageHandler&) const;
 
     void stats(MemStats& stats_dest) const noexcept;
+#endif
 
     void verify() const;
 
@@ -518,8 +520,6 @@ protected:
     /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
     static size_t bit_width(int64_t value);
 
-    void report_memory_usage_2(MemUsageHandler&) const;
-
 protected:
     Getter m_getter = nullptr; // cached to avoid indirection
     const VTable* m_vtable = nullptr;
@@ -535,6 +535,10 @@ protected:
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+
+#ifdef REALM_DEBUG
+    void report_memory_usage_2(MemUsageHandler&) const;
+#endif
 
     friend class Allocator;
     friend class SlabAlloc;

@@ -2,7 +2,6 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 * Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
 
 ### Fixed
@@ -10,8 +9,29 @@
 * None.
 
 ### Breaking changes
-* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 * You can no longer associate a Logger Factory with the SyncManager. Instead you can install one default logger via Logger::set_default_logger(). This logger will then be used all over Core. Logging cmake flags updated to use REALM_TEST_LOGGING and REALM_TEST_LOGGING_LEVEL
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.6.0 Release notes
+
+### Enhancements
+* Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
+
+### Fixed
+* You may have a crash on Windows if you try to open a file with non-ASCII path. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* Creating subscriptions with queries having unicode parameters causes a server error. ([#6350](https://github.com/realm/realm-core/issues/6350), since v11.7.0)
+
+### Breaking changes
+* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -21,6 +41,7 @@
 ### Internals
 * Add CAPI test for Binding Callback Thread Observer. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 * Implement MigrationStore to support migration from PBS to FLX ([PR #6324](https://github.com/realm/realm-core/pull/6324))
+* Removed overloads of `Session::bind()` that allow binding a sync session to server other than the one configured in `Session::Config` ([PR #6358](https://github.com/realm/realm-core/pull/6358)).
 
 ----------------------------------------------
 
@@ -117,7 +138,7 @@
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
 ### Breaking changes
-* None.
+* Remove Group::compute_aggregated_byte_size(), which is no longer used by anything.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
