@@ -2384,7 +2384,7 @@ TEST(Query_TwoColumnsNumeric)
             size_t num_expected_matches = num_rows;
             if ((lhs_type == type_Mixed) != (rhs_type == type_Mixed)) {
                 // Only one prop is mixed
-                num_expected_matches = 6;
+                num_expected_matches = 5;
             }
             if ((lhs_type == type_String) != (rhs_type == type_String)) {
                 // Only one prop is string

@@ -5545,6 +5545,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 
     tv = (table->column<Mixed>(col_any) == StringData("abcdefgh")).find_all();
     CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == StringData("ABCDEFGH")).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     ObjLink link_to_first = table->begin()->get_link();
     tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();
