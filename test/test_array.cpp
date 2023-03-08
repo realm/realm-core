@@ -1509,52 +1509,48 @@ TEST(Array_get_sum)
     CHECK_EQUAL(c.get_sum(), 120);
     c.clear();
 
-    // simple sum2
-    for (int i = 0; i < 0x5; ++i)
-        c.add(0x1);
-    CHECK_EQUAL(c.get_sum(), 0x5);
+    const auto size = realm::max_array_size / 4;
 
     // test multiple chunks w=1
-    c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
-        c.add(1);
-    CHECK(c.get_sum() != 0);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.get_sum(), size);
 
     // test multiple chunks w=2
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(3);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), 3 * size);
 
     // test multiple chunks w=4
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(13);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), 13 * size);
 
     // test multiple chunks w=8
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(100);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), 100 * size);
 
     // test multiple chunks w=16
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(10000);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), int64_t(10000) * size);
 
     // test multiple chunks w=32
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(100000);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), 100000 * size);
 
     // test multiple chunks w=64
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size - 1; ++i)
+    for (uint64_t i = 0; i < size; ++i)
         c.add(8000000000LL);
-    CHECK(c.get_sum() != 0);
+    CHECK_EQUAL(c.get_sum(), (size * 8000000000LL));
 
     // test generic case
     c.clear();
@@ -1563,6 +1559,65 @@ TEST(Array_get_sum)
     CHECK_EQUAL(c.get_sum(), 0x47FFE8000);
 
     c.destroy();
+}
+
+TEST(Array_count)
+{
+    struct TestArray : public Array {
+        explicit TestArray(Allocator& allocator)
+            : Array(allocator)
+        {
+        }
+        size_t count(int64_t v)
+        {
+            return Array::count(v);
+        }
+    };
+
+    TestArray c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    // test multiple chunks w=1
+    c.clear();
+    for (uint64_t i = 0; i < 10; ++i)
+        c.add(1);
+    CHECK_EQUAL(c.count(1), 10);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size; ++i)
+        c.add(3);
+    CHECK_EQUAL(c.count(3), realm::max_array_size);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size; ++i)
+        c.add(13);
+    CHECK_EQUAL(c.count(13), realm::max_array_size);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size; ++i)
+        c.add(100);
+    CHECK_EQUAL(c.count(100), realm::max_array_size);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < realm::max_array_size; ++i)
+        c.add(10000);
+    CHECK_EQUAL(c.count(10000), realm::max_array_size);
+
+    // test w=32 (number of chunks does not matter)
+    c.clear();
+    for (uint64_t i = 0; i < 10; ++i)
+        c.add(100000);
+    CHECK_EQUAL(c.count(100000), 10);
+
+    // test w=64 (number of chunks does not matter)
+    c.clear();
+    for (uint64_t i = 0; i < 10; ++i)
+        c.add(8000000000LL);
+    CHECK_EQUAL(c.count(8000000000LL), 10);
 }
 
 #endif // TEST_ARRAY
