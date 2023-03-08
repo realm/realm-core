@@ -74,37 +74,37 @@ struct ClientReset {
 /// sessions.
 enum class ClientError {
     // clang-format off
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
+    connection_closed           = RLM_SYNC_ERR_CLIENT_CONNECTION_CLOSED          , ///< Connection closed (no error)
+    unknown_message             = RLM_SYNC_ERR_CLIENT_UNKNOWN_MESSAGE            , ///< Unknown type of input message
+    bad_syntax                  = RLM_SYNC_ERR_CLIENT_BAD_SYNTAX                 , ///< Bad syntax in input message head
+    limits_exceeded             = RLM_SYNC_ERR_CLIENT_LIMITS_EXCEEDED            , ///< Limits exceeded in input message
+    bad_session_ident           = RLM_SYNC_ERR_CLIENT_BAD_SESSION_IDENT          , ///< Bad session identifier in input message
+    bad_message_order           = RLM_SYNC_ERR_CLIENT_BAD_MESSAGE_ORDER          , ///< Bad input message order
+    bad_client_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT      , ///< Bad client file identifier (IDENT)
+    bad_progress                = RLM_SYNC_ERR_CLIENT_BAD_PROGRESS               , ///< Bad progress information (DOWNLOAD)
+    bad_changeset_header_syntax = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_HEADER_SYNTAX, ///< Bad syntax in changeset header (DOWNLOAD)
+    bad_changeset_size          = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_SIZE         , ///< Bad changeset size in changeset header (DOWNLOAD)
+    bad_origin_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_ORIGIN_FILE_IDENT      , ///< Bad origin file identifier in changeset header (DOWNLOAD)
+    bad_server_version          = RLM_SYNC_ERR_CLIENT_BAD_SERVER_VERSION         , ///< Bad server version in changeset header (DOWNLOAD)
+    bad_changeset               = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET              , ///< Bad changeset (DOWNLOAD)
+    bad_request_ident           = RLM_SYNC_ERR_CLIENT_BAD_REQUEST_IDENT          , ///< Bad request identifier (MARK)
+    bad_error_code              = RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE             , ///< Bad error code (ERROR),
+    bad_compression             = RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION            , ///< Bad compression (DOWNLOAD)
+    bad_client_version          = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION         , ///< Bad last integrated client version in changeset header (DOWNLOAD)
+    ssl_server_cert_rejected    = RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED   , ///< SSL server certificate rejected
+    pong_timeout                = RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT               , ///< Timeout on reception of PONG respone message
+    bad_client_file_ident_salt  = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT , ///< Bad client file identifier salt (IDENT)
+    bad_file_ident              = RLM_SYNC_ERR_CLIENT_BAD_FILE_IDENT             , ///< Bad file identifier (ALLOC)
+    connect_timeout             = RLM_SYNC_ERR_CLIENT_CONNECT_TIMEOUT            , ///< Sync connection was not fully established in time
+    bad_timestamp               = RLM_SYNC_ERR_CLIENT_BAD_TIMESTAMP              , ///< Bad timestamp (PONG)
+    bad_protocol_from_server    = RLM_SYNC_ERR_CLIENT_BAD_PROTOCOL_FROM_SERVER   , ///< Bad or missing protocol version information from server
+    client_too_old_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_OLD_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too old for server
+    client_too_new_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_NEW_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too new for server
+    protocol_mismatch           = RLM_SYNC_ERR_CLIENT_PROTOCOL_MISMATCH          , ///< Protocol version negotiation failed: No version supported by both client and server
+    bad_state_message           = RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE          , ///< Bad values in state message (STATE)
+    missing_protocol_feature    = RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE   , ///< Requested feature missing in negotiated protocol version
+    http_tunnel_failed          = RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED         , ///< Failed to establish HTTP tunnel with configured proxy
+    auto_client_reset_failure   = RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE  , ///< A fatal error was encountered which prevents completion of a client reset
     // clang-format on
 };
 

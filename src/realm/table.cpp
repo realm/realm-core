@@ -341,9 +341,9 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("Property '%1.%2' is not an object reference",
-                                              m_current_table->get_class_name(),
-                                              m_current_table->get_column_name(ck)));
+        throw LogicError(ErrorCodes::TypeMismatch,
+                         util::format("Property '%1.%2' is not an object reference",
+                                      m_current_table->get_class_name(), m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
 }
@@ -392,8 +392,7 @@ Table::Table(Replication* const* repl, Allocator& alloc)
 
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
 {
-    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
-        throw LogicError(LogicError::illegal_type);
+    REALM_ASSERT(!is_link_type(ColumnType(type)));
 
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
@@ -409,17 +408,15 @@ ColKey Table::add_column(Table& target, StringData name)
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
-    if (!origin_group || !target_group)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (origin_group != target_group)
-        throw LogicError(LogicError::group_mismatch);
+    REALM_ASSERT_RELEASE(origin_group && target_group);
+    REALM_ASSERT_RELEASE(origin_group == target_group);
     // Only links to embedded objects are allowed.
     if (is_asymmetric() && !target.is_embedded()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Object property not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Ephemeral objects not supported");
     }
 
     m_has_any_embedded_objects.reset();
@@ -459,17 +456,15 @@ ColKey Table::add_column_list(Table& target, StringData name)
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
-    if (!origin_group || !target_group)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (origin_group != target_group)
-        throw LogicError(LogicError::group_mismatch);
+    REALM_ASSERT_RELEASE(origin_group && target_group);
+    REALM_ASSERT_RELEASE(origin_group == target_group);
     // Only links to embedded objects are allowed.
     if (is_asymmetric() && !target.is_embedded()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("List of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("List of ephemeral objects not supported");
     }
 
     m_has_any_embedded_objects.reset();
@@ -486,19 +481,17 @@ ColKey Table::add_column_set(Table& target, StringData name)
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
-    if (!origin_group || !target_group)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (origin_group != target_group)
-        throw LogicError(LogicError::group_mismatch);
+    REALM_ASSERT_RELEASE(origin_group && target_group);
+    REALM_ASSERT_RELEASE(origin_group == target_group);
     if (target.is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Set of embedded objects not supported");
     // Outgoing links from an asymmetric table are not allowed.
     if (is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Set of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Set of ephemeral objects not supported");
     }
 
     ColumnAttrMask attr;
@@ -509,8 +502,7 @@ ColKey Table::add_column_set(Table& target, StringData name)
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
-    if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
-        throw LogicError(LogicError::illegal_type);
+    REALM_ASSERT(is_link_type(ColumnType(type)));
 
     if (type == type_LinkList) {
         return add_column_list(target, name);
@@ -538,17 +530,15 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
-    if (!origin_group || !target_group)
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (origin_group != target_group)
-        throw LogicError(LogicError::group_mismatch);
+    REALM_ASSERT_RELEASE(origin_group && target_group);
+    REALM_ASSERT_RELEASE(origin_group == target_group);
     // Only links to embedded objects are allowed.
     if (is_asymmetric() && !target.is_embedded()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Dictionary of ephemeral objects not supported");
     }
 
     ColumnAttrMask attr;
@@ -938,7 +928,7 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
         (type == IndexType::Fulltext && col_key.get_type() != col_type_String)) {
         // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
         // it should probably be a type mismatch exception instead.
-        throw LogicError(LogicError::illegal_combination);
+        throw IllegalOperation(util::format("Index not supported for this property: %1", get_column_name(col_key)));
     }
 
     // m_index_accessors always has the same number of pointers as the number of columns. Columns without search
@@ -1154,7 +1144,8 @@ void Table::set_table_type(Type table_type, bool handle_backlinks)
     }
 
     if (m_table_type == Type::TopLevelAsymmetric || table_type == Type::TopLevelAsymmetric) {
-        throw std::logic_error(util::format("Cannot change '%1' to/from asymmetric.", get_name()));
+        throw LogicError(ErrorCodes::MigrationFailed, util::format("Cannot change '%1' from %2 to %3",
+                                                                   get_class_name(), m_table_type, table_type));
     }
 
     REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);
@@ -1170,7 +1161,7 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
 
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
-        throw std::logic_error(
+        throw IllegalOperation(
             util::format("Cannot change '%1' to embedded when using a primary key.", get_class_name()));
     }
 
@@ -1227,7 +1218,7 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
                 auto source_col = get_opposite_column(col);
                 if (source_col.get_type() == col_type_Mixed) {
                     auto source_table = get_opposite_table(col);
-                    throw std::logic_error(util::format(
+                    throw IllegalOperation(util::format(
                         "Cannot convert '%1' to embedded: there is an incoming link from the Mixed property '%2.%3', "
                         "which does not support linking to embedded objects.",
                         get_class_name(), source_table->get_class_name(), source_table->get_column_name(source_col)));
@@ -1239,7 +1230,7 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
         for (size_t i = 0; i < size; ++i) {
             if (incoming_link_count[i] == LinkCount::None) {
                 if (!handle_backlinks) {
-                    throw std::logic_error(util::format("Cannot convert '%1' to embedded: at least one object has no "
+                    throw IllegalOperation(util::format("Cannot convert '%1' to embedded: at least one object has no "
                                                         "incoming links and would be deleted.",
                                                         get_class_name()));
                 }
@@ -1247,7 +1238,7 @@ void Table::set_embedded(bool embedded, bool handle_backlinks)
             }
             else if (incoming_link_count[i] == LinkCount::Multiple) {
                 if (!handle_backlinks) {
-                    throw std::logic_error(util::format(
+                    throw IllegalOperation(util::format(
                         "Cannot convert '%1' to embedded: at least one object has more than one incoming link.",
                         get_class_name()));
                 }
@@ -1745,8 +1736,8 @@ bool Table::migrate_objects()
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
         if (!(col_ndx < col_refs.size())) {
-            throw std::runtime_error(
-                util::format("Objects in '%1' corrupted by previous upgrade attempt", get_name()));
+            throw RuntimeError(ErrorCodes::BrokenInvariant,
+                               util::format("Objects in '%1' corrupted by previous upgrade attempt", get_name()));
         }
 
         if (!col_refs.get(col_ndx)) {
@@ -1914,7 +1905,7 @@ bool Table::migrate_objects()
 
 #if 0
     if (fastrand(100) < 20) {
-        throw util::runtime_error("Upgrade interrupted");
+        throw std::runtime_error("Upgrade interrupted"); // Can be used for testing
     }
 #endif
     return !has_link_columns;
@@ -2560,7 +2551,7 @@ TableView Table::find_all_string(ColKey col_key, StringData value) const
 
 TableView Table::find_all_binary(ColKey, BinaryData)
 {
-    throw util::runtime_error("Not implemented");
+    throw Exception(ErrorCodes::IllegalOperation, "Table::find_all_binary not supported");
 }
 
 TableView Table::find_all_binary(ColKey col_key, BinaryData value) const
@@ -2607,24 +2598,9 @@ TableView Table::get_sorted_view(SortDescriptor order) const
     return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
-
-const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain) const
+util::Logger* Table::get_logger() const noexcept
 {
-    const Table* table = this;
-    for (size_t t = 0; t < link_chain.size(); t++) {
-        // Link column can be a single Link, LinkList, or BackLink.
-        REALM_ASSERT(table->valid_column(link_chain[t]));
-        ColumnType type = table->get_real_column_type(link_chain[t]);
-        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            table = table->get_opposite_table(link_chain[t]).unchecked_ptr();
-        }
-        else {
-            // Only last column in link chain is allowed to be non-link
-            if (t + 1 != link_chain.size())
-                throw(LogicError::type_mismatch);
-        }
-    }
-    return table;
+    return *m_repl ? (*m_repl)->get_logger() : nullptr;
 }
 
 // Called after a commit. Table will effectively contain the same as before,
@@ -2743,16 +2719,6 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
     out << "]";
 }
 
-
-size_t Table::compute_aggregated_byte_size() const noexcept
-{
-    if (!m_top.is_attached())
-        return 0;
-    const Array& real_top = (m_top);
-    MemStats stats_2;
-    real_top.stats(stats_2);
-    return stats_2.allocated;
-}
 
 bool Table::operator==(const Table& t) const
 {
@@ -2930,8 +2896,10 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
-    if (is_embedded() || m_primary_key_col)
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (is_embedded())
+        throw IllegalOperation(util::format("Explicit creation of embedded object not allowed in: %1", get_name()));
+    if (m_primary_key_col)
+        throw IllegalOperation(util::format("Table has primary key: %1", get_name()));
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
@@ -2953,13 +2921,11 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     return obj;
 }
 
-Obj Table::create_linked_object(GlobalKey object_id)
+Obj Table::create_linked_object()
 {
-    if (!is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
-    if (!object_id) {
-        object_id = allocate_object_id_squeezed();
-    }
+    REALM_ASSERT(is_embedded());
+
+    GlobalKey object_id = allocate_object_id_squeezed();
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     REALM_ASSERT(key.value >= 0);
@@ -2971,8 +2937,10 @@ Obj Table::create_linked_object(GlobalKey object_id)
 
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
-    if (is_embedded() || m_primary_key_col)
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (is_embedded())
+        throw IllegalOperation(util::format("Explicit creation of embedded object not allowed in: %1", get_name()));
+    if (m_primary_key_col)
+        throw IllegalOperation(util::format("Table has primary key: %1", get_name()));
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
@@ -3005,10 +2973,22 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 {
     auto primary_key_col = get_primary_key_column();
     if (is_embedded() || !primary_key_col)
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw InvalidArgument(ErrorCodes::UnexpectedPrimaryKey,
+                              util::format("Table has no primary key: %1", get_name()));
+
     DataType type = DataType(primary_key_col.get_type());
-    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
-                 primary_key.get_type() == type);
+
+    if (primary_key.is_null() && !primary_key_col.is_nullable()) {
+        throw InvalidArgument(
+            ErrorCodes::PropertyNotNullable,
+            util::format("Primary key for class %1 cannot be NULL", Group::table_name_to_class_name(get_name())));
+    }
+
+    if (!(primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) &&
+        primary_key.get_type() != type) {
+        throw InvalidArgument(ErrorCodes::TypeMismatch, util::format("Wrong primary key type for class %1",
+                                                                     Group::table_name_to_class_name(get_name())));
+    }
 
     REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int || type == type_UUID);
 
@@ -3018,9 +2998,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     // Check for existing object
     if (ObjKey key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
         if (mode == UpdateMode::never) {
-            throw std::logic_error(
-                util::format("Attempting to create an object in '%1' with an existing primary key value '%2'.",
-                             get_name(), primary_key));
+            throw ObjectAlreadyExists(this->get_class_name(), primary_key);
         }
         auto obj = m_clusters.get(key);
         for (auto& val : field_values) {
@@ -3422,7 +3400,7 @@ void Table::remove_object(ObjKey key)
 ObjKey Table::invalidate_object(ObjKey key)
 {
     if (is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Deletion of embedded object not allowed");
     REALM_ASSERT(!key.is_unresolved());
 
     Obj tombstone;
@@ -3592,7 +3570,8 @@ void Table::set_primary_key_column(ColKey col_key)
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error(
+            throw RuntimeError(
+                ErrorCodes::BrokenInvariant,
                 util::format("Cannot change primary key property in '%1' when realm is synchronized", get_name()));
         }
     }
@@ -3648,7 +3627,8 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(get_class_name(), get_column_name(col));
+        throw MigrationFailed(util::format("Primary key property '%1.%2' has duplicate values after migration.",
+                                           get_class_name(), get_column_name(col)));
     }
 }
 
@@ -3713,8 +3693,9 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
         for (size_t i = 0; i < sz; i++) {
             if (from_nullability && from_arr.is_null(i)) {
                 if (throw_on_null) {
-                    throw std::runtime_error(util::format("Objects in '%1' has null value(s) in property '%2'",
-                                                          get_name(), get_column_name(key_from)));
+                    throw RuntimeError(ErrorCodes::BrokenInvariant,
+                                       util::format("Objects in '%1' has null value(s) in property '%2'", get_name(),
+                                                    get_column_name(key_from)));
                 }
                 else {
                     to_arr.set(i, ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
@@ -3761,9 +3742,9 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
                     }
                     else {
                         if (throw_on_null) {
-                            throw std::runtime_error(
-                                util::format("Objects in '%1' has null value(s) in list property '%2'", get_name(),
-                                             get_column_name(key_from)));
+                            throw RuntimeError(ErrorCodes::BrokenInvariant,
+                                               util::format("Objects in '%1' has null value(s) in list property '%2'",
+                                                            get_name(), get_column_name(key_from)));
                         }
                         else {
                             to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));

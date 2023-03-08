@@ -2,9 +2,11 @@
 
 #include <realm.h>
 #include <realm/object-store/object.hpp>
-#include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
+#include <realm/object-store/c_api/realm.hpp>
+#include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/util/base64.hpp>
 
 #include "sync/flx_sync_harness.hpp"
@@ -16,6 +18,7 @@
 #include <cstring>
 #include <numeric>
 #include <thread>
+#include <fstream>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
@@ -25,8 +28,7 @@
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/sync/client_base.hpp>
-#include <realm/sync/network/default_socket.hpp>
-#include <realm/sync/network/network.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/util/misc_errors.hpp>
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
@@ -264,6 +266,23 @@ CPtr<T> clone_cptr(const T* ptr)
         }                                                                                                            \
     } while (false);
 
+#define CHECK_ERR_CAT(err, category)                                                                                 \
+    do {                                                                                                             \
+        realm_error_t _err;                                                                                          \
+        _err.message = "";                                                                                           \
+        _err.categories = 0;                                                                                         \
+        _err.error = RLM_ERR_NONE;                                                                                   \
+        CHECK(realm_get_last_error(&_err));                                                                          \
+        CHECK((_err.categories ^ category) == 0);                                                                    \
+        if (_err.error != err) {                                                                                     \
+            CHECK(_err.error == err);                                                                                \
+            CHECK(std::string{_err.message} == "");                                                                  \
+        }                                                                                                            \
+        else {                                                                                                       \
+            realm_clear_last_error();                                                                                \
+        }                                                                                                            \
+    } while (false);
+
 #if REALM_ENABLE_AUTH_TESTS
 class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
@@ -415,7 +434,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_error_t err;
         CHECK(realm_get_last_error(&err));
-        CHECK(err.error == RLM_ERR_OTHER_EXCEPTION);
+        CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
         realm_clear_last_error();
     }
@@ -434,7 +453,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_error_t err;
         realm_get_async_error(async_err, &err);
 
-        CHECK(err.error == RLM_ERR_OTHER_EXCEPTION);
+        CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
 
         SECTION("realm_clone()") {
@@ -442,7 +461,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(realm_equals(async_err, cloned.get()));
             realm_error_t err2;
             realm_get_async_error(cloned.get(), &err2);
-            CHECK(err2.error == RLM_ERR_OTHER_EXCEPTION);
+            CHECK(err2.error == RLM_ERR_RUNTIME);
             CHECK(std::string{err2.message} == "Synthetic error");
         }
 
@@ -477,7 +496,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         // realm_config_t is not sendable between threads
         auto config = cptr(realm_config_new());
         CHECK(!realm_create_thread_safe_reference(config.get()));
-        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
     }
 
     SECTION("realm_is_frozen() false by default") {
@@ -511,7 +530,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(len == 64);
 
             CHECK(!realm_config_set_encryption_key(config.get(), key, 63));
-            CHECK_ERR(RLM_ERR_LOGIC);
+            CHECK_ERR(RLM_ERR_INVALID_ENCRYPTION_KEY);
         }
 
         SECTION("realm_config_set_schema()") {
@@ -643,7 +662,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         std::string message;
 
         std::error_code error_code = make_error_code(sync::ClientError::connection_closed);
-        realm_sync_error_code_t error = c_api::to_capi(error_code, message);
+        realm_sync_error_code_t error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
         CHECK(error.value == int(error_code.value()));
         CHECK(error_code.message() == error.message);
@@ -655,7 +674,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(sync::ProtocolError::connection_closed);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
 
         c_api::sync_error_to_error_code(error, &ec_check);
@@ -663,7 +682,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(sync::ProtocolError::session_closed);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
 
         c_api::sync_error_to_error_code(error, &ec_check);
@@ -671,24 +690,25 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
 
         c_api::sync_error_to_error_code(error, &ec_check);
         CHECK(ec_check.category() == std::system_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
-        error_code = make_error_code(sync::network::ResolveErrors::socket_type_not_supported);
-        error = c_api::to_capi(error_code, message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_RESOLVE);
-        CHECK(error.value == realm_sync_error_resolve_e::RLM_SYNC_ERROR_RESOLVE_SOCKET_TYPE_NOT_SUPPORTED);
+        error_code.assign(ErrorCodes::WebSocketResolveFailedError,
+                          realm::sync::websocket::websocket_error_category());
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
+        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_WEBSOCKET);
+        CHECK(error.value == realm_errno::RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR);
 
         c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::sync::network::resolve_error_category());
+        CHECK(ec_check.category() == realm::sync::websocket::websocket_error_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
         error_code = make_error_code(util::error::misc_errors::unknown);
-        error = c_api::to_capi(error_code, message);
+        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
 
         c_api::sync_error_to_error_code(error, &ec_check);
@@ -1045,6 +1065,16 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
     return false;
 }
 
+struct LogUserData {
+    std::vector<std::string> log;
+};
+
+void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
+{
+    LogUserData* userdata = static_cast<LogUserData*>(u);
+    userdata->log.emplace_back(message);
+}
+
 } // anonymous namespace
 
 TEST_CASE("C API", "[c_api]") {
@@ -1061,6 +1091,18 @@ TEST_CASE("C API", "[c_api]") {
         realm_config_set_schema_mode(config.get(), RLM_SCHEMA_MODE_AUTOMATIC);
         realm_config_set_schema_version(config.get(), 0);
         realm_config_set_schema(config.get(), schema.get());
+
+        SECTION("error on open") {
+            {
+                std::ofstream o(test_file_2.path.c_str());
+                o << "Mary had a little lamb" << std::endl;
+            }
+            CHECK(!realm_open(config.get()));
+            realm_error_t err;
+            CHECK(realm_get_last_error(&err));
+            REQUIRE(test_file_2.path == err.path);
+            CHECK(realm_clear_last_error());
+        }
 
         SECTION("data initialization callback") {
             ConfigUserdata userdata;
@@ -1325,6 +1367,26 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(realm_clear_last_error());
             delete ex;
         }
+    }
+
+    SECTION("logging") {
+        LogUserData userdata;
+        auto log_level_old = util::Logger::get_default_level_threshold();
+        realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+        auto config = make_config(test_file.path.c_str(), false);
+        realm_t* realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.size() == 2);
+        userdata.log.clear();
+        realm_set_log_level(RLM_LOG_LEVEL_ERROR);
+        realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.empty());
+
+        // Remove this logger again
+        realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
+        // Restore old log level
+        util::Logger::set_default_level_threshold(log_level_old);
     }
 
     realm_t* realm;
@@ -1670,7 +1732,7 @@ TEST_CASE("C API", "[c_api]") {
     SECTION("realm_remove_table()") {
         bool table_deleted = true;
         CHECK(!realm_remove_table(realm, "Foo", &table_deleted));
-        CHECK_ERR(RLM_ERR_LOGIC);
+        CHECK_ERR(RLM_ERR_INVALID_SCHEMA_CHANGE);
         CHECK(!table_deleted);
     }
 
@@ -1794,7 +1856,7 @@ TEST_CASE("C API", "[c_api]") {
             write([&]() {
                 auto p = realm_object_create_with_primary_key(realm, class_bar.key, rlm_str_val("Hello"));
                 CHECK(!p);
-                CHECK_ERR(RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
+                CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
             });
 
             write([&]() {
@@ -1816,13 +1878,13 @@ TEST_CASE("C API", "[c_api]") {
                 cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123)));
                 auto p = realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123));
                 CHECK(!p);
-                CHECK_ERR(RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
+                CHECK_ERR(RLM_ERR_OBJECT_ALREADY_EXISTS);
             });
         }
 
         SECTION("not in a transaction") {
             CHECK(!realm_object_create(realm, class_foo.key));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
         }
     }
 
@@ -1968,7 +2030,7 @@ TEST_CASE("C API", "[c_api]") {
 
         SECTION("realm_set_value() errors") {
             CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_int_val(456), false));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
             write([&]() {
                 CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_null(), false));
@@ -1985,7 +2047,7 @@ TEST_CASE("C API", "[c_api]") {
         SECTION("realm_set_values() errors") {
             realm_value_t int456 = rlm_int_val(456);
             CHECK(!realm_set_values(obj1.get(), 1, &foo_int_key, &int456, false));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
             write([&]() {
                 realm_value_t value;
@@ -2035,7 +2097,7 @@ TEST_CASE("C API", "[c_api]") {
             }
             SECTION("ERROR") {
                 CHECK(!realm_object_add_int(obj1.get(), foo_int_key, 10));
-                CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+                CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
             }
         }
 
@@ -2271,15 +2333,19 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("realm_query_parse() errors") {
                 // Invalid class key
                 CHECK(!realm_query_parse(realm, 123123123, "string == $0", num_args, arg_list));
-                CHECK_ERR(RLM_ERR_NO_SUCH_TABLE);
+                CHECK_ERR_CAT(RLM_ERR_NO_SUCH_TABLE, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid syntax
                 CHECK(!realm_query_parse(realm, class_foo.key, "lel", 0, nullptr));
-                CHECK_ERR(RLM_ERR_INVALID_QUERY_STRING);
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_STRING, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+
+                // Invalid property
+                CHECK(!realm_query_parse(realm, class_foo.key, "strong = 5", 0, nullptr));
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
-                CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
             SECTION("decimal NaN") {
@@ -2625,7 +2691,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 SECTION("realm_results_delete_all()") {
                     CHECK(!realm_results_delete_all(r.get()));
-                    CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+                    CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
                     write([&]() {
                         size_t num_objects;
@@ -4510,23 +4576,23 @@ TEST_CASE("C API", "[c_api]") {
 
             SECTION("type error") {
                 CHECK(!realm_object_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_list_from_thread_safe_reference(realm, foo_obj_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_set_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_dictionary_from_thread_safe_reference(realm, set_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_results_from_thread_safe_reference(realm, list_tsr.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
                 CHECK(!realm_from_thread_safe_reference(list_tsr.get(), nullptr));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             }
 
             SECTION("non-sendable") {
                 auto c = cptr(realm_config_new());
                 CHECK(!realm_create_thread_safe_reference(c.get()));
-                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             }
         }
     }
@@ -4840,6 +4906,8 @@ struct Userdata {
     bool has_error;
     realm_error_t error;
     realm_thread_safe_reference_t* realm_ref = nullptr;
+    std::string error_message;
+    std::string error_catagory;
 };
 
 #if REALM_ENABLE_SYNC
@@ -4854,6 +4922,14 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     if (userdata_p->has_error)
         realm_get_async_error(async_error, &userdata_p->error);
     userdata_p->called = true;
+}
+
+static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
+{
+    auto userdata_p = static_cast<Userdata*>(p);
+    userdata_p->has_error = true;
+    userdata_p->error_message = error.error_code.message;
+    userdata_p->error_catagory = error.error_code.category_name;
 }
 
 TEST_CASE("C API - async_open", "[c_api][sync]") {
@@ -4915,9 +4991,11 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         sync_config->user->update_access_token(std::move(invalid_token));
 
         realm_config_set_path(config, test_config.path.c_str());
-        realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
+        realm_sync_config_set_error_handler(sync_config, sync_error_handler, &userdata, nullptr);
+        realm_config_set_sync_config(config, sync_config);
+
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
@@ -4927,10 +5005,98 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         });
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
+        REQUIRE(userdata.error_message == "Bad user authentication (BIND)");
+        REQUIRE(userdata.error_catagory == "realm::sync::ProtocolError");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
     }
+}
+
+struct BCTOState {
+    bool bcto_deleted = false;
+    bool thread_create_called = false;
+    bool thread_destroy_called = false;
+    std::string thread_on_error_message;
+    std::string id = "BTCO-STATE";
+};
+
+
+TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
+    auto bcto_user_data = BCTOState();
+
+    auto bcto_free_userdata = [](realm_userdata_t userdata) {
+        REQUIRE(userdata);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE(user_data->bcto_deleted == false);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        user_data->id.clear();
+        user_data->bcto_deleted = true;
+    };
+
+    auto bcto_on_thread_create = [](realm_userdata_t userdata) {
+        REQUIRE(userdata);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE(user_data->bcto_deleted == false);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(!user_data->thread_create_called);
+        user_data->thread_create_called = true;
+    };
+
+    auto bcto_on_thread_destroy = [](realm_userdata_t userdata) {
+        REQUIRE(userdata);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE(user_data->bcto_deleted == false);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(!user_data->thread_destroy_called);
+        user_data->thread_destroy_called = true;
+    };
+
+    auto bcto_on_thread_error = [](realm_userdata_t userdata, const char* err_message) {
+        REQUIRE(userdata);
+        REQUIRE(err_message);
+        auto user_data = static_cast<BCTOState*>(userdata);
+        REQUIRE(user_data->bcto_deleted == false);
+        REQUIRE((user_data && user_data->id == "BTCO-STATE"));
+        REQUIRE(user_data->thread_on_error_message.empty());
+        user_data->thread_on_error_message = err_message;
+        return true;
+    };
+
+    {
+        auto config = cptr(realm_sync_client_config_new());
+        realm_sync_client_config_set_default_binding_thread_observer(
+            config.get(), bcto_on_thread_create, bcto_on_thread_destroy, bcto_on_thread_error,
+            static_cast<realm_userdata_t>(&bcto_user_data), bcto_free_userdata);
+        REQUIRE(config->default_socket_provider_thread_observer);
+        auto observer_ptr =
+            static_cast<CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
+        REQUIRE(observer_ptr->test_get_create_callback_func() == bcto_on_thread_create);
+        REQUIRE(observer_ptr->test_get_destroy_callback_func() == bcto_on_thread_destroy);
+        REQUIRE(observer_ptr->test_get_error_callback_func() == bcto_on_thread_error);
+        REQUIRE(observer_ptr->test_get_userdata_ptr() == &bcto_user_data);
+
+        auto test_thread = std::thread([&]() {
+            auto bcto_ptr = std::static_pointer_cast<realm::BindingCallbackThreadObserver>(
+                config->default_socket_provider_thread_observer);
+            REQUIRE(bcto_ptr);
+            auto will_destroy_thread = util::make_scope_exit([&bcto_ptr]() noexcept {
+                bcto_ptr->will_destroy_thread();
+            });
+            bcto_ptr->did_create_thread();
+            REQUIRE(bcto_ptr->handle_error(MultipleSyncAgents()));
+        });
+
+        // Wait for the thread to exit
+        test_thread.join();
+
+        REQUIRE(bcto_user_data.thread_create_called);
+        REQUIRE(bcto_user_data.thread_on_error_message.find(
+                    "Multiple sync agents attempted to join the same session") != std::string::npos);
+        REQUIRE(bcto_user_data.thread_destroy_called);
+    }
+
+    REQUIRE(bcto_user_data.bcto_deleted == true);
 }
 #endif
 
@@ -5126,7 +5292,7 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
 TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
     struct TestTransportUserData {
         TestTransportUserData()
-            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL))
+            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL))
             , transport(std::make_unique<SynchronousTestTransport>())
         {
         }
@@ -5900,7 +6066,7 @@ TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         auto cb = [callback_copy = callback](Status s) {
-            realm_sync_socket_callback_complete(callback_copy, static_cast<status_error_code_e>(s.code()),
+            realm_sync_socket_callback_complete(callback_copy, static_cast<realm_web_socket_errno_e>(s.code()),
                                                 s.reason().c_str());
         };
         test_data->socket_provider->post(std::move(cb));

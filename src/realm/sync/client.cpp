@@ -189,8 +189,6 @@ public:
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
 
     void initiate();
-    void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
-                  std::string signed_access_token);
 
     void force_close();
 
@@ -415,7 +413,7 @@ void ClientImpl::cancel_reconnect_delay()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         for (auto& p : m_server_slots) {
             ServerSlot& slot = p.second;
@@ -473,7 +471,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         std::lock_guard lock{m_mutex};
         m_sessions_terminated = true;
@@ -805,7 +803,7 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
     }
     catch (const LogicError& ex) {
-        if (ex.kind() == LogicError::binary_too_big) {
+        if (ex.code() == ErrorCodes::LimitExceeded) {
             IntegrationException ex(ClientError::bad_changeset_size,
                                     "bootstrap changeset too large to store in pending bootstrap store");
             on_integration_failure(ex);
@@ -1054,7 +1052,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
@@ -1135,7 +1133,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             return; // Already finalized
@@ -1240,21 +1238,7 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 inline void SessionWrapper::initiate()
 {
-    // FIXME: Storing connection related information in the session object seems
-    // unnecessary and goes against the idea that a session should be truely
-    // lightweight (when many share a single connection). The original idea was
-    // that all connection related information is passed directly from the
-    // caller of initiate() to the connection constructor.
     do_initiate(m_protocol_envelope, m_server_address, m_server_port); // Throws
-}
-
-
-inline void SessionWrapper::initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port,
-                                     std::string virt_path, std::string signed_access_token)
-{
-    m_virt_path = std::move(virt_path);
-    m_signed_access_token = std::move(signed_access_token);
-    do_initiate(protocol, std::move(server_address), server_port); // Throws
 }
 
 
@@ -1268,7 +1252,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1290,7 +1274,7 @@ void SessionWrapper::cancel_reconnect_delay()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1314,7 +1298,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
@@ -1361,7 +1345,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
@@ -1404,7 +1388,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
@@ -1440,7 +1424,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
@@ -1807,7 +1791,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         REALM_ASSERT(m_activated);
         if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
@@ -1969,27 +1953,6 @@ void Session::set_connection_state_change_listener(util::UniqueFunction<Connecti
 void Session::bind()
 {
     m_impl->initiate(); // Throws
-}
-
-
-void Session::bind(std::string server_url, std::string signed_access_token)
-{
-    ClientImpl& client = m_impl->get_client();
-    ProtocolEnvelope protocol = {};
-    std::string address;
-    port_type port = {};
-    std::string path;
-    if (!client.decompose_server_url(server_url, protocol, address, port, path)) // Throws
-        throw BadServerUrl();
-    bind(std::move(address), std::move(path), std::move(signed_access_token), port, protocol); // Throws
-}
-
-
-void Session::bind(std::string server_address, std::string realm_identifier, std::string signed_access_token,
-                   port_type server_port, ProtocolEnvelope protocol)
-{
-    m_impl->initiate(protocol, std::move(server_address), server_port, std::move(realm_identifier),
-                     std::move(signed_access_token)); // Throws
 }
 
 

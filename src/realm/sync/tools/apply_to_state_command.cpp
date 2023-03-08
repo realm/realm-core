@@ -95,9 +95,16 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     ret.progress.latest_server_version.salt = msg.read_next<sync::salt_type>();
     ret.progress.upload.client_version = msg.read_next<sync::version_type>();
     ret.progress.upload.last_integrated_server_version = msg.read_next<sync::version_type>();
-    ret.query_version = is_flx_sync ? msg.read_next<int64_t>() : 0;
-    auto last_in_batch = is_flx_sync ? msg.read_next<bool>() : true;
-    ret.batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_flx_sync) {
+        ret.query_version = msg.read_next<int64_t>();
+        auto last_in_batch = msg.read_next<bool>();
+        ret.batch_state =
+            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    }
+    else {
+        ret.query_version = 0;
+        ret.batch_state = sync::DownloadBatchState::SteadyState;
+    }
     ret.downloadable_bytes = msg.read_next<int64_t>();
     auto is_body_compressed = msg.read_next<bool>();
     auto uncompressed_body_size = msg.read_next<size_t>();

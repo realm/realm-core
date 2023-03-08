@@ -29,6 +29,7 @@
 #include <random>
 #include <deque>
 #include <thread>
+#include <chrono>
 #include <condition_variable>
 
 #include <realm/disable_sync_to_disk.hpp>
@@ -590,12 +591,12 @@ public:
             bool picked_newest = read_lock.m_reader_idx == (unsigned)newest;
             auto& r = m_info->readers.get(read_lock.m_reader_idx);
             if (pick_specific && version_id.version != r.version)
-                throw BadVersion();
+                throw BadVersion(version_id.version);
             if (!picked_newest) {
                 if (type == ReadLockInfo::Frozen && r.count_frozen == 0 && r.count_live == 0)
-                    throw BadVersion();
+                    throw BadVersion(version_id.version);
                 if (type != ReadLockInfo::Frozen && r.count_live == 0)
-                    throw BadVersion();
+                    throw BadVersion(version_id.version);
             }
             populate_read_lock(read_lock, r, type);
         }
@@ -806,11 +807,19 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
+    using util::format;
 
     REALM_ASSERT(!is_attached());
     REALM_ASSERT(path.size());
 
     m_db_path = path;
+    m_path_hash = StringData(path).hash() & 0xffff;
+    set_logger(options.logger);
+    if (m_replication) {
+        m_replication->set_logger(m_logger.get());
+    }
+    if (m_logger)
+        m_logger->log(util::Logger::Level::info, "Open file: %1", path);
     SlabAlloc& alloc = m_alloc;
     if (options.is_immutable) {
         SlabAlloc::Config cfg;
@@ -970,19 +979,16 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Architecture mismatch: SharedInfo size is %1 but should be %2.",
+                                                    info_size, sizeof(SharedInfo)));
         }
         if (info->shared_info_version != g_shared_info_version) {
             if (retries_left) {
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Shared info version doesn't match, " << info->shared_info_version << " " << g_shared_info_version
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Version mismatch: SharedInfo version is %1 but should be %2.",
+                                                    info->shared_info_version, g_shared_info_version));
         }
         // Validate compatible sizes of mutex and condvar types. Sizes of all
         // other fields are architecture independent, so if condvar and mutex
@@ -994,10 +1000,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Mutex size doesn't match: " << info->size_of_mutex << " " << sizeof(info->shared_controlmutex)
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(path, format("Architecture mismatch: Mutex size is %1 but should be %2.",
+                                                    info->size_of_mutex, sizeof(info->shared_controlmutex)));
         }
 
         if (info->size_of_condvar != sizeof info->room_to_write) {
@@ -1005,10 +1009,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 --retries_left;
                 continue;
             }
-            std::stringstream ss;
-            ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " << sizeof(info->room_to_write)
-               << ".";
-            throw IncompatibleLockFile(ss.str());
+            throw IncompatibleLockFile(
+                path, format("Architecture mismatch: Condition variable size is %1 but should be %2.",
+                             info->size_of_condvar, sizeof(info->room_to_write)));
         }
         m_writemutex.set_shared_part(info->shared_writemutex, lockfile_prefix, "write");
         m_controlmutex.set_shared_part(info->shared_controlmutex, lockfile_prefix, "control");
@@ -1017,7 +1020,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
         if (!m_controlmutex.is_valid()) {
-            throw IncompatibleLockFile("Control mutex is invalid.");
+            throw IncompatibleLockFile(
+                path, "Control mutex is invalid. This suggests that incompatible pthread libraries are in use.");
         }
 
         // OK! lock file appears valid. We can now continue operations under the protection
@@ -1103,9 +1107,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
                 }
-                catch (InvalidDatabase& e) {
+                catch (const InvalidDatabase& e) {
                     if (e.get_path().empty()) {
-                        e.set_path(path);
+                        throw InvalidDatabase(e.what(), path);
                     }
                     throw;
                 }
@@ -1143,8 +1147,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                         good_history_type = (stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format("Expected a Realm without history, but found history type %1",
-                                             stored_hist_type),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened "
+                                             "with replication disabled.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_OutOfRealm:
@@ -1155,27 +1160,28 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                                              stored_hist_type == Replication::hist_None);
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format(
-                                    "Expected a Realm with no or in-realm history, but found history type %1",
-                                    stored_hist_type),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "local history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_SyncClient:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncClient) || (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
-                                util::format(
-                                    "Expected an empty or synced Realm, but found history type %1, top ref %2",
-                                    stored_hist_type, top_ref),
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "synchronized history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
                                 path);
                         break;
                     case Replication::hist_SyncServer:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) || (top_ref == 0));
                         if (!good_history_type)
-                            throw IncompatibleHistories(util::format("Expected a Realm containing a server-side "
-                                                                     "history, but found history type %1, top ref %2",
-                                                                     stored_hist_type, top_ref),
-                                                        path);
+                            throw IncompatibleHistories(
+                                util::format("Realm file at path '%1' has history type '%2', but is being opened in "
+                                             "server history mode.",
+                                             path, Replication::history_type_name(stored_hist_type)),
+                                path);
                         break;
                 }
 
@@ -1199,7 +1205,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 bool need_file_format_upgrade =
                     current_file_format_version < target_file_format_version && top_ref != 0;
                 if (!options.allow_file_format_upgrade && (need_hist_schema_upgrade || need_file_format_upgrade)) {
-                    throw FileFormatUpgradeRequired("Database upgrade required but prohibited", m_db_path);
+                    throw FileFormatUpgradeRequired(m_db_path);
                 }
 
                 alloc.convert_from_streaming_form(top_ref);
@@ -1236,14 +1242,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // make sure that all possible concurrent session participants
                 // use the same durability setting for the same Realm file.
                 if (Durability(info->durability) != options.durability)
-                    throw LogicError(LogicError::mixed_durability);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "Durability not consistent");
 
                 // History type must be consistent across a session. An
                 // inconsistency is a logic error, as the user is required to
                 // make sure that all possible concurrent session participants
                 // use the same history type for the same Realm file.
                 if (info->history_type != openers_hist_type)
-                    throw LogicError(LogicError::mixed_history_type);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "History type not consistent");
 
                 // History schema version must be consistent across a
                 // session. An inconsistency is a logic error, as the user is
@@ -1251,7 +1257,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // participants use the same history schema version for the same
                 // Realm file.
                 if (info->history_schema_version != openers_hist_schema_version)
-                    throw LogicError(LogicError::mixed_history_schema_version);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "History schema version not consistent");
 #ifdef _WIN32
                 uint64_t pid = GetCurrentProcessId();
 #else
@@ -1263,7 +1269,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
                        << ".";
-                    throw std::runtime_error(ss.str());
+                    throw Exception(ErrorCodes::IllegalOperation, ss.str());
                 }
 
                 // We need per session agreement among all participants on the
@@ -1279,10 +1285,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // throw the same kind of exception, as would have been thrown
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
-                    std::stringstream ss;
-                    ss << "File format version doesn't match: " << info->file_format_version << " "
-                       << target_file_format_version << ".";
-                    throw IncompatibleLockFile(ss.str());
+                    throw IncompatibleLockFile(path,
+                                               format("Version mismatch: File format version is %1 but should be %2.",
+                                                      info->file_format_version, target_file_format_version));
                 }
 
                 // Even though this session participant is not the session initiator,
@@ -1373,6 +1378,34 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 
     bool no_create = false;
     open(file, no_create, options); // Throws
+}
+class DBLogger : public Logger {
+public:
+    DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
+        : Logger(base_logger->get_level_threshold())
+        , m_base_logger(base_logger)
+        , m_hash(hash)
+    {
+    }
+
+protected:
+    void do_log(Level level, const std::string& message) final
+    {
+        std::ostringstream ostr;
+        auto id = std::this_thread::get_id();
+        ostr << "DB: " << m_hash << " Thread " << id << ": ";
+        Logger::do_log(*m_base_logger, level, ostr.str() + message);
+    }
+
+private:
+    std::shared_ptr<util::Logger> m_base_logger;
+    size_t m_hash;
+};
+
+void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
+{
+    if (logger)
+        m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1476,13 +1509,14 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     // Verify that the lock file is still attached. There is no attempt to guard against
     // a race between close() and compact().
     if (is_attached() == false) {
-        throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
+        throw Exception(ErrorCodes::IllegalOperation, m_db_path + ": compact must be done on an open/attached DB");
     }
     auto info = m_info;
     Durability dura = Durability(info->durability);
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
+        auto t1 = std::chrono::steady_clock::now();
 
         // We must be the ONLY DB object attached if we're to do compaction
         if (info->num_participants > 1)
@@ -1494,6 +1528,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // in the VersionList. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
+        auto file_size_before = tr->get_logical_file_size();
 
         // local lock blocking any transaction from starting (and stopping)
         CheckedLockGuard local_lock(m_mutex);
@@ -1560,6 +1595,11 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             logical_file_size = Group::get_logical_file_size(top);
         }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
+        if (m_logger) {
+            auto t2 = std::chrono::steady_clock::now();
+            m_logger->log(util::Logger::Level::info, "DB compacted from: %1 to %2 in %3 us", file_size_before,
+                          logical_file_size, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        }
     }
     return true;
 }
@@ -1569,7 +1609,8 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
-            throw std::runtime_error("Could not write file as not all client changes are integrated in server");
+            throw Exception(ErrorCodes::IllegalOperation,
+                            "All client changes must be integrated in server before writing copy");
         }
     }
 
@@ -1591,7 +1632,13 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
     file.open(path, File::access_ReadWrite, File::create_Must, 0);
     file.resize(0);
 
+    auto t1 = std::chrono::steady_clock::now();
     tr->write(file, output_encryption_key, m_info->latest_version_number, writer);
+    if (m_logger) {
+        auto t2 = std::chrono::steady_clock::now();
+        m_logger->log(util::Logger::Level::info, "DB written to '%1' in %2 us", path,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+    }
 }
 
 uint_fast64_t DB::get_number_of_versions()
@@ -1637,7 +1684,7 @@ void DB::close(bool allow_open_read_transactions)
         {
             CheckedLockGuard local_lock(m_mutex);
             if (!allow_open_read_transactions && m_transaction_count)
-                throw LogicError(LogicError::wrong_transact_state);
+                throw WrongTransactionState("Closing with open read transactions");
         }
         if (m_alloc.is_attached())
             m_alloc.detach();
@@ -1657,9 +1704,9 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     {
         CheckedLockGuard local_lock(m_mutex);
         if (m_write_transaction_open)
-            throw LogicError(LogicError::wrong_transact_state);
+            throw WrongTransactionState("Closing with open write transactions");
         if (!allow_open_read_transactions && m_transaction_count)
-            throw LogicError(LogicError::wrong_transact_state);
+            throw WrongTransactionState("Closing with open read transactions");
     }
     SharedInfo* info = m_info;
     {
@@ -1710,6 +1757,8 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
             m_file.close();
         }
         m_info = nullptr;
+        if (m_logger)
+            m_logger->log(util::Logger::Level::info, "DB closed");
     }
 }
 
@@ -2061,7 +2110,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
         if (need_hist_schema_upgrade) {
             if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired("Database upgrade required but prohibited", this->m_db_path);
+                throw FileFormatUpgradeRequired(this->m_db_path);
 
             Replication* repl = get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
@@ -2079,7 +2128,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         bool need_file_format_upgrade = (current_file_format_version_2 < target_file_format_version);
         if (need_file_format_upgrade) {
             if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired("Database upgrade required but prohibited", this->m_db_path);
+                throw FileFormatUpgradeRequired(this->m_db_path);
             wt->upgrade_file_format(target_file_format_version); // Throws
             // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
@@ -2235,7 +2284,7 @@ void DB::finish_begin_write()
 {
     if (m_info->commit_in_critical_phase) {
         m_writemutex.unlock();
-        throw std::runtime_error("Crash of other process detected, session restart required");
+        throw RuntimeError(ErrorCodes::BrokenInvariant, "Crash of other process detected, session restart required");
     }
 
 
@@ -2332,11 +2381,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
-
+    auto t1 = std::chrono::steady_clock::now();
+    auto commit_size = m_alloc.get_commit_size();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::debug, "Initiate commit version: %1", new_version);
+    }
     if (auto limit = out.get_evacuation_limit()) {
         // Get a work limit based on the size of the transaction we're about to commit
         // Add 4k to ensure progress on small commits
-        size_t work_limit = m_alloc.get_commit_size() / 2 + out.get_free_list_size() + 0x1000;
+        size_t work_limit = commit_size / 2 + out.get_free_list_size() + 0x1000;
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 
@@ -2407,6 +2460,11 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
         m_new_commit_available.notify_all();
     }
+    auto t2 = std::chrono::steady_clock::now();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us", commit_size,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+    }
 }
 
 #ifdef REALM_DEBUG
@@ -2467,7 +2525,7 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
 TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+        throw StaleAccessor("Stale transaction");
     TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
@@ -2486,7 +2544,7 @@ TransactionRef DB::start_read(VersionID version_id)
 TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+        throw StaleAccessor("Stale transaction");
     TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
@@ -2521,7 +2579,7 @@ TransactionRef DB::start_write(bool nonblocking)
         if (!is_attached()) {
             local_lock.unlock();
             end_write_on_correct_thread();
-            throw LogicError(LogicError::wrong_transact_state);
+            throw StaleAccessor("Stale transaction");
         }
         m_write_transaction_open = true;
     }
@@ -2554,6 +2612,10 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         util::CheckedLockGuard lck(tr->m_async_mutex);
         REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
         tr->m_async_stage = Transaction::AsyncState::Requesting;
+        tr->m_request_time_point = std::chrono::steady_clock::now();
+        if (tr->db->m_logger) {
+            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+        }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
@@ -2563,6 +2625,12 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             // we may be in HasCommits
             if (tr->m_async_stage == Transaction::AsyncState::Requesting) {
                 tr->m_async_stage = Transaction::AsyncState::HasLock;
+            }
+            if (tr->db->m_logger) {
+                auto t2 = std::chrono::steady_clock::now();
+                tr->db->m_logger->log(
+                    util::Logger::Level::trace, "Got write lock in %1 us",
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {
                 tr->m_waiting_for_write_lock = false;

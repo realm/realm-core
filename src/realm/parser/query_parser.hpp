@@ -142,7 +142,7 @@ protected:
             else {
                 error_message = util::format("Request for argument at index %1 but no arguments are provided", ndx);
             }
-            throw std::out_of_range(error_message);
+            throw InvalidArgument(ErrorCodes::OutOfBounds, error_message);
         }
     }
     size_t m_count;
@@ -242,10 +242,10 @@ private:
     }
 };
 
-class NoArgsError : public std::out_of_range {
+class NoArgsError : public InvalidQueryArgError {
 public:
     NoArgsError()
-        : std::out_of_range("Attempt to retreive an argument when no arguments were given")
+        : InvalidQueryArgError("Attempt to retreive an argument when no arguments were given")
     {
     }
 };

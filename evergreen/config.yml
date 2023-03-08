@@ -108,8 +108,8 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
-          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING_LEVEL STRING "debug"
+          set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
+          set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "debug"
 
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
@@ -625,7 +625,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b 46606ac78cbf10435197722be4acf14ba97e1038 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 029b693c53074c29379a67789d6a56740b1aaef9 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec

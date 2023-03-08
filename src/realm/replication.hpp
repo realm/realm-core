@@ -235,6 +235,8 @@ public:
         hist_SyncServer = 4
     };
 
+    static const char* history_type_name(int);
+
     /// Returns the type of history maintained by this Replication
     /// implementation, or \ref hist_None if no history is maintained by it.
     ///
@@ -350,6 +352,16 @@ public:
         return nullptr;
     }
 
+    void set_logger(util::Logger* logger)
+    {
+        m_logger = logger;
+    }
+
+    util::Logger* get_logger() const noexcept
+    {
+        return m_logger;
+    }
+
 protected:
     Replication() = default;
 
@@ -408,6 +420,7 @@ private:
 
     _impl::TransactLogBufferStream m_stream;
     _impl::TransactLogEncoder m_encoder{m_stream};
+    util::Logger* m_logger = nullptr;
     mutable const Table* m_selected_table = nullptr;
     mutable CollectionId m_selected_list;
 

@@ -30,6 +30,7 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/backtrace.hpp>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -657,8 +658,6 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     size_t free_space, used_space;
     sg->get_stats(free_space, used_space);
-    auto state_size = rt->compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
-    CHECK_EQUAL(used_space, state_size);
 
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
@@ -787,9 +786,6 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     }
 
     rt->advance_read();
-    auto size_all =
-        rt->compute_aggregated_byte_size(Group::SizeAggregateControl(Group::SizeAggregateControl::size_of_all));
-    CHECK_EQUAL(used_space, size_all);
     auto used_space1 = rt->get_used_space();
     CHECK_EQUAL(used_space, used_space1);
 }
@@ -5349,7 +5345,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history();
-        CHECK_LOGIC_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), LogicError::mixed_history_type);
+        CHECK_RUNTIME_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), ErrorCodes::IncompatibleSession);
     }
 }
 

@@ -2,14 +2,14 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
+* None.
 
 ### Breaking changes
-* None.
+* You can no longer associate a Logger Factory with the SyncManager. Instead you can install one default logger via Logger::set_default_logger(). This logger will then be used all over Core. Logging cmake flags updated to use REALM_TEST_LOGGING and REALM_TEST_LOGGING_LEVEL
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -18,6 +18,57 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 13.6.0 Release notes
+
+### Enhancements
+* Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
+
+### Fixed
+* You may have a crash on Windows if you try to open a file with non-ASCII path. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* Creating subscriptions with queries having unicode parameters causes a server error. ([#6350](https://github.com/realm/realm-core/issues/6350), since v11.7.0)
+
+### Breaking changes
+* BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add CAPI test for Binding Callback Thread Observer. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
+* Implement MigrationStore to support migration from PBS to FLX ([PR #6324](https://github.com/realm/realm-core/pull/6324))
+* Removed overloads of `Session::bind()` that allow binding a sync session to server other than the one configured in `Session::Config` ([PR #6358](https://github.com/realm/realm-core/pull/6358)).
+
+----------------------------------------------
+
+# 13.5.0 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Converting local realm to sync'd realm crashes if an embedded object is null ([#6294](https://github.com/realm/realm-core/issues/6294), since v11.9.0)
+* Fixed performance degradation on SubQueries ([#6327](https://github.com/realm/realm-core/issues/6327), since v6.0.0)
+* The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
+* Fixed several cases where wrong type of exception was thrown ([#6208](https://github.com/realm/realm-core/issues/6208), never released)
+* Fixed classification of InvalidQuery exception ([#6223](https://github.com/realm/realm-core/issues/6223), never released)
+* Fix crash if secure transport returns an error with a non-zero length. ([#5435](https://github.com/realm/realm-core/issues/5435), since 10.0.0)
+
+### Breaking changes
+* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Fixed a test failure originating due to the location for flexible sync permissions in the new version of baas changing.
+([#6319](https://github.com/realm/realm-core/pull/6319))
 
 ----------------------------------------------
 
@@ -87,7 +138,7 @@
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
 ### Breaking changes
-* None.
+* Remove Group::compute_aggregated_byte_size(), which is no longer used by anything.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -465,7 +516,7 @@
 * Fix crash when upserting a document with the primary key not an ObjectId into a mongo collection. ([#5345](https://github.com/realm/realm-core/issues/5345), since v10.0.0).
 
 ### Breaking changes
-None.
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -556,7 +607,7 @@ None.
 * Using the Query Parser, it was not allowed to query on a property named 'desc'. ([#5723](https://github.com/realm/realm-core/issues/5723))
 
 ### Breaking changes
-* None.
+* None
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

@@ -20,7 +20,6 @@
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <realm/util/file.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/features.h>
 
 #if REALM_ENABLE_ENCRYPTION
@@ -177,9 +176,9 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 namespace realm::util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
-struct DecryptionFailed : util::File::AccessError {
+struct DecryptionFailed : FileAccessError {
     DecryptionFailed()
-        : util::File::AccessError("Decryption failed", std::string())
+        : FileAccessError(ErrorCodes::DecryptionFailed, "Decryption failed", std::string(), 0)
     {
     }
 };

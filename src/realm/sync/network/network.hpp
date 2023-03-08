@@ -2360,6 +2360,7 @@ public:
             Want want = Want::nothing;
             std::size_t n = s.m_stream->do_read_some_async(buffer, size, s.m_error_code, want);
             REALM_ASSERT(n > 0 || s.m_error_code || want != Want::nothing); // No busy loop, please
+            // Any errors reported by do_read_some_async() (other than end_of_input) should always return 0
             bool got_nothing = (n == 0);
             if (got_nothing) {
                 if (REALM_UNLIKELY(s.m_error_code)) {
@@ -2529,8 +2530,8 @@ public:
             }
             // Transfer buffered data to callers buffer
             bool complete = s.m_read_ahead_buffer.read(s.m_curr, s.m_end, s.m_delim, s.m_error_code);
-            if (complete) {
-                s.set_is_complete(true); // Success or failure (delim_not_found)
+            if (complete || s.m_error_code == util::MiscExtErrors::end_of_input) {
+                s.set_is_complete(true); // Success or failure (delim_not_found or end_of_input)
                 return Want::nothing;
             }
             if (want != Want::nothing)
@@ -3580,9 +3581,10 @@ inline bool ReadAheadBuffer::refill_async(S& stream, std::error_code& ec, Want& 
     std::size_t size = s_size;
     static_assert(noexcept(stream.do_read_some_async(buffer, size, ec, want)), "");
     std::size_t n = stream.do_read_some_async(buffer, size, ec, want);
+    // Any errors reported by do_read_some_async() (other than end_of_input) should always return 0
     if (n == 0)
         return false;
-    REALM_ASSERT(!ec);
+    REALM_ASSERT(!ec || ec == util::MiscExtErrors::end_of_input);
     REALM_ASSERT(n <= size);
     m_begin = m_buffer.get();
     m_end = m_begin + n;

@@ -129,7 +129,7 @@ void FUTURE_FAIL_TEST(const TestFunc& test) noexcept
 
     { // async future
         test(async([&]() -> CompletionType {
-            throw ExceptionForStatus(fail_status);
+            throw Exception(fail_status);
             REALM_UNREACHABLE();
         }));
     }
@@ -220,21 +220,21 @@ TEST(Future_Success_getAsync)
 TEST(Future_Fail_getLvalue)
 {
     FUTURE_FAIL_TEST<int>([&](Future<int>&& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_Fail_getConstLvalue)
 {
     FUTURE_FAIL_TEST<int>([&](const Future<int>& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_Fail_getRvalue)
 {
     FUTURE_FAIL_TEST<int>([&](const Future<int>& fut) {
-        CHECK_THROW_EX(std::move(fut).get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(std::move(fut).get(), Exception, (e.to_status() == fail_status));
     });
 }
 
@@ -383,7 +383,7 @@ TEST(Future_Success_thenError_Status)
                 return fail_status;
             });
             static_assert(std::is_same_v<decltype(fut2), Future<void>>);
-            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+            CHECK_THROW_EX(fut2.get(), Exception, (e.to_status() == fail_status));
         });
 }
 
@@ -399,7 +399,7 @@ TEST(Future_Success_thenError_StatusWith)
                 return StatusWith<double>(fail_status);
             });
             static_assert(std::is_same_v<decltype(fut2), Future<double>>);
-            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+            CHECK_THROW_EX(fut2.get(), Exception, (e.to_status() == fail_status));
         });
 }
 
@@ -465,7 +465,7 @@ TEST(Future_Success_thenFutureAsyncThrow)
         [&](Future<int>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .then([](int) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<int>();
                             })
                             .get_no_throw(),
@@ -478,7 +478,7 @@ TEST(Future_Fail_thenSimple)
     FUTURE_FAIL_TEST<int>([&](Future<int>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([](int) {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return int();
                         })
                         .get_no_throw(),
@@ -491,7 +491,7 @@ TEST(Future_Fail_thenFutureAsync)
     FUTURE_FAIL_TEST<int>([&](Future<int>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([](int i) {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return Future<int>(i + 1);
                         })
                         .get_no_throw(),
@@ -508,7 +508,7 @@ TEST(Future_Success_onErrorSimple)
         [&](Future<int>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_error([](Status) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return 0;
                             })
                             .then([](int i) {
@@ -528,7 +528,7 @@ TEST(Future_Success_onErrorFutureAsync)
         [&](Future<int>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_error([](Status) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<int>();
                             })
                             .then([](int i) {
@@ -558,7 +558,7 @@ TEST(Future_Fail_onErrorError_throw)
     FUTURE_FAIL_TEST<int>([&](Future<int>&& fut) {
         auto fut2 = std::move(fut).on_error([&](Status s) -> int {
             CHECK_EQUAL(s, fail_status);
-            throw ExceptionForStatus(fail_status_2);
+            throw Exception(fail_status_2);
         });
         CHECK_EQUAL(fut2.get_no_throw(), fail_status_2);
     });
@@ -684,21 +684,21 @@ TEST(Future_Void_Success_getAsync)
 TEST(Future_Void_Fail_getLvalue)
 {
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_Void_Fail_getConstLvalue)
 {
     FUTURE_FAIL_TEST<void>([&](const Future<void>& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_Void_Fail_getRvalue)
 {
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
@@ -875,7 +875,7 @@ TEST(Future_Void_Fail_thenSimple)
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([]() {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return int();
                         })
                         .get_no_throw(),
@@ -888,7 +888,7 @@ TEST(Future_Void_Fail_thenFutureAsync)
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([]() {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return Future<int>();
                         })
                         .get_no_throw(),
@@ -902,7 +902,7 @@ TEST(Future_Void_Success_onErrorSimple)
                         [&](Future<void>&& fut) {
                             CHECK_EQUAL(std::move(fut)
                                             .on_error([](Status) {
-                                                throw ExceptionForStatus(fail_status);
+                                                throw Exception(fail_status);
                                             })
                                             .then([] {
                                                 return 3;
@@ -918,7 +918,7 @@ TEST(Future_Void_Success_onErrorFutureAsync)
                         [&](Future<void>&& fut) {
                             CHECK_EQUAL(std::move(fut)
                                             .on_error([](Status) {
-                                                throw ExceptionForStatus(fail_status);
+                                                throw Exception(fail_status);
                                                 return Future<void>();
                                             })
                                             .then([] {
@@ -949,7 +949,7 @@ TEST(Future_Void_Fail_onErrorError_throw)
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
         auto fut2 = std::move(fut).on_error([&](Status s) {
             CHECK_EQUAL(s, fail_status);
-            throw ExceptionForStatus(fail_status_2);
+            throw Exception(fail_status_2);
         });
         CHECK_EQUAL(fut2.get_no_throw(), fail_status_2);
     });
@@ -1138,21 +1138,21 @@ TEST(Future_MoveOnly_Success_getAsync)
 TEST(Future_MoveOnly_Fail_getLvalue)
 {
     FUTURE_FAIL_TEST<Widget>([&](Future<Widget>&& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_MoveOnly_Fail_getConstLvalue)
 {
     FUTURE_FAIL_TEST<Widget>([&](const Future<Widget>& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
 TEST(Future_MoveOnly_Fail_getRvalue)
 {
     FUTURE_FAIL_TEST<Widget>([&](Future<Widget>&& fut) {
-        CHECK_THROW_EX(fut.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(fut.get(), Exception, (e.to_status() == fail_status));
     });
 }
 
@@ -1348,7 +1348,7 @@ TEST(Future_MoveOnly_Success_thenFutureAsyncThrow)
         [&](Future<Widget>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .then([](Widget) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<Widget>();
                             })
                             .get_no_throw(),
@@ -1361,7 +1361,7 @@ TEST(Future_MoveOnly_Fail_thenSimple)
     FUTURE_FAIL_TEST<Widget>([&](Future<Widget>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([&](Widget) {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return Widget(0);
                         })
                         .get_no_throw(),
@@ -1374,7 +1374,7 @@ TEST(Future_MoveOnly_Fail_thenFutureAsync)
     FUTURE_FAIL_TEST<Widget>([&](Future<Widget>&& fut) {
         CHECK_EQUAL(std::move(fut)
                         .then([](Widget) {
-                            throw ExceptionForStatus(fail_status);
+                            throw Exception(fail_status);
                             return Future<Widget>();
                         })
                         .get_no_throw(),
@@ -1391,7 +1391,7 @@ TEST(Future_MoveOnly_Success_onErrorSimple)
         [&](Future<Widget>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_error([](Status) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Widget(0);
                             })
                             .then([](Widget i) {
@@ -1411,7 +1411,7 @@ TEST(Future_MoveOnly_Success_onErrorFutureAsync)
         [&](Future<Widget>&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_error([](Status) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<Widget>();
                             })
                             .then([](Widget i) {
@@ -1440,7 +1440,7 @@ TEST(Future_MoveOnly_Fail_onErrorError_throw)
     FUTURE_FAIL_TEST<Widget>([&](Future<Widget>&& fut) {
         auto fut2 = std::move(fut).on_error([&](Status s) -> Widget {
             CHECK_EQUAL(s, fail_status);
-            throw ExceptionForStatus(fail_status_2);
+            throw Exception(fail_status_2);
         });
         CHECK_EQUAL(std::move(fut2).get_no_throw(), fail_status_2);
     });
@@ -1650,7 +1650,7 @@ TEST(Future_MoveOnly_Success_onCompletionFutureAsyncThrow)
         [this](auto&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_completion([](StatusWith<Widget>) {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<Widget>();
                             })
                             .get_no_throw(),
@@ -1689,7 +1689,7 @@ TEST(Future_MoveOnly_Fail_onCompletionError_throw)
     FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
         auto fut2 = std::move(fut).on_completion([this](StatusWith<Widget> s) -> Widget {
             CHECK_EQUAL(s.get_status(), fail_status);
-            throw ExceptionForStatus(fail_status_2);
+            throw Exception(fail_status_2);
         });
         CHECK_EQUAL(std::move(fut2).get_no_throw(), fail_status_2);
     });
@@ -1743,7 +1743,7 @@ TEST(Future_EdgeCases_looping_onError)
     UniqueFunction<Future<int>()> read = [&] {
         return async([&] {
                    if (--tries != 0) {
-                       throw ExceptionForStatus(fail_status);
+                       throw Exception(fail_status);
                    }
                    return tries;
                })
@@ -1763,7 +1763,7 @@ TEST(Future_EdgeCases_looping_onError_with_then)
     UniqueFunction<Future<int>()> read = [&] {
         return async([&] {
                    if (--tries != 0) {
-                       throw ExceptionForStatus(fail_status);
+                       throw Exception(fail_status);
                    }
                    return tries;
                })
@@ -1797,7 +1797,7 @@ TEST(Promise_Fail_setFrom)
     FUTURE_FAIL_TEST<int>([&](Future<int>&& fut) {
         auto pf = make_promise_future<int>();
         pf.promise.set_from(std::move(fut));
-        CHECK_THROW_EX(std::move(pf.future).get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(std::move(pf.future).get(), Exception, (e.to_status() == fail_status));
     });
 }
 
@@ -1816,7 +1816,7 @@ TEST(Promise_void_Fail_setFrom)
     FUTURE_FAIL_TEST<void>([&](Future<void>&& fut) {
         auto pf = make_promise_future<void>();
         pf.promise.set_from(std::move(fut));
-        CHECK_THROW_EX(std::move(pf.future).get(), ExceptionForStatus, (e.to_status() == fail_status));
+        CHECK_THROW_EX(std::move(pf.future).get(), Exception, (e.to_status() == fail_status));
     });
 }
 
@@ -1891,7 +1891,7 @@ TEST(Future_Success_onCompletionError_Status)
             static_assert(future_details::is_future<decltype(fut2)>);
             static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
 #endif
-            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+            CHECK_THROW_EX(fut2.get(), Exception, (e.to_status() == fail_status));
         });
 }
 
@@ -1907,7 +1907,7 @@ TEST(Future_Success_onCompletionError_StatusWith)
             });
             static_assert(future_details::is_future<decltype(fut2)>);
             static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
-            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+            CHECK_THROW_EX(fut2.get(), Exception, (e.to_status() == fail_status));
         });
 }
 
@@ -1972,7 +1972,7 @@ TEST(Future_Success_onCompletionFutureAsyncThrow)
         [this](auto&& fut) {
             CHECK_EQUAL(std::move(fut)
                             .on_completion([](StatusWith<int>) -> Future<int> {
-                                throw ExceptionForStatus(fail_status);
+                                throw Exception(fail_status);
                                 return Future<int>();
                             })
                             .get_no_throw(),
@@ -1999,7 +1999,7 @@ TEST(Future_Fail_onCompletionError_throw)
     FUTURE_FAIL_TEST<int>([this](auto&& fut) {
         auto fut2 = std::move(fut).on_completion([this](StatusWith<int> s) -> int {
             CHECK_EQUAL(s.get_status(), fail_status);
-            throw ExceptionForStatus(fail_status);
+            throw Exception(fail_status);
         });
         CHECK_EQUAL(fut2.get_no_throw(), fail_status);
     });
@@ -2168,7 +2168,7 @@ TEST(Future_Void_Fail_onCompletionError_throw)
     FUTURE_FAIL_TEST<void>([this](auto&& fut) {
         auto fut2 = std::move(fut).on_completion([this](Status s) {
             CHECK_EQUAL(s, fail_status);
-            throw ExceptionForStatus(fail_status_2);
+            throw Exception(fail_status_2);
         });
         CHECK_EQUAL(fut2.get_no_throw(), fail_status_2);
     });

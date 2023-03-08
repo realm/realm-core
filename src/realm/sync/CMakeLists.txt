@@ -7,10 +7,10 @@ set(SYNC_SOURCES
     noinst/client_reset_operation.cpp
     noinst/client_reset_recovery.cpp
     noinst/compact_changesets.cpp
+    noinst/migration_store.cpp
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
-    binding_callback_thread_observer.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -70,6 +70,7 @@ set(NOINST_HEADERS
     noinst/client_reset_recovery.hpp
     noinst/compact_changesets.hpp
     noinst/integer_codec.hpp
+    noinst/migration_store.hpp
     noinst/pending_bootstrap_store.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
