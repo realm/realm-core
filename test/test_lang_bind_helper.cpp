@@ -3136,7 +3136,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
+#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE) && !defined(__QNX__)
 // Interprocess communication does not work with encryption enabled on Apple.
 // This is because fork() does not play well with Apple primitives such as
 // dispatch_queue_t in ReclaimerThreadStopper. This could possibly be fixed if

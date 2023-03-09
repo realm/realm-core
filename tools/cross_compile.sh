@@ -10,7 +10,7 @@ function usage {
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug>"
-    echo "   target_os=<android|ios|watchos|tvos>"
+    echo "   target_os=<android|iphoneos|iphonesimulator|watchos|watchsimulator|appletvos|appletvsimulator|qnx>"
     echo "   android_abi=<armeabi-v7a|x86|x86_64|arm64-v8a>"
     exit 1;
 }
@@ -26,7 +26,8 @@ while getopts ":o:a:t:v:f:" opt; do
             [ "${OS}" == "watchos" ] ||
             [ "${OS}" == "watchsimulator" ] ||
             [ "${OS}" == "appletvos" ] ||
-            [ "${OS}" == "appletvsimulator" ] || usage
+            [ "${OS}" == "appletvsimulator" ] || 
+            [ "${OS}" == "qnx" ] || usage
             ;;
         a)
             ARCH=${OPTARG}
@@ -85,6 +86,47 @@ if [ "${OS}" == "android" ]; then
 
     ninja -v
     ninja package
+elif [ "${OS}" == "qnx" ]; then
+    ARCH="x86_64"
+    if [[ -z "${QNX_BASE}" ]]; then
+        echo "QNX_BASE is not defined"
+        exit 1
+    fi
+    HOST_OS=$(uname -s)
+    case "$HOST_OS" in
+        Linux)
+        QNX_HOST=$QNX_BASE/host/linux/x86_64
+            ;;
+        Darwin)
+        QNX_HOST=$QNX_BASE/host/darwin/x86_64
+            ;;
+        *)
+        QNX_HOST=$QNX_BASE/host/win64/x86_64
+            ;;
+    esac
+    export QNX_HOST    
+    export QNX_TARGET=$QNX_BASE/target/qnx7
+    export QNX_CONFIGURATION_EXCLUSIVE=$HOME/.qnx
+    export QNX_CONFIGURATION=$QNX_CONFIGURATION_EXCLUSIVE
+    export PATH=$QNX_HOST/usr/bin:$QNX_CONFIGURATION/bin:$QNX_BASE/jre/bin:$QNX_BASE/host/common/bin:$PATH
+    mkdir -p "build-qnx-${ARCH}-${BUILD_TYPE}"
+    cd "build-qnx-${ARCH}-${BUILD_TYPE}" || exit 1
+    cmake -D CMAKE_SYSTEM_NAME=QNX \
+          -D QNX_BASE="${QNX_BASE}" \
+          -D CMAKE_INSTALL_PREFIX=install \
+          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+          -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/qnx.toolchain.cmake" \
+          -D REALM_ENABLE_ENCRYPTION=1 \
+          -D REALM_TEST_SYNC_LOGGING=On \
+          -D REALM_VERSION="${VERSION}" \
+          -D CMAKE_MAKE_PROGRAM=ninja \
+          -D CMAKE_BUILD_WITH_INSTALL_RPATH=On \
+          -G Ninja \
+          ${CMAKE_FLAGS} \
+          ..
+
+    ninja -v
+#    ninja package
 else
     mkdir -p build-xcode-platforms
     cd build-xcode-platforms || exit 1

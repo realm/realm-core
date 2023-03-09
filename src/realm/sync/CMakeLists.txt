@@ -89,6 +89,10 @@ set_target_properties(Sync PROPERTIES
 
 target_link_libraries(Sync PUBLIC Storage)
 
+if(QNXNTO)
+    target_link_libraries(Sync PUBLIC socket)
+endif()
+
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
 else()

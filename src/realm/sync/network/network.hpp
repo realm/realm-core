@@ -613,7 +613,7 @@ public:
         passive = AI_PASSIVE,
 
         /// Ignore families without a configured non-loopback address
-        address_configured = AI_ADDRCONFIG
+        address_configured = 0
     };
 
     Query(std::string service_port, int init_flags = passive | address_configured);

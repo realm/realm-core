@@ -42,10 +42,12 @@ macro(enable_stdfilesystem _target)
         # check, so just disable libc++ availability checks (which will result
         # in crashes at runtime if running on too old of a macOS version).
         target_compile_definitions("${_target}" PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
             target_link_libraries("${_target}" stdc++fs)
         endif()
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "QCC")
+        target_link_libraries("${_target}" c++fs)
     endif()
 endmacro()
 

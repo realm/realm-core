@@ -137,14 +137,10 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     elseif(REALM_FETCH_MISSING_DEPENDENCIES)
         message(STATUS "LibUV not found, building from source with FetchContent")
         include(FetchContent)
-        set(libUV_Git_TAG "v1.35.0")
-        if(MSVC)
-            set(liUV_Git_TAG "v1.43.0")
-        endif()
         FetchContent_Declare(
             libuv
             GIT_REPOSITORY https://github.com/libuv/libuv.git
-            GIT_TAG ${libUV_Git_TAG}
+            GIT_TAG "v1.43.0"
         )
         # Don't use FetchContent_MakeAvailable since it wants to build libuv.so as well
         FetchContent_Populate(libuv)
