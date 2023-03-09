@@ -278,9 +278,12 @@ struct compressor_driver {
         const char* last;
     };
     std::vector<entry> work;
-    string_compressor& compressor;
-    compressor_driver(string_compressor& compressor, long size)
-        : compressor(compressor)
+    string_compressor* compressor;
+    void set_compressor(string_compressor* _compressor)
+    {
+        compressor = _compressor;
+    }
+    compressor_driver(long size)
     {
         work.reserve(size);
     }
@@ -291,7 +294,7 @@ struct compressor_driver {
     void perform()
     {
         for (auto& entry : work) {
-            *entry.res = compressor.handle(entry.first, entry.last);
+            *entry.res = compressor->handle(entry.first, entry.last);
         }
         work.clear();
     }
@@ -357,6 +360,15 @@ public:
     }
 };
 
+struct driver_workload {
+    std::vector<std::unique_ptr<compressor_driver>> drivers;
+    results* res;
+    driver_workload(int max)
+    {
+        drivers.resize(max);
+    }
+};
+
 int main(int argc, char* argv[])
 {
     const int limit = 1000000;
@@ -419,6 +431,8 @@ int main(int argc, char* argv[])
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
     concurrent_queue<results*> to_writer;
+    concurrent_queue<std::shared_ptr<driver_workload>> to_compressor;
+    concurrent_queue<std::shared_ptr<driver_workload>> free_drivers;
 
     std::thread writer([&]() {
         std::cout << "Initial scan / object creation" << std::endl;
@@ -470,7 +484,7 @@ int main(int argc, char* argv[])
                 res = to_writer.get();
             }
             catch (...) {
-                std::cout << "Done" << std::endl;
+                std::cout << "Writing Done" << std::endl;
                 break;
             }
 
@@ -491,7 +505,7 @@ int main(int argc, char* argv[])
                 }
             };
             auto write_range = [&](long first, long past) {
-                std::cout << "constructing [" << first << " - " << past << "[" << std::endl;
+                // std::cout << "constructing [" << first << " - " << past << "[" << std::endl;
                 auto val_ptr = res->values + (first - res->first_line) * res->num_fields;
                 for (auto line = first; line < past; ++line) {
                     write_object(line, val_ptr);
@@ -529,20 +543,66 @@ int main(int argc, char* argv[])
             std::cout << "   ...committed in " << ms.count() << " msecs" << std::endl << std::endl;
         }
     });
+
+    std::vector<std::unique_ptr<string_compressor>> compressors;
+    compressors.resize(105);
+    for (int j = 0; j < 105; j++) {
+        if (compressible[j] == 's') {
+            compressors[j] = std::make_unique<string_compressor>();
+        }
+    }
+
+    std::thread compressor([&]() {
+        std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
+        start = std::chrono::high_resolution_clock::now();
+        while (1) {
+            std::shared_ptr<driver_workload> drivers;
+            try {
+                drivers = to_compressor.get();
+            }
+            catch (...) {
+                to_writer.close();
+                break;
+            }
+            std::vector<std::unique_ptr<std::thread>> threads;
+            for (int j = 0; j < 105; j++) {
+                if (compressible[j] == 's') {
+                    auto& driver = drivers->drivers[j];
+                    driver->set_compressor(compressors[j].get());
+                    threads.push_back(std::make_unique<std::thread>([&]() { driver->perform(); }));
+                }
+            }
+            for (auto& p : threads) {
+                p->join();
+            }
+            to_writer.put(drivers->res);
+            free_drivers.put(drivers);
+            end = std::chrono::high_resolution_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
+            start = end;
+        }
+    });
     // now populate dataset
     {
         std::cout << std::endl << "Ingesting data.... " << std::endl;
         std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
         long num_line = 0;
-        std::vector<std::unique_ptr<string_compressor>> compressors;
-        compressors.resize(105);
-        std::vector<std::unique_ptr<compressor_driver>> drivers;
-        drivers.resize(105);
+        for (int k = 0; k < 2; k++) {
+            auto drivers = std::make_shared<driver_workload>(105);
+            for (int j = 0; j < 105; j++) {
+                if (compressible[j] == 's') {
+                    drivers->drivers[j] = std::make_unique<compressor_driver>(5000000);
+                }
+            }
+            free_drivers.put(drivers);
+        }
         const char* read_ptr = (const char*)file_start;
         while (read_ptr < file_start + size) {
             long limit = num_line + step_size;
             long first_line = num_line;
             results* res = to_reader.get();
+            auto drivers = free_drivers.get();
             start = std::chrono::high_resolution_clock::now();
             while (num_line < limit && read_ptr < file_start + size) {
                 long num_value = 0;
@@ -556,15 +616,7 @@ int main(int argc, char* argv[])
                     while (*read_ptr2 != '\t' && *read_ptr2 != 0 && *read_ptr2 != '\n')
                         ++read_ptr2;
                     if (compressible[num_value] == 's') {
-                        if (!compressors[num_value]) {
-                            compressors[num_value] = std::make_unique<string_compressor>();
-                            drivers[num_value] =
-                                std::make_unique<compressor_driver>(*compressors[num_value], 1000000);
-                        }
-                        auto& compressor = *compressors[num_value];
-                        // long compressed = compressor.handle(read_ptr, read_ptr2);
-                        // line_results[num_value] = compressed;
-                        drivers[num_value]->add_to_work(line_results + num_value, read_ptr, read_ptr2);
+                        drivers->drivers[num_value]->add_to_work(line_results + num_value, read_ptr, read_ptr2);
                     }
                     else if (read_ptr == read_ptr2)
                         line_results[num_value] = 0;
@@ -576,30 +628,21 @@ int main(int argc, char* argv[])
                 }
             }
             res->finalize(first_line, num_line);
+            drivers->res = res;
+            to_compressor.put(drivers);
             end = std::chrono::high_resolution_clock::now();
             std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << std::endl << "   ...read in " << ms.count() << " millisecs" << std::endl;
             start = end;
-            {
-                std::vector<std::unique_ptr<std::thread>> threads;
-                for (auto& p : drivers) {
-                    if (p) {
-                        // p->perform();
-                        threads.push_back(std::make_unique<std::thread>([&]() { p->perform(); }));
-                    }
-                }
-                for (auto& p : threads) {
-                    p->join();
-                }
-            }
-            to_writer.put(res);
-            end = std::chrono::high_resolution_clock::now();
-            ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
         }
         std::cout << "shutting down..." << std::endl;
-        to_writer.close();
-
+        to_compressor.close();
+        compressor.join();
+        // destroy drivers...
+        {
+            auto p = free_drivers.get();
+            p = free_drivers.get();
+        }
         uint64_t from_size = 0;
         uint64_t to_size = 0;
         for (int i = 0; i < max_fields; ++i) {
