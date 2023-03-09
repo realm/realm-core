@@ -113,7 +113,7 @@ public:
     {
         REALM_ASSERT(extent == std::distance(begin, end));
     }
-#if !defined(_MSC_VER) || _MSC_VER >= 1929 // Visual Studio 16.9 incorrectly rejects this. 16.10+ supports it
+#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
     constexpr Span(element_type (&arr)[extent]) noexcept
         : m_data{arr}
     {
@@ -149,7 +149,7 @@ public:
     {
     }
 
-#if !defined(_MSC_VER) || _MSC_VER >= 1929 // Visual Studio 16.9 incorrectly rejects this. 16.10+ supports it
+#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
     template <class U, std::enable_if_t<std::is_convertible_v<U (*)[], element_type (*)[]>, int> = 0>
     constexpr explicit Span(const Span<U, dynamic_extent>& other) noexcept
         : m_data{other.data()}
